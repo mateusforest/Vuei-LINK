@@ -1,16 +1,21 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import Image from "next/image"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { motion } from "framer-motion"
 import { Eye, EyeOff, Loader2, Mail, Lock, Building2, User, Phone, Users, ArrowRight, Calendar } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { useAuth } from "@/contexts/auth-context"
+import { getRedirectByRole } from "@/lib/auth/role-redirect"
 
 export default function AgencySignupPage() {
+  const router = useRouter()
+  const { signUp, user, profile, loading } = useAuth()
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
@@ -26,6 +31,12 @@ export default function AgencySignupPage() {
     confirmPassword: ""
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
+
+  useEffect(() => {
+    if (!loading && user) {
+      router.replace(getRedirectByRole(profile?.role))
+    }
+  }, [loading, profile?.role, router, user])
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {}
@@ -45,10 +56,47 @@ export default function AgencySignupPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!validateForm()) return
+    console.log("[CADASTRO] botão clicado")
+
+    if (!validateForm()) {
+      console.error("[CADASTRO] signUp error", "Validacao do formulario falhou.")
+      return
+    }
+
+    console.log("[CADASTRO] validações ok")
     setIsLoading(true)
-    await new Promise(resolve => setTimeout(resolve, 2000))
-    setIsLoading(false)
+    setErrors({})
+
+    try {
+      console.log("[CADASTRO] iniciando signUp")
+      const result = await signUp({
+        email: formData.email,
+        password: formData.password,
+        name: formData.responsibleName,
+        phone: formData.whatsapp,
+        role: "agency_owner",
+        metadata: {
+          agency_name: formData.agencyName,
+          agent_count: formData.agentCount,
+          accepted_news: acceptNews,
+        },
+      })
+
+      if (result.error) {
+        console.error("[CADASTRO] signUp error", result.error)
+        setErrors((prev) => ({ ...prev, auth: result.error }))
+        return
+      }
+
+      console.log("[CADASTRO] signUp success")
+      router.replace("/agencia")
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Erro inesperado ao criar conta."
+      console.error("[CADASTRO] signUp error", message)
+      setErrors((prev) => ({ ...prev, auth: message }))
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   return (
@@ -366,7 +414,7 @@ export default function AgencySignupPage() {
                 {/* Botão */}
                 <Button
                   type="submit"
-                  disabled={isLoading}
+                  disabled={isLoading || loading}
                   className="w-full h-12 bg-gradient-to-r from-[#5de0e6] to-[#004aad] hover:opacity-90 text-white font-medium rounded-xl transition-all duration-300 shadow-lg shadow-[#5de0e6]/20 mt-4"
                 >
                   {isLoading ? (
@@ -378,6 +426,11 @@ export default function AgencySignupPage() {
                     </>
                   )}
                 </Button>
+                {errors.auth && (
+                  <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center text-xs text-red-400">
+                    {errors.auth}
+                  </motion.p>
+                )}
               </form>
 
               {/* Divisor */}

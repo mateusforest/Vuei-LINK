@@ -3,6 +3,7 @@ import type { Database } from "@/lib/supabase/types"
 import { getCurrentProfile } from "@/lib/auth/get-current-profile"
 
 const DEFAULT_TRAVELER_CREDITS = 150
+const ALLOWED_PROFILE_ROLES = new Set(["traveler", "agency_owner", "agency_member", "master"])
 
 export async function ensureProfile(user: User, client?: SupabaseClient<Database>) {
   const resolvedClient = client ?? null
@@ -20,7 +21,10 @@ export async function ensureProfile(user: User, client?: SupabaseClient<Database
       (user.email ? user.email.split("@")[0] : "Viajante"),
     phone: typeof user.user_metadata?.phone === "string" ? user.user_metadata.phone : null,
     avatar_url: typeof user.user_metadata?.avatar_url === "string" ? user.user_metadata.avatar_url : null,
-    role: "traveler",
+    role:
+      typeof user.user_metadata?.role === "string" && ALLOWED_PROFILE_ROLES.has(user.user_metadata.role)
+        ? user.user_metadata.role
+        : "traveler",
     credits_balance: DEFAULT_TRAVELER_CREDITS,
     settings: {
       language: "pt-BR",

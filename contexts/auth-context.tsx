@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react"
 import type { User } from "@supabase/supabase-js"
-import type { Profile } from "@/types"
+import type { Profile, UserRole } from "@/types"
 import { createSupabaseBrowserClient } from "@/lib/supabase/client"
 import { shouldUseSupabase } from "@/lib/data-source"
 import { ensureProfile } from "@/lib/auth/ensure-profile"
@@ -17,6 +17,8 @@ interface SignUpPayload {
   password: string
   name?: string
   phone?: string
+  role?: UserRole
+  metadata?: Record<string, unknown>
 }
 
 interface AuthContextType {
@@ -133,7 +135,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  const signUp = async ({ email, password, name, phone }: SignUpPayload) => {
+  const signUp = async ({ email, password, name, phone, role, metadata }: SignUpPayload) => {
     const supabaseEnvOk = shouldUseSupabase() && Boolean(supabase)
     console.log("Supabase env ok", supabaseEnvOk)
 
@@ -153,6 +155,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           data: {
             name,
             phone,
+            role,
+            ...metadata,
           },
         },
       })
