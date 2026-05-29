@@ -1,0 +1,165 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  --background: #000000;
+  --foreground: #ffffff;
+  --card: #0a0a0a;
+  --card-foreground: #ffffff;
+  --popover: #0a0a0a;
+  --popover-foreground: #ffffff;
+  --primary: #5de0e6;
+  --primary-foreground: #000000;
+  --secondary: #004aad;
+  --secondary-foreground: #ffffff;
+  --muted: #111111;
+  --muted-foreground: #888888;
+  --accent: #004aad;
+  --accent-foreground: #ffffff;
+  --destructive: oklch(0.577 0.245 27.325);
+  --destructive-foreground: oklch(0.577 0.245 27.325);
+  --border: #1a1a1a;
+  --input: #1a1a1a;
+  --ring: #5de0e6;
+  --radius: 0.75rem;
+  
+  /* Vuei Brand Colors */
+  --vuei-cyan: #5de0e6;
+  --vuei-blue: #004aad;
+  --vuei-glow: rgba(93, 224, 230, 0.15);
+  --vuei-glow-blue: rgba(0, 74, 173, 0.15);
+}
+
+@theme inline {
+  --font-sans: 'Geist', 'Geist Fallback', system-ui, sans-serif;
+  --font-mono: 'Geist Mono', 'Geist Mono Fallback', monospace;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* Smooth Scroll */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #0a0a0a;
+}
+
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #5de0e6, #004aad);
+  border-radius: 3px;
+}
+
+/* Vuei Gradient Text */
+.vuei-gradient-text {
+  background: linear-gradient(135deg, #5de0e6 0%, #004aad 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Vuei Glow Effect */
+.vuei-glow {
+  box-shadow: 0 0 40px rgba(93, 224, 230, 0.15), 0 0 80px rgba(0, 74, 173, 0.1);
+}
+
+/* Vuei Button Glow */
+.vuei-button-glow {
+  box-shadow: 0 0 20px rgba(93, 224, 230, 0.3), 0 0 40px rgba(0, 74, 173, 0.2);
+}
+
+/* Subtle Grid Background */
+.vuei-grid {
+  background-image: 
+    linear-gradient(rgba(93, 224, 230, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(93, 224, 230, 0.03) 1px, transparent 1px);
+  background-size: 80px 80px;
+}
+
+/* Glass Effect */
+.vuei-glass {
+  background: rgba(10, 10, 10, 0.8);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(93, 224, 230, 0.1);
+}
+
+/* Pulsing Line Animation */
+@keyframes pulse-line {
+  0%, 100% {
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 0.8;
+  }
+}
+
+.animate-pulse-line {
+  animation: pulse-line 3s ease-in-out infinite;
+}
+
+/* Float Animation */
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+.animate-float {
+  animation: float 6s ease-in-out infinite;
+}
+
+/* Glow Pulse */
+@keyframes glow-pulse {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(93, 224, 230, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 40px rgba(93, 224, 230, 0.4), 0 0 60px rgba(0, 74, 173, 0.2);
+  }
+}
+
+.animate-glow-pulse {
+  animation: glow-pulse 4s ease-in-out infinite;
+}

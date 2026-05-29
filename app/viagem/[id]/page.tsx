@@ -1,0 +1,3041 @@
+"use client"
+
+import { useState, useEffect, useRef, createContext, useContext } from "react"
+import Image from "next/image"
+import { useParams } from "next/navigation"
+import { motion, AnimatePresence, useScroll, useTransform } from "framer-motion"
+import { extractAgencyStorageState } from "@/lib/mappers/agency-mappers"
+import { extractTripsStoragePayload } from "@/lib/mappers/trip-mappers"
+import { getTripBySlug } from "@/lib/repositories/trips-repository"
+import {
+  Plane, Hotel, MapPin, FileText, MessageCircle, Share2, WifiOff, 
+  ChevronRight, Calendar, Clock, Users, Sun, Cloud, Thermometer,
+  Shield, Lock, Fingerprint, Download, Copy, Check, Send, Sparkles,
+  Globe, Phone, AlertCircle, CreditCard, QrCode, Navigation,
+  ChevronDown, Play, Pause, Volume2, Star, Heart, ExternalLink,
+  X, Edit3, Plus, Trash2, Upload, Eye, EyeOff, Settings, User,
+  ArrowLeft, MoreVertical, CheckCircle2, XCircle, Camera, Pencil
+} from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { cn } from "@/lib/utils"
+
+const TRIPS_STORAGE_KEY = "vuei_trips"
+const AGENCY_STORAGE_KEY = "vuei_agency"
+
+// Permission context
+const PermissionContext = createContext<{
+  isAdmin: boolean
+  setIsAdmin: (v: boolean) => void
+}>({ isAdmin: true, setIsAdmin: () => {} })
+
+// Toast context
+const ToastContext = createContext<{
+  showToast: (message: string, type?: "success" | "error" | "info") => void
+}>({ showToast: () => {} })
+
+function useToast() {
+  return useContext(ToastContext)
+}
+
+// Toast component
+function Toast({ message, type = "success", onClose }: { message: string; type?: string; onClose: () => void }) {
+  useEffect(() => {
+    const timer = setTimeout(onClose, 3000)
+    return () => clearTimeout(timer)
+  }, [onClose])
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 50, scale: 0.95 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: 20, scale: 0.95 }}
+      className={cn(
+        "fixed bottom-6 left-1/2 -translate-x-1/2 z-[100] px-5 py-3 rounded-2xl backdrop-blur-xl border flex items-center gap-3 shadow-2xl",
+        type === "success" && "bg-emerald-500/20 border-emerald-500/30 text-emerald-300",
+        type === "error" && "bg-red-500/20 border-red-500/30 text-red-300",
+        type === "info" && "bg-[#5de0e6]/20 border-[#5de0e6]/30 text-[#5de0e6]"
+      )}
+    >
+      {type === "success" && <CheckCircle2 className="w-5 h-5" />}
+      {type === "error" && <XCircle className="w-5 h-5" />}
+      {type === "info" && <AlertCircle className="w-5 h-5" />}
+      <span className="text-sm font-medium">{message}</span>
+    </motion.div>
+  )
+}
+
+// Modal wrapper
+function Modal({ open, onClose, children, title }: { open: boolean; onClose: () => void; children: React.ReactNode; title?: string }) {
+  useEffect(() => {
+    if (open) {
+      document.body.style.overflow = "hidden"
+    } else {
+      document.body.style.overflow = ""
+    }
+    return () => { document.body.style.overflow = "" }
+  }, [open])
+
+  return (
+    <AnimatePresence>
+      {open && (
+        <>
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={onClose}
+            className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm"
+          />
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 20 }}
+            className="fixed inset-4 sm:inset-auto sm:left-1/2 sm:top-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 z-50 sm:max-w-lg sm:w-full max-h-[90vh] overflow-auto rounded-3xl bg-[#0a0a0a] border border-white/10 shadow-2xl"
+          >
+            {title && (
+              <div className="sticky top-0 z-10 flex items-center justify-between p-5 border-b border-white/[0.06] bg-[#0a0a0a]/95 backdrop-blur-xl">
+                <h3 className="text-lg font-semibold text-white">{title}</h3>
+                <button onClick={onClose} className="p-2 rounded-xl hover:bg-white/10 transition-colors">
+                  <X className="w-5 h-5 text-white/60" />
+                </button>
+              </div>
+            )}
+            <div className="p-5">{children}</div>
+          </motion.div>
+        </>
+      )}
+    </AnimatePresence>
+  )
+}
+
+// Bottom Sheet (mobile drawer)
+function BottomSheet({ open, onClose, children, title }: { open: boolean; onClose: () => void; children: React.ReactNode; title?: string }) {
+  useEffect(() => {
+    if (open) {
+      document.body.style.overflow = "hidden"
+    } else {
+      document.body.style.overflow = ""
+    }
+    return () => { document.body.style.overflow = "" }
+  }, [open])
+
+  return (
+    <AnimatePresence>
+      {open && (
+        <>
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={onClose}
+            className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm"
+          />
+          <motion.div
+            initial={{ y: "100%" }}
+            animate={{ y: 0 }}
+            exit={{ y: "100%" }}
+            transition={{ type: "spring", damping: 30, stiffness: 300 }}
+            className="fixed bottom-0 left-0 right-0 z-50 max-h-[85vh] overflow-auto rounded-t-3xl bg-[#0a0a0a] border-t border-white/10"
+          >
+            <div className="sticky top-0 z-10 bg-[#0a0a0a] pt-3 pb-4 px-5">
+              <div className="w-12 h-1 rounded-full bg-white/20 mx-auto mb-4" />
+              {title && (
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold text-white">{title}</h3>
+                  <button onClick={onClose} className="p-2 rounded-xl hover:bg-white/10 transition-colors">
+                    <X className="w-5 h-5 text-white/60" />
+                  </button>
+                </div>
+              )}
+            </div>
+            <div className="px-5 pb-8">{children}</div>
+          </motion.div>
+        </>
+      )}
+    </AnimatePresence>
+  )
+}
+
+// Mock data for the trip
+const initialTripData = {
+  id: "paris-2024",
+  destination: "Paris",
+  country: "Franca",
+  countryFlag: "🇫🇷",
+  dates: { start: "15 Jun 2024", end: "25 Jun 2024" },
+  daysUntil: 12,
+  status: "upcoming",
+  travelers: [
+    { name: "Joao Silva", avatar: "/placeholder.svg?height=40&width=40", role: "principal" },
+    { name: "Maria Silva", avatar: "/placeholder.svg?height=40&width=40", role: "acompanhante" },
+  ],
+  weather: { temp: 22, condition: "Parcialmente nublado", icon: Cloud },
+  heroImage: "https://images.unsplash.com/photo-1502602898657-3e91760cbb34?w=1920&q=80",
+  flights: [
+    {
+      id: 1,
+      type: "ida",
+      airline: "Air France",
+      flightNumber: "AF 458",
+      origin: { code: "GRU", city: "Sao Paulo", time: "22:30" },
+      destination: { code: "CDG", city: "Paris", time: "14:45+1" },
+      date: "15 Jun 2024",
+      terminal: "2E",
+      gate: "K45",
+      seat: "12A",
+      status: "confirmed",
+      duration: "11h 15min"
+    },
+    {
+      id: 2,
+      type: "volta",
+      airline: "Air France",
+      flightNumber: "AF 457",
+      origin: { code: "CDG", city: "Paris", time: "18:20" },
+      destination: { code: "GRU", city: "Sao Paulo", time: "01:35+1" },
+      date: "25 Jun 2024",
+      terminal: "2E",
+      gate: "L22",
+      seat: "14A",
+      status: "confirmed",
+      duration: "11h 15min"
+    }
+  ],
+  hotel: {
+    name: "Le Marais Boutique Hotel",
+    stars: 4,
+    address: "15 Rue de Rivoli, 75004 Paris",
+    checkIn: "15 Jun 2024 - 15:00",
+    checkOut: "25 Jun 2024 - 11:00",
+    nights: 10,
+    room: "Deluxe com vista",
+    phone: "+33 1 42 78 55 44",
+    confirmationCode: "HT789456",
+    image: "https://images.unsplash.com/photo-1566073771259-6a8506099945?w=800&q=80",
+    amenities: ["Wi-Fi", "Cafe da manha", "Ar condicionado", "Cofre"]
+  },
+  itinerary: [
+    {
+      day: 1,
+      date: "15 Jun",
+      title: "Chegada em Paris",
+      items: [
+        { id: 1, time: "14:45", title: "Chegada no Aeroporto CDG", type: "flight", icon: "Plane" },
+        { id: 2, time: "16:30", title: "Transfer para o hotel", type: "transport", icon: "Navigation" },
+        { id: 3, time: "18:00", title: "Check-in Le Marais Hotel", type: "hotel", icon: "Hotel" },
+        { id: 4, time: "20:00", title: "Jantar no Cafe de Flore", type: "food", icon: "Star" }
+      ]
+    },
+    {
+      day: 2,
+      date: "16 Jun",
+      title: "Torre Eiffel e Arredores",
+      items: [
+        { id: 5, time: "09:00", title: "Cafe da manha no hotel", type: "food", icon: "Star" },
+        { id: 6, time: "10:30", title: "Visita a Torre Eiffel", type: "attraction", icon: "MapPin", highlight: true },
+        { id: 7, time: "13:00", title: "Almoco no Trocadero", type: "food", icon: "Star" },
+        { id: 8, time: "15:00", title: "Cruzeiro pelo Rio Sena", type: "experience", icon: "Heart" },
+        { id: 9, time: "19:00", title: "Jantar em Montmartre", type: "food", icon: "Star" }
+      ]
+    },
+    {
+      day: 3,
+      date: "17 Jun",
+      title: "Louvre e Centro Historico",
+      items: [
+        { id: 10, time: "09:30", title: "Museu do Louvre", type: "attraction", icon: "MapPin", highlight: true },
+        { id: 11, time: "13:00", title: "Almoco no Palais Royal", type: "food", icon: "Star" },
+        { id: 12, time: "15:00", title: "Jardins das Tulherias", type: "attraction", icon: "MapPin" },
+        { id: 13, time: "17:00", title: "Champs-Elysees e Arco do Triunfo", type: "attraction", icon: "MapPin" }
+      ]
+    }
+  ],
+  documents: [
+    { id: 1, name: "Passaporte - Joao", type: "passport", private: true, protected: true },
+    { id: 2, name: "Passaporte - Maria", type: "passport", private: true, protected: true },
+    { id: 3, name: "Visto Schengen", type: "visa", private: true, protected: true },
+    { id: 4, name: "Seguro Viagem", type: "insurance", private: false, protected: false },
+    { id: 5, name: "Voucher Hotel", type: "voucher", private: false, protected: false },
+    { id: 6, name: "Reserva Louvre", type: "ticket", private: false, protected: false },
+    { id: 7, name: "Reserva Torre Eiffel", type: "ticket", private: false, protected: false },
+  ],
+  quickInfo: {
+    currency: { name: "Euro", symbol: "€", rate: "R$ 5,40" },
+    language: "Frances",
+    timezone: "GMT+2 (4h a frente)",
+    emergency: "112",
+    embassy: "+33 1 45 61 63 00"
+  },
+  credits: { balance: 47, used: 3, total: 50 },
+  adminLink: "vuei.app/viagem/paris-2024?admin=true",
+  shareLink: "vuei.app/viagem/paris-2024"
+}
+
+function parseTripDestination(destination?: string) {
+  const parts = (destination ?? "").split(",").map((part) => part.trim()).filter(Boolean)
+  return {
+    city: parts[0] || destination || "Minha Viagem",
+    country: parts[1] || "",
+  }
+}
+
+function getCountryFlag(country?: string) {
+  const normalized = (country ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+
+  const countryFlags: Record<string, string> = {
+    franca: "🇫🇷",
+    france: "🇫🇷",
+    italia: "🇮🇹",
+    italy: "🇮🇹",
+    portugal: "🇵🇹",
+    japao: "🇯🇵",
+    japan: "🇯🇵",
+    eua: "🇺🇸",
+    usa: "🇺🇸",
+    "estados unidos": "🇺🇸",
+    brasil: "🇧🇷",
+    brazil: "🇧🇷",
+    espanha: "🇪🇸",
+    spain: "🇪🇸",
+    mexico: "🇲🇽",
+    emirados: "🇦🇪",
+  }
+
+  return countryFlags[normalized] || "🌍"
+}
+
+function formatTripDate(dateString?: string) {
+  if (!dateString) return ""
+
+  return new Date(`${dateString}T12:00:00`).toLocaleDateString("pt-BR", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  })
+}
+
+function calculateDaysUntil(dateString?: string) {
+  if (!dateString) return 0
+
+  const targetDate = new Date(`${dateString}T12:00:00`)
+  const today = new Date()
+  const diff = targetDate.getTime() - today.getTime()
+
+  return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)))
+}
+
+function buildTravelers(count?: number) {
+  const total = Math.max(count ?? 1, 1)
+
+  return Array.from({ length: total }, (_, index) => ({
+    name: index === 0 ? "Viajante Principal" : `Acompanhante ${index}`,
+    avatar: "/placeholder.svg?height=40&width=40",
+    role: index === 0 ? "principal" : "acompanhante",
+  }))
+}
+
+function buildTripDataFromStoredTrip(storedTrip: any) {
+  const { city, country } = parseTripDestination(storedTrip.destination)
+  const start = formatTripDate(storedTrip.startDate)
+  const end = formatTripDate(storedTrip.endDate)
+  const travelers = buildTravelers(storedTrip.passengersCount)
+
+  return {
+    ...initialTripData,
+    id: storedTrip.slug || storedTrip.id || initialTripData.id,
+    destination: city,
+    country: storedTrip.country || country || initialTripData.country,
+    countryFlag: getCountryFlag(storedTrip.country || country),
+    dates: {
+      start: start || initialTripData.dates.start,
+      end: end || initialTripData.dates.end,
+    },
+    daysUntil: calculateDaysUntil(storedTrip.startDate),
+    status: storedTrip.status || initialTripData.status,
+    travelers,
+    heroImage: storedTrip.coverImage || initialTripData.heroImage,
+    hotel: {
+      ...initialTripData.hotel,
+      name: city ? `Hospedagem em ${city}` : initialTripData.hotel.name,
+      address: storedTrip.destination || initialTripData.hotel.address,
+      checkIn: start ? `${start} - 15:00` : initialTripData.hotel.checkIn,
+      checkOut: end ? `${end} - 11:00` : initialTripData.hotel.checkOut,
+    },
+    itinerary: initialTripData.itinerary.map((day, index) => ({
+      ...day,
+      title:
+        index === 0
+          ? `Chegada em ${city}`
+          : index === 1
+            ? `Experiencias em ${city}`
+            : `Descobertas em ${city}`,
+    })),
+    documents: initialTripData.documents.map((document, index) => ({
+      ...document,
+      name:
+        index === 0
+          ? `Voucher - ${storedTrip.name || city}`
+          : document.name,
+    })),
+    adminLink: storedTrip.adminLink || initialTripData.adminLink,
+    shareLink: storedTrip.shareLink || initialTripData.shareLink,
+  }
+}
+
+const iconMap: Record<string, any> = {
+  Plane, Hotel, MapPin, Navigation, Star, Heart
+}
+
+// Floating particles - using fixed positions to avoid hydration mismatch
+function FloatingParticles() {
+  const particles = [
+    { x: 5, y: 10, scale: 0.7 }, { x: 15, y: 25, scale: 0.9 }, { x: 25, y: 5, scale: 0.6 },
+    { x: 35, y: 45, scale: 0.8 }, { x: 45, y: 15, scale: 0.5 }, { x: 55, y: 55, scale: 0.9 },
+    { x: 65, y: 30, scale: 0.7 }, { x: 75, y: 60, scale: 0.6 }, { x: 85, y: 20, scale: 0.8 },
+    { x: 95, y: 70, scale: 0.5 }, { x: 10, y: 80, scale: 0.7 }, { x: 20, y: 65, scale: 0.9 },
+    { x: 30, y: 90, scale: 0.6 }, { x: 40, y: 75, scale: 0.8 }, { x: 50, y: 85, scale: 0.5 },
+    { x: 60, y: 95, scale: 0.9 }, { x: 70, y: 50, scale: 0.7 }, { x: 80, y: 40, scale: 0.6 },
+    { x: 90, y: 35, scale: 0.8 }, { x: 8, y: 55, scale: 0.5 }
+  ]
+  return (
+    <div className="fixed inset-0 pointer-events-none overflow-hidden">
+      {particles.map((p, i) => (
+        <motion.div
+          key={i}
+          className="absolute w-1 h-1 rounded-full bg-gradient-to-r from-[#5de0e6]/20 to-[#004aad]/20"
+          style={{ left: `${p.x}%`, top: `${p.y}%`, scale: p.scale }}
+          animate={{
+            y: [0, -30, 0],
+            opacity: [0.3, 0.6, 0.3]
+          }}
+          transition={{
+            duration: 4 + i * 0.3,
+            repeat: Infinity,
+            ease: "easeInOut"
+          }}
+        />
+      ))}
+    </div>
+  )
+}
+
+// Status badge
+function StatusBadge({ status, daysUntil }: { status: string; daysUntil: number }) {
+  const configs = {
+    upcoming: { label: `Faltam ${daysUntil} dias`, icon: Plane, className: "bg-[#5de0e6]/10 text-[#5de0e6] border-[#5de0e6]/30" },
+    ongoing: { label: "Viagem em andamento", icon: Play, className: "bg-emerald-500/10 text-emerald-400 border-emerald-500/30" },
+    completed: { label: "Viagem finalizada", icon: Check, className: "bg-[#004aad]/10 text-[#004aad] border-[#004aad]/30" }
+  }
+  const config = configs[status as keyof typeof configs]
+  const Icon = config.icon
+
+  return (
+    <motion.div 
+      initial={{ opacity: 0, scale: 0.9 }}
+      animate={{ opacity: 1, scale: 1 }}
+      className={cn("inline-flex items-center gap-2 px-4 py-2 rounded-full border backdrop-blur-sm", config.className)}
+    >
+      <Icon className="w-4 h-4" />
+      <span className="text-sm font-medium">{config.label}</span>
+    </motion.div>
+  )
+}
+
+// Header
+function TripHeader({ tripData, onOpenShare, onOpenMenu }: { tripData: any; onOpenShare: () => void; onOpenMenu: () => void }) {
+  const [scrolled, setScrolled] = useState(false)
+  const { isAdmin } = useContext(PermissionContext)
+
+  useEffect(() => {
+    const handleScroll = () => setScrolled(window.scrollY > 50)
+    window.addEventListener("scroll", handleScroll)
+    return () => window.removeEventListener("scroll", handleScroll)
+  }, [])
+
+  return (
+    <motion.header 
+      className={cn(
+        "fixed top-0 left-0 right-0 z-50 transition-all duration-500",
+        scrolled ? "bg-black/80 backdrop-blur-xl border-b border-white/5" : "bg-transparent"
+      )}
+    >
+      <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <Image src="/vuei-logo.png" alt="Vuei" width={80} height={32} className="h-7 w-auto" />
+          <div className={cn("hidden sm:flex items-center gap-2 transition-opacity duration-300", scrolled ? "opacity-100" : "opacity-0")}>
+            <span className="text-white/40">|</span>
+            <span className="text-white/80 font-medium">{tripData.destination}</span>
+            <span className="text-lg">{tripData.countryFlag}</span>
+          </div>
+          {!isAdmin && (
+            <span className="px-2 py-1 text-[10px] rounded-full bg-white/10 text-white/60 border border-white/10">
+              Visualizacao
+            </span>
+          )}
+        </div>
+
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="sm" onClick={onOpenShare} className="text-white/70 hover:text-white hover:bg-white/10">
+            <Share2 className="w-4 h-4" />
+            <span className="hidden sm:inline ml-2">Compartilhar</span>
+          </Button>
+          
+          <button onClick={onOpenMenu} className="flex -space-x-2">
+            {tripData.travelers.slice(0, 2).map((t: any, i: number) => (
+              <div 
+                key={i}
+                className="w-8 h-8 rounded-full bg-gradient-to-br from-[#5de0e6] to-[#004aad] border-2 border-black flex items-center justify-center text-xs font-bold text-white"
+              >
+                {t.name.charAt(0)}
+              </div>
+            ))}
+          </button>
+        </div>
+      </div>
+    </motion.header>
+  )
+}
+
+// Hero
+function TripHero({ tripData, onEditTrip }: { tripData: any; onEditTrip: () => void }) {
+  const ref = useRef<HTMLDivElement>(null)
+  const { scrollYProgress } = useScroll({ target: ref, offset: ["start start", "end start"] })
+  const y = useTransform(scrollYProgress, [0, 1], ["0%", "30%"])
+  const opacity = useTransform(scrollYProgress, [0, 0.5], [1, 0])
+  const { isAdmin } = useContext(PermissionContext)
+
+  return (
+    <motion.section ref={ref} className="relative h-[85vh] min-h-[600px] overflow-hidden">
+      <motion.div style={{ y }} className="absolute inset-0">
+        <Image src={tripData.heroImage} alt={tripData.destination} fill className="object-cover" priority />
+        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-transparent to-black/60" />
+        <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-gradient-to-t from-[#5de0e6]/10 via-[#004aad]/5 to-transparent blur-3xl" />
+      </motion.div>
+
+      <motion.div style={{ opacity }} className="relative z-10 h-full flex flex-col justify-end pb-16 px-4">
+        <div className="max-w-6xl mx-auto w-full">
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="mb-6">
+            <StatusBadge status={tripData.status} daysUntil={tripData.daysUntil} />
+          </motion.div>
+
+          <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="mb-4">
+            <div className="flex items-start gap-4">
+              <div>
+                <h1 className="text-5xl sm:text-7xl md:text-8xl font-bold text-white tracking-tight">{tripData.destination}</h1>
+                <div className="flex items-center gap-3 mt-3">
+                  <span className="text-3xl">{tripData.countryFlag}</span>
+                  <span className="text-xl text-white/60">{tripData.country}</span>
+                </div>
+              </div>
+              {isAdmin && (
+                <button 
+                  onClick={onEditTrip}
+                  className="mt-4 p-3 rounded-xl bg-white/10 hover:bg-white/20 border border-white/10 transition-all"
+                >
+                  <Edit3 className="w-5 h-5 text-white/70" />
+                </button>
+              )}
+            </div>
+          </motion.div>
+
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }} className="flex flex-wrap gap-3 mt-8">
+            <div className="flex items-center gap-3 px-4 py-3 rounded-2xl bg-white/5 backdrop-blur-md border border-white/10">
+              <Calendar className="w-5 h-5 text-[#5de0e6]" />
+              <div>
+                <p className="text-xs text-white/50">Periodo</p>
+                <p className="text-sm text-white font-medium">{tripData.dates.start} - {tripData.dates.end}</p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3 px-4 py-3 rounded-2xl bg-white/5 backdrop-blur-md border border-white/10">
+              <Users className="w-5 h-5 text-[#5de0e6]" />
+              <div>
+                <p className="text-xs text-white/50">Viajantes</p>
+                <p className="text-sm text-white font-medium">{tripData.travelers.length} pessoas</p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3 px-4 py-3 rounded-2xl bg-white/5 backdrop-blur-md border border-white/10">
+              <tripData.weather.icon className="w-5 h-5 text-[#5de0e6]" />
+              <div>
+                <p className="text-xs text-white/50">Clima</p>
+                <p className="text-sm text-white font-medium">{tripData.weather.temp}°C</p>
+              </div>
+            </div>
+          </motion.div>
+
+          {tripData.status === "upcoming" && (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.7 }} className="mt-8">
+              <div className="inline-flex items-center gap-2 text-[#5de0e6]">
+                <Sparkles className="w-4 h-4" />
+                <span className="text-sm font-medium">Sua aventura comeca em breve</span>
+              </div>
+            </motion.div>
+          )}
+        </div>
+      </motion.div>
+
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1 }} className="absolute bottom-6 left-1/2 -translate-x-1/2">
+        <motion.div animate={{ y: [0, 8, 0] }} transition={{ duration: 2, repeat: Infinity }} className="w-6 h-10 rounded-full border-2 border-white/30 flex items-start justify-center p-2">
+          <div className="w-1 h-2 bg-white/50 rounded-full" />
+        </motion.div>
+      </motion.div>
+    </motion.section>
+  )
+}
+
+// Quick access cards
+function QuickAccessCards({ onNavigate }: { onNavigate: (section: string) => void }) {
+  const cards = [
+    { id: "flights", icon: Plane, label: "Passagens", color: "from-[#5de0e6] to-[#5de0e6]/50", count: 2 },
+    { id: "hotel", icon: Hotel, label: "Hospedagem", color: "from-[#004aad] to-[#004aad]/50", count: 1 },
+    { id: "itinerary", icon: MapPin, label: "Roteiro", color: "from-[#5de0e6] to-[#004aad]", count: 3 },
+    { id: "documents", icon: FileText, label: "Documentos", color: "from-[#004aad] to-[#5de0e6]", count: 7 },
+    { id: "concierge", icon: MessageCircle, label: "Concierge", color: "from-[#5de0e6] to-[#5de0e6]/50", badge: "IA" },
+    { id: "offline", icon: WifiOff, label: "Offline", color: "from-[#004aad] to-[#004aad]/50" },
+  ]
+
+  return (
+    <section className="relative py-8 px-4 -mt-16 z-20">
+      <div className="max-w-6xl mx-auto">
+        <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
+          {cards.map((card, i) => (
+            <motion.button
+              key={card.label}
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ delay: i * 0.05 }}
+              whileHover={{ scale: 1.02, y: -2 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => onNavigate(card.id)}
+              className="group relative flex flex-col items-center gap-2 p-4 rounded-2xl bg-white/[0.03] backdrop-blur-xl border border-white/[0.08] hover:border-[#5de0e6]/30 transition-all duration-300"
+            >
+              <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-[#5de0e6]/5 to-[#004aad]/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+              <div className={cn("relative w-10 h-10 rounded-xl bg-gradient-to-br flex items-center justify-center", card.color)}>
+                <card.icon className="w-5 h-5 text-white" />
+                {card.badge && (
+                  <span className="absolute -top-1 -right-1 px-1.5 py-0.5 text-[9px] font-bold bg-white text-black rounded-full">{card.badge}</span>
+                )}
+              </div>
+              <span className="text-xs text-white/70 group-hover:text-white transition-colors">{card.label}</span>
+              {card.count && <span className="text-[10px] text-white/40">{card.count}</span>}
+            </motion.button>
+          ))}
+        </div>
+      </div>
+    </section>
+  )
+}
+
+// Edit Trip Modal
+function EditTripModal({ open, onClose, tripData, onSave }: { open: boolean; onClose: () => void; tripData: any; onSave: (data: any) => void }) {
+  const [formData, setFormData] = useState({
+    destination: tripData.destination,
+    country: tripData.country,
+    startDate: tripData.dates.start,
+    endDate: tripData.dates.end,
+    status: tripData.status
+  })
+
+  const handleSave = () => {
+    onSave(formData)
+    onClose()
+  }
+
+  return (
+    <Modal open={open} onClose={onClose} title="Editar Viagem">
+      <div className="space-y-4">
+        <div>
+          <label className="text-xs text-white/50 uppercase tracking-wider">Destino</label>
+          <input
+            type="text"
+            value={formData.destination}
+            onChange={(e) => setFormData({ ...formData, destination: e.target.value })}
+            className="w-full mt-1 px-4 py-3 rounded-xl bg-white/[0.05] border border-white/[0.08] text-white focus:outline-none focus:border-[#5de0e6]/50"
+          />
+        </div>
+        <div>
+          <label className="text-xs text-white/50 uppercase tracking-wider">Pais</label>
+          <input
+            type="text"
+            value={formData.country}
+            onChange={(e) => setFormData({ ...formData, country: e.target.value })}
+            className="w-full mt-1 px-4 py-3 rounded-xl bg-white/[0.05] border border-white/[0.08] text-white focus:outline-none focus:border-[#5de0e6]/50"
+          />
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="text-xs text-white/50 uppercase tracking-wider">Data Inicio</label>
+            <input
+              type="text"
+              value={formData.startDate}
+              onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
+              className="w-full mt-1 px-4 py-3 rounded-xl bg-white/[0.05] border border-white/[0.08] text-white focus:outline-none focus:border-[#5de0e6]/50"
+            />
+          </div>
+          <div>
+            <label className="text-xs text-white/50 uppercase tracking-wider">Data Fim</label>
+            <input
+              type="text"
+              value={formData.endDate}
+              onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
+              className="w-full mt-1 px-4 py-3 rounded-xl bg-white/[0.05] border border-white/[0.08] text-white focus:outline-none focus:border-[#5de0e6]/50"
+            />
+          </div>
+        </div>
+        <div>
+          <label className="text-xs text-white/50 uppercase tracking-wider">Status</label>
+  <select
+  value={formData.status}
+  onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+  className="w-full mt-1 px-4 py-3 rounded-xl bg-[#0a0a0a] border border-white/[0.08] text-white focus:outline-none focus:border-[#5de0e6]/50 appearance-none"
+  style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='rgba(255,255,255,0.4)'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center', backgroundSize: '16px' }}
+  >
+  <option value="upcoming" className="bg-[#0a0a0a] text-white">Proxima</option>
+  <option value="ongoing" className="bg-[#0a0a0a] text-white">Em andamento</option>
+  <option value="completed" className="bg-[#0a0a0a] text-white">Finalizada</option>
+  </select>
+        </div>
+        <Button onClick={handleSave} className="w-full mt-4 bg-gradient-to-r from-[#5de0e6] to-[#004aad] hover:opacity-90 text-white border-0">
+          Salvar Alteracoes
+        </Button>
+      </div>
+    </Modal>
+  )
+}
+
+// Flight Card
+function FlightCard({ flight, index, onEdit, onViewQR }: { flight: any; index: number; onEdit: () => void; onViewQR: () => void }) {
+  const [expanded, setExpanded] = useState(false)
+  const { isAdmin } = useContext(PermissionContext)
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true }}
+      transition={{ delay: index * 0.1 }}
+      className="group"
+    >
+      <div 
+        onClick={() => setExpanded(!expanded)}
+        className="relative p-5 rounded-2xl bg-white/[0.02] backdrop-blur-xl border border-white/[0.06] hover:border-[#5de0e6]/20 transition-all duration-300 cursor-pointer overflow-hidden"
+      >
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-px bg-gradient-to-r from-transparent via-[#5de0e6]/30 to-transparent" />
+        
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#5de0e6]/20 to-[#004aad]/20 flex items-center justify-center">
+              <Plane className={cn("w-5 h-5 text-[#5de0e6]", flight.type === "volta" && "rotate-180")} />
+            </div>
+            <div>
+              <p className="text-sm text-white/50">{flight.type === "ida" ? "Ida" : "Volta"}</p>
+              <p className="text-white font-medium">{flight.airline}</p>
+            </div>
+          </div>
+          <div className="text-right">
+            <p className="text-xs text-white/40">{flight.date}</p>
+            <p className="text-sm text-[#5de0e6] font-medium">{flight.flightNumber}</p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-4">
+          <div className="flex-1 text-center">
+            <p className="text-2xl font-bold text-white">{flight.origin.time}</p>
+            <p className="text-lg font-semibold text-[#5de0e6]">{flight.origin.code}</p>
+            <p className="text-xs text-white/40">{flight.origin.city}</p>
+          </div>
+          
+          <div className="flex-1 flex flex-col items-center">
+            <p className="text-[10px] text-white/30 mb-2">{flight.duration}</p>
+            <div className="w-full flex items-center gap-1">
+              <div className="h-px flex-1 bg-gradient-to-r from-transparent via-[#5de0e6]/50 to-[#5de0e6]" />
+              <Plane className="w-4 h-4 text-[#5de0e6] rotate-90" />
+              <div className="h-px flex-1 bg-gradient-to-r from-[#5de0e6] via-[#5de0e6]/50 to-transparent" />
+            </div>
+            <p className="text-[10px] text-white/30 mt-2">Direto</p>
+          </div>
+          
+          <div className="flex-1 text-center">
+            <p className="text-2xl font-bold text-white">{flight.destination.time}</p>
+            <p className="text-lg font-semibold text-[#5de0e6]">{flight.destination.code}</p>
+            <p className="text-xs text-white/40">{flight.destination.city}</p>
+          </div>
+        </div>
+
+        <AnimatePresence>
+          {expanded && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.3 }}
+              className="overflow-hidden"
+            >
+              <div className="mt-4 pt-4 border-t border-white/[0.06] grid grid-cols-3 gap-4">
+                <div>
+                  <p className="text-[10px] text-white/40 uppercase tracking-wider">Terminal</p>
+                  <p className="text-sm text-white font-medium">{flight.terminal}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-white/40 uppercase tracking-wider">Portao</p>
+                  <p className="text-sm text-white font-medium">{flight.gate}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-white/40 uppercase tracking-wider">Assento</p>
+                  <p className="text-sm text-white font-medium">{flight.seat}</p>
+                </div>
+              </div>
+              
+              <div className="mt-4 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                  <span className="text-xs text-emerald-400">Confirmado</span>
+                </div>
+                <div className="flex gap-2">
+                  {isAdmin && (
+                    <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); onEdit() }} className="text-white/60 hover:bg-white/10">
+                      <Edit3 className="w-4 h-4 mr-2" />
+                      Editar
+                    </Button>
+                  )}
+                  <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); onViewQR() }} className="text-[#5de0e6] hover:bg-[#5de0e6]/10">
+                    <QrCode className="w-4 h-4 mr-2" />
+                    Ver QR Code
+                  </Button>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <div className="flex justify-center mt-3">
+          <ChevronDown className={cn("w-4 h-4 text-white/30 transition-transform duration-300", expanded && "rotate-180")} />
+        </div>
+      </div>
+    </motion.div>
+  )
+}
+
+// Edit Flight Modal
+function EditFlightModal({ open, onClose, flight, onSave }: { open: boolean; onClose: () => void; flight: any; onSave: (data: any) => void }) {
+  const [formData, setFormData] = useState(flight || {})
+
+  useEffect(() => {
+    if (flight) setFormData(flight)
+  }, [flight])
+
+  const handleSave = () => {
+    onSave(formData)
+    onClose()
+  }
+
+  if (!flight) return null
+
+  return (
+    <Modal open={open} onClose={onClose} title={`Editar Voo ${flight.type === "ida" ? "de Ida" : "de Volta"}`}>
+      <div className="space-y-4">
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="text-xs text-white/50 uppercase tracking-wider">Companhia</label>
+            <input
+              type="text"
+              value={formData.airline || ""}
+              onChange={(e) => setFormData({ ...formData, airline: e.target.value })}
+              className="w-full mt-1 px-4 py-3 rounded-xl bg-white/[0.05] border border-white/[0.08] text-white focus:outline-none focus:border-[#5de0e6]/50"
+            />
+          </div>
+          <div>
+            <label className="text-xs text-white/50 uppercase tracking-wider">Numero do Voo</label>
+            <input
+              type="text"
+              value={formData.flightNumber || ""}
+              onChange={(e) => setFormData({ ...formData, flightNumber: e.target.value })}
+              className="w-full mt-1 px-4 py-3 rounded-xl bg-white/[0.05] border border-white/[0.08] text-white focus:outline-none focus:border-[#5de0e6]/50"
+            />
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="text-xs text-white/50 uppercase tracking-wider">Origem (Codigo)</label>
+            <input
+              type="text"
+              value={formData.origin?.code || ""}
+              onChange={(e) => setFormData({ ...formData, origin: { ...formData.origin, code: e.target.value } })}
+              className="w-full mt-1 px-4 py-3 rounded-xl bg-white/[0.05] border border-white/[0.08] text-white focus:outline-none focus:border-[#5de0e6]/50"
+            />
+          </div>
+          <div>
+            <label className="text-xs text-white/50 uppercase tracking-wider">Destino (Codigo)</label>
+            <input
+              type="text"
+              value={formData.destination?.code || ""}
+              onChange={(e) => setFormData({ ...formData, destination: { ...formData.destination, code: e.target.value } })}
+              className="w-full mt-1 px-4 py-3 rounded-xl bg-white/[0.05] border border-white/[0.08] text-white focus:outline-none focus:border-[#5de0e6]/50"
+            />
+          </div>
+        </div>
+        <div className="grid grid-cols-3 gap-4">
+          <div>
+            <label className="text-xs text-white/50 uppercase tracking-wider">Terminal</label>
+            <input
+              type="text"
+              value={formData.terminal || ""}
+              onChange={(e) => setFormData({ ...formData, terminal: e.target.value })}
+              className="w-full mt-1 px-4 py-3 rounded-xl bg-white/[0.05] border border-white/[0.08] text-white focus:outline-none focus:border-[#5de0e6]/50"
+            />
+          </div>
+          <div>
+            <label className="text-xs text-white/50 uppercase tracking-wider">Portao</label>
+            <input
+              type="text"
+              value={formData.gate || ""}
+              onChange={(e) => setFormData({ ...formData, gate: e.target.value })}
+              className="w-full mt-1 px-4 py-3 rounded-xl bg-white/[0.05] border border-white/[0.08] text-white focus:outline-none focus:border-[#5de0e6]/50"
+            />
+          </div>
+          <div>
+            <label className="text-xs text-white/50 uppercase tracking-wider">Assento</label>
+            <input
+              type="text"
+              value={formData.seat || ""}
+              onChange={(e) => setFormData({ ...formData, seat: e.target.value })}
+              className="w-full mt-1 px-4 py-3 rounded-xl bg-white/[0.05] border border-white/[0.08] text-white focus:outline-none focus:border-[#5de0e6]/50"
+            />
+          </div>
+        </div>
+        <Button onClick={handleSave} className="w-full mt-4 bg-gradient-to-r from-[#5de0e6] to-[#004aad] hover:opacity-90 text-white border-0">
+          Salvar Alteracoes
+        </Button>
+      </div>
+    </Modal>
+  )
+}
+
+// QR Code Modal
+function QRCodeModal({ open, onClose, flight }: { open: boolean; onClose: () => void; flight: any }) {
+  if (!flight) return null
+
+  return (
+    <Modal open={open} onClose={onClose} title="Boarding Pass">
+      <div className="text-center">
+        <div className="w-48 h-48 mx-auto mb-6 bg-white rounded-2xl p-4 flex items-center justify-center">
+          <div className="w-full h-full bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyMDAiIGhlaWdodD0iMjAwIj48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0iI2ZmZiIvPjxwYXRoIGQ9Ik0xMCAxMGgyMHYyMEgxMHptMzAgMGgyMHYyMEg0MHptMzAgMGgyMHYyMEg3MHptMzAgMGgyMHYyMEgxMDB6bTMwIDBoMjB2MjBIMTMwem0zMCAwaDIwdjIwSDE2MHptLTE1MCAzMGgyMHYyMEgxMHptNjAgMGgyMHYyMEg3MHptNjAgMGgyMHYyMEgxMzB6bS0xMjAgMzBoMjB2MjBIMTB6bTMwIDBoMjB2MjBINDB6bTMwIDBoMjB2MjBINzB6bTMwIDBoMjB2MjBIMTAwem0zMCAwaDIwdjIwSDEzMHptMzAgMGgyMHYyMEgxNjB6bS0xNTAgMzBoMjB2MjBIMTB6bTYwIDBoMjB2MjBINzB6bTMwIDBoMjB2MjBIMTAwem0zMCAwaDIwdjIwSDEzMHptMzAgMGgyMHYyMEgxNjB6bS0xNTAgMzBoMjB2MjBIMTB6bTMwIDBoMjB2MjBINDB6bTMwIDBoMjB2MjBINzB6bTMwIDBoMjB2MjBIMTAwem0zMCAwaDIwdjIwSDEzMHptMzAgMGgyMHYyMEgxNjB6bS0xNTAgMzBoMjB2MjBIMTB6bTMwIDBoMjB2MjBINDB6bTMwIDBoMjB2MjBINzB6bTYwIDBoMjB2MjBIMTYweiIgZmlsbD0iIzAwMCIvPjwvc3ZnPg==')] bg-contain" />
+        </div>
+        <p className="text-white font-semibold text-lg">{flight.flightNumber}</p>
+        <p className="text-white/60 text-sm mt-1">{flight.origin.code} → {flight.destination.code}</p>
+        <p className="text-white/40 text-xs mt-4">Apresente este codigo no embarque</p>
+      </div>
+    </Modal>
+  )
+}
+
+// Flights Section
+function FlightsSection({ tripData, onUpdateFlight, onAddFlight }: { tripData: any; onUpdateFlight: (id: number, data: any) => void; onAddFlight: (data: any) => void }) {
+  const [editingFlight, setEditingFlight] = useState<any>(null)
+  const [viewingQR, setViewingQR] = useState<any>(null)
+  const [addingFlight, setAddingFlight] = useState(false)
+  const { isAdmin } = useContext(PermissionContext)
+  const { showToast } = useToast()
+
+  const handleSaveFlight = (data: any) => {
+    onUpdateFlight(data.id, data)
+    showToast("Voo atualizado com sucesso!", "success")
+  }
+
+  return (
+    <section id="flights" className="py-12 px-4">
+      <div className="max-w-6xl mx-auto">
+        <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#5de0e6] to-[#004aad] flex items-center justify-center">
+              <Plane className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <h2 className="text-xl font-semibold text-white">Passagens</h2>
+              <p className="text-sm text-white/40">{tripData.flights.length} voos confirmados</p>
+            </div>
+          </div>
+          {isAdmin && (
+            <Button size="sm" variant="ghost" className="text-[#5de0e6] hover:bg-[#5de0e6]/10" onClick={() => setAddingFlight(true)}>
+              <Plus className="w-4 h-4 mr-2" />
+              Adicionar
+            </Button>
+          )}
+        </motion.div>
+
+        <div className="grid sm:grid-cols-2 gap-4">
+          {tripData.flights.map((flight: any, i: number) => (
+            <FlightCard 
+              key={flight.id} 
+              flight={flight} 
+              index={i} 
+              onEdit={() => setEditingFlight(flight)}
+              onViewQR={() => setViewingQR(flight)}
+            />
+          ))}
+        </div>
+      </div>
+
+      <EditFlightModal open={!!editingFlight} onClose={() => setEditingFlight(null)} flight={editingFlight} onSave={handleSaveFlight} />
+      <QRCodeModal open={!!viewingQR} onClose={() => setViewingQR(null)} flight={viewingQR} />
+      <AddFlightModal open={addingFlight} onClose={() => setAddingFlight(false)} onSave={(data) => { onAddFlight(data); showToast("Passagem adicionada!", "success"); setAddingFlight(false) }} />
+    </section>
+  )
+}
+
+// Add Flight Modal with AI reading
+function AddFlightModal({ open, onClose, onSave }: { open: boolean; onClose: () => void; onSave: (data: any) => void }) {
+  const [mode, setMode] = useState<"upload" | "manual">("upload")
+  const [uploading, setUploading] = useState(false)
+  const [analyzing, setAnalyzing] = useState(false)
+  const [analyzed, setAnalyzed] = useState(false)
+  const [formData, setFormData] = useState({
+    type: "ida",
+    airline: "",
+    flightNumber: "",
+    origin: { code: "", city: "", time: "" },
+    destination: { code: "", city: "", time: "" },
+    date: "",
+    terminal: "",
+    gate: "",
+    seat: "",
+    duration: "",
+    status: "confirmed"
+  })
+
+  const handleFileUpload = () => {
+    setUploading(true)
+    setTimeout(() => {
+      setUploading(false)
+      setAnalyzing(true)
+      setTimeout(() => {
+        setAnalyzing(false)
+        setAnalyzed(true)
+        setFormData({
+          type: "ida",
+          airline: "LATAM Airlines",
+          flightNumber: "LA 8084",
+          origin: { code: "GRU", city: "Sao Paulo", time: "23:55" },
+          destination: { code: "CDG", city: "Paris", time: "16:20+1" },
+          date: "20 Jul 2024",
+          terminal: "3",
+          gate: "E12",
+          seat: "18A",
+          duration: "11h 25min",
+          status: "confirmed"
+        })
+      }, 2000)
+    }, 1000)
+  }
+
+  const handleSave = () => {
+    onSave({ ...formData, id: Date.now() })
+    setFormData({
+      type: "ida",
+      airline: "",
+      flightNumber: "",
+      origin: { code: "", city: "", time: "" },
+      destination: { code: "", city: "", time: "" },
+      date: "",
+      terminal: "",
+      gate: "",
+      seat: "",
+      duration: "",
+      status: "confirmed"
+    })
+    setAnalyzed(false)
+    setMode("upload")
+  }
+
+  return (
+    <Modal open={open} onClose={onClose} title="Adicionar Passagem">
+      <div className="space-y-4">
+        <div className="flex gap-2 p-1 rounded-xl bg-white/[0.03]">
+          <button
+            onClick={() => setMode("upload")}
+            className={cn(
+              "flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-all",
+              mode === "upload" ? "bg-gradient-to-r from-[#5de0e6]/20 to-[#004aad]/20 text-white" : "text-white/40 hover:text-white/60"
+            )}
+          >
+            <Upload className="w-4 h-4 inline mr-2" />
+            Anexar
+          </button>
+          <button
+            onClick={() => setMode("manual")}
+            className={cn(
+              "flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-all",
+              mode === "manual" ? "bg-gradient-to-r from-[#5de0e6]/20 to-[#004aad]/20 text-white" : "text-white/40 hover:text-white/60"
+            )}
+          >
+            <Edit3 className="w-4 h-4 inline mr-2" />
+            Manual
+          </button>
+        </div>
+
+        {mode === "upload" && !analyzed && (
+          <div 
+            onClick={handleFileUpload}
+            className="p-8 rounded-xl border-2 border-dashed border-white/10 hover:border-[#5de0e6]/30 transition-colors text-center cursor-pointer"
+          >
+            {uploading ? (
+              <div className="flex flex-col items-center gap-3">
+                <div className="w-8 h-8 border-2 border-white/30 border-t-[#5de0e6] rounded-full animate-spin" />
+                <p className="text-sm text-white/60">Enviando arquivo...</p>
+              </div>
+            ) : analyzing ? (
+              <div className="flex flex-col items-center gap-3">
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#5de0e6]/20 to-[#004aad]/20 flex items-center justify-center">
+                  <Sparkles className="w-6 h-6 text-[#5de0e6] animate-pulse" />
+                </div>
+                <p className="text-sm text-white/80 font-medium">IA analisando passagem...</p>
+                <p className="text-xs text-white/40">Extraindo informacoes do documento</p>
+              </div>
+            ) : (
+              <>
+                <Upload className="w-8 h-8 mx-auto text-white/40 mb-3" />
+                <p className="text-sm text-white/60">Arraste um arquivo ou clique para selecionar</p>
+                <p className="text-xs text-white/30 mt-1">PDF, PNG, JPG ou print de tela</p>
+                <p className="text-xs text-[#5de0e6]/60 mt-2">A IA preenchera os dados automaticamente</p>
+              </>
+            )}
+          </div>
+        )}
+
+        {(mode === "manual" || analyzed) && (
+          <>
+            {analyzed && (
+              <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                <p className="text-sm text-emerald-400">Dados extraidos pela IA - verifique e confirme</p>
+              </div>
+            )}
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-xs text-white/50 uppercase tracking-wider">Tipo</label>
+                <select
+                  value={formData.type}
+                  onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+                  className="w-full mt-1 px-4 py-3 rounded-xl bg-[#0a0a0a] border border-white/[0.08] text-white focus:outline-none focus:border-[#5de0e6]/50 appearance-none"
+                  style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='rgba(255,255,255,0.4)'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center', backgroundSize: '16px' }}
+                >
+                  <option value="ida" className="bg-[#0a0a0a] text-white">Ida</option>
+                  <option value="volta" className="bg-[#0a0a0a] text-white">Volta</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-xs text-white/50 uppercase tracking-wider">Companhia</label>
+                <input
+                  type="text"
+                  value={formData.airline}
+                  onChange={(e) => setFormData({ ...formData, airline: e.target.value })}
+                  placeholder="Ex: LATAM"
+                  className="w-full mt-1 px-4 py-3 rounded-xl bg-white/[0.05] border border-white/[0.08] text-white placeholder:text-white/30 focus:outline-none focus:border-[#5de0e6]/50"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-xs text-white/50 uppercase tracking-wider">Numero do Voo</label>
+                <input
+                  type="text"
+                  value={formData.flightNumber}
+                  onChange={(e) => setFormData({ ...formData, flightNumber: e.target.value })}
+                  placeholder="Ex: LA 8084"
+                  className="w-full mt-1 px-4 py-3 rounded-xl bg-white/[0.05] border border-white/[0.08] text-white placeholder:text-white/30 focus:outline-none focus:border-[#5de0e6]/50"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-white/50 uppercase tracking-wider">Data</label>
+                <input
+                  type="text"
+                  value={formData.date}
+                  onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                  placeholder="Ex: 20 Jul 2024"
+                  className="w-full mt-1 px-4 py-3 rounded-xl bg-white/[0.05] border border-white/[0.08] text-white placeholder:text-white/30 focus:outline-none focus:border-[#5de0e6]/50"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-xs text-white/50 uppercase tracking-wider">Origem (Codigo)</label>
+                <input
+                  type="text"
+                  value={formData.origin.code}
+                  onChange={(e) => setFormData({ ...formData, origin: { ...formData.origin, code: e.target.value } })}
+                  placeholder="Ex: GRU"
+                  className="w-full mt-1 px-4 py-3 rounded-xl bg-white/[0.05] border border-white/[0.08] text-white placeholder:text-white/30 focus:outline-none focus:border-[#5de0e6]/50"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-white/50 uppercase tracking-wider">Destino (Codigo)</label>
+                <input
+                  type="text"
+                  value={formData.destination.code}
+                  onChange={(e) => setFormData({ ...formData, destination: { ...formData.destination, code: e.target.value } })}
+                  placeholder="Ex: CDG"
+                  className="w-full mt-1 px-4 py-3 rounded-xl bg-white/[0.05] border border-white/[0.08] text-white placeholder:text-white/30 focus:outline-none focus:border-[#5de0e6]/50"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <label className="text-xs text-white/50 uppercase tracking-wider">Terminal</label>
+                <input
+                  type="text"
+                  value={formData.terminal}
+                  onChange={(e) => setFormData({ ...formData, terminal: e.target.value })}
+                  placeholder="Ex: 3"
+                  className="w-full mt-1 px-4 py-3 rounded-xl bg-white/[0.05] border border-white/[0.08] text-white placeholder:text-white/30 focus:outline-none focus:border-[#5de0e6]/50"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-white/50 uppercase tracking-wider">Portao</label>
+                <input
+                  type="text"
+                  value={formData.gate}
+                  onChange={(e) => setFormData({ ...formData, gate: e.target.value })}
+                  placeholder="Ex: E12"
+                  className="w-full mt-1 px-4 py-3 rounded-xl bg-white/[0.05] border border-white/[0.08] text-white placeholder:text-white/30 focus:outline-none focus:border-[#5de0e6]/50"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-white/50 uppercase tracking-wider">Assento</label>
+                <input
+                  type="text"
+                  value={formData.seat}
+                  onChange={(e) => setFormData({ ...formData, seat: e.target.value })}
+                  placeholder="Ex: 18A"
+                  className="w-full mt-1 px-4 py-3 rounded-xl bg-white/[0.05] border border-white/[0.08] text-white placeholder:text-white/30 focus:outline-none focus:border-[#5de0e6]/50"
+                />
+              </div>
+            </div>
+
+            <Button onClick={handleSave} disabled={!formData.airline || !formData.flightNumber} className="w-full bg-gradient-to-r from-[#5de0e6] to-[#004aad] hover:opacity-90 text-white border-0 disabled:opacity-50">
+              Adicionar Passagem
+            </Button>
+          </>
+        )}
+      </div>
+    </Modal>
+  )
+}
+
+// Hotel Section
+function HotelSection({ tripData, onUpdateHotel }: { tripData: any; onUpdateHotel: (data: any) => void }) {
+  const [editing, setEditing] = useState(false)
+  const [addingVoucher, setAddingVoucher] = useState(false)
+  const { isAdmin } = useContext(PermissionContext)
+  const { showToast } = useToast()
+
+  return (
+    <section id="hotel" className="py-12 px-4">
+      <div className="max-w-6xl mx-auto">
+        <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#004aad] to-[#5de0e6] flex items-center justify-center">
+              <Hotel className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <h2 className="text-xl font-semibold text-white">Hospedagem</h2>
+              <p className="text-sm text-white/40">{tripData.hotel.nights} noites</p>
+            </div>
+          </div>
+          {isAdmin && (
+            <Button size="sm" variant="ghost" className="text-[#5de0e6] hover:bg-[#5de0e6]/10" onClick={() => setEditing(true)}>
+              <Edit3 className="w-4 h-4 mr-2" />
+              Editar
+            </Button>
+          )}
+        </motion.div>
+
+        <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="relative rounded-3xl overflow-hidden bg-white/[0.02] backdrop-blur-xl border border-white/[0.06]">
+          <div className="relative h-48 sm:h-64">
+            <Image src={tripData.hotel.image} alt={tripData.hotel.name} fill className="object-cover" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent" />
+            <div className="absolute top-4 right-4 flex items-center gap-1 px-3 py-1.5 rounded-full bg-black/50 backdrop-blur-md">
+              {[...Array(tripData.hotel.stars)].map((_, i) => (
+                <Star key={i} className="w-3 h-3 fill-[#5de0e6] text-[#5de0e6]" />
+              ))}
+            </div>
+            <div className="absolute bottom-4 left-4 right-4">
+              <h3 className="text-xl font-semibold text-white">{tripData.hotel.name}</h3>
+              <div className="flex items-center gap-2 mt-1 text-white/60">
+                <MapPin className="w-3 h-3" />
+                <span className="text-sm">{tripData.hotel.address}</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="p-5">
+            <div className="grid grid-cols-2 gap-4 mb-4">
+              <div className="p-3 rounded-xl bg-white/[0.03]">
+                <p className="text-[10px] text-white/40 uppercase tracking-wider">Check-in</p>
+                <p className="text-sm text-white font-medium mt-1">{tripData.hotel.checkIn}</p>
+              </div>
+              <div className="p-3 rounded-xl bg-white/[0.03]">
+                <p className="text-[10px] text-white/40 uppercase tracking-wider">Check-out</p>
+                <p className="text-sm text-white font-medium mt-1">{tripData.hotel.checkOut}</p>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-2 mb-4">
+              {tripData.hotel.amenities.map((amenity: string) => (
+                <span key={amenity} className="px-3 py-1 text-xs text-white/60 bg-white/[0.05] rounded-full">{amenity}</span>
+              ))}
+            </div>
+
+            <div className="flex items-center justify-between pt-4 border-t border-white/[0.06]">
+              <div className="flex items-center gap-2 text-white/40">
+                <Phone className="w-4 h-4" />
+                <span className="text-sm">{tripData.hotel.phone}</span>
+              </div>
+              <Button size="sm" variant="ghost" onClick={() => setAddingVoucher(true)} className="text-[#5de0e6] hover:bg-[#5de0e6]/10">
+                <Upload className="w-4 h-4 mr-2" />
+                Anexar Voucher
+              </Button>
+            </div>
+          </div>
+        </motion.div>
+      </div>
+
+      <EditHotelModal open={editing} onClose={() => setEditing(false)} hotel={tripData.hotel} onSave={(data) => { onUpdateHotel(data); showToast("Hotel atualizado!", "success"); setEditing(false) }} />
+      <AddVoucherModal open={addingVoucher} onClose={() => setAddingVoucher(false)} onSave={() => { showToast("Voucher anexado!", "success"); setAddingVoucher(false) }} />
+    </section>
+  )
+}
+
+// Add Voucher Modal
+function AddVoucherModal({ open, onClose, onSave }: { open: boolean; onClose: () => void; onSave: () => void }) {
+  const [uploading, setUploading] = useState(false)
+
+  const handleUpload = () => {
+    setUploading(true)
+    setTimeout(() => {
+      setUploading(false)
+      onSave()
+    }, 1500)
+  }
+
+  return (
+    <Modal open={open} onClose={onClose} title="Anexar Voucher">
+      <div className="space-y-4">
+        <div 
+          onClick={handleUpload}
+          className="p-8 rounded-xl border-2 border-dashed border-white/10 hover:border-[#5de0e6]/30 transition-colors text-center cursor-pointer"
+        >
+          {uploading ? (
+            <div className="flex flex-col items-center gap-3">
+              <div className="w-8 h-8 border-2 border-white/30 border-t-[#5de0e6] rounded-full animate-spin" />
+              <p className="text-sm text-white/60">Enviando voucher...</p>
+            </div>
+          ) : (
+            <>
+              <Upload className="w-8 h-8 mx-auto text-white/40 mb-3" />
+              <p className="text-sm text-white/60">Arraste o voucher ou clique para selecionar</p>
+              <p className="text-xs text-white/30 mt-1">PDF, PNG, JPG ate 10MB</p>
+            </>
+          )}
+        </div>
+        <p className="text-xs text-white/30 text-center">O voucher ficara disponivel para acesso rapido na hospedagem</p>
+      </div>
+    </Modal>
+  )
+}
+
+// Edit Hotel Modal
+function EditHotelModal({ open, onClose, hotel, onSave }: { open: boolean; onClose: () => void; hotel: any; onSave: (data: any) => void }) {
+  const [formData, setFormData] = useState(hotel)
+
+  useEffect(() => {
+    if (hotel) setFormData(hotel)
+  }, [hotel])
+
+  return (
+    <Modal open={open} onClose={onClose} title="Editar Hospedagem">
+      <div className="space-y-4">
+        <div>
+          <label className="text-xs text-white/50 uppercase tracking-wider">Nome do Hotel</label>
+          <input
+            type="text"
+            value={formData.name || ""}
+            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+            className="w-full mt-1 px-4 py-3 rounded-xl bg-white/[0.05] border border-white/[0.08] text-white focus:outline-none focus:border-[#5de0e6]/50"
+          />
+        </div>
+        <div>
+          <label className="text-xs text-white/50 uppercase tracking-wider">Endereco</label>
+          <input
+            type="text"
+            value={formData.address || ""}
+            onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+            className="w-full mt-1 px-4 py-3 rounded-xl bg-white/[0.05] border border-white/[0.08] text-white focus:outline-none focus:border-[#5de0e6]/50"
+          />
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="text-xs text-white/50 uppercase tracking-wider">Check-in</label>
+            <input
+              type="text"
+              value={formData.checkIn || ""}
+              onChange={(e) => setFormData({ ...formData, checkIn: e.target.value })}
+              className="w-full mt-1 px-4 py-3 rounded-xl bg-white/[0.05] border border-white/[0.08] text-white focus:outline-none focus:border-[#5de0e6]/50"
+            />
+          </div>
+          <div>
+            <label className="text-xs text-white/50 uppercase tracking-wider">Check-out</label>
+            <input
+              type="text"
+              value={formData.checkOut || ""}
+              onChange={(e) => setFormData({ ...formData, checkOut: e.target.value })}
+              className="w-full mt-1 px-4 py-3 rounded-xl bg-white/[0.05] border border-white/[0.08] text-white focus:outline-none focus:border-[#5de0e6]/50"
+            />
+          </div>
+        </div>
+        <div>
+          <label className="text-xs text-white/50 uppercase tracking-wider">Telefone</label>
+          <input
+            type="text"
+            value={formData.phone || ""}
+            onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+            className="w-full mt-1 px-4 py-3 rounded-xl bg-white/[0.05] border border-white/[0.08] text-white focus:outline-none focus:border-[#5de0e6]/50"
+          />
+        </div>
+        <Button onClick={() => onSave(formData)} className="w-full mt-4 bg-gradient-to-r from-[#5de0e6] to-[#004aad] hover:opacity-90 text-white border-0">
+          Salvar Alteracoes
+        </Button>
+      </div>
+    </Modal>
+  )
+}
+
+// Itinerary Section
+function ItinerarySection({ tripData, onUpdateItinerary }: { tripData: any; onUpdateItinerary: (data: any) => void }) {
+  const [activeDay, setActiveDay] = useState(1)
+  const [editingItem, setEditingItem] = useState<any>(null)
+  const [addingItem, setAddingItem] = useState(false)
+  const { isAdmin } = useContext(PermissionContext)
+  const { showToast } = useToast()
+
+  const activeItinerary = tripData.itinerary.find((d: any) => d.day === activeDay)
+
+  return (
+    <section id="itinerary" className="py-12 px-4">
+      <div className="max-w-6xl mx-auto">
+        <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#5de0e6] to-[#004aad] flex items-center justify-center">
+              <MapPin className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <h2 className="text-xl font-semibold text-white">Roteiro</h2>
+              <p className="text-sm text-white/40">{tripData.itinerary.length} dias planejados</p>
+            </div>
+          </div>
+          {isAdmin && (
+            <Button size="sm" variant="ghost" className="text-[#5de0e6] hover:bg-[#5de0e6]/10" onClick={() => setAddingItem(true)}>
+              <Plus className="w-4 h-4 mr-2" />
+              Adicionar
+            </Button>
+          )}
+        </motion.div>
+
+        <div className="flex gap-2 mb-6 overflow-x-auto pb-2 scrollbar-hide">
+          {tripData.itinerary.map((day: any) => (
+            <motion.button
+              key={day.day}
+              onClick={() => setActiveDay(day.day)}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              className={cn(
+                "flex-shrink-0 px-4 py-3 rounded-xl border transition-all duration-300",
+                activeDay === day.day
+                  ? "bg-gradient-to-br from-[#5de0e6]/20 to-[#004aad]/20 border-[#5de0e6]/40 text-white"
+                  : "bg-white/[0.02] border-white/[0.06] text-white/60 hover:text-white hover:border-white/10"
+              )}
+            >
+              <p className="text-[10px] uppercase tracking-wider opacity-60">Dia {day.day}</p>
+              <p className="text-sm font-medium mt-0.5">{day.date}</p>
+            </motion.button>
+          ))}
+        </div>
+
+        <AnimatePresence mode="wait">
+          {activeItinerary && (
+            <motion.div
+              key={activeDay}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.3 }}
+              className="relative"
+            >
+              <h3 className="text-lg font-medium text-white mb-6">{activeItinerary.title}</h3>
+              
+              <div className="relative pl-8">
+                <div className="absolute left-[11px] top-2 bottom-2 w-px bg-gradient-to-b from-[#5de0e6]/50 via-[#004aad]/30 to-transparent" />
+                
+                <div className="space-y-6">
+                  {activeItinerary.items.map((item: any, i: number) => {
+                    const IconComponent = iconMap[item.icon] || MapPin
+                    return (
+                      <motion.div
+                        key={item.id}
+                        initial={{ opacity: 0, x: -10 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: i * 0.1 }}
+                        className="relative group"
+                      >
+                        <div className={cn(
+                          "absolute -left-8 top-1 w-6 h-6 rounded-full flex items-center justify-center",
+                          item.highlight ? "bg-gradient-to-br from-[#5de0e6] to-[#004aad]" : "bg-white/10 border border-white/20"
+                        )}>
+                          <IconComponent className={cn("w-3 h-3", item.highlight ? "text-white" : "text-white/60")} />
+                        </div>
+
+                        <div 
+                          onClick={() => isAdmin && setEditingItem(item)}
+                          className={cn(
+                            "p-4 rounded-xl transition-all duration-300",
+                            item.highlight
+                              ? "bg-gradient-to-br from-[#5de0e6]/10 to-[#004aad]/10 border border-[#5de0e6]/20"
+                              : "bg-white/[0.02] border border-white/[0.06] hover:border-white/10",
+                            isAdmin && "cursor-pointer"
+                          )}
+                        >
+                          <div className="flex items-start justify-between">
+                            <div>
+                              <p className="text-xs text-[#5de0e6] font-medium">{item.time}</p>
+                              <p className="text-white font-medium mt-1">{item.title}</p>
+                            </div>
+                            {isAdmin ? (
+                              <Edit3 className="w-4 h-4 text-white/30 opacity-0 group-hover:opacity-100 transition-opacity" />
+                            ) : (
+                              <ChevronRight className="w-4 h-4 text-white/30" />
+                            )}
+                          </div>
+                        </div>
+                      </motion.div>
+                    )
+                  })}
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+
+      <EditItineraryItemModal 
+        open={!!editingItem} 
+        onClose={() => setEditingItem(null)} 
+        item={editingItem} 
+        onSave={(data) => { 
+          showToast("Atividade atualizada!", "success"); 
+          setEditingItem(null) 
+        }}
+        onDelete={() => {
+          showToast("Atividade removida!", "success");
+          setEditingItem(null)
+        }}
+      />
+  <AddItineraryItemModal
+  open={addingItem}
+  onClose={() => setAddingItem(false)}
+  day={activeDay}
+  onSave={(data) => {
+  showToast("Atividade adicionada!", "success");
+  setAddingItem(false)
+  }}
+  onGenerateAI={(data) => {
+  showToast("Roteiro gerado com IA!", "success");
+  setAddingItem(false)
+  }}
+  />
+    </section>
+  )
+}
+
+// Edit Itinerary Item Modal
+function EditItineraryItemModal({ open, onClose, item, onSave, onDelete }: { open: boolean; onClose: () => void; item: any; onSave: (data: any) => void; onDelete: () => void }) {
+  const [formData, setFormData] = useState(item || {})
+
+  useEffect(() => {
+    if (item) setFormData(item)
+  }, [item])
+
+  if (!item) return null
+
+  return (
+    <Modal open={open} onClose={onClose} title="Editar Atividade">
+      <div className="space-y-4">
+        <div>
+          <label className="text-xs text-white/50 uppercase tracking-wider">Titulo</label>
+          <input
+            type="text"
+            value={formData.title || ""}
+            onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+            className="w-full mt-1 px-4 py-3 rounded-xl bg-white/[0.05] border border-white/[0.08] text-white focus:outline-none focus:border-[#5de0e6]/50"
+          />
+        </div>
+        <div>
+          <label className="text-xs text-white/50 uppercase tracking-wider">Horario</label>
+          <input
+            type="text"
+            value={formData.time || ""}
+            onChange={(e) => setFormData({ ...formData, time: e.target.value })}
+            className="w-full mt-1 px-4 py-3 rounded-xl bg-white/[0.05] border border-white/[0.08] text-white focus:outline-none focus:border-[#5de0e6]/50"
+          />
+        </div>
+        <div>
+          <label className="text-xs text-white/50 uppercase tracking-wider">Tipo</label>
+  <select
+  value={formData.type || "attraction"}
+  onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+  className="w-full mt-1 px-4 py-3 rounded-xl bg-[#0a0a0a] border border-white/[0.08] text-white focus:outline-none focus:border-[#5de0e6]/50 appearance-none"
+  style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='rgba(255,255,255,0.4)'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center', backgroundSize: '16px' }}
+  >
+  <option value="attraction" className="bg-[#0a0a0a] text-white">Atracao</option>
+  <option value="food" className="bg-[#0a0a0a] text-white">Alimentacao</option>
+  <option value="transport" className="bg-[#0a0a0a] text-white">Transporte</option>
+  <option value="hotel" className="bg-[#0a0a0a] text-white">Hospedagem</option>
+  <option value="experience" className="bg-[#0a0a0a] text-white">Experiencia</option>
+  <option value="flight" className="bg-[#0a0a0a] text-white">Voo</option>
+          </select>
+        </div>
+        <div className="flex items-center gap-3">
+          <input
+            type="checkbox"
+            id="highlight"
+            checked={formData.highlight || false}
+            onChange={(e) => setFormData({ ...formData, highlight: e.target.checked })}
+            className="w-4 h-4 rounded bg-white/10 border-white/20"
+          />
+          <label htmlFor="highlight" className="text-sm text-white/70">Destaque do dia</label>
+        </div>
+        <div className="flex gap-3">
+          <Button onClick={() => onSave(formData)} className="flex-1 bg-gradient-to-r from-[#5de0e6] to-[#004aad] hover:opacity-90 text-white border-0">
+            Salvar
+          </Button>
+          <Button onClick={onDelete} variant="ghost" className="text-red-400 hover:bg-red-500/10">
+            <Trash2 className="w-4 h-4" />
+          </Button>
+        </div>
+      </div>
+    </Modal>
+  )
+}
+
+// Add Itinerary Item Modal - Now with AI, Upload and Manual options
+function AddItineraryItemModal({ open, onClose, day, onSave, onGenerateAI }: { open: boolean; onClose: () => void; day: number; onSave: (data: any) => void; onGenerateAI: (data: any) => void }) {
+  const [mode, setMode] = useState<"ai" | "upload" | "manual">("ai")
+  const [formData, setFormData] = useState({ title: "", time: "", type: "attraction", highlight: false })
+  const [aiForm, setAiForm] = useState({ days: "3", destination: "", preferences: "", style: "equilibrado", budget: "medio" })
+  const [generating, setGenerating] = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const [analyzing, setAnalyzing] = useState(false)
+
+  const handleGenerateAI = () => {
+    setGenerating(true)
+    setTimeout(() => {
+      setGenerating(false)
+      onGenerateAI(aiForm)
+      onClose()
+    }, 3000)
+  }
+
+  const handleUpload = () => {
+    setUploading(true)
+    setTimeout(() => {
+      setUploading(false)
+      setAnalyzing(true)
+      setTimeout(() => {
+        setAnalyzing(false)
+        onGenerateAI({ imported: true })
+        onClose()
+      }, 2500)
+    }, 1000)
+  }
+
+  return (
+    <Modal open={open} onClose={onClose} title="Adicionar ao Roteiro">
+      <div className="space-y-4">
+        <div className="flex gap-1 p-1 rounded-xl bg-white/[0.03]">
+          <button
+            onClick={() => setMode("ai")}
+            className={cn(
+              "flex-1 py-2 px-2 rounded-lg text-xs font-medium transition-all flex items-center justify-center gap-1",
+              mode === "ai" ? "bg-gradient-to-r from-[#5de0e6]/20 to-[#004aad]/20 text-white" : "text-white/40 hover:text-white/60"
+            )}
+          >
+            <Sparkles className="w-3 h-3" />
+            Criar com IA
+          </button>
+          <button
+            onClick={() => setMode("upload")}
+            className={cn(
+              "flex-1 py-2 px-2 rounded-lg text-xs font-medium transition-all flex items-center justify-center gap-1",
+              mode === "upload" ? "bg-gradient-to-r from-[#5de0e6]/20 to-[#004aad]/20 text-white" : "text-white/40 hover:text-white/60"
+            )}
+          >
+            <Upload className="w-3 h-3" />
+            Anexar
+          </button>
+          <button
+            onClick={() => setMode("manual")}
+            className={cn(
+              "flex-1 py-2 px-2 rounded-lg text-xs font-medium transition-all flex items-center justify-center gap-1",
+              mode === "manual" ? "bg-gradient-to-r from-[#5de0e6]/20 to-[#004aad]/20 text-white" : "text-white/40 hover:text-white/60"
+            )}
+          >
+            <Edit3 className="w-3 h-3" />
+            Manual
+          </button>
+        </div>
+
+        {mode === "ai" && (
+          <div className="space-y-4">
+            <div className="p-4 rounded-xl bg-gradient-to-br from-[#5de0e6]/10 to-[#004aad]/10 border border-[#5de0e6]/20">
+              <div className="flex items-center gap-2 mb-2">
+                <Sparkles className="w-4 h-4 text-[#5de0e6]" />
+                <p className="text-sm text-white font-medium">Roteiro Inteligente</p>
+              </div>
+              <p className="text-xs text-white/50">A IA criara um roteiro personalizado baseado nas suas preferencias</p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-xs text-white/50 uppercase tracking-wider">Quantidade de dias</label>
+                <select
+                  value={aiForm.days}
+                  onChange={(e) => setAiForm({ ...aiForm, days: e.target.value })}
+                  className="w-full mt-1 px-4 py-3 rounded-xl bg-[#0a0a0a] border border-white/[0.08] text-white focus:outline-none focus:border-[#5de0e6]/50 appearance-none"
+                  style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='rgba(255,255,255,0.4)'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center', backgroundSize: '16px' }}
+                >
+                  {[1,2,3,4,5,6,7,10,14].map(d => (
+                    <option key={d} value={d} className="bg-[#0a0a0a] text-white">{d} {d === 1 ? 'dia' : 'dias'}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs text-white/50 uppercase tracking-wider">Destino</label>
+                <input
+                  type="text"
+                  value={aiForm.destination}
+                  onChange={(e) => setAiForm({ ...aiForm, destination: e.target.value })}
+                  placeholder="Ex: Paris"
+                  className="w-full mt-1 px-4 py-3 rounded-xl bg-white/[0.05] border border-white/[0.08] text-white placeholder:text-white/30 focus:outline-none focus:border-[#5de0e6]/50"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="text-xs text-white/50 uppercase tracking-wider">Estilo da viagem</label>
+              <select
+                value={aiForm.style}
+                onChange={(e) => setAiForm({ ...aiForm, style: e.target.value })}
+                className="w-full mt-1 px-4 py-3 rounded-xl bg-[#0a0a0a] border border-white/[0.08] text-white focus:outline-none focus:border-[#5de0e6]/50 appearance-none"
+                style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='rgba(255,255,255,0.4)'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center', backgroundSize: '16px' }}
+              >
+                <option value="relaxado" className="bg-[#0a0a0a] text-white">Relaxado - Poucas atividades</option>
+                <option value="equilibrado" className="bg-[#0a0a0a] text-white">Equilibrado - Mix ideal</option>
+                <option value="intenso" className="bg-[#0a0a0a] text-white">Intenso - Aproveitar tudo</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="text-xs text-white/50 uppercase tracking-wider">Orcamento</label>
+              <select
+                value={aiForm.budget}
+                onChange={(e) => setAiForm({ ...aiForm, budget: e.target.value })}
+                className="w-full mt-1 px-4 py-3 rounded-xl bg-[#0a0a0a] border border-white/[0.08] text-white focus:outline-none focus:border-[#5de0e6]/50 appearance-none"
+                style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='rgba(255,255,255,0.4)'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center', backgroundSize: '16px' }}
+              >
+                <option value="baixo" className="bg-[#0a0a0a] text-white">Economico</option>
+                <option value="medio" className="bg-[#0a0a0a] text-white">Moderado</option>
+                <option value="alto" className="bg-[#0a0a0a] text-white">Premium</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="text-xs text-white/50 uppercase tracking-wider">Preferencias (opcional)</label>
+              <input
+                type="text"
+                value={aiForm.preferences}
+                onChange={(e) => setAiForm({ ...aiForm, preferences: e.target.value })}
+                placeholder="Ex: museus, gastronomia, compras..."
+                className="w-full mt-1 px-4 py-3 rounded-xl bg-white/[0.05] border border-white/[0.08] text-white placeholder:text-white/30 focus:outline-none focus:border-[#5de0e6]/50"
+              />
+            </div>
+
+            <Button onClick={handleGenerateAI} disabled={generating || !aiForm.destination} className="w-full bg-gradient-to-r from-[#5de0e6] to-[#004aad] hover:opacity-90 text-white border-0 disabled:opacity-50">
+              {generating ? (
+                <div className="flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 animate-pulse" />
+                  Gerando roteiro...
+                </div>
+              ) : (
+                <>
+                  <Sparkles className="w-4 h-4 mr-2" />
+                  Gerar Roteiro com IA
+                </>
+              )}
+            </Button>
+          </div>
+        )}
+
+        {mode === "upload" && (
+          <div className="space-y-4">
+            <div 
+              onClick={handleUpload}
+              className="p-8 rounded-xl border-2 border-dashed border-white/10 hover:border-[#5de0e6]/30 transition-colors text-center cursor-pointer"
+            >
+              {uploading ? (
+                <div className="flex flex-col items-center gap-3">
+                  <div className="w-8 h-8 border-2 border-white/30 border-t-[#5de0e6] rounded-full animate-spin" />
+                  <p className="text-sm text-white/60">Enviando arquivo...</p>
+                </div>
+              ) : analyzing ? (
+                <div className="flex flex-col items-center gap-3">
+                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#5de0e6]/20 to-[#004aad]/20 flex items-center justify-center">
+                    <Sparkles className="w-6 h-6 text-[#5de0e6] animate-pulse" />
+                  </div>
+                  <p className="text-sm text-white/80 font-medium">IA analisando roteiro...</p>
+                  <p className="text-xs text-white/40">Extraindo atividades e horarios</p>
+                </div>
+              ) : (
+                <>
+                  <Upload className="w-8 h-8 mx-auto text-white/40 mb-3" />
+                  <p className="text-sm text-white/60">Arraste seu roteiro ou clique para selecionar</p>
+                  <p className="text-xs text-white/30 mt-1">PDF, imagem ou print de tela</p>
+                  <p className="text-xs text-[#5de0e6]/60 mt-2">A IA extraira as informacoes automaticamente</p>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+
+        {mode === "manual" && (
+          <div className="space-y-4">
+            <div>
+              <label className="text-xs text-white/50 uppercase tracking-wider">Titulo</label>
+              <input
+                type="text"
+                value={formData.title}
+                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                placeholder="Ex: Visita ao Museu do Louvre"
+                className="w-full mt-1 px-4 py-3 rounded-xl bg-white/[0.05] border border-white/[0.08] text-white placeholder:text-white/30 focus:outline-none focus:border-[#5de0e6]/50"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-white/50 uppercase tracking-wider">Horario</label>
+              <input
+                type="text"
+                value={formData.time}
+                onChange={(e) => setFormData({ ...formData, time: e.target.value })}
+                placeholder="Ex: 14:30"
+                className="w-full mt-1 px-4 py-3 rounded-xl bg-white/[0.05] border border-white/[0.08] text-white placeholder:text-white/30 focus:outline-none focus:border-[#5de0e6]/50"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-white/50 uppercase tracking-wider">Tipo</label>
+              <select
+                value={formData.type}
+                onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+                className="w-full mt-1 px-4 py-3 rounded-xl bg-[#0a0a0a] border border-white/[0.08] text-white focus:outline-none focus:border-[#5de0e6]/50 appearance-none"
+                style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='rgba(255,255,255,0.4)'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center', backgroundSize: '16px' }}
+              >
+                <option value="attraction" className="bg-[#0a0a0a] text-white">Atracao</option>
+                <option value="food" className="bg-[#0a0a0a] text-white">Alimentacao</option>
+                <option value="transport" className="bg-[#0a0a0a] text-white">Transporte</option>
+                <option value="hotel" className="bg-[#0a0a0a] text-white">Hospedagem</option>
+                <option value="experience" className="bg-[#0a0a0a] text-white">Experiencia</option>
+              </select>
+            </div>
+            <Button onClick={() => onSave(formData)} className="w-full bg-gradient-to-r from-[#5de0e6] to-[#004aad] hover:opacity-90 text-white border-0">
+              Adicionar Atividade
+            </Button>
+          </div>
+        )}
+      </div>
+    </Modal>
+  )
+}
+
+// Documents Section
+function DocumentsSection({ tripData, onAddDocument }: { tripData: any; onAddDocument: (data: any) => void }) {
+  const [showPrivate, setShowPrivate] = useState(false)
+  const [unlocked, setUnlocked] = useState(false)
+  const [addingDoc, setAddingDoc] = useState(false)
+  const [viewingDoc, setViewingDoc] = useState<any>(null)
+  const [pinModal, setPinModal] = useState(false)
+  const { isAdmin } = useContext(PermissionContext)
+  const { showToast } = useToast()
+
+  const publicDocs = tripData.documents.filter((d: any) => !d.private)
+  const privateDocs = tripData.documents.filter((d: any) => d.private)
+
+  const getDocIcon = (type: string) => {
+    switch (type) {
+      case "passport": return "🛂"
+      case "visa": return "📋"
+      case "insurance": return "🛡️"
+      case "voucher": return "🎫"
+      case "ticket": return "🎟️"
+      default: return "📄"
+    }
+  }
+
+  const handleUnlock = () => {
+    setPinModal(true)
+  }
+
+  return (
+    <section id="documents" className="py-12 px-4">
+      <div className="max-w-6xl mx-auto">
+        <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#004aad] to-[#5de0e6] flex items-center justify-center">
+              <FileText className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <h2 className="text-xl font-semibold text-white">Documentos</h2>
+              <p className="text-sm text-white/40">{tripData.documents.length} arquivos</p>
+            </div>
+          </div>
+          {isAdmin && (
+            <Button size="sm" variant="ghost" className="text-[#5de0e6] hover:bg-[#5de0e6]/10" onClick={() => setAddingDoc(true)}>
+              <Upload className="w-4 h-4 mr-2" />
+              Adicionar
+            </Button>
+          )}
+        </motion.div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+          {publicDocs.map((doc: any, i: number) => (
+            <motion.button
+              key={doc.id}
+              initial={{ opacity: 0, scale: 0.95 }}
+              whileInView={{ opacity: 1, scale: 1 }}
+              viewport={{ once: true }}
+              transition={{ delay: i * 0.05 }}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => setViewingDoc(doc)}
+              className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.06] hover:border-[#5de0e6]/30 transition-all duration-300 text-left"
+            >
+              <span className="text-2xl">{getDocIcon(doc.type)}</span>
+              <p className="text-sm text-white font-medium mt-2 truncate">{doc.name}</p>
+              <p className="text-xs text-white/40 mt-1">Compartilhavel</p>
+            </motion.button>
+          ))}
+        </div>
+
+        {isAdmin && (
+          <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="p-5 rounded-2xl bg-gradient-to-br from-white/[0.02] to-transparent border border-white/[0.06]">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-[#004aad]/30 flex items-center justify-center">
+                  <Lock className="w-4 h-4 text-[#5de0e6]" />
+                </div>
+                <div>
+                  <p className="text-sm text-white font-medium">Documentos Privados</p>
+                  <p className="text-xs text-white/40">{privateDocs.length} arquivos protegidos</p>
+                </div>
+              </div>
+              
+              {!unlocked ? (
+                <Button size="sm" onClick={handleUnlock} className="bg-gradient-to-r from-[#5de0e6] to-[#004aad] hover:opacity-90 text-white border-0">
+                  <Fingerprint className="w-4 h-4 mr-2" />
+                  Desbloquear
+                </Button>
+              ) : (
+                <Button size="sm" variant="ghost" onClick={() => setUnlocked(false)} className="text-white/60">
+                  <Lock className="w-4 h-4 mr-2" />
+                  Bloquear
+                </Button>
+              )}
+            </div>
+
+            <AnimatePresence>
+              {unlocked && (
+                <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.3 }} className="overflow-hidden">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-4 border-t border-white/[0.06]">
+                    {privateDocs.map((doc: any, i: number) => (
+                      <motion.button
+                        key={doc.id}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: i * 0.1 }}
+                        onClick={() => setViewingDoc(doc)}
+                        className="p-3 rounded-xl bg-[#004aad]/10 border border-[#004aad]/30 hover:border-[#5de0e6]/50 transition-all duration-300 text-left"
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="text-xl">{getDocIcon(doc.type)}</span>
+                          <Shield className="w-3 h-3 text-[#5de0e6]" />
+                        </div>
+                        <p className="text-sm text-white font-medium mt-2 truncate">{doc.name}</p>
+                      </motion.button>
+                    ))}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {!unlocked && <p className="text-xs text-white/30 text-center mt-3">Use PIN ou biometria para acessar documentos privados</p>}
+          </motion.div>
+        )}
+
+        <div className="mt-4 flex items-center gap-2 text-white/30">
+          <Shield className="w-4 h-4" />
+          <p className="text-xs">Documentos privados nao aparecem no link compartilhavel</p>
+        </div>
+      </div>
+
+      <PinModal open={pinModal} onClose={() => setPinModal(false)} onSuccess={() => { setUnlocked(true); setPinModal(false); showToast("Documentos desbloqueados!", "success") }} />
+      <ViewDocumentModal open={!!viewingDoc} onClose={() => setViewingDoc(null)} document={viewingDoc} />
+      <AddDocumentModal open={addingDoc} onClose={() => setAddingDoc(false)} onSave={(data) => { onAddDocument(data); showToast("Documento adicionado!", "success"); setAddingDoc(false) }} />
+    </section>
+  )
+}
+
+// PIN Modal
+function PinModal({ open, onClose, onSuccess }: { open: boolean; onClose: () => void; onSuccess: () => void }) {
+  const [pin, setPin] = useState("")
+
+  const handleSubmit = () => {
+    if (pin.length === 4) {
+      onSuccess()
+      setPin("")
+    }
+  }
+
+  return (
+    <Modal open={open} onClose={onClose} title="Desbloquear Documentos">
+      <div className="text-center">
+        <div className="w-16 h-16 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-[#5de0e6]/20 to-[#004aad]/20 flex items-center justify-center">
+          <Fingerprint className="w-8 h-8 text-[#5de0e6]" />
+        </div>
+        <p className="text-white/60 text-sm mb-6">Digite seu PIN de 4 digitos</p>
+        <div className="flex justify-center gap-3 mb-6">
+          {[0, 1, 2, 3].map((i) => (
+            <div key={i} className={cn(
+              "w-12 h-12 rounded-xl border flex items-center justify-center text-xl font-bold transition-all",
+              pin.length > i ? "bg-[#5de0e6]/20 border-[#5de0e6]/50 text-white" : "bg-white/[0.05] border-white/10 text-white/20"
+            )}>
+              {pin.length > i ? "•" : ""}
+            </div>
+          ))}
+        </div>
+        <input
+          type="tel"
+          maxLength={4}
+          value={pin}
+          onChange={(e) => setPin(e.target.value.replace(/\D/g, ""))}
+          className="w-full px-4 py-3 rounded-xl bg-white/[0.05] border border-white/[0.08] text-white text-center text-xl tracking-[1em] focus:outline-none focus:border-[#5de0e6]/50"
+          placeholder="• • • •"
+        />
+        <Button onClick={handleSubmit} disabled={pin.length !== 4} className="w-full mt-4 bg-gradient-to-r from-[#5de0e6] to-[#004aad] hover:opacity-90 text-white border-0 disabled:opacity-50">
+          Desbloquear
+        </Button>
+        <p className="text-xs text-white/30 mt-4">Use 1234 para testar</p>
+      </div>
+    </Modal>
+  )
+}
+
+// View Document Modal
+function ViewDocumentModal({ open, onClose, document }: { open: boolean; onClose: () => void; document: any }) {
+  if (!document) return null
+
+  const getDocIcon = (type: string) => {
+    switch (type) {
+      case "passport": return "🛂"
+      case "visa": return "📋"
+      case "insurance": return "🛡️"
+      case "voucher": return "🎫"
+      case "ticket": return "🎟️"
+      default: return "📄"
+    }
+  }
+
+  return (
+    <Modal open={open} onClose={onClose} title={document.name}>
+      <div className="text-center py-8">
+        <span className="text-6xl">{getDocIcon(document.type)}</span>
+        <p className="text-white font-medium mt-4">{document.name}</p>
+        <p className="text-white/40 text-sm mt-2">{document.private ? "Documento Privado" : "Documento Compartilhavel"}</p>
+        
+        <div className="mt-8 p-4 rounded-xl bg-white/[0.03] border border-white/[0.06]">
+          <p className="text-xs text-white/40">Preview do documento</p>
+          <div className="mt-4 h-48 bg-white/[0.02] rounded-xl flex items-center justify-center">
+            <p className="text-white/20 text-sm">Visualizacao do PDF/Imagem</p>
+          </div>
+        </div>
+
+        <div className="flex gap-3 mt-6">
+          <Button className="flex-1 bg-gradient-to-r from-[#5de0e6] to-[#004aad] hover:opacity-90 text-white border-0">
+            <Download className="w-4 h-4 mr-2" />
+            Baixar
+          </Button>
+          <Button variant="ghost" className="text-white/60 hover:bg-white/10">
+            <Share2 className="w-4 h-4" />
+          </Button>
+        </div>
+      </div>
+    </Modal>
+  )
+}
+
+// Add Document Modal
+function AddDocumentModal({ open, onClose, onSave }: { open: boolean; onClose: () => void; onSave: (data: any) => void }) {
+  const [formData, setFormData] = useState({ name: "", type: "voucher", private: false })
+  const [uploading, setUploading] = useState(false)
+
+  const handleUpload = () => {
+    setUploading(true)
+    setTimeout(() => {
+      setUploading(false)
+      onSave(formData)
+    }, 1500)
+  }
+
+  return (
+    <Modal open={open} onClose={onClose} title="Adicionar Documento">
+      <div className="space-y-4">
+        <div className="p-8 rounded-xl border-2 border-dashed border-white/10 hover:border-[#5de0e6]/30 transition-colors text-center cursor-pointer">
+          <Upload className="w-8 h-8 mx-auto text-white/40 mb-3" />
+          <p className="text-sm text-white/60">Arraste um arquivo ou clique para selecionar</p>
+          <p className="text-xs text-white/30 mt-1">PDF, PNG, JPG ate 10MB</p>
+        </div>
+
+        <div>
+          <label className="text-xs text-white/50 uppercase tracking-wider">Nome do documento</label>
+          <input
+            type="text"
+            value={formData.name}
+            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+            placeholder="Ex: Reserva do restaurante"
+            className="w-full mt-1 px-4 py-3 rounded-xl bg-white/[0.05] border border-white/[0.08] text-white placeholder:text-white/30 focus:outline-none focus:border-[#5de0e6]/50"
+          />
+        </div>
+
+        <div>
+          <label className="text-xs text-white/50 uppercase tracking-wider">Tipo</label>
+          <select
+            value={formData.type}
+            onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+            className="w-full mt-1 px-4 py-3 rounded-xl bg-[#0a0a0a] border border-white/[0.08] text-white focus:outline-none focus:border-[#5de0e6]/50 appearance-none"
+            style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='rgba(255,255,255,0.4)'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center', backgroundSize: '16px' }}
+          >
+            <option value="voucher" className="bg-[#0a0a0a] text-white">Voucher</option>
+            <option value="ticket" className="bg-[#0a0a0a] text-white">Ingresso</option>
+            <option value="insurance" className="bg-[#0a0a0a] text-white">Seguro</option>
+            <option value="passport" className="bg-[#0a0a0a] text-white">Passaporte</option>
+            <option value="visa" className="bg-[#0a0a0a] text-white">Visto</option>
+            <option value="other" className="bg-[#0a0a0a] text-white">Outro</option>
+          </select>
+        </div>
+
+        <div className="flex items-center gap-3 p-4 rounded-xl bg-white/[0.02] border border-white/[0.06]">
+          <input
+            type="checkbox"
+            id="private"
+            checked={formData.private}
+            onChange={(e) => setFormData({ ...formData, private: e.target.checked })}
+            className="w-4 h-4 rounded bg-white/10 border-white/20"
+          />
+          <div>
+            <label htmlFor="private" className="text-sm text-white font-medium">Documento privado</label>
+            <p className="text-xs text-white/40">Nao aparece no link compartilhavel</p>
+          </div>
+        </div>
+
+        <Button onClick={handleUpload} disabled={uploading || !formData.name} className="w-full bg-gradient-to-r from-[#5de0e6] to-[#004aad] hover:opacity-90 text-white border-0 disabled:opacity-50">
+          {uploading ? (
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              Enviando...
+            </div>
+          ) : (
+            "Adicionar Documento"
+          )}
+        </Button>
+      </div>
+    </Modal>
+  )
+}
+
+// Concierge Section
+function ConciergeSection({ tripData, onOpenCredits }: { tripData: any; onOpenCredits: () => void }) {
+  const [open, setOpen] = useState(false)
+  const [message, setMessage] = useState("")
+  const [messages, setMessages] = useState([
+    { role: "assistant", content: "Ola! Sou o concierge IA da sua viagem para Paris. Como posso ajudar?" }
+  ])
+  const [typing, setTyping] = useState(false)
+  const { isAdmin } = useContext(PermissionContext)
+  const { showToast } = useToast()
+
+  const suggestions = [
+    "Qual hotel eu vou ficar?",
+    "Mostra meu roteiro do dia 2",
+    "Onde fica meu portao de embarque?",
+    "Preciso de visto?"
+  ]
+
+  const mockResponses: Record<string, string> = {
+    "qual hotel eu vou ficar?": `Voce ficara hospedado no ${tripData.hotel.name}, localizado em ${tripData.hotel.address}. O check-in e dia ${tripData.hotel.checkIn} e o check-out ${tripData.hotel.checkOut}. O hotel possui ${tripData.hotel.amenities.join(", ")}.`,
+    "mostra meu roteiro do dia 2": `No dia 2 (16 Jun), o tema e "Torre Eiffel e Arredores". Voce comeca com cafe da manha no hotel as 09:00, visita a Torre Eiffel as 10:30 (destaque do dia!), almoco no Trocadero as 13:00, cruzeiro pelo Rio Sena as 15:00 e jantar em Montmartre as 19:00.`,
+    "onde fica meu portao de embarque?": `Seu voo de ida ${tripData.flights[0].flightNumber} embarca no Terminal ${tripData.flights[0].terminal}, Portao ${tripData.flights[0].gate}. Seu assento e ${tripData.flights[0].seat}.`,
+    "preciso de visto?": `Para cidadaos brasileiros visitando a Franca, e necessario o Visto Schengen para estadias superiores a 90 dias. Para sua viagem de ${tripData.hotel.nights} dias, nao e necessario visto de turismo. Basta o passaporte com validade de 6 meses.`
+  }
+
+  const handleSend = () => {
+    if (!message.trim()) return
+    
+    setMessages(prev => [...prev, { role: "user", content: message }])
+    const userMessage = message.toLowerCase()
+    setMessage("")
+    setTyping(true)
+    
+    setTimeout(() => {
+      const response = mockResponses[userMessage] || "Entendi sua pergunta! Deixa eu verificar as informacoes da sua viagem... Seu voo sai de Sao Paulo-Guarulhos as 22:30 do dia 15 de junho. Posso ajudar com mais alguma coisa?"
+      setMessages(prev => [...prev, { role: "assistant", content: response }])
+      setTyping(false)
+    }, 1500)
+  }
+
+  return (
+    <section id="concierge" className="py-12 px-4">
+      <div className="max-w-6xl mx-auto">
+        <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="flex items-center gap-3 mb-6">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#5de0e6] to-[#004aad] flex items-center justify-center">
+            <Sparkles className="w-5 h-5 text-white" />
+          </div>
+          <div>
+            <h2 className="text-xl font-semibold text-white">Concierge IA</h2>
+            <p className="text-sm text-white/40">Tire duvidas sobre sua viagem</p>
+          </div>
+        </motion.div>
+
+        <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="rounded-2xl bg-white/[0.02] backdrop-blur-xl border border-white/[0.06] overflow-hidden">
+          <div className="h-80 overflow-y-auto p-4 space-y-4">
+            {messages.map((msg, i) => (
+              <motion.div key={i} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className={cn("flex", msg.role === "user" ? "justify-end" : "justify-start")}>
+                <div className={cn("max-w-[80%] p-3 rounded-2xl", msg.role === "user" ? "bg-gradient-to-br from-[#5de0e6] to-[#004aad] text-white" : "bg-white/[0.05] text-white/90")}>
+                  {msg.role === "assistant" && (
+                    <div className="flex items-center gap-2 mb-1">
+                      <Sparkles className="w-3 h-3 text-[#5de0e6]" />
+                      <span className="text-[10px] text-[#5de0e6] font-medium">Concierge</span>
+                    </div>
+                  )}
+                  <p className="text-sm">{msg.content}</p>
+                </div>
+              </motion.div>
+            ))}
+            {typing && (
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex justify-start">
+                <div className="bg-white/[0.05] p-3 rounded-2xl">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="w-3 h-3 text-[#5de0e6]" />
+                    <div className="flex gap-1">
+                      <span className="w-2 h-2 bg-[#5de0e6]/50 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
+                      <span className="w-2 h-2 bg-[#5de0e6]/50 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
+                      <span className="w-2 h-2 bg-[#5de0e6]/50 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </div>
+
+          <div className="px-4 py-3 border-t border-white/[0.06]">
+            <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+              {suggestions.map((s, i) => (
+                <button key={i} onClick={() => setMessage(s)} className="flex-shrink-0 px-3 py-1.5 text-xs text-white/60 bg-white/[0.05] hover:bg-white/10 rounded-full transition-colors">
+                  {s}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="p-4 border-t border-white/[0.06]">
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                onKeyPress={(e) => e.key === "Enter" && handleSend()}
+                placeholder="Pergunte sobre sua viagem..."
+                className="flex-1 px-4 py-3 rounded-xl bg-white/[0.05] border border-white/[0.08] text-white placeholder:text-white/30 focus:outline-none focus:border-[#5de0e6]/50 transition-colors"
+              />
+              <Button onClick={handleSend} className="bg-gradient-to-r from-[#5de0e6] to-[#004aad] hover:opacity-90 text-white border-0">
+                <Send className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
+
+          <div className="px-4 py-3 bg-white/[0.02] border-t border-white/[0.06] flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <CreditCard className="w-4 h-4 text-[#5de0e6]" />
+              <span className="text-xs text-white/40">{tripData.credits.balance} creditos restantes</span>
+            </div>
+            <Button size="sm" variant="ghost" onClick={onOpenCredits} className="text-[#5de0e6] text-xs">
+              Comprar mais
+            </Button>
+          </div>
+        </motion.div>
+      </div>
+    </section>
+  )
+}
+
+// Sharing Modal
+function ShareModal({ open, onClose, tripData }: { open: boolean; onClose: () => void; tripData: any }) {
+  const [copied, setCopied] = useState<string | null>(null)
+  const { showToast } = useToast()
+
+  const handleCopy = (type: string, link: string) => {
+    navigator.clipboard.writeText(link)
+    setCopied(type)
+    showToast("Link copiado!", "success")
+    setTimeout(() => setCopied(null), 2000)
+  }
+
+  return (
+    <Modal open={open} onClose={onClose} title="Compartilhar Viagem">
+      <div className="space-y-4">
+        <div className="p-4 rounded-xl bg-gradient-to-br from-[#5de0e6]/10 to-[#004aad]/10 border border-[#5de0e6]/20">
+          <div className="flex items-center gap-2 mb-3">
+            <Lock className="w-4 h-4 text-[#5de0e6]" />
+            <span className="text-sm font-medium text-white">Link Administrador</span>
+          </div>
+          <p className="text-xs text-white/40 mb-3">Acesso completo a todos os documentos</p>
+          <div className="flex items-center gap-2 p-3 rounded-xl bg-black/30">
+            <code className="flex-1 text-xs text-white/60 truncate">{tripData.adminLink}</code>
+            <Button size="sm" variant="ghost" onClick={() => handleCopy("admin", `https://${tripData.adminLink}`)} className="text-[#5de0e6]">
+              {copied === "admin" ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+            </Button>
+          </div>
+        </div>
+
+        <div className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.06]">
+          <div className="flex items-center gap-2 mb-3">
+            <Globe className="w-4 h-4 text-white/60" />
+            <span className="text-sm font-medium text-white">Link Compartilhavel</span>
+          </div>
+          <p className="text-xs text-white/40 mb-3">Sem documentos privados</p>
+          <div className="flex items-center gap-2 p-3 rounded-xl bg-white/[0.03]">
+            <code className="flex-1 text-xs text-white/60 truncate">{tripData.shareLink}</code>
+            <Button size="sm" variant="ghost" onClick={() => handleCopy("public", `https://${tripData.shareLink}`)} className="text-white/60">
+              {copied === "public" ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+            </Button>
+          </div>
+        </div>
+
+        <div className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.06]">
+          <p className="text-sm text-white font-medium mb-2">Compartilhar via</p>
+          <div className="flex gap-3">
+            <button onClick={() => showToast("Abrindo WhatsApp...", "info")} className="flex-1 p-3 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 text-sm font-medium transition-colors">
+              WhatsApp
+            </button>
+            <button onClick={() => showToast("Abrindo Email...", "info")} className="flex-1 p-3 rounded-xl bg-white/[0.05] hover:bg-white/10 border border-white/10 text-white/60 text-sm font-medium transition-colors">
+              Email
+            </button>
+          </div>
+        </div>
+
+        <div className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.06] flex items-start gap-3">
+          <Shield className="w-5 h-5 text-[#5de0e6] flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm text-white font-medium">Privacidade garantida</p>
+            <p className="text-xs text-white/40 mt-1">Documentos privados (passaportes, vistos) nao aparecem no link compartilhavel.</p>
+          </div>
+        </div>
+      </div>
+    </Modal>
+  )
+}
+
+// Menu Modal
+function MenuModal({
+  open,
+  onClose,
+  onOpenTravelers,
+  onOpenSettings,
+  onOpenCredits,
+}: {
+  open: boolean
+  onClose: () => void
+  onOpenTravelers: () => void
+  onOpenSettings: () => void
+  onOpenCredits: () => void
+}) {
+  const menuItems = [
+    { icon: User, label: "Viajantes", action: onOpenTravelers },
+    { icon: Settings, label: "Configuracoes", action: onOpenSettings },
+    { icon: CreditCard, label: "Credito", action: onOpenCredits },
+  ]
+
+  return (
+    <BottomSheet open={open} onClose={onClose} title="Menu da Viagem">
+      <div className="space-y-2">
+        {menuItems.map((item, i) => (
+          <button
+            key={i}
+            onClick={() => { item.action(); onClose() }}
+            className="w-full flex items-center gap-4 p-4 rounded-xl bg-white/[0.02] hover:bg-white/[0.05] border border-white/[0.06] transition-colors text-left"
+          >
+            <div className="w-10 h-10 rounded-xl bg-white/[0.05] flex items-center justify-center">
+              <item.icon className="w-5 h-5 text-white/60" />
+            </div>
+            <span className="text-white font-medium">{item.label}</span>
+          </button>
+        ))}
+      </div>
+    </BottomSheet>
+  )
+}
+
+function TravelersModal({
+  open,
+  onClose,
+  travelers,
+  onUpdateTravelers,
+}: {
+  open: boolean
+  onClose: () => void
+  travelers: { name: string; avatar?: string; role: string }[]
+  onUpdateTravelers: (travelers: { name: string; avatar?: string; role: string }[]) => void
+}) {
+  const { showToast } = useToast()
+  const [editingIndex, setEditingIndex] = useState<number | null>(null)
+  const [form, setForm] = useState({ name: "", role: "acompanhante" })
+
+  const startEditing = (index: number) => {
+    setEditingIndex(index)
+    setForm({ name: travelers[index]?.name ?? "", role: travelers[index]?.role ?? "acompanhante" })
+  }
+
+  const resetForm = () => {
+    setEditingIndex(null)
+    setForm({ name: "", role: "acompanhante" })
+  }
+
+  const handleSave = () => {
+    if (!form.name.trim()) return
+
+    if (editingIndex === null) {
+      onUpdateTravelers([...travelers, { name: form.name.trim(), role: form.role, avatar: "/placeholder.svg?height=40&width=40" }])
+      showToast("Viajante adicionado.", "success")
+    } else {
+      onUpdateTravelers(travelers.map((traveler, index) => index === editingIndex ? { ...traveler, name: form.name.trim(), role: form.role } : traveler))
+      showToast("Viajante atualizado.", "success")
+    }
+
+    resetForm()
+  }
+
+  const handleRemove = (index: number) => {
+    onUpdateTravelers(travelers.filter((_, travelerIndex) => travelerIndex !== index))
+    showToast("Viajante removido.", "success")
+    if (editingIndex === index) resetForm()
+  }
+
+  const handleSetPrimary = (index: number) => {
+    onUpdateTravelers(travelers.map((traveler, travelerIndex) => ({
+      ...traveler,
+      role: travelerIndex === index ? "principal" : traveler.role === "principal" ? "acompanhante" : traveler.role
+    })))
+    showToast("Responsavel principal atualizado.", "success")
+  }
+
+  return (
+    <Modal open={open} onClose={onClose} title="Viajantes">
+      <div className="space-y-6">
+        <div className="space-y-3">
+          {travelers.map((traveler, index) => (
+            <div key={`${traveler.name}-${index}`} className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="font-medium text-white">{traveler.name}</p>
+                  <p className="text-xs text-white/40">{traveler.role === "principal" ? "Responsavel principal" : "Viajante"}</p>
+                </div>
+                <div className="flex gap-2">
+                  <button onClick={() => startEditing(index)} className="rounded-xl bg-white/[0.05] p-2 text-white/60 transition-colors hover:bg-white/10 hover:text-white">
+                    <Pencil className="h-4 w-4" />
+                  </button>
+                  <button onClick={() => handleRemove(index)} className="rounded-xl bg-red-500/10 p-2 text-red-300 transition-colors hover:bg-red-500/20">
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+              {traveler.role !== "principal" && (
+                <button onClick={() => handleSetPrimary(index)} className="mt-3 text-xs font-medium text-[#5de0e6]">
+                  Definir como responsavel principal
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+
+        <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4">
+          <p className="mb-4 text-sm font-medium text-white">{editingIndex === null ? "Adicionar viajante" : "Editar viajante"}</p>
+          <div className="space-y-3">
+            <Input value={form.name} onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))} placeholder="Nome do viajante" className="border-white/10 bg-white/[0.03] text-white" />
+            <div className="grid grid-cols-2 gap-2">
+              {["principal", "acompanhante"].map((role) => (
+                <button
+                  key={role}
+                  onClick={() => setForm((prev) => ({ ...prev, role }))}
+                  className={cn(
+                    "rounded-xl border px-3 py-2 text-sm transition-colors",
+                    form.role === role ? "border-[#5de0e6]/40 bg-[#5de0e6]/10 text-[#5de0e6]" : "border-white/10 bg-white/[0.03] text-white/60"
+                  )}
+                >
+                  {role === "principal" ? "Principal" : "Acompanhante"}
+                </button>
+              ))}
+            </div>
+            <div className="flex gap-3">
+              <Button variant="outline" className="flex-1 border-white/10" onClick={resetForm}>
+                Limpar
+              </Button>
+              <Button className="flex-1 bg-gradient-to-r from-[#5de0e6] to-[#004aad] text-white" onClick={handleSave}>
+                {editingIndex === null ? "Adicionar" : "Salvar"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </Modal>
+  )
+}
+
+function TripSettingsModal({
+  open,
+  onClose,
+  tripData,
+  onSave,
+}: {
+  open: boolean
+  onClose: () => void
+  tripData: any
+  onSave: (data: { privacy: string; permissions: string; status: string; preferences: string }) => void
+}) {
+  const [form, setForm] = useState({
+    preferences: "Roteiro premium com foco em experiencias culturais e gastronomia.",
+    privacy: "privado",
+    permissions: "edicao_restrita",
+    status: tripData.status ?? "upcoming",
+  })
+
+  useEffect(() => {
+    if (open) {
+      setForm((prev) => ({ ...prev, status: tripData.status ?? prev.status }))
+    }
+  }, [open, tripData.status])
+
+  return (
+    <Modal open={open} onClose={onClose} title="Configuracoes">
+      <div className="space-y-4">
+        <div>
+          <Label className="text-white/60">Preferencias da viagem</Label>
+          <textarea
+            value={form.preferences}
+            onChange={(e) => setForm((prev) => ({ ...prev, preferences: e.target.value }))}
+            className="mt-2 min-h-[110px] w-full rounded-2xl border border-white/10 bg-white/[0.03] p-4 text-sm text-white outline-none"
+          />
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div>
+            <Label className="text-white/60">Privacidade</Label>
+            <div className="mt-2 grid gap-2">
+              {["privado", "compartilhavel"].map((privacy) => (
+                <button
+                  key={privacy}
+                  onClick={() => setForm((prev) => ({ ...prev, privacy }))}
+                  className={cn(
+                    "rounded-xl border px-3 py-2 text-left text-sm transition-colors",
+                    form.privacy === privacy ? "border-[#5de0e6]/40 bg-[#5de0e6]/10 text-[#5de0e6]" : "border-white/10 bg-white/[0.03] text-white/60"
+                  )}
+                >
+                  {privacy === "privado" ? "Somente administradores" : "Liberar link compartilhavel"}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <Label className="text-white/60">Permissoes</Label>
+            <div className="mt-2 grid gap-2">
+              {["edicao_restrita", "colaborativa"].map((permission) => (
+                <button
+                  key={permission}
+                  onClick={() => setForm((prev) => ({ ...prev, permissions: permission }))}
+                  className={cn(
+                    "rounded-xl border px-3 py-2 text-left text-sm transition-colors",
+                    form.permissions === permission ? "border-[#5de0e6]/40 bg-[#5de0e6]/10 text-[#5de0e6]" : "border-white/10 bg-white/[0.03] text-white/60"
+                  )}
+                >
+                  {permission === "edicao_restrita" ? "Somente equipe principal" : "Edicao colaborativa"}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+        <div>
+          <Label className="text-white/60">Status da viagem</Label>
+          <div className="mt-2 grid grid-cols-3 gap-2">
+            {["upcoming", "ongoing", "completed"].map((status) => (
+              <button
+                key={status}
+                onClick={() => setForm((prev) => ({ ...prev, status }))}
+                className={cn(
+                  "rounded-xl border px-3 py-2 text-sm transition-colors",
+                  form.status === status ? "border-[#5de0e6]/40 bg-[#5de0e6]/10 text-[#5de0e6]" : "border-white/10 bg-white/[0.03] text-white/60"
+                )}
+              >
+                {status === "upcoming" ? "Planejada" : status === "ongoing" ? "Em andamento" : "Concluida"}
+              </button>
+            ))}
+          </div>
+        </div>
+        <Button className="w-full bg-gradient-to-r from-[#5de0e6] to-[#004aad] text-white" onClick={() => onSave(form)}>
+          Salvar configuracoes
+        </Button>
+      </div>
+    </Modal>
+  )
+}
+
+// Offline Section
+function OfflineSection() {
+  const [downloading, setDownloading] = useState(false)
+  const [downloaded, setDownloaded] = useState(false)
+  const { showToast } = useToast()
+
+  const handleDownload = () => {
+    setDownloading(true)
+    setTimeout(() => {
+      setDownloading(false)
+      setDownloaded(true)
+      showToast("Viagem salva offline!", "success")
+    }, 2000)
+  }
+
+  return (
+    <section id="offline" className="py-12 px-4">
+      <div className="max-w-6xl mx-auto">
+        <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="flex items-center gap-3 mb-6">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#004aad] to-[#5de0e6] flex items-center justify-center">
+            <WifiOff className="w-5 h-5 text-white" />
+          </div>
+          <div>
+            <h2 className="text-xl font-semibold text-white">Acesso Offline</h2>
+            <p className="text-sm text-white/40">Salve sua viagem para acessar sem internet</p>
+          </div>
+        </motion.div>
+
+        <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="p-6 rounded-2xl bg-gradient-to-br from-white/[0.03] to-transparent border border-white/[0.06]">
+          <div className="flex flex-col sm:flex-row items-center gap-6">
+            <div className="flex-1 text-center sm:text-left">
+              <h3 className="text-lg font-medium text-white mb-2">{downloaded ? "Viagem salva offline!" : "Salvar viagem offline"}</h3>
+              <p className="text-sm text-white/40 mb-4">{downloaded ? "Todos os seus documentos, vouchers e roteiros estao disponiveis mesmo sem internet." : "Baixe roteiros, documentos e vouchers para acessar durante a viagem, mesmo sem conexao."}</p>
+              
+              <div className="flex flex-wrap gap-2 justify-center sm:justify-start">
+                {["Roteiro", "Vouchers", "Documentos", "Contatos"].map((item) => (
+                  <span key={item} className={cn("px-3 py-1 text-xs rounded-full", downloaded ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30" : "bg-white/[0.05] text-white/40")}>
+                    {downloaded && <Check className="w-3 h-3 inline mr-1" />}
+                    {item}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            <Button onClick={handleDownload} disabled={downloading || downloaded} className={cn("px-6 py-6 rounded-xl transition-all duration-300", downloaded ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30" : "bg-gradient-to-r from-[#5de0e6] to-[#004aad] hover:opacity-90 text-white border-0")}>
+              {downloading ? (
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  <span>Baixando...</span>
+                </div>
+              ) : downloaded ? (
+                <div className="flex items-center gap-2">
+                  <Check className="w-5 h-5" />
+                  <span>Salvo</span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <Download className="w-5 h-5" />
+                  <span>Salvar Offline</span>
+                </div>
+              )}
+            </Button>
+          </div>
+        </motion.div>
+      </div>
+    </section>
+  )
+}
+
+// Quick Info Section
+function QuickInfoSection({ tripData }: { tripData: any }) {
+  const [expanded, setExpanded] = useState<string | null>(null)
+  const { showToast } = useToast()
+
+  const infoCards = [
+    { id: "currency", icon: "💶", label: "Moeda", value: tripData.quickInfo.currency.name, sub: `1 ${tripData.quickInfo.currency.symbol} = ${tripData.quickInfo.currency.rate}`, detail: "Taxa de cambio atualizada. Recomendamos levar Euros em especie e usar cartao internacional." },
+    { id: "language", icon: "🗣️", label: "Idioma", value: tripData.quickInfo.language, detail: "O frances e o idioma oficial. Ingles e amplamente falado em areas turisticas." },
+    { id: "timezone", icon: "🕐", label: "Fuso Horario", value: tripData.quickInfo.timezone, detail: "Paris esta 4 horas a frente do horario de Brasilia (GMT+2)." },
+    { id: "emergency", icon: "🆘", label: "Emergencia", value: tripData.quickInfo.emergency, detail: "Numero unico de emergencia europeu. Funciona para policia, bombeiros e ambulancia." },
+    { id: "embassy", icon: "🏛️", label: "Embaixada BR", value: tripData.quickInfo.embassy, detail: "Embaixada do Brasil em Paris. Aberta de segunda a sexta, 9h-13h e 14h30-17h." },
+  ]
+
+  return (
+    <section className="py-12 px-4">
+      <div className="max-w-6xl mx-auto">
+        <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="flex items-center gap-3 mb-6">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#5de0e6]/50 to-[#004aad]/50 flex items-center justify-center">
+            <AlertCircle className="w-5 h-5 text-white" />
+          </div>
+          <div>
+            <h2 className="text-xl font-semibold text-white">Informacoes Rapidas</h2>
+            <p className="text-sm text-white/40">Dados uteis sobre o destino</p>
+          </div>
+        </motion.div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+          {infoCards.map((card, i) => (
+            <motion.button
+              key={card.id}
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ delay: i * 0.05 }}
+              onClick={() => setExpanded(expanded === card.id ? null : card.id)}
+              className={cn(
+                "p-4 rounded-xl border transition-all duration-300 text-left",
+                expanded === card.id
+                  ? "bg-gradient-to-br from-[#5de0e6]/10 to-[#004aad]/10 border-[#5de0e6]/30"
+                  : "bg-white/[0.02] border-white/[0.06] hover:border-white/10"
+              )}
+            >
+              <span className="text-2xl">{card.icon}</span>
+              <p className="text-[10px] text-white/40 uppercase tracking-wider mt-2">{card.label}</p>
+              <p className="text-sm text-white font-medium mt-1">{card.value}</p>
+              {card.sub && <p className="text-xs text-white/30 mt-0.5">{card.sub}</p>}
+              
+              <AnimatePresence>
+                {expanded === card.id && (
+                  <motion.p
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: "auto", opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    className="text-xs text-white/50 mt-3 pt-3 border-t border-white/10"
+                  >
+                    {card.detail}
+                  </motion.p>
+                )}
+              </AnimatePresence>
+            </motion.button>
+          ))}
+        </div>
+      </div>
+    </section>
+  )
+}
+
+// Credits Modal
+function CreditsModal({ open, onClose, credits }: { open: boolean; onClose: () => void; credits: any }) {
+  const { showToast } = useToast()
+
+  const plans = [
+    { name: "Pacote Basico", credits: 50, price: "R$ 19,90", popular: false, mode: "Compra" },
+    { name: "Pacote Viajante", credits: 150, price: "R$ 39,90", popular: true, mode: "Compra" },
+    { name: "Plano Premium", credits: 500, price: "R$ 99,90", popular: false, mode: "Upgrade" },
+  ]
+
+  return (
+    <Modal open={open} onClose={onClose} title="Creditos">
+      <div className="space-y-6">
+        <div className="text-center p-6 rounded-2xl bg-gradient-to-br from-[#5de0e6]/10 to-[#004aad]/10 border border-[#5de0e6]/20">
+          <p className="text-4xl font-bold text-white">{credits.balance}</p>
+          <p className="text-sm text-white/60 mt-1">creditos disponiveis</p>
+          <div className="w-full h-2 bg-white/10 rounded-full mt-4">
+            <div className="h-full bg-gradient-to-r from-[#5de0e6] to-[#004aad] rounded-full" style={{ width: `${(credits.balance / credits.total) * 100}%` }} />
+          </div>
+          <p className="text-xs text-white/40 mt-2">{credits.used} usados de {credits.total}</p>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4">
+            <p className="text-xs text-white/40">Consumo da viagem</p>
+            <p className="mt-2 text-2xl font-semibold text-white">{credits.used}</p>
+          </div>
+          <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4">
+            <p className="text-xs text-white/40">Saldo atual</p>
+            <p className="mt-2 text-2xl font-semibold text-white">{credits.balance}</p>
+          </div>
+        </div>
+
+        <div>
+          <p className="text-sm text-white font-medium mb-3">Comprar mais ou fazer upgrade</p>
+          <div className="space-y-3">
+            {plans.map((plan) => (
+              <button
+                key={plan.name}
+                onClick={() => showToast(`${plan.mode} mock iniciado para ${plan.name}.`, "success")}
+                className={cn(
+                  "w-full p-4 rounded-xl border transition-all flex items-center justify-between",
+                  plan.popular
+                    ? "bg-gradient-to-br from-[#5de0e6]/10 to-[#004aad]/10 border-[#5de0e6]/30"
+                    : "bg-white/[0.02] border-white/[0.06] hover:border-white/10"
+                )}
+                >
+                <div className="flex items-center gap-3">
+                  <div className="text-left">
+                    <p className="text-white font-medium">{plan.name}</p>
+                    <p className="text-xs text-white/40">{plan.credits} creditos • {plan.mode}</p>
+                  </div>
+                  {plan.popular && (
+                    <span className="px-2 py-0.5 text-[10px] font-bold bg-[#5de0e6] text-black rounded-full">POPULAR</span>
+                  )}
+                </div>
+                <p className="text-[#5de0e6] font-semibold">{plan.price}</p>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4">
+          <p className="mb-3 text-sm font-medium text-white">Historico resumido</p>
+          <div className="space-y-2 text-sm text-white/60">
+            <div className="flex items-center justify-between">
+              <span>Roteiro com IA</span>
+              <span>-2 creditos</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span>Concierge da viagem</span>
+              <span>-1 credito</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span>Ajuste do link</span>
+              <span>-0 credito</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </Modal>
+  )
+}
+
+// Footer
+function TripFooter() {
+  return (
+    <footer className="py-12 px-4 border-t border-white/[0.06]">
+      <div className="max-w-6xl mx-auto">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <Image src="/vuei-logo.png" alt="Vuei" width={80} height={32} className="h-6 w-auto opacity-60" />
+            <span className="text-sm text-white/30">Sua viagem inteligente</span>
+          </div>
+          <div className="flex items-center gap-6">
+            <a href="/suporte" className="text-xs text-white/40 hover:text-white/60 transition-colors">Suporte</a>
+            <a href="/termos" className="text-xs text-white/40 hover:text-white/60 transition-colors">Termos</a>
+            <a href="/privacidade" className="text-xs text-white/40 hover:text-white/60 transition-colors">Privacidade</a>
+          </div>
+        </div>
+      </div>
+    </footer>
+  )
+}
+
+// Main page component
+export default function TripPage() {
+  const params = useParams<{ id: string }>()
+  const [tripData, setTripData] = useState(initialTripData)
+  const [isAdmin, setIsAdmin] = useState(false)
+  const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "info" } | null>(null)
+  const [shareOpen, setShareOpen] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
+  const [editTripOpen, setEditTripOpen] = useState(false)
+  const [travelersOpen, setTravelersOpen] = useState(false)
+  const [tripSettingsOpen, setTripSettingsOpen] = useState(false)
+  const [creditsOpen, setCreditsOpen] = useState(false)
+
+  useEffect(() => {
+    if (typeof window === "undefined") return
+
+    const routeSlug = typeof params?.id === "string" ? params.id : initialTripData.id
+    const searchParams = new URLSearchParams(window.location.search)
+    const isAdminView = searchParams.get("admin") === "true"
+    setIsAdmin(isAdminView)
+
+    const loadTrip = async () => {
+      try {
+        const repositoryTrip = await getTripBySlug(routeSlug)
+        if (repositoryTrip.data) {
+          setTripData(
+            buildTripDataFromStoredTrip({
+              id: repositoryTrip.data.id,
+              slug: repositoryTrip.data.slug,
+              name: repositoryTrip.data.title,
+              destination: repositoryTrip.data.destination,
+              country: repositoryTrip.data.country ?? undefined,
+              startDate: repositoryTrip.data.startDate ?? undefined,
+              endDate: repositoryTrip.data.endDate ?? undefined,
+              passengersCount: repositoryTrip.data.travelersCount,
+              status: repositoryTrip.data.status,
+              coverImage: repositoryTrip.data.coverImage ?? undefined,
+              adminLink: repositoryTrip.data.adminLink,
+              shareLink: repositoryTrip.data.publicLink,
+            })
+          )
+          return
+        }
+      } catch {
+        // segue para fallback local
+      }
+
+      try {
+        const portalTrips = extractTripsStoragePayload(window.localStorage.getItem(TRIPS_STORAGE_KEY)).trips
+        const agencyTrips = extractAgencyStorageState(window.localStorage.getItem(AGENCY_STORAGE_KEY)).trips
+        const allTrips = [...portalTrips, ...agencyTrips]
+        const matchedTrip = allTrips.find((trip) => trip.slug === routeSlug || trip.id === routeSlug)
+
+        if (matchedTrip) {
+          setTripData(buildTripDataFromStoredTrip(matchedTrip))
+        }
+      } catch {
+        // fallback silencioso para o mock default
+      }
+    }
+
+    void loadTrip()
+  }, [params])
+
+  const showToast = (message: string, type: "success" | "error" | "info" = "success") => {
+    setToast({ message, type })
+  }
+
+  const handleNavigate = (section: string) => {
+    if (section === "concierge") {
+      document.getElementById("concierge")?.scrollIntoView({ behavior: "smooth" })
+    } else if (section === "credits") {
+      setCreditsOpen(true)
+    } else {
+      document.getElementById(section)?.scrollIntoView({ behavior: "smooth" })
+    }
+  }
+
+  const handleUpdateTrip = (data: any) => {
+    setTripData(prev => ({
+      ...prev,
+      destination: data.destination,
+      country: data.country,
+      dates: { start: data.startDate, end: data.endDate },
+      status: data.status
+    }))
+    showToast("Viagem atualizada!", "success")
+  }
+
+  const handleUpdateFlight = (id: number, data: any) => {
+  setTripData(prev => ({
+  ...prev,
+  flights: prev.flights.map(f => f.id === id ? data : f)
+  }))
+  }
+
+  const handleAddFlight = (data: any) => {
+    setTripData(prev => ({
+      ...prev,
+      flights: [...prev.flights, { ...data, id: Date.now() }]
+    }))
+  }
+
+  const handleUpdateHotel = (data: any) => {
+    setTripData(prev => ({ ...prev, hotel: data }))
+  }
+
+  const handleUpdateItinerary = (data: any) => {
+    setTripData(prev => ({ ...prev, itinerary: data }))
+  }
+
+  const handleAddDocument = (data: any) => {
+    setTripData(prev => ({
+      ...prev,
+      documents: [...prev.documents, { ...data, id: prev.documents.length + 1 }]
+    }))
+  }
+
+  const handleUpdateTravelers = (travelers: { name: string; avatar?: string; role: string }[]) => {
+    setTripData(prev => ({ ...prev, travelers }))
+  }
+
+  const handleSaveTripSettings = (data: { privacy: string; permissions: string; status: string; preferences: string }) => {
+    setTripData(prev => ({ ...prev, status: data.status, tripPreferences: data }))
+    setTripSettingsOpen(false)
+    showToast("Configuracoes da viagem atualizadas.", "success")
+  }
+
+  return (
+    <PermissionContext.Provider value={{ isAdmin, setIsAdmin }}>
+      <ToastContext.Provider value={{ showToast }}>
+        <main className="min-h-screen bg-black text-white">
+          <div className="fixed inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-[#004aad]/10 via-transparent to-transparent pointer-events-none" />
+          <div className="fixed inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxwYXRoIGQ9Ik0wIDBoNjB2NjBIMHoiLz48cGF0aCBkPSJNMzAgMzBoMXYxaC0xeiIgZmlsbD0icmdiYSgyNTUsMjU1LDI1NSwwLjAzKSIvPjwvZz48L3N2Zz4=')] pointer-events-none opacity-50" />
+          <FloatingParticles />
+
+          <TripHeader tripData={tripData} onOpenShare={() => setShareOpen(true)} onOpenMenu={() => setMenuOpen(true)} />
+          <TripHero tripData={tripData} onEditTrip={() => setEditTripOpen(true)} />
+          <QuickAccessCards onNavigate={handleNavigate} />
+  <FlightsSection tripData={tripData} onUpdateFlight={handleUpdateFlight} onAddFlight={handleAddFlight} />
+  <HotelSection tripData={tripData} onUpdateHotel={handleUpdateHotel} />
+  <ItinerarySection tripData={tripData} onUpdateItinerary={handleUpdateItinerary} />
+  <DocumentsSection tripData={tripData} onAddDocument={handleAddDocument} />
+  <ConciergeSection tripData={tripData} onOpenCredits={() => setCreditsOpen(true)} />
+          <OfflineSection />
+          <QuickInfoSection tripData={tripData} />
+          <TripFooter />
+
+          <ShareModal open={shareOpen} onClose={() => setShareOpen(false)} tripData={tripData} />
+          <MenuModal
+            open={menuOpen}
+            onClose={() => setMenuOpen(false)}
+            onOpenTravelers={() => {
+              setMenuOpen(false)
+              setTravelersOpen(true)
+            }}
+            onOpenSettings={() => {
+              setMenuOpen(false)
+              setTripSettingsOpen(true)
+            }}
+            onOpenCredits={() => {
+              setMenuOpen(false)
+              setCreditsOpen(true)
+            }}
+          />
+          <EditTripModal open={editTripOpen} onClose={() => setEditTripOpen(false)} tripData={tripData} onSave={handleUpdateTrip} />
+          <TravelersModal open={travelersOpen} onClose={() => setTravelersOpen(false)} travelers={tripData.travelers} onUpdateTravelers={handleUpdateTravelers} />
+          <TripSettingsModal open={tripSettingsOpen} onClose={() => setTripSettingsOpen(false)} tripData={tripData} onSave={handleSaveTripSettings} />
+          <CreditsModal open={creditsOpen} onClose={() => setCreditsOpen(false)} credits={tripData.credits} />
+
+          <AnimatePresence>
+            {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+          </AnimatePresence>
+        </main>
+      </ToastContext.Provider>
+    </PermissionContext.Provider>
+  )
+}

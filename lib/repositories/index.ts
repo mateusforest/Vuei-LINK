@@ -1,0 +1,7 @@
+export * from "./profiles-repository"
+export * from "./agencies-repository"
+export * from "./clients-repository"
+export * from "./trips-repository"
+export * from "./documents-repository"
+export * from "./credits-repository"
+export * from "./ai-repository"

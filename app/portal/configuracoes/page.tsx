@@ -1,0 +1,526 @@
+"use client"
+
+import { useEffect, useMemo, useState } from "react"
+import { motion } from "framer-motion"
+import Image from "next/image"
+import {
+  User,
+  Lock,
+  Bell,
+  Fingerprint,
+  Shield,
+  Crown,
+  ChevronRight,
+  LogOut,
+  Moon,
+  Globe,
+  HelpCircle,
+  FileText,
+  Trash2,
+  Camera,
+  Check,
+} from "lucide-react"
+import { Card } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Switch } from "@/components/ui/switch"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { useRouter } from "next/navigation"
+import { useAuth } from "@/contexts/auth-context"
+
+const fadeInUp = {
+  initial: { opacity: 0, y: 20 },
+  animate: { opacity: 1, y: 0 },
+  transition: { duration: 0.5 }
+}
+
+const staggerContainer = {
+  animate: {
+    transition: {
+      staggerChildren: 0.1
+    }
+  }
+}
+
+const STORAGE_KEY = "vuei_portal_settings"
+
+const defaultProfile = {
+  name: "Viajante",
+  email: "viajante@email.com",
+  phone: "+55 11 99999-0000",
+  plan: "Premium",
+  avatar: "",
+  createdAt: "Janeiro 2024",
+}
+
+const defaultSettings = {
+  faceId: true,
+  pinEnabled: true,
+  notifications: true,
+  darkMode: true,
+  language: "pt-BR",
+  pin: "1234",
+}
+
+function SettingsToast({ message }: { message: string }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: 16 }}
+      className="fixed bottom-24 left-1/2 z-50 flex -translate-x-1/2 items-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/20 px-4 py-2 text-sm text-emerald-400"
+    >
+      <Check size={16} />
+      {message}
+    </motion.div>
+  )
+}
+
+export default function ConfiguracoesPage() {
+  const router = useRouter()
+  const { signOut } = useAuth()
+  const [profile, setProfile] = useState(defaultProfile)
+  const [settings, setSettings] = useState(defaultSettings)
+  const [toastMessage, setToastMessage] = useState("")
+  const [showPhotoModal, setShowPhotoModal] = useState(false)
+  const [showProfileModal, setShowProfileModal] = useState(false)
+  const [showBiometricModal, setShowBiometricModal] = useState(false)
+  const [showPinModal, setShowPinModal] = useState(false)
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [profileForm, setProfileForm] = useState(defaultProfile)
+  const [photoPreview, setPhotoPreview] = useState("")
+  const [pinForm, setPinForm] = useState({ pin: "", confirmPin: "" })
+
+  useEffect(() => {
+    if (typeof window === "undefined") return
+
+    const saved = window.localStorage.getItem(STORAGE_KEY)
+    if (!saved) return
+
+    try {
+      const parsed = JSON.parse(saved)
+      if (parsed.profile) {
+        setProfile({ ...defaultProfile, ...parsed.profile })
+        setProfileForm({ ...defaultProfile, ...parsed.profile })
+        setPhotoPreview(parsed.profile.avatar ?? "")
+      }
+      if (parsed.settings) {
+        setSettings({ ...defaultSettings, ...parsed.settings })
+      }
+    } catch {
+      // fallback silencioso
+    }
+  }, [])
+
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ profile, settings }))
+  }, [profile, settings])
+
+  const showToast = (message: string) => {
+    setToastMessage(message)
+    window.setTimeout(() => setToastMessage(""), 2200)
+  }
+
+  const handlePhotoSelected = (file?: File) => {
+    if (!file) return
+
+    const reader = new FileReader()
+    reader.onload = () => {
+      const preview = typeof reader.result === "string" ? reader.result : ""
+      setPhotoPreview(preview)
+    }
+    reader.readAsDataURL(file)
+  }
+
+  const handleSavePhoto = () => {
+    setProfile((prev) => ({ ...prev, avatar: photoPreview }))
+    setShowPhotoModal(false)
+    showToast("Foto atualizada com sucesso.")
+  }
+
+  const handleSaveProfile = () => {
+    setProfile(profileForm)
+    setShowProfileModal(false)
+    showToast("Perfil atualizado com sucesso.")
+  }
+
+  const handleSavePin = () => {
+    if (pinForm.pin.length !== 4 || pinForm.pin !== pinForm.confirmPin) return
+
+    setSettings((prev) => ({ ...prev, pinEnabled: true, pin: pinForm.pin }))
+    setPinForm({ pin: "", confirmPin: "" })
+    setShowPinModal(false)
+    showToast("PIN salvo com sucesso.")
+  }
+
+  const handleSignOut = async () => {
+    await signOut()
+    router.push("/login")
+  }
+
+  const sections = useMemo(() => [
+    {
+      title: "Conta",
+      items: [
+        {
+          icon: Camera,
+          label: "Alterar foto",
+          description: "Atualize sua imagem de perfil",
+          action: () => setShowPhotoModal(true),
+        },
+        {
+          icon: User,
+          label: "Editar perfil",
+          description: "Nome, email e telefone",
+          action: () => setShowProfileModal(true),
+        },
+        {
+          icon: Crown,
+          label: "Plano atual",
+          description: profile.plan,
+          badgeText: profile.plan,
+          badgeClass: "bg-amber-500/20 text-amber-400",
+        },
+      ],
+    },
+    {
+      title: "Seguranca",
+      items: [
+        {
+          icon: Fingerprint,
+          label: "Face ID / Biometria",
+          description: settings.faceId ? "Protecao ativa" : "Protecao desativada",
+          action: () => setShowBiometricModal(true),
+        },
+        {
+          icon: Lock,
+          label: "PIN de seguranca",
+          description: settings.pinEnabled ? "PIN configurado" : "Defina um PIN de 4 digitos",
+          action: () => setShowPinModal(true),
+        },
+        {
+          icon: Shield,
+          label: "Sessoes ativas",
+          description: "2 dispositivos conectados",
+        },
+      ],
+    },
+    {
+      title: "Preferencias",
+      items: [
+        { icon: Bell, label: "Notificacoes", description: "Alertas e lembretes", switchKey: "notifications" as const },
+        { icon: Moon, label: "Tema escuro", description: "Ativado por padrao", switchKey: "darkMode" as const },
+        { icon: Globe, label: "Idioma", description: "Portugues (Brasil)" },
+      ],
+    },
+    {
+      title: "Suporte",
+      items: [
+        { icon: HelpCircle, label: "Central de ajuda", description: "Duvidas frequentes" },
+        { icon: FileText, label: "Termos e privacidade", description: "Politicas do Vuei" },
+      ],
+    },
+  ], [profile.plan, settings.darkMode, settings.faceId, settings.notifications, settings.pinEnabled])
+
+  return (
+    <motion.div
+      initial="initial"
+      animate="animate"
+      variants={staggerContainer}
+      className="mx-auto max-w-4xl space-y-6"
+    >
+      <motion.div variants={fadeInUp}>
+        <h1 className="text-2xl font-bold">Configuracoes</h1>
+        <p className="text-sm text-muted-foreground">Gerencie sua conta e preferencias</p>
+      </motion.div>
+
+      <motion.div variants={fadeInUp}>
+        <Card className="vuei-glass border-border/50 bg-card/50 p-5">
+          <div className="flex items-center gap-4">
+            <div className="relative">
+              <div className="relative flex h-16 w-16 items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-primary to-secondary">
+                {profile.avatar ? (
+                  <Image src={profile.avatar} alt="Avatar" fill className="object-cover" />
+                ) : (
+                  <User size={28} className="text-primary-foreground" />
+                )}
+              </div>
+              <button
+                onClick={() => setShowPhotoModal(true)}
+                className="absolute -bottom-1 -right-1 flex h-7 w-7 items-center justify-center rounded-full border-2 border-background bg-muted transition-colors hover:bg-muted/80"
+              >
+                <Camera size={12} />
+              </button>
+            </div>
+            <div className="flex-1">
+              <h2 className="text-lg font-semibold">{profile.name}</h2>
+              <p className="text-sm text-muted-foreground">{profile.email}</p>
+              <p className="mt-1 text-xs text-muted-foreground">Membro desde {profile.createdAt}</p>
+            </div>
+            <Badge className="border-amber-500/30 bg-gradient-to-r from-amber-500/20 to-amber-600/20 text-amber-400">
+              <Crown size={12} className="mr-1" />
+              {profile.plan}
+            </Badge>
+          </div>
+        </Card>
+      </motion.div>
+
+      {sections.map((section) => (
+        <motion.div key={section.title} variants={fadeInUp}>
+          <h2 className="mb-3 px-1 text-sm font-medium text-muted-foreground">{section.title}</h2>
+          <Card className="vuei-glass divide-y divide-border/50 border-border/50 bg-card/50">
+            {section.items.map((item) => (
+              <div
+                key={item.label}
+                className={`flex items-center justify-between p-4 ${item.action ? "cursor-pointer transition-colors hover:bg-muted/20" : ""}`}
+                onClick={item.action}
+              >
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-muted/50">
+                    <item.icon size={18} className="text-muted-foreground" />
+                  </div>
+                  <div>
+                    <p className="font-medium">{item.label}</p>
+                    <p className="text-sm text-muted-foreground">{item.description}</p>
+                  </div>
+                </div>
+
+                {"switchKey" in item && item.switchKey ? (
+                  <Switch
+                    checked={settings[item.switchKey]}
+                    onCheckedChange={(checked) => setSettings((prev) => ({ ...prev, [item.switchKey]: checked }))}
+                    onClick={(event) => event.stopPropagation()}
+                  />
+                ) : item.badgeText ? (
+                  <Badge className={item.badgeClass}>{item.badgeText}</Badge>
+                ) : (
+                  <ChevronRight size={18} className="text-muted-foreground" />
+                )}
+              </div>
+            ))}
+          </Card>
+        </motion.div>
+      ))}
+
+      <motion.div variants={fadeInUp}>
+        <h2 className="mb-3 px-1 text-sm font-medium text-muted-foreground">Zona de perigo</h2>
+        <Card className="divide-y divide-border/50 border-destructive/20 bg-card/50">
+          <div
+            className="flex cursor-pointer items-center justify-between p-4 transition-colors hover:bg-destructive/5"
+            onClick={() => setShowDeleteModal(true)}
+          >
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-destructive/10">
+                <Trash2 size={18} className="text-destructive" />
+              </div>
+              <div>
+                <p className="font-medium text-destructive">Excluir conta</p>
+                <p className="text-sm text-muted-foreground">Remover permanentemente sua conta</p>
+              </div>
+            </div>
+            <ChevronRight size={18} className="text-muted-foreground" />
+          </div>
+        </Card>
+      </motion.div>
+
+      <motion.div variants={fadeInUp}>
+        <Button variant="outline" className="w-full rounded-xl border-border/50 text-muted-foreground hover:text-foreground" onClick={() => void handleSignOut()}>
+          <LogOut size={18} className="mr-2" />
+          Sair da conta
+        </Button>
+      </motion.div>
+
+      <motion.div variants={fadeInUp} className="py-4 text-center">
+        <p className="text-xs text-muted-foreground">Vuei v1.0.0</p>
+      </motion.div>
+
+      <Dialog open={showPhotoModal} onOpenChange={setShowPhotoModal}>
+        <DialogContent className="vuei-glass max-w-md border-border/50">
+          <DialogHeader>
+            <DialogTitle>Alterar foto</DialogTitle>
+            <DialogDescription>Escolha uma nova imagem para o seu perfil.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="flex justify-center">
+              <div className="relative flex h-24 w-24 items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-primary to-secondary">
+                {photoPreview || profile.avatar ? (
+                  <Image src={photoPreview || profile.avatar} alt="Preview" fill className="object-cover" />
+                ) : (
+                  <Camera className="text-primary-foreground" />
+                )}
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Selecionar imagem</Label>
+              <Input type="file" accept="image/*" onChange={(e) => handlePhotoSelected(e.target.files?.[0])} />
+            </div>
+            <div className="flex gap-3">
+              <Button variant="outline" className="flex-1" onClick={() => setShowPhotoModal(false)}>
+                Cancelar
+              </Button>
+              <Button className="flex-1 bg-gradient-to-r from-primary to-secondary text-primary-foreground" onClick={handleSavePhoto}>
+                Salvar foto
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showProfileModal} onOpenChange={setShowProfileModal}>
+        <DialogContent className="vuei-glass max-w-md border-border/50">
+          <DialogHeader>
+            <DialogTitle>Editar perfil</DialogTitle>
+            <DialogDescription>Atualize seus dados principais do portal.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label>Nome</Label>
+              <Input value={profileForm.name} onChange={(e) => setProfileForm((prev) => ({ ...prev, name: e.target.value }))} />
+            </div>
+            <div className="space-y-2">
+              <Label>Email</Label>
+              <Input value={profileForm.email} onChange={(e) => setProfileForm((prev) => ({ ...prev, email: e.target.value }))} />
+            </div>
+            <div className="space-y-2">
+              <Label>Telefone</Label>
+              <Input value={profileForm.phone} onChange={(e) => setProfileForm((prev) => ({ ...prev, phone: e.target.value }))} />
+            </div>
+            <div className="flex gap-3">
+              <Button variant="outline" className="flex-1" onClick={() => setShowProfileModal(false)}>
+                Cancelar
+              </Button>
+              <Button className="flex-1 bg-gradient-to-r from-primary to-secondary text-primary-foreground" onClick={handleSaveProfile}>
+                Salvar perfil
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showBiometricModal} onOpenChange={setShowBiometricModal}>
+        <DialogContent className="vuei-glass max-w-md border-border/50">
+          <DialogHeader>
+            <DialogTitle>Face ID / Biometria</DialogTitle>
+            <DialogDescription>
+              Proteja documentos e acessos sensiveis usando a biometria do dispositivo.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="rounded-xl border border-border/50 bg-muted/20 p-4">
+              <p className="text-sm text-muted-foreground">
+                Quando ativado, o Vuei solicita validacao biometrica antes de abrir areas privadas.
+              </p>
+            </div>
+            <div className="flex items-center justify-between rounded-xl border border-border/50 p-4">
+              <div>
+                <p className="font-medium">Protecao biometrica</p>
+                <p className="text-sm text-muted-foreground">{settings.faceId ? "Ativa agora" : "Desativada agora"}</p>
+              </div>
+              <Switch checked={settings.faceId} onCheckedChange={(checked) => setSettings((prev) => ({ ...prev, faceId: checked }))} />
+            </div>
+            <Button
+              className="w-full bg-gradient-to-r from-primary to-secondary text-primary-foreground"
+              onClick={() => {
+                setShowBiometricModal(false)
+                showToast(settings.faceId ? "Biometria ativada." : "Biometria desativada.")
+              }}
+            >
+              {settings.faceId ? "Manter ativada" : "Salvar preferencia"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showPinModal} onOpenChange={setShowPinModal}>
+        <DialogContent className="vuei-glass max-w-sm border-border/50">
+          <DialogHeader>
+            <DialogTitle>Configurar PIN</DialogTitle>
+            <DialogDescription>Crie ou altere um PIN de 4 digitos para areas privadas.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label>Novo PIN</Label>
+              <Input
+                type="password"
+                maxLength={4}
+                placeholder="0000"
+                value={pinForm.pin}
+                onChange={(e) => setPinForm((prev) => ({ ...prev, pin: e.target.value.replace(/\D/g, "").slice(0, 4) }))}
+                className="text-center text-2xl tracking-widest"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Confirmar PIN</Label>
+              <Input
+                type="password"
+                maxLength={4}
+                placeholder="0000"
+                value={pinForm.confirmPin}
+                onChange={(e) => setPinForm((prev) => ({ ...prev, confirmPin: e.target.value.replace(/\D/g, "").slice(0, 4) }))}
+                className="text-center text-2xl tracking-widest"
+              />
+            </div>
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => {
+                setSettings((prev) => ({ ...prev, pinEnabled: !prev.pinEnabled }))
+                showToast(settings.pinEnabled ? "PIN desativado." : "PIN sera exigido apos salvar.")
+              }}
+            >
+              {settings.pinEnabled ? "Desativar PIN atual" : "Ativar protecao por PIN"}
+            </Button>
+            <div className="flex gap-3">
+              <Button variant="outline" className="flex-1" onClick={() => setShowPinModal(false)}>
+                Cancelar
+              </Button>
+              <Button
+                className="flex-1 bg-gradient-to-r from-primary to-secondary text-primary-foreground"
+                onClick={handleSavePin}
+                disabled={pinForm.pin.length !== 4 || pinForm.pin !== pinForm.confirmPin}
+              >
+                Salvar
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showDeleteModal} onOpenChange={setShowDeleteModal}>
+        <DialogContent className="vuei-glass max-w-sm border-border/50">
+          <DialogHeader>
+            <DialogTitle className="text-destructive">Excluir conta</DialogTitle>
+            <DialogDescription>
+              Esta acao e irreversivel. Todos os seus dados, viagens e documentos serao permanentemente excluidos.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label>Digite "EXCLUIR" para confirmar</Label>
+              <Input placeholder="EXCLUIR" />
+            </div>
+            <div className="flex gap-3">
+              <Button variant="outline" className="flex-1" onClick={() => setShowDeleteModal(false)}>
+                Cancelar
+              </Button>
+              <Button variant="destructive" className="flex-1">
+                Excluir conta
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {toastMessage && <SettingsToast message={toastMessage} />}
+    </motion.div>
+  )
+}
