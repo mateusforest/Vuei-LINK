@@ -1,10 +1,12 @@
 import type { Profile, UserRole } from "@/types"
 
 export function getRedirectByRole(role?: UserRole | null) {
+  console.log("[AUTH] redirect role", role ?? null)
+
   switch (role) {
     case "agency_owner":
     case "agency_member":
-      return "/agencia"
+      return "/agency"
     case "master":
       return "/master"
     case "traveler":

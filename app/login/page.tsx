@@ -43,12 +43,13 @@ export default function LoginPage() {
     setErrors({})
     const result = await signIn({ email, password })
     if (result.error) {
-      setErrors((prev) => ({ ...prev, auth: "Nao foi possivel entrar. Verifique email e senha." }))
+      console.error("[AUTH ERROR]", result.error)
+      setErrors((prev) => ({ ...prev, auth: result.error }))
       setIsLoading(false)
       return
     }
     setIsLoading(false)
-    router.replace(getRedirectByRole(profile?.role))
+    router.replace(getRedirectByRole(result.profile?.role ?? profile?.role))
   }
 
   return (

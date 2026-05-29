@@ -1,6 +1,7 @@
 import type { Agency } from "@/types"
 import { shouldUseSupabase } from "@/lib/data-source"
-import { createSupabaseBrowserClientPlaceholder } from "@/lib/supabase/client"
+import { createSupabaseBrowserClient, createSupabaseBrowserClientPlaceholder } from "@/lib/supabase/client"
+import type { Database } from "@/lib/supabase/types"
 import { mapAgencySettingsToAgency } from "@/lib/mappers/agency-mappers"
 
 interface AgencyMember {
@@ -12,6 +13,15 @@ interface AgencyMember {
   createdAt: string
   name?: string
   email?: string
+}
+
+interface CreateAgencyPayload {
+  name: string
+  ownerUserId: string
+  email?: string | null
+  phone?: string | null
+  plan?: Agency["plan"]
+  agentsCount?: string | null
 }
 
 interface AgencyConfigState {
@@ -78,7 +88,142 @@ function buildAgencyMembers(agencyId: string): AgencyMember[] {
   }))
 }
 
+function slugifyAgencyName(name: string) {
+  const base = name
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+
+  return base || "agencia-vuei"
+}
+
+function mapAgencyRowToAgency(row: Database["public"]["Tables"]["agencies"]["Row"]): Agency {
+  const settings = (row.settings ?? {}) as Record<string, unknown>
+  const notifications = (settings.notifications ?? {}) as Record<string, unknown>
+  const branding = (row.branding ?? {}) as Record<string, unknown>
+
+  return {
+    id: row.id,
+    name: row.name,
+    slug: row.slug,
+    logo: row.logo_url,
+    ownerUserId: row.owner_user_id,
+    plan: row.plan,
+    status: row.status,
+    creditsBalance: row.credits_balance,
+    settings: {
+      email: typeof settings.email === "string" ? settings.email : null,
+      phone: typeof settings.phone === "string" ? settings.phone : null,
+      cnpj: typeof settings.cnpj === "string" ? settings.cnpj : null,
+      address: typeof settings.address === "string" ? settings.address : null,
+      notifications: {
+        concierge: typeof notifications.concierge === "boolean" ? notifications.concierge : true,
+        trips: typeof notifications.trips === "boolean" ? notifications.trips : true,
+        credits: typeof notifications.credits === "boolean" ? notifications.credits : true,
+        newClients: typeof notifications.newClients === "boolean" ? notifications.newClients : false,
+      },
+      twoFactorEnabled: typeof settings.twoFactorEnabled === "boolean" ? settings.twoFactorEnabled : false,
+    },
+    branding: {
+      logoUrl: typeof branding.logoUrl === "string" ? branding.logoUrl : row.logo_url,
+    },
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  }
+}
+
+async function buildUniqueAgencySlug(baseName: string, client: ReturnType<typeof createSupabaseBrowserClient>) {
+  const safeBase = slugifyAgencyName(baseName)
+  if (!client) return safeBase
+
+  let candidate = safeBase
+  let suffix = 2
+
+  while (true) {
+    const { data, error } = await client.from("agencies").select("id").eq("slug", candidate).maybeSingle()
+    if (error || !data) return candidate
+    candidate = `${safeBase}-${suffix}`
+    suffix += 1
+  }
+}
+
+export async function createAgency(payload: CreateAgencyPayload) {
+  if (shouldUseSupabase()) {
+    const client = createSupabaseBrowserClient()
+
+    if (client) {
+      const existingAgency = await getAgencyByOwner(payload.ownerUserId)
+      if (existingAgency.data) {
+        return existingAgency
+      }
+
+      const slug = await buildUniqueAgencySlug(payload.name, client)
+      const insertPayload: Database["public"]["Tables"]["agencies"]["Insert"] = {
+        name: payload.name,
+        slug,
+        owner_user_id: payload.ownerUserId,
+        plan: payload.plan ?? "starter",
+        status: "active",
+        settings: {
+          email: payload.email ?? null,
+          phone: payload.phone ?? null,
+          notifications: {
+            concierge: true,
+            trips: true,
+            credits: true,
+            newClients: false,
+          },
+          agentsCount: payload.agentsCount ?? null,
+          twoFactorEnabled: false,
+        },
+        branding: {},
+      }
+
+      const { data, error } = await client.from("agencies").insert(insertPayload).select("*").single()
+      if (error) {
+        console.error("[AUTH ERROR]", error.message)
+        return { source: "supabase" as const, data: null, error: error.message }
+      }
+
+      const { error: membershipError } = await client.from("agency_members").insert({
+        agency_id: data.id,
+        profile_id: payload.ownerUserId,
+        role: "owner",
+        status: "active",
+      })
+
+      if (membershipError) {
+        console.error("[AUTH ERROR]", membershipError.message)
+      }
+
+      const { error: profileError } = await client.from("profiles").update({ agency_id: data.id, role: "agency_owner" }).eq("id", payload.ownerUserId)
+      if (profileError) {
+        console.error("[AUTH ERROR]", profileError.message)
+      }
+
+      return { source: "supabase" as const, data: mapAgencyRowToAgency(data), error: null }
+    }
+  }
+
+  const agency = buildAgency()
+  return { source: "local" as const, data: agency, error: null }
+}
+
 export async function getAgencyById(id: string) {
+  if (shouldUseSupabase()) {
+    const client = createSupabaseBrowserClient()
+    if (client) {
+      const { data, error } = await client.from("agencies").select("*").eq("id", id).maybeSingle()
+      if (error) {
+        console.error("[AUTH ERROR]", error.message)
+        return { source: "supabase" as const, data: null }
+      }
+      return { source: "supabase" as const, data: data ? mapAgencyRowToAgency(data) : null }
+    }
+  }
+
   const agency = buildAgency()
   return {
     source: "local" as const,
@@ -87,6 +232,18 @@ export async function getAgencyById(id: string) {
 }
 
 export async function getAgencyBySlug(slug: string) {
+  if (shouldUseSupabase()) {
+    const client = createSupabaseBrowserClient()
+    if (client) {
+      const { data, error } = await client.from("agencies").select("*").eq("slug", slug).maybeSingle()
+      if (error) {
+        console.error("[AUTH ERROR]", error.message)
+        return { source: "supabase" as const, data: null }
+      }
+      return { source: "supabase" as const, data: data ? mapAgencyRowToAgency(data) : null }
+    }
+  }
+
   const agency = buildAgency()
   return {
     source: "local" as const,
@@ -95,6 +252,18 @@ export async function getAgencyBySlug(slug: string) {
 }
 
 export async function getAgencyByOwner(userId: string) {
+  if (shouldUseSupabase()) {
+    const client = createSupabaseBrowserClient()
+    if (client) {
+      const { data, error } = await client.from("agencies").select("*").eq("owner_user_id", userId).maybeSingle()
+      if (error) {
+        console.error("[AUTH ERROR]", error.message)
+        return { source: "supabase" as const, data: null }
+      }
+      return { source: "supabase" as const, data: data ? mapAgencyRowToAgency(data) : null }
+    }
+  }
+
   const agency = buildAgency()
   return {
     source: "local" as const,
@@ -103,15 +272,45 @@ export async function getAgencyByOwner(userId: string) {
 }
 
 export async function updateAgency(id: string, payload: Partial<Agency>) {
-  const agency = buildAgency()
-
   if (shouldUseSupabase()) {
-    return {
-      source: "supabase-placeholder" as const,
-      config: createSupabaseBrowserClientPlaceholder(),
-      data: agency.id === id ? { ...agency, ...payload, updatedAt: new Date().toISOString() } : null,
+    const client = createSupabaseBrowserClient()
+    if (client) {
+      const updatePayload: Database["public"]["Tables"]["agencies"]["Update"] = {
+        name: payload.name,
+        slug: payload.slug,
+        logo_url: payload.logo,
+        owner_user_id: payload.ownerUserId,
+        plan: payload.plan,
+        status: payload.status,
+        credits_balance: payload.creditsBalance,
+        settings: payload.settings
+          ? {
+              email: payload.settings.email,
+              phone: payload.settings.phone,
+              cnpj: payload.settings.cnpj,
+              address: payload.settings.address,
+              notifications: payload.settings.notifications,
+              twoFactorEnabled: payload.settings.twoFactorEnabled,
+            }
+          : undefined,
+        branding: payload.branding
+          ? {
+              logoUrl: payload.branding.logoUrl,
+            }
+          : undefined,
+      }
+
+      const { data, error } = await client.from("agencies").update(updatePayload).eq("id", id).select("*").maybeSingle()
+      if (error) {
+        console.error("[AUTH ERROR]", error.message)
+        return { source: "supabase" as const, data: null }
+      }
+
+      return { source: "supabase" as const, data: data ? mapAgencyRowToAgency(data) : null }
     }
   }
+
+  const agency = buildAgency()
 
   const config = readAgencyConfig()
   const nextConfig = {
@@ -137,10 +336,25 @@ export async function updateAgency(id: string, payload: Partial<Agency>) {
 
 export async function listAgencyMembers(agencyId: string) {
   if (shouldUseSupabase()) {
-    return {
-      source: "supabase-placeholder" as const,
-      config: createSupabaseBrowserClientPlaceholder(),
-      data: [] as AgencyMember[],
+    const client = createSupabaseBrowserClient()
+    if (client) {
+      const { data, error } = await client.from("agency_members").select("*").eq("agency_id", agencyId)
+      if (error) {
+        console.error("[AUTH ERROR]", error.message)
+        return { source: "supabase" as const, data: [] as AgencyMember[] }
+      }
+
+      return {
+        source: "supabase" as const,
+        data: (data ?? []).map((member) => ({
+          id: member.id,
+          agencyId: member.agency_id,
+          profileId: member.profile_id,
+          role: member.role,
+          status: member.status,
+          createdAt: member.created_at,
+        })),
+      }
     }
   }
 
@@ -155,10 +369,33 @@ export async function addAgencyMember(payload: Omit<AgencyMember, "id" | "create
   }
 
   if (shouldUseSupabase()) {
-    return {
-      source: "supabase-placeholder" as const,
-      config: createSupabaseBrowserClientPlaceholder(),
-      data: member,
+    const client = createSupabaseBrowserClient()
+    if (client) {
+      const { data, error } = await client.from("agency_members").insert({
+        agency_id: payload.agencyId,
+        profile_id: payload.profileId,
+        role: payload.role as Database["public"]["Tables"]["agency_members"]["Insert"]["role"],
+        status: payload.status as Database["public"]["Tables"]["agency_members"]["Insert"]["status"],
+      }).select("*").single()
+
+      if (error) {
+        console.error("[AUTH ERROR]", error.message)
+        return { source: "supabase" as const, data: null as AgencyMember | null }
+      }
+
+      return {
+        source: "supabase" as const,
+        data: {
+          id: data.id,
+          agencyId: data.agency_id,
+          profileId: data.profile_id,
+          role: data.role,
+          status: data.status,
+          createdAt: data.created_at,
+          name: payload.name,
+          email: payload.email,
+        },
+      }
     }
   }
 
@@ -188,10 +425,31 @@ export async function addAgencyMember(payload: Omit<AgencyMember, "id" | "create
 
 export async function updateAgencyMember(id: string, payload: Partial<AgencyMember>) {
   if (shouldUseSupabase()) {
-    return {
-      source: "supabase-placeholder" as const,
-      config: createSupabaseBrowserClientPlaceholder(),
-      data: null as AgencyMember | null,
+    const client = createSupabaseBrowserClient()
+    if (client) {
+      const { data, error } = await client.from("agency_members").update({
+        role: payload.role as Database["public"]["Tables"]["agency_members"]["Update"]["role"],
+        status: payload.status as Database["public"]["Tables"]["agency_members"]["Update"]["status"],
+      }).eq("id", id).select("*").maybeSingle()
+
+      if (error) {
+        console.error("[AUTH ERROR]", error.message)
+        return { source: "supabase" as const, data: null as AgencyMember | null }
+      }
+
+      return {
+        source: "supabase" as const,
+        data: data
+          ? {
+              id: data.id,
+              agencyId: data.agency_id,
+              profileId: data.profile_id,
+              role: data.role,
+              status: data.status,
+              createdAt: data.created_at,
+            }
+          : null,
+      }
     }
   }
 

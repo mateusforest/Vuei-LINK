@@ -35,6 +35,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
+import { shouldUseSupabase } from "@/lib/data-source"
+import { updateProfile as updateProfileRepository } from "@/lib/repositories/profiles-repository"
 
 const fadeInUp = {
   initial: { opacity: 0, y: 20 },
@@ -86,7 +88,7 @@ function SettingsToast({ message }: { message: string }) {
 
 export default function ConfiguracoesPage() {
   const router = useRouter()
-  const { signOut } = useAuth()
+  const { signOut, profile: authProfile, refreshProfile } = useAuth()
   const [profile, setProfile] = useState(defaultProfile)
   const [settings, setSettings] = useState(defaultSettings)
   const [toastMessage, setToastMessage] = useState("")
@@ -101,6 +103,22 @@ export default function ConfiguracoesPage() {
 
   useEffect(() => {
     if (typeof window === "undefined") return
+
+    if (shouldUseSupabase() && authProfile) {
+      const nextProfile = {
+        name: authProfile.name || defaultProfile.name,
+        email: authProfile.email || defaultProfile.email,
+        phone: authProfile.phone || defaultProfile.phone,
+        plan: authProfile.role === "agency_owner" || authProfile.role === "agency_member" ? "Agency" : "Premium",
+        avatar: authProfile.avatarUrl || "",
+        createdAt: new Date(authProfile.createdAt).toLocaleDateString("pt-BR", { month: "long", year: "numeric" }),
+      }
+
+      setProfile(nextProfile)
+      setProfileForm(nextProfile)
+      setPhotoPreview(authProfile.avatarUrl || "")
+      return
+    }
 
     const saved = window.localStorage.getItem(STORAGE_KEY)
     if (!saved) return
@@ -118,12 +136,13 @@ export default function ConfiguracoesPage() {
     } catch {
       // fallback silencioso
     }
-  }, [])
+  }, [authProfile])
 
   useEffect(() => {
     if (typeof window === "undefined") return
+    if (shouldUseSupabase() && authProfile) return
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ profile, settings }))
-  }, [profile, settings])
+  }, [authProfile, profile, settings])
 
   const showToast = (message: string) => {
     setToastMessage(message)
@@ -141,14 +160,31 @@ export default function ConfiguracoesPage() {
     reader.readAsDataURL(file)
   }
 
-  const handleSavePhoto = () => {
-    setProfile((prev) => ({ ...prev, avatar: photoPreview }))
+  const handleSavePhoto = async () => {
+    const nextProfile = { ...profile, avatar: photoPreview }
+    setProfile(nextProfile)
+
+    if (shouldUseSupabase() && authProfile) {
+      await updateProfileRepository(authProfile.id, { avatarUrl: photoPreview })
+      await refreshProfile()
+    }
+
     setShowPhotoModal(false)
     showToast("Foto atualizada com sucesso.")
   }
 
-  const handleSaveProfile = () => {
+  const handleSaveProfile = async () => {
     setProfile(profileForm)
+
+    if (shouldUseSupabase() && authProfile) {
+      await updateProfileRepository(authProfile.id, {
+        name: profileForm.name,
+        email: profileForm.email,
+        phone: profileForm.phone,
+      })
+      await refreshProfile()
+    }
+
     setShowProfileModal(false)
     showToast("Perfil atualizado com sucesso.")
   }

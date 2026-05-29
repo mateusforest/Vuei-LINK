@@ -12,10 +12,11 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useAuth } from "@/contexts/auth-context"
 import { getRedirectByRole } from "@/lib/auth/role-redirect"
+import { createAgency } from "@/lib/repositories/agencies-repository"
 
 export default function AgencySignupPage() {
   const router = useRouter()
-  const { signUp, user, profile, loading } = useAuth()
+  const { signUp, user, profile, loading, refreshProfile } = useAuth()
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
@@ -76,8 +77,9 @@ export default function AgencySignupPage() {
         phone: formData.whatsapp,
         role: "agency_owner",
         metadata: {
+          full_name: formData.responsibleName,
           agency_name: formData.agencyName,
-          agent_count: formData.agentCount,
+          agents_count: formData.agentCount,
           accepted_news: acceptNews,
         },
       })
@@ -88,8 +90,29 @@ export default function AgencySignupPage() {
         return
       }
 
+      if (!result.user) {
+        setErrors((prev) => ({ ...prev, auth: "Nao foi possivel iniciar a sessao apos o cadastro." }))
+        return
+      }
+
+      const agencyResult = await createAgency({
+        name: formData.agencyName,
+        ownerUserId: result.user.id,
+        email: formData.email,
+        phone: formData.whatsapp,
+        agentsCount: formData.agentCount,
+      })
+
+      if ("error" in agencyResult && agencyResult.error) {
+        console.error("[AUTH ERROR]", agencyResult.error)
+        setErrors((prev) => ({ ...prev, auth: agencyResult.error ?? "Nao foi possivel criar a agencia." }))
+        return
+      }
+
+      console.log("[AGENCY SIGNUP] agency created", agencyResult.data?.id ?? null)
+      await refreshProfile()
       console.log("[CADASTRO] signUp success")
-      router.replace("/agencia")
+      router.replace(getRedirectByRole(result.profile?.role ?? "agency_owner"))
     } catch (error) {
       const message = error instanceof Error ? error.message : "Erro inesperado ao criar conta."
       console.error("[CADASTRO] signUp error", message)

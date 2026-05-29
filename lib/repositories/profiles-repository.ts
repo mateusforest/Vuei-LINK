@@ -1,6 +1,8 @@
 import type { Profile, UserRole } from "@/types"
 import { shouldUseSupabase } from "@/lib/data-source"
-import { createSupabaseBrowserClientPlaceholder } from "@/lib/supabase/client"
+import { createSupabaseBrowserClient, createSupabaseBrowserClientPlaceholder } from "@/lib/supabase/client"
+import type { Database } from "@/lib/supabase/types"
+import { mapProfileRowToProfile } from "@/lib/auth/get-current-profile"
 
 interface PortalSettingsState {
   profile?: {
@@ -60,11 +62,37 @@ function buildLocalProfile(): Profile {
 }
 
 export async function getProfile(id: string) {
+  if (shouldUseSupabase()) {
+    const client = createSupabaseBrowserClient()
+    if (client) {
+      const { data, error } = await client.from("profiles").select("*").eq("id", id).maybeSingle()
+      if (error) {
+        console.error("[AUTH ERROR]", error.message)
+        return { source: "supabase" as const, data: null }
+      }
+
+      return { source: "supabase" as const, data: data ? mapProfileRowToProfile(data) : null }
+    }
+  }
+
   const profile = buildLocalProfile()
   return { source: "local" as const, data: profile.id === id ? profile : null }
 }
 
 export async function getProfileByEmail(email: string) {
+  if (shouldUseSupabase()) {
+    const client = createSupabaseBrowserClient()
+    if (client) {
+      const { data, error } = await client.from("profiles").select("*").eq("email", email).maybeSingle()
+      if (error) {
+        console.error("[AUTH ERROR]", error.message)
+        return { source: "supabase" as const, data: null }
+      }
+
+      return { source: "supabase" as const, data: data ? mapProfileRowToProfile(data) : null }
+    }
+  }
+
   const profile = buildLocalProfile()
   return { source: "local" as const, data: profile.email === email ? profile : null }
 }
@@ -74,6 +102,35 @@ export async function createProfile(payload: Omit<Profile, "createdAt" | "update
   const profile: Profile = { ...payload, createdAt: now, updatedAt: now }
 
   if (shouldUseSupabase()) {
+    const client = createSupabaseBrowserClient()
+    if (client) {
+      const insertPayload: Database["public"]["Tables"]["profiles"]["Insert"] = {
+        id: profile.id,
+        email: profile.email,
+        name: profile.name,
+        phone: profile.phone,
+        avatar_url: profile.avatarUrl,
+        role: profile.role,
+        agency_id: profile.agencyId,
+        credits_balance: profile.creditsBalance ?? 0,
+        settings: {
+          language: profile.settings?.language ?? "pt-BR",
+          darkMode: profile.settings?.darkMode ?? true,
+          notificationsEnabled: profile.settings?.notificationsEnabled ?? true,
+          biometricEnabled: profile.settings?.biometricEnabled ?? false,
+          pinEnabled: profile.settings?.pinEnabled ?? false,
+        },
+      }
+
+      const { data, error } = await client.from("profiles").insert(insertPayload).select("*").single()
+      if (error) {
+        console.error("[AUTH ERROR]", error.message)
+        return { source: "supabase" as const, data: null as Profile | null }
+      }
+
+      return { source: "supabase" as const, data: mapProfileRowToProfile(data) }
+    }
+
     return {
       source: "supabase-placeholder" as const,
       config: createSupabaseBrowserClientPlaceholder(),
@@ -120,6 +177,34 @@ export async function updateProfile(id: string, payload: Partial<Profile>) {
   }
 
   if (shouldUseSupabase()) {
+    const client = createSupabaseBrowserClient()
+    if (client) {
+      const updatePayload: Database["public"]["Tables"]["profiles"]["Update"] = {
+        email: nextProfile.email,
+        name: nextProfile.name,
+        phone: nextProfile.phone,
+        avatar_url: nextProfile.avatarUrl,
+        role: nextProfile.role,
+        agency_id: nextProfile.agencyId,
+        credits_balance: nextProfile.creditsBalance ?? 0,
+        settings: {
+          language: nextProfile.settings?.language ?? "pt-BR",
+          darkMode: nextProfile.settings?.darkMode ?? true,
+          notificationsEnabled: nextProfile.settings?.notificationsEnabled ?? true,
+          biometricEnabled: nextProfile.settings?.biometricEnabled ?? false,
+          pinEnabled: nextProfile.settings?.pinEnabled ?? false,
+        },
+      }
+
+      const { data, error } = await client.from("profiles").update(updatePayload).eq("id", id).select("*").maybeSingle()
+      if (error) {
+        console.error("[AUTH ERROR]", error.message)
+        return { source: "supabase" as const, data: null as Profile | null }
+      }
+
+      return { source: "supabase" as const, data: data ? mapProfileRowToProfile(data) : null }
+    }
+
     return {
       source: "supabase-placeholder" as const,
       config: createSupabaseBrowserClientPlaceholder(),
@@ -163,6 +248,19 @@ export async function listProfiles(params?: ListProfilesParams) {
   })
 
   if (shouldUseSupabase()) {
+    const client = createSupabaseBrowserClient()
+    if (client) {
+      let query = client.from("profiles").select("*")
+      if (params?.role) query = query.eq("role", params.role)
+      if (params?.query) query = query.or(`name.ilike.%${params.query}%,email.ilike.%${params.query}%`)
+      const { data, error } = await query
+      if (error) {
+        console.error("[AUTH ERROR]", error.message)
+        return { source: "supabase" as const, data: [] as Profile[] }
+      }
+      return { source: "supabase" as const, data: (data ?? []).map(mapProfileRowToProfile) }
+    }
+
     return {
       source: "supabase-placeholder" as const,
       config: createSupabaseBrowserClientPlaceholder(),
@@ -174,6 +272,18 @@ export async function listProfiles(params?: ListProfilesParams) {
 }
 
 export async function listProfilesByAgency(agencyId: string) {
+  if (shouldUseSupabase()) {
+    const client = createSupabaseBrowserClient()
+    if (client) {
+      const { data, error } = await client.from("profiles").select("*").eq("agency_id", agencyId)
+      if (error) {
+        console.error("[AUTH ERROR]", error.message)
+        return { source: "supabase" as const, data: [] as Profile[] }
+      }
+      return { source: "supabase" as const, data: (data ?? []).map(mapProfileRowToProfile) }
+    }
+  }
+
   const profiles = [buildLocalProfile()].filter((profile) => profile.agencyId === agencyId)
   return { source: "local" as const, data: profiles }
 }

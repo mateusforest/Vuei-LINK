@@ -23,6 +23,7 @@ import { useIsMobile } from "@/components/ui/use-mobile"
 import { cn } from "@/lib/utils"
 import { TripsProvider, useTrips } from "@/contexts/trips-context"
 import { RouteGuard } from "@/components/auth/route-guard"
+import { useAuth } from "@/contexts/auth-context"
 
 const navItems = [
   { href: "/portal", icon: Home, label: "Início" },
@@ -57,6 +58,16 @@ function PortalLayoutInner({ children }: { children: React.ReactNode }) {
   const isMobile = useIsMobile()
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const { credits } = useTrips()
+  const { profile } = useAuth()
+  const firstName = profile?.name?.trim().split(" ")[0] ?? ""
+  const initials = profile?.name
+    ? profile.name
+        .split(" ")
+        .filter(Boolean)
+        .slice(0, 2)
+        .map((part) => part[0]?.toUpperCase() ?? "")
+        .join("")
+    : "VP"
 
   return (
     <div className="min-h-screen bg-background vuei-grid">
@@ -176,13 +187,17 @@ function PortalLayoutInner({ children }: { children: React.ReactNode }) {
                 "flex items-center gap-3 p-2 rounded-xl hover:bg-muted/30 transition-colors cursor-pointer",
                 sidebarCollapsed && "justify-center"
               )}>
-                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center">
-                  <User size={20} className="text-primary-foreground" />
+                <div className="relative w-10 h-10 overflow-hidden rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center">
+                  {profile?.avatarUrl ? (
+                    <Image src={profile.avatarUrl} alt={profile.name} fill className="object-cover rounded-full" />
+                  ) : (
+                    <span className="text-sm font-semibold text-primary-foreground">{initials}</span>
+                  )}
                 </div>
                 {!sidebarCollapsed && (
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">Viajante</p>
-                    <p className="text-xs text-muted-foreground truncate">Premium</p>
+                    <p className="text-sm font-medium truncate">{firstName || "Conta"}</p>
+                    <p className="text-xs text-muted-foreground truncate">{profile?.email ?? "Portal Vuei"}</p>
                   </div>
                 )}
               </div>
@@ -209,8 +224,12 @@ function PortalLayoutInner({ children }: { children: React.ReactNode }) {
                 <Coins size={14} className="text-primary" />
                 <span className="text-xs font-medium">{credits.balance}</span>
               </div>
-              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center">
-                <User size={16} className="text-primary-foreground" />
+              <div className="relative w-8 h-8 overflow-hidden rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center">
+                {profile?.avatarUrl ? (
+                  <Image src={profile.avatarUrl} alt={profile.name} fill className="object-cover rounded-full" />
+                ) : (
+                  <span className="text-[10px] font-semibold text-primary-foreground">{initials}</span>
+                )}
               </div>
             </div>
           </div>

@@ -59,6 +59,10 @@ export default function SignupPage() {
         password: formData.password,
         name: formData.name,
         phone: formData.phone,
+        role: "traveler",
+        metadata: {
+          full_name: formData.name,
+        },
       })
       if (result.error) {
         console.error("Cadastro Vuei - erro recebido da camada auth:", result.error)
@@ -66,7 +70,7 @@ export default function SignupPage() {
         return
       }
 
-      router.replace(getRedirectByRole(profile?.role))
+      router.replace(getRedirectByRole(result.profile?.role ?? profile?.role))
     } finally {
       setIsLoading(false)
     }

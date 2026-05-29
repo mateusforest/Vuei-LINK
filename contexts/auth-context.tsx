@@ -1,7 +1,7 @@
 "use client"
 
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react"
-import type { User } from "@supabase/supabase-js"
+import type { Session, User } from "@supabase/supabase-js"
 import type { Profile, UserRole } from "@/types"
 import { createSupabaseBrowserClient } from "@/lib/supabase/client"
 import { shouldUseSupabase } from "@/lib/data-source"
@@ -22,11 +22,12 @@ interface SignUpPayload {
 }
 
 interface AuthContextType {
+  session: Session | null
   user: User | null
   profile: Profile | null
   loading: boolean
-  signIn: (payload: SignInPayload) => Promise<{ error: string | null }>
-  signUp: (payload: SignUpPayload) => Promise<{ error: string | null }>
+  signIn: (payload: SignInPayload) => Promise<{ error: string | null; user: User | null; profile: Profile | null; session: Session | null }>
+  signUp: (payload: SignUpPayload) => Promise<{ error: string | null; user: User | null; profile: Profile | null; session: Session | null }>
   signOut: () => Promise<void>
   refreshProfile: () => Promise<void>
 }
@@ -34,10 +35,30 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const [session, setSession] = useState<Session | null>(null)
   const [user, setUser] = useState<User | null>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
   const supabase = useMemo(() => createSupabaseBrowserClient(), [])
+
+  const applyAuthState = async (nextSession: Session | null) => {
+    const nextUser = nextSession?.user ?? null
+    setSession(nextSession)
+    setUser(nextUser)
+
+    console.log("[AUTH] session user", nextUser?.id ?? null)
+    console.log("[AUTH] metadata", nextUser?.user_metadata ?? null)
+
+    if (!nextUser || !supabase) {
+      setProfile(null)
+      return null
+    }
+
+    const ensuredProfile = await ensureProfile(nextUser, supabase)
+    setProfile(ensuredProfile)
+    console.log("[AUTH] profile loaded", ensuredProfile)
+    return ensuredProfile
+  }
 
   const refreshProfile = async () => {
     if (!shouldUseSupabase() || !supabase) {
@@ -46,18 +67,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     const {
-      data: { user: currentUser },
-    } = await supabase.auth.getUser()
+      data: { session: currentSession },
+    } = await supabase.auth.getSession()
 
-    setUser(currentUser ?? null)
-
-    if (!currentUser) {
-      setProfile(null)
-      return
-    }
-
-    const ensuredProfile = await ensureProfile(currentUser, supabase)
-    setProfile(ensuredProfile)
+    await applyAuthState(currentSession ?? null)
   }
 
   useEffect(() => {
@@ -70,18 +83,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const bootstrap = async () => {
       const {
-        data: { user: currentUser },
-      } = await supabase.auth.getUser()
+        data: { session: currentSession },
+      } = await supabase.auth.getSession()
 
       if (!mounted) return
 
-      setUser(currentUser ?? null)
-      if (currentUser) {
-        const ensuredProfile = await ensureProfile(currentUser, supabase)
-        if (mounted) setProfile(ensuredProfile)
-      } else {
-        setProfile(null)
-      }
+      await applyAuthState(currentSession ?? null)
       setLoading(false)
     }
 
@@ -92,15 +99,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (!mounted) return
 
-      const nextUser = session?.user ?? null
-      setUser(nextUser)
-
-      if (nextUser) {
-        const ensuredProfile = await ensureProfile(nextUser, supabase)
-        if (mounted) setProfile(ensuredProfile)
-      } else {
-        setProfile(null)
-      }
+      await applyAuthState(session ?? null)
 
       if (mounted) setLoading(false)
     })
@@ -113,7 +112,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signIn = async ({ email, password }: SignInPayload) => {
     if (!shouldUseSupabase() || !supabase) {
-      return { error: "Supabase nao esta configurado neste ambiente." }
+      return { error: "Supabase nao esta configurado neste ambiente.", user: null, profile: null, session: null }
     }
 
     setLoading(true)
@@ -121,15 +120,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password })
 
       if (error) {
-        return { error: error.message }
+        console.error("[AUTH ERROR]", error.message)
+        return { error: error.message, user: null, profile: null, session: null }
       }
 
-      setUser(data.user)
-      if (data.user) {
-        const ensuredProfile = await ensureProfile(data.user, supabase)
-        setProfile(ensuredProfile)
-      }
-      return { error: null }
+      const ensuredProfile = await applyAuthState(data.session ?? null)
+      return { error: null, user: data.user ?? null, profile: ensuredProfile, session: data.session ?? null }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Erro inesperado no login."
+      console.error("[AUTH ERROR]", message)
+      return { error: message, user: null, profile: null, session: null }
     } finally {
       setLoading(false)
     }
@@ -141,7 +141,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     if (!supabaseEnvOk || !supabase) {
       console.error("signUp error", "Supabase nao esta configurado neste ambiente.")
-      return { error: "Supabase nao esta configurado neste ambiente." }
+      return { error: "Supabase nao esta configurado neste ambiente.", user: null, profile: null, session: null }
     }
 
     console.log("signUp started")
@@ -163,21 +163,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (error) {
         console.error("signUp error", error.message)
-        return { error: error.message }
+        console.error("[AUTH ERROR]", error.message)
+        return { error: error.message, user: null, profile: null, session: null }
       }
 
-      if (data.user) {
-        const ensuredProfile = await ensureProfile(data.user, supabase)
-        setProfile(ensuredProfile)
-        setUser(data.user)
-      }
+      const ensuredProfile = data.user ? await ensureProfile(data.user, supabase) : null
+      setSession(data.session ?? null)
+      setUser(data.user ?? null)
+      setProfile(ensuredProfile)
+
+      console.log("[AUTH] session user", data.user?.id ?? null)
+      console.log("[AUTH] metadata", data.user?.user_metadata ?? null)
+      console.log("[AUTH] profile loaded", ensuredProfile)
 
       console.log("signUp success")
-      return { error: null }
+      return { error: null, user: data.user ?? null, profile: ensuredProfile, session: data.session ?? null }
     } catch (error) {
       const message = error instanceof Error ? error.message : "Erro inesperado no cadastro."
       console.error("signUp error", message)
-      return { error: message }
+      console.error("[AUTH ERROR]", message)
+      return { error: message, user: null, profile: null, session: null }
     } finally {
       setLoading(false)
     }
@@ -189,11 +194,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     setUser(null)
+    setSession(null)
     setProfile(null)
   }
 
   return (
-    <AuthContext.Provider value={{ user, profile, loading, signIn, signUp, signOut, refreshProfile }}>
+    <AuthContext.Provider value={{ session, user, profile, loading, signIn, signUp, signOut, refreshProfile }}>
       {children}
     </AuthContext.Provider>
   )

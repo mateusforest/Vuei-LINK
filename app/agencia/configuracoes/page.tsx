@@ -35,6 +35,8 @@ import {
 import { useAgency } from "@/contexts/agency-context"
 import { useAuth } from "@/contexts/auth-context"
 import { useRouter } from "next/navigation"
+import { getAgencyByOwner, updateAgency as updateAgencyRepository } from "@/lib/repositories/agencies-repository"
+import { shouldUseSupabase } from "@/lib/data-source"
 
 const settingsSections = [
   { id: "agency", label: "Dados da Agencia", icon: Building2 },
@@ -69,7 +71,7 @@ const STORAGE_KEY = "vuei_agencia_configuracoes_frontend"
 
 export default function SettingsPage() {
   const router = useRouter()
-  const { signOut } = useAuth()
+  const { signOut, user, profile } = useAuth()
   const { credits } = useAgency()
   const [activeSection, setActiveSection] = useState("agency")
   const [saving, setSaving] = useState(false)
@@ -105,6 +107,40 @@ export default function SettingsPage() {
   useEffect(() => {
     if (typeof window === "undefined") return
 
+    if (shouldUseSupabase() && user?.id) {
+      let active = true
+
+      const loadAgency = async () => {
+        const result = await getAgencyByOwner(user.id)
+        if (!active || !result.data) return
+
+        setAgencyData((prev) => ({
+          ...prev,
+          name: result.data?.name || prev.name,
+          email: result.data?.settings?.email || profile?.email || prev.email,
+          phone: result.data?.settings?.phone || profile?.phone || prev.phone,
+          address: result.data?.settings?.address || prev.address,
+          logo: result.data?.logo || result.data?.branding?.logoUrl || prev.logo,
+          plan: result.data?.plan ? result.data.plan[0].toUpperCase() + result.data.plan.slice(1) : prev.plan,
+        }))
+
+        if (result.data?.settings?.notifications) {
+          setNotifications({
+            concierge: result.data.settings.notifications.concierge,
+            trips: result.data.settings.notifications.trips,
+            credits: result.data.settings.notifications.credits,
+            newClients: result.data.settings.notifications.newClients,
+          })
+        }
+      }
+
+      void loadAgency()
+
+      return () => {
+        active = false
+      }
+    }
+
     const savedState = window.localStorage.getItem(STORAGE_KEY)
     if (!savedState) return
 
@@ -115,12 +151,13 @@ export default function SettingsPage() {
     } catch {
       // fallback silencioso
     }
-  }, [])
+  }, [profile?.email, profile?.phone, user?.id])
 
   useEffect(() => {
     if (typeof window === "undefined") return
+    if (shouldUseSupabase() && user?.id) return
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ agencyData, notifications }))
-  }, [agencyData, notifications])
+  }, [agencyData, notifications, user?.id])
 
   const showToast = (message: string) => {
     setToastMessage(message)
@@ -129,7 +166,38 @@ export default function SettingsPage() {
 
   const handleSave = async (message = "Configuracoes salvas com sucesso.") => {
     setSaving(true)
-    await new Promise((resolve) => setTimeout(resolve, 700))
+
+    if (shouldUseSupabase() && user?.id) {
+      const currentAgency = await getAgencyByOwner(user.id)
+      if (currentAgency.data) {
+        await updateAgencyRepository(currentAgency.data.id, {
+          name: agencyData.name,
+          logo: agencyData.logo,
+          plan: agencyData.plan.toLowerCase() as "starter" | "pro" | "enterprise",
+          settings: {
+            ...(currentAgency.data.settings ?? {
+              email: null,
+              phone: null,
+              cnpj: null,
+              address: null,
+              notifications: notifications,
+              twoFactorEnabled: false,
+            }),
+            email: agencyData.email,
+            phone: agencyData.phone,
+            cnpj: agencyData.cnpj,
+            address: agencyData.address,
+            notifications,
+          },
+          branding: {
+            logoUrl: agencyData.logo || null,
+          },
+        })
+      }
+    } else {
+      await new Promise((resolve) => setTimeout(resolve, 700))
+    }
+
     setSaving(false)
     setSaved(true)
     showToast(message)

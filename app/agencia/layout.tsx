@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { usePathname } from "next/navigation"
@@ -40,6 +40,9 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { AgencyProvider, useAgency } from "@/contexts/agency-context"
 import { RouteGuard } from "@/components/auth/route-guard"
+import { useAuth } from "@/contexts/auth-context"
+import { getAgencyByOwner } from "@/lib/repositories/agencies-repository"
+import type { Agency } from "@/types"
 
 const navItems = [
   { href: "/agencia", icon: LayoutDashboard, label: "Dashboard" },
@@ -70,7 +73,9 @@ function AgencyLayoutInner({ children }: { children: React.ReactNode }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [notificationsOpen, setNotificationsOpen] = useState(false)
+  const { user, profile } = useAuth()
   const { credits, conciergeRequests } = useAgency()
+  const [agencyProfile, setAgencyProfile] = useState<Agency | null>(null)
   const [agencyNotifications, setAgencyNotifications] = useState([
     {
       id: "agency-notification-1",
@@ -100,6 +105,33 @@ function AgencyLayoutInner({ children }: { children: React.ReactNode }) {
   
   const pendingRequests = conciergeRequests.filter(r => r.status === "pending").length
   const unreadNotifications = agencyNotifications.filter((notification) => !notification.read).length
+  const displayName = agencyProfile?.name || profile?.name || "Agencia"
+  const displayPlan = agencyProfile?.plan ? agencyProfile.plan[0].toUpperCase() + agencyProfile.plan.slice(1) : "Agency"
+  const initials = displayName
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? "")
+    .join("") || "AG"
+
+  useEffect(() => {
+    if (!user?.id) return
+
+    let active = true
+
+    const loadAgency = async () => {
+      const result = await getAgencyByOwner(user.id)
+      if (active) {
+        setAgencyProfile(result.data)
+      }
+    }
+
+    void loadAgency()
+
+    return () => {
+      active = false
+    }
+  }, [user?.id])
 
   const markAgencyNotificationRead = (id: string) => {
     setAgencyNotifications((prev) => prev.map((notification) => notification.id === id ? { ...notification, read: true } : notification))
@@ -309,8 +341,8 @@ function AgencyLayoutInner({ children }: { children: React.ReactNode }) {
               </DropdownMenuContent>
             </DropdownMenu>
             <Avatar className="h-8 w-8 border border-white/10">
-              <AvatarImage src="/placeholder.svg" />
-              <AvatarFallback className="bg-primary/20 text-xs text-primary">AG</AvatarFallback>
+              <AvatarImage src={profile?.avatarUrl ?? "/placeholder.svg"} />
+              <AvatarFallback className="bg-primary/20 text-xs text-primary">{initials}</AvatarFallback>
             </Avatar>
           </div>
         </div>
@@ -468,12 +500,12 @@ function AgencyLayoutInner({ children }: { children: React.ReactNode }) {
             </DropdownMenu>
             <div className="flex items-center gap-3 border-l border-white/10 pl-3">
               <div className="text-right">
-                <div className="text-sm font-medium text-foreground">Agência Viaje+</div>
-                <div className="text-xs text-muted-foreground">Plano Pro</div>
+                <div className="text-sm font-medium text-foreground">{displayName}</div>
+                <div className="text-xs text-muted-foreground">{displayPlan}</div>
               </div>
               <Avatar className="h-10 w-10 border-2 border-primary/30">
-                <AvatarImage src="/placeholder.svg" />
-                <AvatarFallback className="bg-primary/20 text-primary">AG</AvatarFallback>
+                <AvatarImage src={profile?.avatarUrl ?? "/placeholder.svg"} />
+                <AvatarFallback className="bg-primary/20 text-primary">{initials}</AvatarFallback>
               </Avatar>
             </div>
           </div>

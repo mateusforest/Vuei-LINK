@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
@@ -27,6 +27,8 @@ import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { useAgency, type Client, type AgencyTrip } from "@/contexts/agency-context"
+import { useAuth } from "@/contexts/auth-context"
+import { getAgencyByOwner } from "@/lib/repositories/agencies-repository"
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -430,10 +432,31 @@ function GenerateItineraryModal({ open, onClose, clients, trips, onGenerate }: {
 
 export default function AgencyDashboard() {
   const router = useRouter()
+  const { user, profile } = useAuth()
   const { clients, trips, credits, activities, conciergeRequests, addClient, addDocument, useCredits } = useAgency()
   const [newClientOpen, setNewClientOpen] = useState(false)
   const [uploadDocOpen, setUploadDocOpen] = useState(false)
   const [generateItineraryOpen, setGenerateItineraryOpen] = useState(false)
+  const [agencyName, setAgencyName] = useState(profile?.name || "Agencia")
+
+  useEffect(() => {
+    if (!user?.id) return
+
+    let active = true
+
+    const loadAgency = async () => {
+      const result = await getAgencyByOwner(user.id)
+      if (active && result.data?.name) {
+        setAgencyName(result.data.name)
+      }
+    }
+
+    void loadAgency()
+
+    return () => {
+      active = false
+    }
+  }, [user?.id])
 
   // Calculate stats from real data
   const upcomingTrips = trips.filter(t => t.status === "upcoming")
@@ -505,7 +528,7 @@ export default function AgencyDashboard() {
       {/* Welcome Section */}
       <motion.div variants={itemVariants} className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-foreground lg:text-3xl">Bom dia, Agencia Viaje+</h1>
+          <h1 className="text-2xl font-bold text-foreground lg:text-3xl">Bom dia, {agencyName}</h1>
           <p className="mt-1 text-muted-foreground">
             Voce tem {upcomingTrips.length} viagens com embarque proximo
           </p>

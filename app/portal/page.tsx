@@ -19,6 +19,7 @@ import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { useTrips } from "@/contexts/trips-context"
+import { useAuth } from "@/contexts/auth-context"
 
 const fadeInUp = {
   initial: { opacity: 0, y: 20 },
@@ -91,8 +92,10 @@ function Toast({ message, visible }: { message: string; visible: boolean }) {
 export default function PortalHomePage() {
   const router = useRouter()
   const { trips, activeTrip } = useTrips()
+  const { profile, loading } = useAuth()
   const [showNoTripModal, setShowNoTripModal] = useState(false)
   const [copiedLink, setCopiedLink] = useState<string | null>(null)
+  const firstName = profile?.name?.trim().split(" ")[0]
 
   const copyLink = (link: string, type: string) => {
     navigator.clipboard.writeText(`https://${link}`)
@@ -131,7 +134,7 @@ export default function PortalHomePage() {
     >
       <motion.div variants={fadeInUp} className="space-y-2">
         <h1 className="text-2xl font-bold md:text-3xl">
-          Ola, <span className="vuei-gradient-text">Viajante</span>
+          {loading || !firstName ? "Ola" : <>Ola, <span className="vuei-gradient-text">{firstName}</span></>}
         </h1>
         <p className="text-muted-foreground">
           {trips.length > 0 ? "Seu link de viagem esta pronto para abrir, copiar e compartilhar." : "Crie sua primeira viagem para comecar."}
