@@ -115,52 +115,68 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     setLoading(true)
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password })
 
-    if (error) {
+      if (error) {
+        return { error: error.message }
+      }
+
+      setUser(data.user)
+      if (data.user) {
+        const ensuredProfile = await ensureProfile(data.user, supabase)
+        setProfile(ensuredProfile)
+      }
+      return { error: null }
+    } finally {
       setLoading(false)
-      return { error: error.message }
     }
-
-    setUser(data.user)
-    if (data.user) {
-      const ensuredProfile = await ensureProfile(data.user, supabase)
-      setProfile(ensuredProfile)
-    }
-    setLoading(false)
-    return { error: null }
   }
 
   const signUp = async ({ email, password, name, phone }: SignUpPayload) => {
-    if (!shouldUseSupabase() || !supabase) {
+    const supabaseEnvOk = shouldUseSupabase() && Boolean(supabase)
+    console.log("Supabase env ok", supabaseEnvOk)
+
+    if (!supabaseEnvOk || !supabase) {
+      console.error("signUp error", "Supabase nao esta configurado neste ambiente.")
       return { error: "Supabase nao esta configurado neste ambiente." }
     }
 
+    console.log("signUp started")
     setLoading(true)
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          name,
-          phone,
+
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            name,
+            phone,
+          },
         },
-      },
-    })
+      })
 
-    if (error) {
+      if (error) {
+        console.error("signUp error", error.message)
+        return { error: error.message }
+      }
+
+      if (data.user) {
+        const ensuredProfile = await ensureProfile(data.user, supabase)
+        setProfile(ensuredProfile)
+        setUser(data.user)
+      }
+
+      console.log("signUp success")
+      return { error: null }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Erro inesperado no cadastro."
+      console.error("signUp error", message)
+      return { error: message }
+    } finally {
       setLoading(false)
-      return { error: error.message }
     }
-
-    if (data.user) {
-      const ensuredProfile = await ensureProfile(data.user, supabase)
-      setProfile(ensuredProfile)
-      setUser(data.user)
-    }
-
-    setLoading(false)
-    return { error: null }
   }
 
   const signOut = async () => {

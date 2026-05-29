@@ -53,19 +53,23 @@ export default function SignupPage() {
     if (!validateForm()) return
     setIsLoading(true)
     setErrors({})
-    const result = await signUp({
-      email: formData.email,
-      password: formData.password,
-      name: formData.name,
-      phone: formData.phone,
-    })
-    if (result.error) {
-      setErrors((prev) => ({ ...prev, auth: "Nao foi possivel criar a conta com esses dados." }))
+    try {
+      const result = await signUp({
+        email: formData.email,
+        password: formData.password,
+        name: formData.name,
+        phone: formData.phone,
+      })
+      if (result.error) {
+        console.error("Cadastro Vuei - erro recebido da camada auth:", result.error)
+        setErrors((prev) => ({ ...prev, auth: result.error || "Nao foi possivel criar a conta com esses dados." }))
+        return
+      }
+
+      router.replace(getRedirectByRole(profile?.role))
+    } finally {
       setIsLoading(false)
-      return
     }
-    setIsLoading(false)
-    router.replace(getRedirectByRole(profile?.role))
   }
 
   const passwordStrength = () => {
