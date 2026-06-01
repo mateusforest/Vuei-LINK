@@ -32,6 +32,15 @@ export default function AgencySignupPage() {
     confirmPassword: ""
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const canSubmit =
+    formData.agencyName.trim().length > 0 &&
+    formData.responsibleName.trim().length > 0 &&
+    /\S+@\S+\.\S+/.test(formData.email) &&
+    formData.whatsapp.trim().length > 0 &&
+    formData.agentCount.trim().length > 0 &&
+    formData.password.length >= 6 &&
+    formData.password === formData.confirmPassword &&
+    acceptTerms
 
   useEffect(() => {
     if (!loading && user) {
@@ -440,7 +449,7 @@ export default function AgencySignupPage() {
                 {/* Botão */}
                 <Button
                   type="submit"
-                  disabled={isLoading || loading}
+                  disabled={isLoading || loading || !canSubmit}
                   className="w-full h-12 bg-gradient-to-r from-[#5de0e6] to-[#004aad] hover:opacity-90 text-white font-medium rounded-xl transition-all duration-300 shadow-lg shadow-[#5de0e6]/20 mt-4"
                 >
                   {isLoading ? (

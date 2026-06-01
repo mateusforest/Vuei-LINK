@@ -11,6 +11,8 @@ import { Input } from "@/components/ui/input"
 import { useAuth } from "@/contexts/auth-context"
 import { getRedirectByRole } from "@/lib/auth/role-redirect"
 
+type AppRole = "traveler" | "agency_owner" | "agency_member" | "master"
+
 export default function LoginPage() {
   const router = useRouter()
   const { signIn, user, profile, loading } = useAuth()
@@ -19,10 +21,11 @@ export default function LoginPage() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [errors, setErrors] = useState<{ email?: string; password?: string; auth?: string }>({})
+  const canSubmit = email.trim().length > 0 && password.length >= 6
 
   useEffect(() => {
     if (!loading && user) {
-      router.replace(getRedirectByRole(profile?.role))
+      router.replace(getRedirectByRole((profile?.role ?? user.user_metadata?.role) as AppRole | undefined))
     }
   }, [loading, profile?.role, router, user])
 
@@ -41,18 +44,31 @@ export default function LoginPage() {
     if (!validateForm()) return
     setIsLoading(true)
     setErrors({})
-    const result = await signIn({ email, password })
-    if (result.error) {
-      console.error("[AUTH ERROR]", result.error)
-      setErrors((prev) => ({ ...prev, auth: result.error }))
+    console.log("[AUTH] login started")
+
+    try {
+      const result = await signIn({ email: email.trim(), password })
+      if (result.error) {
+        console.error("[AUTH ERROR]", result.error)
+        const authMessage = result.error.includes("429")
+          ? "Muitas tentativas. Aguarde um momento e tente novamente."
+          : result.error
+        setErrors((prev) => ({ ...prev, auth: authMessage }))
+        return
+      }
+
+      const detectedRole = (result.profile?.role ?? profile?.role ?? result.user?.user_metadata?.role) as AppRole | undefined
+      const redirectPath = getRedirectByRole(detectedRole)
+      console.log("[AUTH] role detected", detectedRole ?? null)
+      console.log("[AUTH] redirect target", redirectPath)
+      router.replace(redirectPath)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Nao foi possivel entrar agora."
+      console.error("[AUTH ERROR]", message)
+      setErrors((prev) => ({ ...prev, auth: message }))
+    } finally {
       setIsLoading(false)
-      return
     }
-    setIsLoading(false)
-    const redirectPath = getRedirectByRole(result.profile?.role ?? profile?.role)
-    console.log("[AUTH] role detectada", result.profile?.role ?? profile?.role ?? null)
-    console.log("[AUTH] redirect destino", redirectPath)
-    router.replace(redirectPath)
   }
 
   return (
@@ -279,7 +295,7 @@ export default function LoginPage() {
                 {/* Botão Entrar */}
                 <Button
                   type="submit"
-                  disabled={isLoading || loading}
+                  disabled={isLoading || loading || !canSubmit}
                   className="w-full h-12 bg-gradient-to-r from-[#5de0e6] to-[#004aad] hover:opacity-90 text-white font-medium rounded-xl transition-all duration-300 shadow-lg shadow-[#5de0e6]/20"
                 >
                   {isLoading ? (

@@ -27,10 +27,17 @@ export default function SignupPage() {
     confirmPassword: ""
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const canSubmit =
+    formData.name.trim().length > 0 &&
+    /\S+@\S+\.\S+/.test(formData.email) &&
+    formData.phone.trim().length > 0 &&
+    formData.password.length >= 6 &&
+    formData.password === formData.confirmPassword &&
+    acceptTerms
 
   useEffect(() => {
     if (!loading && user) {
-      router.replace(getRedirectByRole(profile?.role))
+      router.replace(getRedirectByRole(profile?.role ?? (user.user_metadata?.role as any)))
     }
   }, [loading, profile?.role, router, user])
 
@@ -53,27 +60,37 @@ export default function SignupPage() {
     if (!validateForm()) return
     setIsLoading(true)
     setErrors({})
+    console.log("[AUTH] signup started")
     try {
       const result = await signUp({
-        email: formData.email,
+        email: formData.email.trim(),
         password: formData.password,
-        name: formData.name,
-        phone: formData.phone,
+        name: formData.name.trim(),
+        phone: formData.phone.trim(),
         role: "traveler",
         metadata: {
-          full_name: formData.name,
+          full_name: formData.name.trim(),
+          phone: formData.phone.trim(),
         },
       })
       if (result.error) {
         console.error("Cadastro Vuei - erro recebido da camada auth:", result.error)
-        setErrors((prev) => ({ ...prev, auth: result.error || "Nao foi possivel criar a conta com esses dados." }))
+        const authMessage = result.error.includes("429")
+          ? "Muitas tentativas. Aguarde um momento e tente novamente."
+          : result.error || "Nao foi possivel criar a conta com esses dados."
+        setErrors((prev) => ({ ...prev, auth: authMessage }))
         return
       }
 
-      const redirectPath = getRedirectByRole(result.profile?.role ?? profile?.role)
-      console.log("[AUTH] role detectada", result.profile?.role ?? profile?.role ?? null)
-      console.log("[AUTH] redirect destino", redirectPath)
+      const detectedRole = result.profile?.role ?? profile?.role ?? (result.user?.user_metadata?.role as any)
+      const redirectPath = getRedirectByRole(detectedRole)
+      console.log("[AUTH] role detected", detectedRole ?? null)
+      console.log("[AUTH] redirect target", redirectPath)
       router.replace(redirectPath)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Nao foi possivel concluir o cadastro."
+      console.error("[AUTH ERROR]", message)
+      setErrors((prev) => ({ ...prev, auth: message }))
     } finally {
       setIsLoading(false)
     }
@@ -356,7 +373,7 @@ export default function SignupPage() {
                 {/* Botão */}
                 <Button
                   type="submit"
-                  disabled={isLoading || loading}
+                  disabled={isLoading || loading || !canSubmit}
                   className="w-full h-12 bg-gradient-to-r from-[#5de0e6] to-[#004aad] hover:opacity-90 text-white font-medium rounded-xl transition-all duration-300 shadow-lg shadow-[#5de0e6]/20 mt-6"
                 >
                   {isLoading ? (

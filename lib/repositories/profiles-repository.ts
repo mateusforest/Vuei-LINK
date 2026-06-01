@@ -163,22 +163,21 @@ export async function createProfile(payload: Omit<Profile, "createdAt" | "update
 }
 
 export async function updateProfile(id: string, payload: Partial<Profile>) {
-  const current = buildLocalProfile()
-  if (current.id !== id) return { source: "local" as const, data: null as Profile | null }
-
-  const nextProfile: Profile = {
-    ...current,
-    ...payload,
-    settings: {
-      ...current.settings,
-      ...payload.settings,
-    },
-    updatedAt: new Date().toISOString(),
-  }
-
   if (shouldUseSupabase()) {
     const client = createSupabaseBrowserClient()
     if (client) {
+      const currentRemote = await getProfile(id)
+      const baseProfile = currentRemote.data ?? buildLocalProfile()
+      const nextProfile: Profile = {
+        ...baseProfile,
+        ...payload,
+        settings: {
+          ...baseProfile.settings,
+          ...payload.settings,
+        },
+        updatedAt: new Date().toISOString(),
+      }
+
       const updatePayload: Database["public"]["Tables"]["profiles"]["Update"] = {
         email: nextProfile.email,
         name: nextProfile.name,
@@ -208,8 +207,21 @@ export async function updateProfile(id: string, payload: Partial<Profile>) {
     return {
       source: "supabase-placeholder" as const,
       config: createSupabaseBrowserClientPlaceholder(),
-      data: nextProfile,
+      data: null,
     }
+  }
+
+  const current = buildLocalProfile()
+  if (current.id !== id && id !== "local-traveler") return { source: "local" as const, data: null as Profile | null }
+
+  const nextProfile: Profile = {
+    ...current,
+    ...payload,
+    settings: {
+      ...current.settings,
+      ...payload.settings,
+    },
+    updatedAt: new Date().toISOString(),
   }
 
   if (typeof window !== "undefined") {

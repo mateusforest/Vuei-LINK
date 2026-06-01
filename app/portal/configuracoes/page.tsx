@@ -37,6 +37,7 @@ import { useRouter } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
 import { shouldUseSupabase } from "@/lib/data-source"
 import { updateProfile as updateProfileRepository } from "@/lib/repositories/profiles-repository"
+import { createSupabaseBrowserClient } from "@/lib/supabase/client"
 
 const fadeInUp = {
   initial: { opacity: 0, y: 20 },
@@ -92,6 +93,10 @@ export default function ConfiguracoesPage() {
   const [profile, setProfile] = useState(defaultProfile)
   const [settings, setSettings] = useState(defaultSettings)
   const [toastMessage, setToastMessage] = useState("")
+  const [actionError, setActionError] = useState("")
+  const [isSavingPhoto, setIsSavingPhoto] = useState(false)
+  const [isSavingProfile, setIsSavingProfile] = useState(false)
+  const [isSavingSettings, setIsSavingSettings] = useState(false)
   const [showPhotoModal, setShowPhotoModal] = useState(false)
   const [showProfileModal, setShowProfileModal] = useState(false)
   const [showBiometricModal, setShowBiometricModal] = useState(false)
@@ -99,6 +104,7 @@ export default function ConfiguracoesPage() {
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [profileForm, setProfileForm] = useState(defaultProfile)
   const [photoPreview, setPhotoPreview] = useState("")
+  const [photoFile, setPhotoFile] = useState<File | null>(null)
   const [pinForm, setPinForm] = useState({ pin: "", confirmPin: "" })
 
   useEffect(() => {
@@ -151,6 +157,7 @@ export default function ConfiguracoesPage() {
 
   const handlePhotoSelected = (file?: File) => {
     if (!file) return
+    setPhotoFile(file)
 
     const reader = new FileReader()
     reader.onload = () => {
@@ -161,32 +168,99 @@ export default function ConfiguracoesPage() {
   }
 
   const handleSavePhoto = async () => {
-    const nextProfile = { ...profile, avatar: photoPreview }
-    setProfile(nextProfile)
+    console.log("[PROFILE] save started")
+    console.log("[UPLOAD] started")
+    setIsSavingPhoto(true)
+    setActionError("")
 
-    if (shouldUseSupabase() && authProfile) {
-      await updateProfileRepository(authProfile.id, { avatarUrl: photoPreview })
-      await refreshProfile()
+    try {
+      let nextAvatar = photoPreview
+
+      if (shouldUseSupabase() && authProfile) {
+        const client = createSupabaseBrowserClient()
+        if (!client) {
+          throw new Error("Cliente Supabase indisponivel para upload da foto.")
+        }
+
+        const file = photoFile
+
+        if (file) {
+          const extension = file.name.split(".").pop()?.toLowerCase() || "png"
+          const filePath = `${authProfile.id}/avatar-${Date.now()}.${extension}`
+          const uploadResult = await client.storage.from("vuei-avatars").upload(filePath, file, {
+            cacheControl: "3600",
+            upsert: true,
+          })
+
+          if (uploadResult.error) {
+            console.error("[UPLOAD] error", uploadResult.error.message)
+            throw new Error(
+              uploadResult.error.message.includes("Bucket not found")
+                ? "Bucket 'vuei-avatars' nao existe. Rode o SQL de configuracao do bucket antes de salvar a foto."
+                : uploadResult.error.message
+            )
+          }
+
+          const publicUrl = client.storage.from("vuei-avatars").getPublicUrl(filePath).data.publicUrl
+          nextAvatar = publicUrl
+          setPhotoPreview(publicUrl)
+        }
+      }
+
+      const nextProfile = { ...profile, avatar: nextAvatar }
+      setProfile(nextProfile)
+
+      if (shouldUseSupabase() && authProfile) {
+        const result = await updateProfileRepository(authProfile.id, { avatarUrl: nextAvatar })
+        if (!result.data) {
+          throw new Error("Nao foi possivel salvar a foto no perfil.")
+        }
+        await refreshProfile()
+      }
+
+      setShowPhotoModal(false)
+      setPhotoFile(null)
+      showToast("Foto atualizada com sucesso.")
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Nao foi possivel atualizar a foto."
+      console.error("[PROFILE] save error", message)
+      setActionError(message)
+    } finally {
+      setIsSavingPhoto(false)
     }
-
-    setShowPhotoModal(false)
-    showToast("Foto atualizada com sucesso.")
   }
 
   const handleSaveProfile = async () => {
-    setProfile(profileForm)
+    console.log("[PROFILE] save started")
+    setIsSavingProfile(true)
+    setActionError("")
 
-    if (shouldUseSupabase() && authProfile) {
-      await updateProfileRepository(authProfile.id, {
-        name: profileForm.name,
-        email: profileForm.email,
-        phone: profileForm.phone,
-      })
-      await refreshProfile()
+    try {
+      setProfile(profileForm)
+
+      if (shouldUseSupabase() && authProfile) {
+        const result = await updateProfileRepository(authProfile.id, {
+          name: profileForm.name,
+          email: profileForm.email,
+          phone: profileForm.phone,
+        })
+
+        if (!result.data) {
+          throw new Error("Nao foi possivel salvar o perfil.")
+        }
+
+        await refreshProfile()
+      }
+
+      setShowProfileModal(false)
+      showToast("Perfil atualizado com sucesso.")
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Nao foi possivel salvar o perfil."
+      console.error("[PROFILE] save error", message)
+      setActionError(message)
+    } finally {
+      setIsSavingProfile(false)
     }
-
-    setShowProfileModal(false)
-    showToast("Perfil atualizado com sucesso.")
   }
 
   const handleSavePin = () => {
@@ -201,6 +275,41 @@ export default function ConfiguracoesPage() {
   const handleSignOut = async () => {
     await signOut()
     router.push("/login")
+  }
+
+  const handleSaveBiometricPreference = async () => {
+    console.log("[SETTINGS] save started")
+    setIsSavingSettings(true)
+    setActionError("")
+
+    try {
+      if (shouldUseSupabase() && authProfile) {
+        const result = await updateProfileRepository(authProfile.id, {
+          settings: {
+            language: authProfile.settings?.language ?? "pt-BR",
+            darkMode: authProfile.settings?.darkMode ?? true,
+            notificationsEnabled: settings.notifications,
+            biometricEnabled: settings.faceId,
+            pinEnabled: settings.pinEnabled,
+          },
+        })
+
+        if (!result.data) {
+          throw new Error("Nao foi possivel salvar a preferencia de biometria.")
+        }
+
+        await refreshProfile()
+      }
+
+      setShowBiometricModal(false)
+      showToast(settings.faceId ? "Biometria ativada." : "Biometria desativada.")
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Nao foi possivel salvar a configuracao."
+      console.error("[PROFILE] save error", message)
+      setActionError(message)
+    } finally {
+      setIsSavingSettings(false)
+    }
   }
 
   const sections = useMemo(() => [
@@ -347,6 +456,12 @@ export default function ConfiguracoesPage() {
         </motion.div>
       ))}
 
+      {actionError && (
+        <motion.div variants={fadeInUp}>
+          <Card className="border-red-500/20 bg-red-500/10 p-4 text-sm text-red-300">{actionError}</Card>
+        </motion.div>
+      )}
+
       <motion.div variants={fadeInUp}>
         <h2 className="mb-3 px-1 text-sm font-medium text-muted-foreground">Zona de perigo</h2>
         <Card className="divide-y divide-border/50 border-destructive/20 bg-card/50">
@@ -403,8 +518,8 @@ export default function ConfiguracoesPage() {
               <Button variant="outline" className="flex-1" onClick={() => setShowPhotoModal(false)}>
                 Cancelar
               </Button>
-              <Button className="flex-1 bg-gradient-to-r from-primary to-secondary text-primary-foreground" onClick={handleSavePhoto}>
-                Salvar foto
+              <Button className="flex-1 bg-gradient-to-r from-primary to-secondary text-primary-foreground" onClick={handleSavePhoto} disabled={isSavingPhoto}>
+                {isSavingPhoto ? "Salvando..." : "Salvar foto"}
               </Button>
             </div>
           </div>
@@ -434,8 +549,8 @@ export default function ConfiguracoesPage() {
               <Button variant="outline" className="flex-1" onClick={() => setShowProfileModal(false)}>
                 Cancelar
               </Button>
-              <Button className="flex-1 bg-gradient-to-r from-primary to-secondary text-primary-foreground" onClick={handleSaveProfile}>
-                Salvar perfil
+              <Button className="flex-1 bg-gradient-to-r from-primary to-secondary text-primary-foreground" onClick={handleSaveProfile} disabled={isSavingProfile}>
+                {isSavingProfile ? "Salvando..." : "Salvar perfil"}
               </Button>
             </div>
           </div>
@@ -445,15 +560,15 @@ export default function ConfiguracoesPage() {
       <Dialog open={showBiometricModal} onOpenChange={setShowBiometricModal}>
         <DialogContent className="vuei-glass max-w-md border-border/50">
           <DialogHeader>
-            <DialogTitle>Face ID / Biometria</DialogTitle>
+            <DialogTitle>Biometria / Face ID</DialogTitle>
             <DialogDescription>
-              Proteja documentos e acessos sensiveis usando a biometria do dispositivo.
+              A autenticacao biometrica sera usada pelo dispositivo quando houver suporte a WebAuthn/passkey.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="rounded-xl border border-border/50 bg-muted/20 p-4">
               <p className="text-sm text-muted-foreground">
-                Quando ativado, o Vuei solicita validacao biometrica antes de abrir areas privadas.
+                Quando ativado, o Vuei salva sua preferencia e pode solicitar biometria do dispositivo em fluxos suportados.
               </p>
             </div>
             <div className="flex items-center justify-between rounded-xl border border-border/50 p-4">
@@ -465,12 +580,10 @@ export default function ConfiguracoesPage() {
             </div>
             <Button
               className="w-full bg-gradient-to-r from-primary to-secondary text-primary-foreground"
-              onClick={() => {
-                setShowBiometricModal(false)
-                showToast(settings.faceId ? "Biometria ativada." : "Biometria desativada.")
-              }}
+              onClick={() => void handleSaveBiometricPreference()}
+              disabled={isSavingSettings}
             >
-              {settings.faceId ? "Manter ativada" : "Salvar preferencia"}
+              {isSavingSettings ? "Salvando..." : "Configurar biometria"}
             </Button>
           </div>
         </DialogContent>

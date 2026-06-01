@@ -58,6 +58,8 @@ const companionTypes = [
   { id: "amigos", label: "Amigos", icon: UserPlus, count: 6 },
 ]
 
+const TRIP_CREATE_TIMEOUT_MS = 15000
+
 function Toast({ message, visible }: { message: string; visible: boolean }) {
   if (!visible) return null
   return (
@@ -129,19 +131,24 @@ export default function CriarViagemPage() {
       let newTrip: Trip
 
       if (shouldUseSupabase() && user) {
-        const result = await createTripInRepository({
-          title: formData.name,
-          destination: formData.destination,
-          startDate: formData.startDate,
-          endDate: formData.endDate,
-          style: formData.style,
-          status: "draft",
-          visibility: "private",
-          ownerType: "traveler",
-          ownerUserId: user.id,
-          travelersCount: companionTypes.find(c => c.id === formData.companions)?.count || 1,
-          creditsSummary: { balance: null, used: null, total: null },
-        })
+        const result = await Promise.race([
+          createTripInRepository({
+            title: formData.name,
+            destination: formData.destination,
+            startDate: formData.startDate,
+            endDate: formData.endDate,
+            style: formData.style,
+            status: "draft",
+            visibility: "private",
+            ownerType: "traveler",
+            ownerUserId: user.id,
+            travelersCount: companionTypes.find(c => c.id === formData.companions)?.count || 1,
+            creditsSummary: { balance: null, used: null, total: null },
+          }),
+          new Promise<never>((_, reject) => {
+            window.setTimeout(() => reject(new Error("Tempo limite excedido ao criar a viagem.")), TRIP_CREATE_TIMEOUT_MS)
+          }),
+        ])
 
         if (result.source === "supabase" && result.data) {
           newTrip = syncTripFromBackend(result.data)

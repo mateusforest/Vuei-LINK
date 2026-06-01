@@ -1,8 +1,10 @@
 import type { Document, DocumentVisibility, DocumentType } from "@/types"
-import { createSupabaseBrowserClientPlaceholder } from "@/lib/supabase/client"
+import { createSupabaseBrowserClient, createSupabaseBrowserClientPlaceholder } from "@/lib/supabase/client"
 import { shouldUseSupabase } from "@/lib/data-source"
+import type { Database } from "@/lib/supabase/types"
 
 const DOCUMENTS_STORAGE_KEY = "vuei_documents_repository"
+const DOCUMENTS_BUCKET = "vuei-documents"
 
 export interface DocumentMetadataPayload {
   tripId: string | null
@@ -26,6 +28,45 @@ interface DocumentsRepositoryPayload {
 }
 
 const DOCUMENTS_SCHEMA_VERSION = 1
+
+function mapDocumentRowToDocument(row: Database["public"]["Tables"]["documents"]["Row"]): Document {
+  return {
+    id: row.id,
+    tripId: row.trip_id,
+    clientId: row.client_id,
+    agencyId: row.agency_id,
+    ownerUserId: row.owner_user_id,
+    name: row.name,
+    type: row.type,
+    fileUrl: row.file_url,
+    filePath: row.file_path,
+    mimeType: row.mime_type,
+    size: row.size_bytes,
+    isPrivate: row.is_private,
+    visibility: row.visibility,
+    aiExtractedData: (row.ai_extracted_data ?? {}) as Record<string, unknown>,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  }
+}
+
+function buildInsertPayload(payload: DocumentMetadataPayload): Database["public"]["Tables"]["documents"]["Insert"] {
+  return {
+    trip_id: payload.tripId,
+    client_id: payload.clientId,
+    agency_id: payload.agencyId,
+    owner_user_id: payload.ownerUserId,
+    name: payload.name,
+    type: payload.type,
+    file_url: payload.fileUrl ?? null,
+    file_path: payload.filePath ?? null,
+    mime_type: payload.mimeType ?? null,
+    size_bytes: payload.size ?? null,
+    is_private: payload.isPrivate ?? true,
+    visibility: payload.visibility ?? "private",
+    ai_extracted_data: payload.aiExtractedData ?? {},
+  }
+}
 
 function readLocalDocuments(): Document[] {
   if (typeof window === "undefined") return []
@@ -55,7 +96,7 @@ function writeLocalDocuments(documents: Document[]) {
   window.localStorage.setItem(DOCUMENTS_STORAGE_KEY, JSON.stringify(payload))
 }
 
-function buildDocument(payload: DocumentMetadataPayload): Document {
+function buildLocalDocument(payload: DocumentMetadataPayload): Document {
   const now = new Date().toISOString()
   return {
     id: `document-${Date.now()}`,
@@ -79,60 +120,130 @@ function buildDocument(payload: DocumentMetadataPayload): Document {
 
 export async function listDocumentsByTrip(tripId: string) {
   if (shouldUseSupabase()) {
+    const client = createSupabaseBrowserClient()
+    if (client) {
+      const { data, error } = await client
+        .from("documents")
+        .select("*")
+        .eq("trip_id", tripId)
+        .order("created_at", { ascending: false })
+
+      if (error) {
+        return { source: "supabase" as const, data: [] as Document[], error: error.message }
+      }
+
+      return { source: "supabase" as const, data: (data ?? []).map(mapDocumentRowToDocument), error: null }
+    }
+
     return {
       source: "supabase-placeholder" as const,
       config: createSupabaseBrowserClientPlaceholder(),
       data: [] as Document[],
+      error: "Supabase browser client indisponivel.",
     }
   }
 
   return {
     source: "local" as const,
     data: readLocalDocuments().filter((document) => document.tripId === tripId),
+    error: null,
   }
 }
 
 export async function listDocumentsByClient(clientId: string) {
   if (shouldUseSupabase()) {
-    return {
-      source: "supabase-placeholder" as const,
-      config: createSupabaseBrowserClientPlaceholder(),
-      data: [] as Document[],
+    const client = createSupabaseBrowserClient()
+    if (client) {
+      const { data, error } = await client
+        .from("documents")
+        .select("*")
+        .eq("client_id", clientId)
+        .order("created_at", { ascending: false })
+
+      if (error) {
+        return { source: "supabase" as const, data: [] as Document[], error: error.message }
+      }
+
+      return { source: "supabase" as const, data: (data ?? []).map(mapDocumentRowToDocument), error: null }
     }
   }
 
   return {
     source: "local" as const,
     data: readLocalDocuments().filter((document) => document.clientId === clientId),
+    error: null,
   }
 }
 
 export async function createDocumentMetadata(payload: DocumentMetadataPayload) {
-  const document = buildDocument(payload)
-
   if (shouldUseSupabase()) {
+    const client = createSupabaseBrowserClient()
+    if (client) {
+      const { data, error } = await client
+        .from("documents")
+        .insert(buildInsertPayload(payload))
+        .select("*")
+        .single()
+
+      if (error) {
+        return { source: "supabase" as const, data: null as Document | null, error: error.message }
+      }
+
+      return { source: "supabase" as const, data: mapDocumentRowToDocument(data), error: null }
+    }
+
     return {
       source: "supabase-placeholder" as const,
       config: createSupabaseBrowserClientPlaceholder(),
-      data: document,
+      data: null as Document | null,
+      error: "Supabase browser client indisponivel.",
     }
   }
 
+  const document = buildLocalDocument(payload)
   const documents = readLocalDocuments()
   writeLocalDocuments([document, ...documents])
 
   return {
     source: "local" as const,
     data: document,
+    error: null,
   }
 }
 
 export async function updateDocumentMetadata(id: string, payload: Partial<DocumentMetadataPayload>) {
   if (shouldUseSupabase()) {
-    return {
-      source: "supabase-placeholder" as const,
-      config: createSupabaseBrowserClientPlaceholder(),
-      data: null,
+    const client = createSupabaseBrowserClient()
+    if (client) {
+      const updatePayload: Database["public"]["Tables"]["documents"]["Update"] = {
+        trip_id: payload.tripId,
+        client_id: payload.clientId,
+        agency_id: payload.agencyId,
+        owner_user_id: payload.ownerUserId,
+        name: payload.name,
+        type: payload.type,
+        file_url: payload.fileUrl,
+        file_path: payload.filePath,
+        mime_type: payload.mimeType,
+        size_bytes: payload.size,
+        is_private: payload.isPrivate,
+        visibility: payload.visibility,
+        ai_extracted_data: payload.aiExtractedData ?? undefined,
+        updated_at: new Date().toISOString(),
+      }
+
+      const { data, error } = await client
+        .from("documents")
+        .update(updatePayload)
+        .eq("id", id)
+        .select("*")
+        .maybeSingle()
+
+      if (error) {
+        return { source: "supabase" as const, data: null as Document | null, error: error.message }
+      }
+
+      return { source: "supabase" as const, data: data ? mapDocumentRowToDocument(data) : null, error: null }
     }
   }
 
@@ -143,6 +254,7 @@ export async function updateDocumentMetadata(id: string, payload: Partial<Docume
     updatedDocument = {
       ...document,
       ...payload,
+      size: payload.size ?? document.size,
       updatedAt: new Date().toISOString(),
     }
     return updatedDocument
@@ -153,36 +265,66 @@ export async function updateDocumentMetadata(id: string, payload: Partial<Docume
   return {
     source: "local" as const,
     data: updatedDocument,
+    error: null,
   }
 }
 
 export async function deleteDocument(id: string) {
   if (shouldUseSupabase()) {
-    return {
-      source: "supabase-placeholder" as const,
-      config: createSupabaseBrowserClientPlaceholder(),
-      success: true,
+    const client = createSupabaseBrowserClient()
+    if (client) {
+      const { error } = await client.from("documents").delete().eq("id", id)
+      if (error) {
+        return { source: "supabase" as const, success: false, error: error.message }
+      }
+
+      return { source: "supabase" as const, success: true, error: null }
     }
   }
 
   const documents = readLocalDocuments().filter((document) => document.id !== id)
   writeLocalDocuments(documents)
 
-  return {
-    source: "local" as const,
-    success: true,
-  }
+  return { source: "local" as const, success: true, error: null }
 }
 
 export async function uploadDocumentFile(file: File, path: string) {
+  console.log("[UPLOAD] started")
+
   if (shouldUseSupabase()) {
+    const client = createSupabaseBrowserClient()
+    if (client) {
+      const { data, error } = await client.storage.from(DOCUMENTS_BUCKET).upload(path, file, {
+        cacheControl: "3600",
+        upsert: true,
+      })
+
+      if (error) {
+        console.error("[UPLOAD] error", error.message)
+        return {
+          source: "supabase" as const,
+          data: null,
+          error: error.message.includes("Bucket not found")
+            ? "Bucket 'vuei-documents' nao existe no Supabase Storage. Rode a configuracao do bucket antes do upload."
+            : error.message,
+        }
+      }
+
+      return {
+        source: "supabase" as const,
+        data: {
+          path: data.path,
+          fileUrl: null,
+        },
+        error: null,
+      }
+    }
+
     return {
       source: "supabase-placeholder" as const,
       config: createSupabaseBrowserClientPlaceholder(),
-      data: {
-        path,
-        fileUrl: null,
-      },
+      data: null,
+      error: "Supabase browser client indisponivel.",
     }
   }
 
@@ -192,30 +334,47 @@ export async function uploadDocumentFile(file: File, path: string) {
       path,
       fileUrl: URL.createObjectURL(file),
     },
+    error: null,
   }
 }
 
 export async function getSignedDocumentUrl(path: string) {
   if (shouldUseSupabase()) {
-    return {
-      source: "supabase-placeholder" as const,
-      config: createSupabaseBrowserClientPlaceholder(),
-      data: null,
+    const client = createSupabaseBrowserClient()
+    if (client) {
+      const { data, error } = await client.storage.from(DOCUMENTS_BUCKET).createSignedUrl(path, 60 * 10)
+      if (error) {
+        return { source: "supabase" as const, data: null, error: error.message }
+      }
+
+      return { source: "supabase" as const, data: data.signedUrl, error: null }
     }
   }
 
   return {
     source: "local" as const,
     data: path,
+    error: null,
   }
 }
 
 export async function listPublicTripDocuments(tripId: string) {
   if (shouldUseSupabase()) {
-    return {
-      source: "supabase-placeholder" as const,
-      config: createSupabaseBrowserClientPlaceholder(),
-      data: [] as Document[],
+    const client = createSupabaseBrowserClient()
+    if (client) {
+      const { data, error } = await client
+        .from("documents")
+        .select("*")
+        .eq("trip_id", tripId)
+        .eq("visibility", "public_trip")
+        .eq("is_private", false)
+        .order("created_at", { ascending: false })
+
+      if (error) {
+        return { source: "supabase" as const, data: [] as Document[], error: error.message }
+      }
+
+      return { source: "supabase" as const, data: (data ?? []).map(mapDocumentRowToDocument), error: null }
     }
   }
 
@@ -224,5 +383,6 @@ export async function listPublicTripDocuments(tripId: string) {
     data: readLocalDocuments().filter(
       (document) => document.tripId === tripId && document.visibility === "public_trip" && !document.isPrivate
     ),
+    error: null,
   }
 }
