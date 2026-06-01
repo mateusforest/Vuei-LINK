@@ -903,6 +903,21 @@ function FlightsSection({ tripData, onUpdateFlight, onAddFlight, tripId, ownerUs
     showToast("Voo atualizado com sucesso!", "success")
   }
 
+  const handleOpenTicketDocument = async (document: any) => {
+    const resolvedUrl = document.fileUrl
+      ? { data: document.fileUrl, error: null }
+      : document.filePath
+        ? await getSignedDocumentUrl(document.filePath)
+        : { data: null, error: "Arquivo indisponivel para visualizacao." }
+
+    if (resolvedUrl.error || !resolvedUrl.data) {
+      showToast(resolvedUrl.error || "Nao foi possivel abrir o anexo.", "error")
+      return
+    }
+
+    window.open(resolvedUrl.data, "_blank", "noopener,noreferrer")
+  }
+
   return (
     <section id="flights" className="py-12 px-4">
       <div className="max-w-6xl mx-auto">
@@ -944,6 +959,12 @@ function FlightsSection({ tripData, onUpdateFlight, onAddFlight, tripId, ownerUs
               <p className="text-sm font-medium text-white">{document.name}</p>
               <p className="mt-2 text-xs text-white/40">Arquivo de passagem anexado</p>
               <p className="mt-1 text-xs text-white/30">{document.mimeType || "Nao informado"}</p>
+              <div className="mt-4">
+                <Button size="sm" variant="outline" className="border-white/10 text-white/70" onClick={() => void handleOpenTicketDocument(document)}>
+                  <Download className="mr-2 h-4 w-4" />
+                  Abrir anexo
+                </Button>
+              </div>
             </div>
           ))}
         </div>
@@ -2120,6 +2141,7 @@ function ConciergeSection({ tripData, onOpenCredits }: { tripData: any; onOpenCr
 function ShareModal({ open, onClose, tripData }: { open: boolean; onClose: () => void; tripData: any }) {
   const [copied, setCopied] = useState<string | null>(null)
   const { showToast } = useToast()
+  const { isAdmin } = useContext(PermissionContext)
 
   const handleCopy = (type: string, link: string) => {
     navigator.clipboard.writeText(link)
@@ -2131,19 +2153,21 @@ function ShareModal({ open, onClose, tripData }: { open: boolean; onClose: () =>
   return (
     <Modal open={open} onClose={onClose} title="Compartilhar Viagem">
       <div className="space-y-4">
-        <div className="p-4 rounded-xl bg-gradient-to-br from-[#5de0e6]/10 to-[#004aad]/10 border border-[#5de0e6]/20">
-          <div className="flex items-center gap-2 mb-3">
-            <Lock className="w-4 h-4 text-[#5de0e6]" />
-            <span className="text-sm font-medium text-white">Link Administrador</span>
+        {isAdmin && (
+          <div className="p-4 rounded-xl bg-gradient-to-br from-[#5de0e6]/10 to-[#004aad]/10 border border-[#5de0e6]/20">
+            <div className="flex items-center gap-2 mb-3">
+              <Lock className="w-4 h-4 text-[#5de0e6]" />
+              <span className="text-sm font-medium text-white">Link Administrador</span>
+            </div>
+            <p className="text-xs text-white/40 mb-3">Acesso completo a todos os documentos</p>
+            <div className="flex items-center gap-2 p-3 rounded-xl bg-black/30">
+              <code className="flex-1 text-xs text-white/60 truncate">{tripData.adminLink}</code>
+              <Button size="sm" variant="ghost" onClick={() => handleCopy("admin", tripData.adminLink)} className="text-[#5de0e6]">
+                {copied === "admin" ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+              </Button>
+            </div>
           </div>
-          <p className="text-xs text-white/40 mb-3">Acesso completo a todos os documentos</p>
-          <div className="flex items-center gap-2 p-3 rounded-xl bg-black/30">
-            <code className="flex-1 text-xs text-white/60 truncate">{tripData.adminLink}</code>
-            <Button size="sm" variant="ghost" onClick={() => handleCopy("admin", tripData.adminLink)} className="text-[#5de0e6]">
-              {copied === "admin" ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-            </Button>
-          </div>
-        </div>
+        )}
 
         <div className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.06]">
           <div className="flex items-center gap-2 mb-3">
@@ -2210,9 +2234,12 @@ function MenuModal({
   onOpenSettings: () => void
   onOpenCredits: () => void
 }) {
+  const { isAdmin } = useContext(PermissionContext)
   const menuItems = [
-    { icon: User, label: "Viajantes", action: onOpenTravelers },
-    { icon: Settings, label: "Configuracoes", action: onOpenSettings },
+    ...(isAdmin ? [
+      { icon: User, label: "Viajantes", action: onOpenTravelers },
+      { icon: Settings, label: "Configuracoes", action: onOpenSettings },
+    ] : []),
     { icon: CreditCard, label: "Credito", action: onOpenCredits },
   ]
 
@@ -2247,6 +2274,7 @@ function TravelersModal({
   travelers: { name: string; avatar?: string; role: string }[]
   onUpdateTravelers: (travelers: { name: string; avatar?: string; role: string }[]) => void
 }) {
+  const { isAdmin } = useContext(PermissionContext)
   const { showToast } = useToast()
   const [editingIndex, setEditingIndex] = useState<number | null>(null)
   const [form, setForm] = useState({ name: "", role: "acompanhante" })
@@ -2262,6 +2290,7 @@ function TravelersModal({
   }
 
   const handleSave = () => {
+    if (!isAdmin) return
     if (!form.name.trim()) return
 
     if (editingIndex === null) {
@@ -2276,12 +2305,14 @@ function TravelersModal({
   }
 
   const handleRemove = (index: number) => {
+    if (!isAdmin) return
     onUpdateTravelers(travelers.filter((_, travelerIndex) => travelerIndex !== index))
     showToast("Viajante removido.", "success")
     if (editingIndex === index) resetForm()
   }
 
   const handleSetPrimary = (index: number) => {
+    if (!isAdmin) return
     onUpdateTravelers(travelers.map((traveler, travelerIndex) => ({
       ...traveler,
       role: travelerIndex === index ? "principal" : traveler.role === "principal" ? "acompanhante" : traveler.role
@@ -2301,15 +2332,19 @@ function TravelersModal({
                   <p className="text-xs text-white/40">{traveler.role === "principal" ? "Responsavel principal" : "Viajante"}</p>
                 </div>
                 <div className="flex gap-2">
-                  <button onClick={() => startEditing(index)} className="rounded-xl bg-white/[0.05] p-2 text-white/60 transition-colors hover:bg-white/10 hover:text-white">
-                    <Pencil className="h-4 w-4" />
-                  </button>
-                  <button onClick={() => handleRemove(index)} className="rounded-xl bg-red-500/10 p-2 text-red-300 transition-colors hover:bg-red-500/20">
-                    <Trash2 className="h-4 w-4" />
-                  </button>
+                  {isAdmin && (
+                    <>
+                      <button onClick={() => startEditing(index)} className="rounded-xl bg-white/[0.05] p-2 text-white/60 transition-colors hover:bg-white/10 hover:text-white">
+                        <Pencil className="h-4 w-4" />
+                      </button>
+                      <button onClick={() => handleRemove(index)} className="rounded-xl bg-red-500/10 p-2 text-red-300 transition-colors hover:bg-red-500/20">
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
-              {traveler.role !== "principal" && (
+              {isAdmin && traveler.role !== "principal" && (
                 <button onClick={() => handleSetPrimary(index)} className="mt-3 text-xs font-medium text-[#5de0e6]">
                   Definir como responsavel principal
                 </button>
@@ -2318,34 +2353,40 @@ function TravelersModal({
           ))}
         </div>
 
-        <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4">
-          <p className="mb-4 text-sm font-medium text-white">{editingIndex === null ? "Adicionar viajante" : "Editar viajante"}</p>
-          <div className="space-y-3">
-            <Input value={form.name} onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))} placeholder="Nome do viajante" className="border-white/10 bg-white/[0.03] text-white" />
-            <div className="grid grid-cols-2 gap-2">
-              {["principal", "acompanhante"].map((role) => (
-                <button
-                  key={role}
-                  onClick={() => setForm((prev) => ({ ...prev, role }))}
-                  className={cn(
-                    "rounded-xl border px-3 py-2 text-sm transition-colors",
-                    form.role === role ? "border-[#5de0e6]/40 bg-[#5de0e6]/10 text-[#5de0e6]" : "border-white/10 bg-white/[0.03] text-white/60"
-                  )}
-                >
-                  {role === "principal" ? "Principal" : "Acompanhante"}
-                </button>
-              ))}
-            </div>
-            <div className="flex gap-3">
-              <Button variant="outline" className="flex-1 border-white/10" onClick={resetForm}>
-                Limpar
-              </Button>
-              <Button className="flex-1 bg-gradient-to-r from-[#5de0e6] to-[#004aad] text-white" onClick={handleSave}>
-                {editingIndex === null ? "Adicionar" : "Salvar"}
-              </Button>
+        {isAdmin ? (
+          <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4">
+            <p className="mb-4 text-sm font-medium text-white">{editingIndex === null ? "Adicionar viajante" : "Editar viajante"}</p>
+            <div className="space-y-3">
+              <Input value={form.name} onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))} placeholder="Nome do viajante" className="border-white/10 bg-white/[0.03] text-white" />
+              <div className="grid grid-cols-2 gap-2">
+                {["principal", "acompanhante"].map((role) => (
+                  <button
+                    key={role}
+                    onClick={() => setForm((prev) => ({ ...prev, role }))}
+                    className={cn(
+                      "rounded-xl border px-3 py-2 text-sm transition-colors",
+                      form.role === role ? "border-[#5de0e6]/40 bg-[#5de0e6]/10 text-[#5de0e6]" : "border-white/10 bg-white/[0.03] text-white/60"
+                    )}
+                  >
+                    {role === "principal" ? "Principal" : "Acompanhante"}
+                  </button>
+                ))}
+              </div>
+              <div className="flex gap-3">
+                <Button variant="outline" className="flex-1 border-white/10" onClick={resetForm}>
+                  Limpar
+                </Button>
+                <Button className="flex-1 bg-gradient-to-r from-[#5de0e6] to-[#004aad] text-white" onClick={handleSave}>
+                  {editingIndex === null ? "Adicionar" : "Salvar"}
+                </Button>
+              </div>
             </div>
           </div>
-        </div>
+        ) : (
+          <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4 text-sm text-white/50">
+            Este link esta em modo de visualizacao. O gerenciamento de viajantes fica disponivel apenas no link administrador.
+          </div>
+        )}
       </div>
     </Modal>
   )
@@ -2362,6 +2403,7 @@ function TripSettingsModal({
   tripData: any
   onSave: (data: { privacy: string; permissions: string; status: string; preferences: string }) => void
 }) {
+  const { isAdmin } = useContext(PermissionContext)
   const [form, setForm] = useState({
     preferences: "Roteiro premium com foco em experiencias culturais e gastronomia.",
     privacy: "privado",
@@ -2382,7 +2424,8 @@ function TripSettingsModal({
           <Label className="text-white/60">Preferencias da viagem</Label>
           <textarea
             value={form.preferences}
-            onChange={(e) => setForm((prev) => ({ ...prev, preferences: e.target.value }))}
+            onChange={(e) => isAdmin && setForm((prev) => ({ ...prev, preferences: e.target.value }))}
+            disabled={!isAdmin}
             className="mt-2 min-h-[110px] w-full rounded-2xl border border-white/10 bg-white/[0.03] p-4 text-sm text-white outline-none"
           />
         </div>
@@ -2393,7 +2436,8 @@ function TripSettingsModal({
               {["privado", "compartilhavel"].map((privacy) => (
                 <button
                   key={privacy}
-                  onClick={() => setForm((prev) => ({ ...prev, privacy }))}
+                  onClick={() => isAdmin && setForm((prev) => ({ ...prev, privacy }))}
+                  disabled={!isAdmin}
                   className={cn(
                     "rounded-xl border px-3 py-2 text-left text-sm transition-colors",
                     form.privacy === privacy ? "border-[#5de0e6]/40 bg-[#5de0e6]/10 text-[#5de0e6]" : "border-white/10 bg-white/[0.03] text-white/60"
@@ -2410,7 +2454,8 @@ function TripSettingsModal({
               {["edicao_restrita", "colaborativa"].map((permission) => (
                 <button
                   key={permission}
-                  onClick={() => setForm((prev) => ({ ...prev, permissions: permission }))}
+                  onClick={() => isAdmin && setForm((prev) => ({ ...prev, permissions: permission }))}
+                  disabled={!isAdmin}
                   className={cn(
                     "rounded-xl border px-3 py-2 text-left text-sm transition-colors",
                     form.permissions === permission ? "border-[#5de0e6]/40 bg-[#5de0e6]/10 text-[#5de0e6]" : "border-white/10 bg-white/[0.03] text-white/60"
@@ -2428,7 +2473,8 @@ function TripSettingsModal({
             {["upcoming", "ongoing", "completed"].map((status) => (
               <button
                 key={status}
-                onClick={() => setForm((prev) => ({ ...prev, status }))}
+                onClick={() => isAdmin && setForm((prev) => ({ ...prev, status }))}
+                disabled={!isAdmin}
                 className={cn(
                   "rounded-xl border px-3 py-2 text-sm transition-colors",
                   form.status === status ? "border-[#5de0e6]/40 bg-[#5de0e6]/10 text-[#5de0e6]" : "border-white/10 bg-white/[0.03] text-white/60"
@@ -2439,9 +2485,15 @@ function TripSettingsModal({
             ))}
           </div>
         </div>
-        <Button className="w-full bg-gradient-to-r from-[#5de0e6] to-[#004aad] text-white" onClick={() => onSave(form)}>
-          Salvar configuracoes
-        </Button>
+        {isAdmin ? (
+          <Button className="w-full bg-gradient-to-r from-[#5de0e6] to-[#004aad] text-white" onClick={() => onSave(form)}>
+            Salvar configuracoes
+          </Button>
+        ) : (
+          <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4 text-sm text-white/50">
+            Este link esta em modo de visualizacao. As configuracoes da viagem ficam disponiveis apenas no link administrador.
+          </div>
+        )}
       </div>
     </Modal>
   )
@@ -2692,7 +2744,7 @@ function TripFooter() {
 export default function TripPage() {
   const params = useParams<{ id: string }>()
   const pathname = usePathname()
-  const { user, profile } = useAuth()
+  const { user, profile, loading: authLoading } = useAuth()
   const [tripData, setTripData] = useState(initialTripData)
   const [isAdmin, setIsAdmin] = useState(false)
   const [isLoadingTrip, setIsLoadingTrip] = useState(true)
@@ -2712,13 +2764,21 @@ export default function TripPage() {
     const searchParams = new URLSearchParams(window.location.search)
     const adminToken = searchParams.get("adminToken")
     const publicToken = searchParams.get("token") || searchParams.get("publicToken")
-    const isAdminView = isAdminLinkMode(searchParams, pathname)
-    setIsAdmin(isAdminView)
+    const isPublicRoute = pathname?.startsWith("/v/") ?? false
+    const isAdminRoute = isAdminLinkMode(searchParams, pathname)
+
+    if (isAdminRoute && authLoading) {
+      setIsLoadingTrip(true)
+      return
+    }
+
+    setIsAdmin(false)
 
     const loadTrip = async () => {
       setIsLoadingTrip(true)
       setLoadError(null)
       console.log("[TRIP] carregando link", routeSlug)
+      console.log("[LINK] loading trip", routeSlug)
 
       const useSupabase = shouldUseSupabase()
 
@@ -2730,7 +2790,26 @@ export default function TripPage() {
             : await getTripBySlug(routeSlug)
 
         if (repositoryTrip.data) {
-          const documentsResult = isAdminView
+          const isOwner = Boolean(user?.id && repositoryTrip.data.ownerUserId && user.id === repositoryTrip.data.ownerUserId)
+
+          if (isAdminRoute && !user) {
+            console.error("[TRIP] erro ao carregar link", "Acesso admin exige autenticacao.")
+            setLoadError("Faca login para acessar o modo administrador desta viagem.")
+            setIsLoadingTrip(false)
+            return
+          }
+
+          if (isAdminRoute && !isOwner) {
+            console.error("[TRIP] erro ao carregar link", "Usuario sem permissao para editar a viagem.")
+            setLoadError("Voce nao tem permissao para editar esta viagem.")
+            setIsLoadingTrip(false)
+            return
+          }
+
+          const canEditTrip = isAdminRoute && isOwner
+          setIsAdmin(canEditTrip)
+
+          const documentsResult = canEditTrip
             ? await listDocumentsByTrip(repositoryTrip.data.id)
             : await listPublicTripDocuments(repositoryTrip.data.id)
           const hotelsResult = await listTripHotels(repositoryTrip.data.id)
@@ -2788,6 +2867,13 @@ export default function TripPage() {
         }
       }
 
+      if (isPublicRoute || isAdminRoute) {
+        console.log("[LINK] trip not found", routeSlug)
+        setLoadError("Viagem nao encontrada ou link expirado.")
+        setIsLoadingTrip(false)
+        return
+      }
+
       try {
         const portalTrips = extractTripsStoragePayload(window.localStorage.getItem(TRIPS_STORAGE_KEY)).trips
         const agencyTrips = extractAgencyStorageState(window.localStorage.getItem(AGENCY_STORAGE_KEY)).trips
@@ -2810,7 +2896,7 @@ export default function TripPage() {
     }
 
     void loadTrip()
-  }, [params, pathname])
+  }, [params, pathname, user?.id, authLoading])
 
   const showToast = (message: string, type: "success" | "error" | "info" = "success") => {
     setToast({ message, type })

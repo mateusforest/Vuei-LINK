@@ -56,12 +56,12 @@ const staggerContainer = {
 const STORAGE_KEY = "vuei_portal_settings"
 
 const defaultProfile = {
-  name: "Viajante",
-  email: "viajante@email.com",
-  phone: "+55 11 99999-0000",
+  name: "Conta",
+  email: "",
+  phone: "",
   plan: "Premium",
   avatar: "",
-  createdAt: "Janeiro 2024",
+  createdAt: "Nao informado",
 }
 
 const defaultSettings = {
@@ -110,19 +110,36 @@ export default function ConfiguracoesPage() {
   useEffect(() => {
     if (typeof window === "undefined") return
 
-    if (shouldUseSupabase() && authProfile) {
+    if (shouldUseSupabase()) {
+      if (!authProfile) {
+        setProfile(defaultProfile)
+        setProfileForm(defaultProfile)
+        setPhotoPreview("")
+        return
+      }
+
       const nextProfile = {
         name: authProfile.name || defaultProfile.name,
         email: authProfile.email || defaultProfile.email,
         phone: authProfile.phone || defaultProfile.phone,
         plan: authProfile.role === "agency_owner" || authProfile.role === "agency_member" ? "Agency" : "Premium",
         avatar: authProfile.avatarUrl || "",
-        createdAt: new Date(authProfile.createdAt).toLocaleDateString("pt-BR", { month: "long", year: "numeric" }),
+        createdAt: authProfile.createdAt
+          ? new Date(authProfile.createdAt).toLocaleDateString("pt-BR", { month: "long", year: "numeric" })
+          : defaultProfile.createdAt,
       }
 
       setProfile(nextProfile)
       setProfileForm(nextProfile)
       setPhotoPreview(authProfile.avatarUrl || "")
+      setSettings((prev) => ({
+        ...prev,
+        faceId: authProfile.settings?.biometricEnabled ?? prev.faceId,
+        pinEnabled: authProfile.settings?.pinEnabled ?? prev.pinEnabled,
+        notifications: authProfile.settings?.notificationsEnabled ?? prev.notifications,
+        darkMode: authProfile.settings?.darkMode ?? prev.darkMode,
+        language: authProfile.settings?.language ?? prev.language,
+      }))
       return
     }
 

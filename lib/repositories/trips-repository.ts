@@ -6,6 +6,7 @@ import { createSupabaseBrowserClient, createSupabaseBrowserClientPlaceholder } f
 import { buildUniqueTripSlug, mapStoredTripToTrip, slugifyTripBase, type LegacyStoredTrip } from "@/lib/mappers/trip-mappers"
 import { buildAdminTripUrl, buildPublicTripUrl, generateSecureToken } from "@/lib/security/link-tokens"
 import type { Database } from "@/lib/supabase/types"
+import { getDestinationCoverImage } from "@/lib/trip-destination"
 
 export interface ListTripsParams {
   ownerType?: TripOwnerType
@@ -54,7 +55,7 @@ function mapTripRowToTrip(row: Database["public"]["Tables"]["trips"]["Row"]): Tr
     publicToken: row.public_token,
     adminLink: buildAdminTripUrl(row.slug),
     publicLink: buildPublicTripUrl(row.slug),
-    coverImage: row.cover_image,
+    coverImage: row.cover_image || getDestinationCoverImage(row.destination, row.city, row.country),
     visibility: row.visibility,
     travelersCount: row.travelers_count,
     travelers: [],
@@ -391,6 +392,8 @@ export async function createTrip(payload: CreateTripPayload) {
       const adminLink = buildAdminTripUrl(trip.slug)
       const publicLink = buildPublicTripUrl(trip.slug)
       const parsedDestination = parseDestinationParts(trip.destination)
+      const resolvedCoverImage =
+        trip.coverImage || getDestinationCoverImage(trip.destination, trip.city ?? parsedDestination.city, trip.country ?? parsedDestination.country)
 
       const insertPayload: Database["public"]["Tables"]["trips"]["Insert"] = {
         title: trip.title,
@@ -410,7 +413,7 @@ export async function createTrip(payload: CreateTripPayload) {
         public_token: publicToken,
         admin_link: adminLink,
         public_link: publicLink,
-        cover_image: trip.coverImage,
+        cover_image: resolvedCoverImage,
         visibility: "private",
         travelers_count: trip.travelersCount || 1,
         permissions: trip.permissions ?? {},

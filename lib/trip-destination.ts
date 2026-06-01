@@ -53,6 +53,15 @@ const destinationCoverMap: Array<{
     emergency: "112",
   },
   {
+    matches: ["dubai", "emirados arabes", "emirados", "uae", "united arab emirates"],
+    image: "https://images.unsplash.com/photo-1512453979798-5ea266f8880c?w=1920&q=80",
+    country: "Emirados Arabes Unidos",
+    language: "Arabe",
+    timezone: "Asia/Dubai",
+    currency: { name: "Dirham dos Emirados", symbol: "AED", rate: "Nao informado" },
+    emergency: "999 / 998",
+  },
+  {
     matches: ["londres", "london"],
     image: "https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?w=1920&q=80",
     country: "Reino Unido",

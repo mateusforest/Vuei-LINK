@@ -42,8 +42,8 @@ function buildLocalProfile(): Profile {
 
   return {
     id: "local-traveler",
-    email: state.profile?.email || "viajante@email.com",
-    name: state.profile?.name || "Viajante",
+    email: state.profile?.email || "",
+    name: state.profile?.name || "Conta",
     phone: state.profile?.phone || null,
     avatarUrl: state.profile?.avatar || null,
     role: "traveler",
