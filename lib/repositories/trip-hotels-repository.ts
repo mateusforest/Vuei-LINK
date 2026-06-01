@@ -11,6 +11,15 @@ export interface TripHotelPayload {
   notes?: string | null
 }
 
+export interface TripHotelUpdatePayload {
+  name?: string
+  address?: string | null
+  checkIn?: string | null
+  checkOut?: string | null
+  confirmationCode?: string | null
+  notes?: string | null
+}
+
 export interface TripHotelRecord {
   id: string
   tripId: string
@@ -39,48 +48,55 @@ function mapRow(row: any): TripHotelRecord {
   }
 }
 
-export async function getTripHotel(tripId: string) {
+function getClient() {
   if (!shouldUseSupabase()) {
-    return { source: "local" as const, data: null, error: null }
+    return { client: null, error: "Supabase nao esta ativo neste ambiente." }
   }
 
   const client = createSupabaseBrowserClient() as any
   if (!client) {
-    return { source: "supabase" as const, data: null, error: "Cliente Supabase indisponivel." }
+    return { client: null, error: "Cliente Supabase indisponivel." }
   }
 
-  const { data, error } = await client.from("trip_hotels").select("*").eq("trip_id", tripId).maybeSingle()
-  if (error) {
-    return { source: "supabase" as const, data: null, error: error.message }
-  }
-
-  return { source: "supabase" as const, data: data ? mapRow(data) : null, error: null }
+  return { client, error: null }
 }
 
-export async function upsertTripHotel(payload: TripHotelPayload) {
-  if (!shouldUseSupabase()) {
-    return { source: "local" as const, data: null, error: "Supabase nao esta ativo neste ambiente." }
-  }
-
-  const client = createSupabaseBrowserClient() as any
+export async function listTripHotels(tripId: string) {
+  const { client, error: clientError } = getClient()
   if (!client) {
-    return { source: "supabase" as const, data: null, error: "Cliente Supabase indisponivel." }
+    return { source: "local" as const, data: [] as TripHotelRecord[], error: clientError }
   }
 
   const { data, error } = await client
     .from("trip_hotels")
-    .upsert(
-      {
-        trip_id: payload.tripId,
-        name: payload.name,
-        address: payload.address ?? null,
-        check_in: payload.checkIn ?? null,
-        check_out: payload.checkOut ?? null,
-        confirmation_code: payload.confirmationCode ?? null,
-        notes: payload.notes ?? null,
-      },
-      { onConflict: "trip_id" }
-    )
+    .select("*")
+    .eq("trip_id", tripId)
+    .order("created_at", { ascending: true })
+
+  if (error) {
+    return { source: "supabase" as const, data: [] as TripHotelRecord[], error: error.message }
+  }
+
+  return { source: "supabase" as const, data: (data ?? []).map(mapRow), error: null }
+}
+
+export async function createTripHotel(payload: TripHotelPayload) {
+  const { client, error: clientError } = getClient()
+  if (!client) {
+    return { source: "local" as const, data: null, error: clientError }
+  }
+
+  const { data, error } = await client
+    .from("trip_hotels")
+    .insert({
+      trip_id: payload.tripId,
+      name: payload.name,
+      address: payload.address ?? null,
+      check_in: payload.checkIn ?? null,
+      check_out: payload.checkOut ?? null,
+      confirmation_code: payload.confirmationCode ?? null,
+      notes: payload.notes ?? null,
+    })
     .select("*")
     .single()
 
@@ -89,4 +105,46 @@ export async function upsertTripHotel(payload: TripHotelPayload) {
   }
 
   return { source: "supabase" as const, data: mapRow(data), error: null }
+}
+
+export async function updateTripHotel(id: string, payload: TripHotelUpdatePayload) {
+  const { client, error: clientError } = getClient()
+  if (!client) {
+    return { source: "local" as const, data: null, error: clientError }
+  }
+
+  const { data, error } = await client
+    .from("trip_hotels")
+    .update({
+      name: payload.name,
+      address: payload.address ?? null,
+      check_in: payload.checkIn ?? null,
+      check_out: payload.checkOut ?? null,
+      confirmation_code: payload.confirmationCode ?? null,
+      notes: payload.notes ?? null,
+    })
+    .eq("id", id)
+    .select("*")
+    .single()
+
+  if (error) {
+    return { source: "supabase" as const, data: null, error: error.message }
+  }
+
+  return { source: "supabase" as const, data: mapRow(data), error: null }
+}
+
+export async function deleteTripHotel(id: string) {
+  const { client, error: clientError } = getClient()
+  if (!client) {
+    return { source: "local" as const, success: false, error: clientError }
+  }
+
+  const { error } = await client.from("trip_hotels").delete().eq("id", id)
+
+  if (error) {
+    return { source: "supabase" as const, success: false, error: error.message }
+  }
+
+  return { source: "supabase" as const, success: true, error: null }
 }

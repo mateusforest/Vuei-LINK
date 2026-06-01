@@ -9,7 +9,7 @@ import { extractTripsStoragePayload } from "@/lib/mappers/trip-mappers"
 import { shouldUseSupabase } from "@/lib/data-source"
 import { getTripByAdminToken, getTripByPublicToken, getTripBySlug } from "@/lib/repositories/trips-repository"
 import { createDocumentMetadata, getSignedDocumentUrl, listDocumentsByTrip, listPublicTripDocuments, uploadDocumentFile } from "@/lib/repositories/documents-repository"
-import { getTripHotel, upsertTripHotel } from "@/lib/repositories/trip-hotels-repository"
+import { createTripHotel, deleteTripHotel, listTripHotels, updateTripHotel } from "@/lib/repositories/trip-hotels-repository"
 import { validateDocumentFile } from "@/lib/files/file-validation"
 import { getDestinationCoverImage, getDestinationMetadata } from "@/lib/trip-destination"
 import { useAuth } from "@/contexts/auth-context"
@@ -183,6 +183,7 @@ const initialTripData = {
   heroImage: DEFAULT_HERO_IMAGE,
   flights: [],
   hotel: null,
+  hotels: [],
   itinerary: [],
   documents: [],
   quickInfo: {
@@ -274,7 +275,14 @@ function buildTripDataFromStoredTrip(storedTrip: any) {
   const travelers = Array.isArray(storedTrip.travelers) && storedTrip.travelers.length > 0
     ? storedTrip.travelers
     : buildTravelers(storedTrip.passengersCount ?? storedTrip.travelersCount)
-  const hotel = storedTrip.hotel ?? storedTrip.accommodation ?? null
+  const hotels = Array.isArray(storedTrip.hotels)
+    ? storedTrip.hotels
+    : storedTrip.hotel
+      ? [storedTrip.hotel]
+      : storedTrip.accommodation
+        ? [storedTrip.accommodation]
+        : []
+  const hotel = hotels[0] ?? null
   const flights = Array.isArray(storedTrip.flights) ? storedTrip.flights : []
   const itinerary = Array.isArray(storedTrip.itinerary) ? storedTrip.itinerary : []
   const documents = Array.isArray(storedTrip.documents) ? storedTrip.documents : []
@@ -313,6 +321,7 @@ function buildTripDataFromStoredTrip(storedTrip: any) {
           amenities: Array.isArray(hotel.amenities) ? hotel.amenities : [],
         }
       : null,
+    hotels,
     itinerary,
     documents: documents.map((document: any) => ({
       ...document,
@@ -536,7 +545,7 @@ function QuickAccessCards({ tripData, onNavigate }: { tripData: any; onNavigate:
 
   const cards = [
     { id: "flights", icon: Plane, label: "Passagens", color: "from-[#5de0e6] to-[#5de0e6]/50", count: tripData.flights.length || ticketDocuments.length },
-    { id: "hotel", icon: Hotel, label: "Hospedagem", color: "from-[#004aad] to-[#004aad]/50", count: tripData.hotel ? 1 : 0 },
+    { id: "hotel", icon: Hotel, label: "Hospedagem", color: "from-[#004aad] to-[#004aad]/50", count: Array.isArray(tripData.hotels) ? tripData.hotels.length : tripData.hotel ? 1 : 0 },
     { id: "itinerary", icon: MapPin, label: "Roteiro", color: "from-[#5de0e6] to-[#004aad]", count: tripData.itinerary.length },
     { id: "documents", icon: FileText, label: "Documentos", color: "from-[#004aad] to-[#5de0e6]", count: tripData.documents.length },
     { id: "concierge", icon: MessageCircle, label: "Concierge", color: "from-[#5de0e6] to-[#5de0e6]/50", badge: "IA" },
@@ -1046,10 +1055,19 @@ function AddFlightModal({ open, onClose, onSave, tripId, ownerUserId, agencyId }
 }
 
 // Hotel Section
-function HotelSection({ tripData, onUpdateHotel }: { tripData: any; onUpdateHotel: (data: any) => void }) {
+function HotelSection({
+  tripData,
+  onSaveHotel,
+  onDeleteHotel,
+}: {
+  tripData: any
+  onSaveHotel: (data: any) => void
+  onDeleteHotel: (hotelId: string) => void
+}) {
   const [editing, setEditing] = useState(false)
+  const [selectedHotel, setSelectedHotel] = useState<any>(null)
   const { isAdmin } = useContext(PermissionContext)
-  const hotel = tripData.hotel
+  const hotels = Array.isArray(tripData.hotels) ? tripData.hotels : tripData.hotel ? [tripData.hotel] : []
 
   return (
     <section id="hotel" className="py-12 px-4">
@@ -1061,71 +1079,107 @@ function HotelSection({ tripData, onUpdateHotel }: { tripData: any; onUpdateHote
             </div>
             <div>
               <h2 className="text-xl font-semibold text-white">Hospedagem</h2>
-              <p className="text-sm text-white/40">{hotel ? `${hotel.nights} noites` : "Nenhuma hospedagem cadastrada"}</p>
+              <p className="text-sm text-white/40">{hotels.length > 0 ? `${hotels.length} hospedagem(ns) cadastrada(s)` : "Nenhuma hospedagem cadastrada"}</p>
             </div>
           </div>
           {isAdmin && (
-            <Button size="sm" variant="ghost" className="text-[#5de0e6] hover:bg-[#5de0e6]/10" onClick={() => setEditing(true)}>
-              <Edit3 className="w-4 h-4 mr-2" />
-              {hotel ? "Editar" : "Adicionar"}
+            <Button
+              size="sm"
+              variant="ghost"
+              className="text-[#5de0e6] hover:bg-[#5de0e6]/10"
+              onClick={() => {
+                setSelectedHotel(null)
+                setEditing(true)
+              }}
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Adicionar
             </Button>
           )}
         </motion.div>
 
-        {!hotel ? (
+        {hotels.length === 0 ? (
           <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="rounded-3xl border border-white/[0.06] bg-white/[0.02] p-6 text-sm text-white/50">
             Nenhuma hospedagem adicionada.
           </motion.div>
         ) : (
-        <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="relative rounded-3xl overflow-hidden bg-white/[0.02] backdrop-blur-xl border border-white/[0.06]">
-          <div className="relative h-48 sm:h-64">
-            <Image src={hotel.image} alt={hotel.name} fill className="object-cover" />
-            <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent" />
-            <div className="absolute top-4 right-4 flex items-center gap-1 px-3 py-1.5 rounded-full bg-black/50 backdrop-blur-md">
-              {[...Array(hotel.stars)].map((_, i) => (
-                <Star key={i} className="w-3 h-3 fill-[#5de0e6] text-[#5de0e6]" />
-              ))}
-            </div>
-            <div className="absolute bottom-4 left-4 right-4">
-              <h3 className="text-xl font-semibold text-white">{hotel.name}</h3>
-              <div className="flex items-center gap-2 mt-1 text-white/60">
-                <MapPin className="w-3 h-3" />
-                <span className="text-sm">{hotel.address}</span>
-              </div>
-            </div>
+          <div className="space-y-4">
+            {hotels.map((hotel: any, index: number) => (
+              <motion.div
+                key={hotel.id || `${hotel.name}-${index}`}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                className="relative rounded-3xl overflow-hidden bg-white/[0.02] backdrop-blur-xl border border-white/[0.06]"
+              >
+                <div className="relative h-48 sm:h-64">
+                  <Image src={hotel.image || tripData.heroImage} alt={hotel.name} fill className="object-cover" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent" />
+                  <div className="absolute bottom-4 left-4 right-4">
+                    <h3 className="text-xl font-semibold text-white">{hotel.name}</h3>
+                    <div className="flex items-center gap-2 mt-1 text-white/60">
+                      <MapPin className="w-3 h-3" />
+                      <span className="text-sm">{hotel.address || "Endereco nao informado"}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-5">
+                  <div className="grid grid-cols-2 gap-4 mb-4">
+                    <div className="p-3 rounded-xl bg-white/[0.03]">
+                      <p className="text-[10px] text-white/40 uppercase tracking-wider">Check-in</p>
+                      <p className="text-sm text-white font-medium mt-1">{hotel.checkIn || "Nao informado"}</p>
+                    </div>
+                    <div className="p-3 rounded-xl bg-white/[0.03]">
+                      <p className="text-[10px] text-white/40 uppercase tracking-wider">Check-out</p>
+                      <p className="text-sm text-white font-medium mt-1">{hotel.checkOut || "Nao informado"}</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-4 border-t border-white/[0.06]">
+                    <span className="text-sm text-white/40">{hotel.confirmationCode || "Reserva nao informada"}</span>
+                    {isAdmin && (
+                      <div className="flex items-center gap-2">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="text-[#5de0e6] hover:bg-[#5de0e6]/10"
+                          onClick={() => {
+                            setSelectedHotel(hotel)
+                            setEditing(true)
+                          }}
+                        >
+                          <Edit3 className="w-4 h-4 mr-2" />
+                          Editar
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="text-red-300 hover:bg-red-500/10"
+                          onClick={() => void onDeleteHotel(hotel.id)}
+                        >
+                          <Trash2 className="w-4 h-4 mr-2" />
+                          Excluir
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </motion.div>
+            ))}
           </div>
-
-          <div className="p-5">
-            <div className="grid grid-cols-2 gap-4 mb-4">
-              <div className="p-3 rounded-xl bg-white/[0.03]">
-                <p className="text-[10px] text-white/40 uppercase tracking-wider">Check-in</p>
-                <p className="text-sm text-white font-medium mt-1">{hotel.checkIn}</p>
-              </div>
-              <div className="p-3 rounded-xl bg-white/[0.03]">
-                <p className="text-[10px] text-white/40 uppercase tracking-wider">Check-out</p>
-                <p className="text-sm text-white font-medium mt-1">{hotel.checkOut}</p>
-              </div>
-            </div>
-
-            <div className="flex flex-wrap gap-2 mb-4">
-              {hotel.amenities.map((amenity: string) => (
-                <span key={amenity} className="px-3 py-1 text-xs text-white/60 bg-white/[0.05] rounded-full">{amenity}</span>
-              ))}
-            </div>
-
-            <div className="flex items-center justify-between pt-4 border-t border-white/[0.06]">
-              <div className="flex items-center gap-2 text-white/40">
-                <Phone className="w-4 h-4" />
-                <span className="text-sm">{hotel.phone}</span>
-              </div>
-              <span className="text-sm text-white/40">{hotel.confirmationCode || "Reserva nao informada"}</span>
-            </div>
-          </div>
-        </motion.div>
         )}
       </div>
 
-      <EditHotelModal open={editing} onClose={() => setEditing(false)} hotel={hotel ?? {}} onSave={(data) => { void onUpdateHotel(data); setEditing(false) }} />
+      <EditHotelModal
+        open={editing}
+        onClose={() => setEditing(false)}
+        hotel={selectedHotel ?? {}}
+        onSave={(data) => {
+          void onSaveHotel(data)
+          setEditing(false)
+        }}
+      />
     </section>
   )
 }
@@ -1139,7 +1193,7 @@ function EditHotelModal({ open, onClose, hotel, onSave }: { open: boolean; onClo
   }, [hotel])
 
   return (
-    <Modal open={open} onClose={onClose} title="Editar Hospedagem">
+    <Modal open={open} onClose={onClose} title={formData?.id ? "Editar Hospedagem" : "Adicionar Hospedagem"}>
       <div className="space-y-4">
         <div>
           <label className="text-xs text-white/50 uppercase tracking-wider">Nome do Hotel</label>
@@ -1163,7 +1217,7 @@ function EditHotelModal({ open, onClose, hotel, onSave }: { open: boolean; onClo
           <div>
             <label className="text-xs text-white/50 uppercase tracking-wider">Check-in</label>
             <input
-              type="text"
+              type="date"
               value={formData.checkIn || ""}
               onChange={(e) => setFormData({ ...formData, checkIn: e.target.value })}
               className="w-full mt-1 px-4 py-3 rounded-xl bg-white/[0.05] border border-white/[0.08] text-white focus:outline-none focus:border-[#5de0e6]/50"
@@ -1172,21 +1226,12 @@ function EditHotelModal({ open, onClose, hotel, onSave }: { open: boolean; onClo
           <div>
             <label className="text-xs text-white/50 uppercase tracking-wider">Check-out</label>
             <input
-              type="text"
+              type="date"
               value={formData.checkOut || ""}
               onChange={(e) => setFormData({ ...formData, checkOut: e.target.value })}
               className="w-full mt-1 px-4 py-3 rounded-xl bg-white/[0.05] border border-white/[0.08] text-white focus:outline-none focus:border-[#5de0e6]/50"
             />
           </div>
-        </div>
-        <div>
-          <label className="text-xs text-white/50 uppercase tracking-wider">Telefone</label>
-          <input
-            type="text"
-            value={formData.phone || ""}
-            onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-            className="w-full mt-1 px-4 py-3 rounded-xl bg-white/[0.05] border border-white/[0.08] text-white focus:outline-none focus:border-[#5de0e6]/50"
-          />
         </div>
         <div>
           <label className="text-xs text-white/50 uppercase tracking-wider">Codigo da Reserva</label>
@@ -1205,7 +1250,7 @@ function EditHotelModal({ open, onClose, hotel, onSave }: { open: boolean; onClo
             className="w-full mt-1 min-h-24 px-4 py-3 rounded-xl bg-white/[0.05] border border-white/[0.08] text-white focus:outline-none focus:border-[#5de0e6]/50"
           />
         </div>
-        <Button onClick={() => onSave(formData)} className="w-full mt-4 bg-gradient-to-r from-[#5de0e6] to-[#004aad] hover:opacity-90 text-white border-0">
+        <Button onClick={() => onSave(formData)} disabled={!formData.name} className="w-full mt-4 bg-gradient-to-r from-[#5de0e6] to-[#004aad] hover:opacity-90 text-white border-0 disabled:opacity-50">
           Salvar Alteracoes
         </Button>
       </div>
@@ -2688,7 +2733,7 @@ export default function TripPage() {
           const documentsResult = isAdminView
             ? await listDocumentsByTrip(repositoryTrip.data.id)
             : await listPublicTripDocuments(repositoryTrip.data.id)
-          const hotelResult = await getTripHotel(repositoryTrip.data.id)
+          const hotelsResult = await listTripHotels(repositoryTrip.data.id)
 
           console.log("[LINK] trip loaded", repositoryTrip.data.id)
           setTripData(
@@ -2706,16 +2751,18 @@ export default function TripPage() {
               adminLink: repositoryTrip.data.adminLink,
               shareLink: repositoryTrip.data.publicLink,
               flights: repositoryTrip.data.flights,
-              hotel: hotelResult.data
+              hotel: hotelsResult.data[0]
                 ? {
-                    name: hotelResult.data.name,
-                    address: hotelResult.data.address,
-                    checkIn: hotelResult.data.checkIn,
-                    checkOut: hotelResult.data.checkOut,
-                    confirmationCode: hotelResult.data.confirmationCode,
-                    notes: hotelResult.data.notes,
+                    ...hotelsResult.data[0],
+                    image: repositoryTrip.data.coverImage ?? undefined,
+                    amenities: [],
                   }
                 : repositoryTrip.data.accommodations?.[0] ?? null,
+              hotels: hotelsResult.data.map((hotel) => ({
+                ...hotel,
+                image: repositoryTrip.data.coverImage ?? undefined,
+                amenities: [],
+              })),
               itinerary: repositoryTrip.data.itinerary,
               documents: documentsResult.data,
               travelersCount: repositoryTrip.data.travelersCount,
@@ -2804,54 +2851,86 @@ export default function TripPage() {
     }))
   }
 
-  const handleUpdateHotel = async (data: any) => {
-    console.log("[HOTEL] create started")
+  const handleSaveHotel = async (data: any) => {
+    console.log(data?.id ? "[HOTEL] update started" : "[HOTEL] create started")
 
     if (!tripData.id) {
       showToast("Viagem nao encontrada para salvar a hospedagem.", "error")
       return
     }
 
-    const result = await upsertTripHotel({
-      tripId: tripData.id,
-      name: data.name,
-      address: data.address,
-      checkIn: data.checkIn,
-      checkOut: data.checkOut,
-      confirmationCode: data.confirmationCode,
-      notes: data.notes,
-    })
+    const result = data?.id
+      ? await updateTripHotel(data.id, {
+          name: data.name,
+          address: data.address,
+          checkIn: data.checkIn,
+          checkOut: data.checkOut,
+          confirmationCode: data.confirmationCode,
+          notes: data.notes,
+        })
+      : await createTripHotel({
+          tripId: tripData.id,
+          name: data.name,
+          address: data.address,
+          checkIn: data.checkIn,
+          checkOut: data.checkOut,
+          confirmationCode: data.confirmationCode,
+          notes: data.notes,
+        })
 
     if (result.error || !result.data) {
       console.error("[HOTEL] error", result.error)
-      showToast(
-        result.error?.includes("relation")
-          ? "Tabela trip_hotels ainda nao existe. Rode o SQL supabase/trip_hotels.sql."
-          : result.error || "Nao foi possivel salvar a hospedagem.",
-        "error"
-      )
+      showToast(result.error || "Nao foi possivel salvar a hospedagem.", "error")
       return
     }
 
     console.log("[HOTEL] success", result.data.id)
     setTripData(prev => ({
       ...prev,
-      hotel: {
-        name: result.data!.name,
-        address: result.data!.address,
-        checkIn: result.data!.checkIn,
-        checkOut: result.data!.checkOut,
-        confirmationCode: result.data!.confirmationCode,
-        notes: result.data!.notes,
-        stars: prev.hotel?.stars || 0,
-        nights: prev.hotel?.nights || 0,
-        room: prev.hotel?.room || "",
-        phone: prev.hotel?.phone || "",
-        image: prev.hotel?.image || prev.heroImage,
-        amenities: prev.hotel?.amenities || [],
-      }
+      hotels: data?.id
+        ? (Array.isArray(prev.hotels) ? prev.hotels : []).map((hotel: any) =>
+            hotel.id === result.data!.id
+              ? { ...hotel, ...result.data, image: hotel.image || prev.heroImage, amenities: hotel.amenities || [] }
+              : hotel,
+          )
+        : [
+            ...(Array.isArray(prev.hotels) ? prev.hotels : []),
+            {
+              ...result.data,
+              image: prev.heroImage,
+              amenities: [],
+            },
+          ],
+      hotel:
+        data?.id
+          ? ((Array.isArray(prev.hotels) ? prev.hotels : []).find((hotel: any) => hotel.id === result.data!.id)
+              ? { ...(Array.isArray(prev.hotels) ? prev.hotels : []).find((hotel: any) => hotel.id === result.data!.id), ...result.data, image: prev.heroImage, amenities: [] }
+              : { ...result.data, image: prev.heroImage, amenities: [] })
+          : (prev.hotel ?? { ...result.data, image: prev.heroImage, amenities: [] }),
     }))
     showToast("Hospedagem salva com sucesso.", "success")
+  }
+
+  const handleDeleteHotel = async (hotelId: string) => {
+    console.log("[HOTEL] delete started")
+    const result = await deleteTripHotel(hotelId)
+
+    if (!result.success) {
+      console.error("[HOTEL] error", result.error)
+      showToast(result.error || "Nao foi possivel excluir a hospedagem.", "error")
+      return
+    }
+
+    console.log("[HOTEL] success", hotelId)
+    setTripData((prev) => {
+      const nextHotels = (Array.isArray(prev.hotels) ? prev.hotels : []).filter((hotel: any) => hotel.id !== hotelId)
+      return {
+        ...prev,
+        hotels: nextHotels,
+        hotel: nextHotels[0] ?? null,
+      }
+    })
+    showToast("Hospedagem removida com sucesso.", "success")
   }
 
   const handleUpdateItinerary = (data: any) => {
@@ -2913,7 +2992,7 @@ export default function TripPage() {
           <TripHero tripData={tripData} onEditTrip={() => setEditTripOpen(true)} />
           <QuickAccessCards tripData={tripData} onNavigate={handleNavigate} />
   <FlightsSection tripData={tripData} onUpdateFlight={handleUpdateFlight} onAddFlight={handleAddFlight} tripId={tripData.id} ownerUserId={user?.id ?? profile?.id ?? null} agencyId={profile?.agencyId ?? null} />
-  <HotelSection tripData={tripData} onUpdateHotel={handleUpdateHotel} />
+  <HotelSection tripData={tripData} onSaveHotel={handleSaveHotel} onDeleteHotel={handleDeleteHotel} />
   <ItinerarySection tripData={tripData} onUpdateItinerary={handleUpdateItinerary} />
   <DocumentsSection tripData={tripData} onAddDocument={handleAddDocument} tripId={tripData.id} ownerUserId={user?.id ?? profile?.id ?? null} agencyId={profile?.agencyId ?? null} />
   <ConciergeSection tripData={tripData} onOpenCredits={() => setCreditsOpen(true)} />
