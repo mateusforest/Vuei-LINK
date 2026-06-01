@@ -1,5 +1,6 @@
 import type { Trip, TripOwnerType } from "@/types"
 import { shouldUseSupabase } from "@/lib/data-source"
+import { ensureProfile } from "@/lib/auth/ensure-profile"
 import { normalizeLegacyAgencyTrips, normalizeLegacyTrips } from "@/lib/local-storage-migration"
 import { createSupabaseBrowserClient, createSupabaseBrowserClientPlaceholder } from "@/lib/supabase/client"
 import { buildUniqueTripSlug, mapStoredTripToTrip, slugifyTripBase, type LegacyStoredTrip } from "@/lib/mappers/trip-mappers"
@@ -165,17 +166,28 @@ function filterTrips(trips: Trip[], params?: ListTripsParams) {
   })
 }
 
+function parseDestinationParts(destination?: string | null) {
+  const value = (destination ?? "").trim()
+  const parts = value.split(",").map((part) => part.trim()).filter(Boolean)
+
+  return {
+    city: parts[0] || value || null,
+    country: parts.length > 1 ? parts[parts.length - 1] : null,
+  }
+}
+
 function buildTrip(payload: CreateTripPayload, existingTrips: Trip[]): Trip {
   const now = new Date().toISOString()
   const baseSlug = slugifyTripBase(payload.title, payload.destination)
   const slug = buildUniqueTripSlug(baseSlug, existingTrips.map((trip) => trip.slug))
+  const destinationParts = parseDestinationParts(payload.destination)
 
   return mapStoredTripToTrip({
     id: `trip-${Date.now()}`,
     title: payload.title || payload.destination || "Minha Viagem",
     destination: payload.destination || payload.title || "Minha Viagem",
-    country: payload.country ?? undefined,
-    city: payload.city ?? undefined,
+    country: payload.country ?? destinationParts.country ?? undefined,
+    city: payload.city ?? destinationParts.city ?? undefined,
     startDate: payload.startDate ?? undefined,
     endDate: payload.endDate ?? undefined,
     style: payload.style ?? undefined,
@@ -184,7 +196,7 @@ function buildTrip(payload: CreateTripPayload, existingTrips: Trip[]): Trip {
     agencyId: payload.agencyId ?? null,
     clientId: payload.clientId ?? null,
     slug,
-    status: payload.status ?? "upcoming",
+    status: payload.status ?? "draft",
     coverImage: payload.coverImage ?? undefined,
     adminToken: payload.adminToken ?? null,
     publicToken: payload.publicToken ?? null,
@@ -362,28 +374,33 @@ export async function createTrip(payload: CreateTripPayload) {
   const trip = buildTrip(payload, currentTrips)
   const supabase = createSupabaseBrowserClient()
 
-  console.log("[TRIP] criando viagem", {
-    ownerType: payload.ownerType ?? "traveler",
-    ownerUserId: payload.ownerUserId ?? null,
-    destination: payload.destination ?? null,
-  })
+  console.log("[TRIP] create started")
 
   if (shouldUseSupabase() && supabase) {
     try {
+      const {
+        data: { user: authUser },
+      } = await supabase.auth.getUser()
+
+      if (authUser && payload.ownerType !== "agency") {
+        await ensureProfile(authUser, supabase)
+      }
+
       const adminToken = trip.adminToken || generateSecureToken()
       const publicToken = trip.publicToken || generateSecureToken()
       const adminLink = `vuei.app${generateAdminLink(trip.slug, adminToken)}`
       const publicLink = `vuei.app${generatePublicLink(trip.slug, publicToken)}`
+      const parsedDestination = parseDestinationParts(trip.destination)
 
       const insertPayload: Database["public"]["Tables"]["trips"]["Insert"] = {
         title: trip.title,
         slug: trip.slug,
         destination: trip.destination,
-        country: trip.country,
-        city: trip.city,
+        country: trip.country ?? parsedDestination.country,
+        city: trip.city ?? parsedDestination.city,
         start_date: trip.startDate,
         end_date: trip.endDate,
-        status: trip.status,
+        status: trip.status === "draft" ? "draft" : "draft",
         style: trip.style,
         owner_type: trip.ownerType,
         owner_user_id: trip.ownerUserId,
@@ -394,17 +411,19 @@ export async function createTrip(payload: CreateTripPayload) {
         admin_link: adminLink,
         public_link: publicLink,
         cover_image: trip.coverImage,
-        visibility: trip.visibility,
-        travelers_count: trip.travelersCount,
-        permissions: trip.permissions,
-        credits_summary: trip.creditsSummary ?? {},
+        visibility: "private",
+        travelers_count: trip.travelersCount || 1,
+        permissions: trip.permissions ?? {},
+        credits_summary: {},
         offline_enabled: trip.offlineEnabled,
         source: "manual",
       }
+      console.log("[TRIP] payload", insertPayload)
 
       const { data, error } = await supabase.from("trips").insert(insertPayload).select("*").single()
 
       if (!error && data) {
+        console.log("[TRIP] insert data", data)
         console.log("[TRIP] viagem criada", data.id)
         return {
           source: "supabase" as const,
@@ -414,7 +433,7 @@ export async function createTrip(payload: CreateTripPayload) {
         }
       }
       if (error) {
-        console.error("[AUTH ERROR]", error.message)
+        console.error("[TRIP] insert error", error)
         return {
           source: "supabase" as const,
           config: createSupabaseBrowserClientPlaceholder(),
@@ -424,7 +443,7 @@ export async function createTrip(payload: CreateTripPayload) {
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : "Falha ao criar viagem."
-      console.error("[AUTH ERROR]", message)
+      console.error("[TRIP] insert error", message)
       return {
         source: "supabase" as const,
         config: createSupabaseBrowserClientPlaceholder(),

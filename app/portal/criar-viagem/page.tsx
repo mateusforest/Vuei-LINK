@@ -125,27 +125,44 @@ export default function CriarViagemPage() {
     setIsCreating(true)
     setErrorMessage("")
 
-    let newTrip: Trip
+    try {
+      let newTrip: Trip
 
-    if (shouldUseSupabase() && user) {
-      const result = await createTripInRepository({
-        title: formData.name,
-        destination: formData.destination,
-        startDate: formData.startDate,
-        endDate: formData.endDate,
-        style: formData.style,
-        status: "upcoming",
-        ownerType: "traveler",
-        ownerUserId: user.id,
-        travelersCount: companionTypes.find(c => c.id === formData.companions)?.count || 1,
-      })
+      if (shouldUseSupabase() && user) {
+        const result = await createTripInRepository({
+          title: formData.name,
+          destination: formData.destination,
+          startDate: formData.startDate,
+          endDate: formData.endDate,
+          style: formData.style,
+          status: "draft",
+          visibility: "private",
+          ownerType: "traveler",
+          ownerUserId: user.id,
+          travelersCount: companionTypes.find(c => c.id === formData.companions)?.count || 1,
+          creditsSummary: { balance: null, used: null, total: null },
+        })
 
-      if (result.source === "supabase" && result.data) {
-        newTrip = syncTripFromBackend(result.data)
-      } else if (result.error) {
-        console.error("[AUTH ERROR]", result.error)
-        setErrorMessage(result.error)
-        setIsCreating(false)
+        if (result.source === "supabase" && result.data) {
+          newTrip = syncTripFromBackend(result.data)
+        } else if (result.error) {
+          console.error("[TRIP] insert error", result.error)
+          setErrorMessage(result.error)
+          return
+        } else {
+          setErrorMessage("Nao foi possivel criar a viagem no Supabase.")
+          return
+        }
+      } else if (shouldUseSupabase() && !user) {
+        writePendingTrip({
+          title: formData.name,
+          destination: formData.destination,
+          startDate: formData.startDate,
+          endDate: formData.endDate,
+          style: formData.style,
+          travelersCount: companionTypes.find(c => c.id === formData.companions)?.count || 1,
+        })
+        router.push("/signup")
         return
       } else {
         newTrip = addTrip({
@@ -161,36 +178,16 @@ export default function CriarViagemPage() {
           status: "upcoming"
         })
       }
-    } else if (shouldUseSupabase() && !user) {
-      writePendingTrip({
-        title: formData.name,
-        destination: formData.destination,
-        startDate: formData.startDate,
-        endDate: formData.endDate,
-        style: formData.style,
-        travelersCount: companionTypes.find(c => c.id === formData.companions)?.count || 1,
-      })
+      
+      setCreatedTrip(newTrip)
+      setIsComplete(true)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Falha ao criar viagem."
+      console.error("[TRIP] insert error", message)
+      setErrorMessage(message)
+    } finally {
       setIsCreating(false)
-      router.push("/signup")
-      return
-    } else {
-      newTrip = addTrip({
-        name: formData.name,
-        destination: formData.destination,
-        country: "",
-        city: "",
-        startDate: formData.startDate,
-        endDate: formData.endDate,
-        style: formData.style,
-        companions: formData.companions,
-        passengersCount: companionTypes.find(c => c.id === formData.companions)?.count || 1,
-        status: "upcoming"
-      })
     }
-    
-    setCreatedTrip(newTrip)
-    setIsCreating(false)
-    setIsComplete(true)
   }
 
   const copyLink = (link: string, type: string) => {

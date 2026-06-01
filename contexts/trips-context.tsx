@@ -309,7 +309,9 @@ export function TripsProvider({ children }: { children: ReactNode }) {
         travelersCount: pendingTrip.travelersCount,
         ownerType: "traveler",
         ownerUserId: user.id,
-        status: "upcoming",
+        status: "draft",
+        visibility: "private",
+        creditsSummary: { balance: null, used: null, total: null },
       })
 
       if (pendingResult.source === "supabase" && pendingResult.data) {
