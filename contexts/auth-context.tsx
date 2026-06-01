@@ -1,11 +1,12 @@
 "use client"
 
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react"
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import type { Session, User } from "@supabase/supabase-js"
 import type { Profile, UserRole } from "@/types"
 import { createSupabaseBrowserClient } from "@/lib/supabase/client"
 import { shouldUseSupabase } from "@/lib/data-source"
 import { ensureProfile } from "@/lib/auth/ensure-profile"
+import { withTimeout } from "@/lib/async/with-timeout"
 
 interface SignInPayload {
   email: string
@@ -33,114 +34,157 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
+const BOOTSTRAP_TIMEOUT_MS = 10_000
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const supabaseEnabled = shouldUseSupabase()
   const [session, setSession] = useState<Session | null>(null)
   const [user, setUser] = useState<User | null>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(supabaseEnabled)
   const supabase = useMemo(() => createSupabaseBrowserClient(), [])
+  const bootstrapRunRef = useRef(0)
 
-  const applyAuthState = async (nextSession: Session | null) => {
-    const nextUser = nextSession?.user ?? null
-    setSession(nextSession)
-    setUser(nextUser)
+  const loadProfile = useCallback(
+    async (nextUser: User | null) => {
+      if (!nextUser || !supabase) {
+        setProfile(null)
+        console.log("[BOOT] profile loaded", null)
+        return null
+      }
 
-    console.log("[AUTH] initial session", nextSession?.user?.id ?? null)
-    console.log("[AUTH] session user", nextUser?.id ?? null)
-    console.log("[AUTH] metadata", nextUser?.user_metadata ?? null)
+      try {
+        const ensuredProfile = await withTimeout(
+          ensureProfile(nextUser, supabase),
+          BOOTSTRAP_TIMEOUT_MS,
+          "Profile bootstrap timeout.",
+        )
 
-    if (!nextUser || !supabase) {
-      setProfile(null)
-      return null
-    }
+        setProfile(ensuredProfile)
+        console.log("[BOOT] profile loaded", ensuredProfile?.id ?? null)
+        console.log("[AUTH] profile loaded", ensuredProfile)
+        return ensuredProfile
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Falha ao carregar profile."
+        console.error("[AUTH ERROR]", message)
+        setProfile(null)
+        console.log("[BOOT] profile loaded", null)
+        return null
+      }
+    },
+    [supabase],
+  )
 
-    const ensuredProfile = await ensureProfile(nextUser, supabase)
-    setProfile(ensuredProfile)
-    console.log("[AUTH] profile loaded", ensuredProfile)
-    return ensuredProfile
-  }
+  const syncAuthState = useCallback(
+    async (nextSession: Session | null) => {
+      const nextUser = nextSession?.user ?? null
 
-  const refreshProfile = async () => {
-    if (!shouldUseSupabase() || !supabase) {
+      setSession(nextSession)
+      setUser(nextUser)
+
+      console.log("[BOOT] session loaded", nextUser?.id ?? null)
+      console.log("[AUTH] session user", nextUser?.id ?? null)
+      console.log("[AUTH] metadata", nextUser?.user_metadata ?? null)
+
+      return loadProfile(nextUser)
+    },
+    [loadProfile],
+  )
+
+  const refreshProfile = useCallback(async () => {
+    if (!supabaseEnabled || !supabase) {
       setProfile(null)
       return
     }
 
-    const {
-      data: { session: currentSession },
-    } = await supabase.auth.getSession()
-
-    setLoading(true)
-    await applyAuthState(currentSession ?? null)
-    setLoading(false)
-  }
+    await loadProfile(user)
+  }, [loadProfile, supabase, supabaseEnabled, user])
 
   useEffect(() => {
     let mounted = true
+    const currentRun = bootstrapRunRef.current + 1
+    bootstrapRunRef.current = currentRun
 
-    if (!shouldUseSupabase() || !supabase) {
+    if (!supabaseEnabled || !supabase) {
       setLoading(false)
       return
     }
 
     const bootstrap = async () => {
+      console.log("[BOOT] started")
       setLoading(true)
-      const {
-        data: { session: currentSession },
-      } = await supabase.auth.getSession()
 
-      if (!mounted) return
+      try {
+        const sessionResult = await withTimeout(
+          supabase.auth.getSession(),
+          BOOTSTRAP_TIMEOUT_MS,
+          "Auth session bootstrap timeout.",
+        )
 
-      await applyAuthState(currentSession ?? null)
-      setLoading(false)
+        if (!mounted || bootstrapRunRef.current !== currentRun) return
+
+        await syncAuthState(sessionResult.data.session ?? null)
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Falha ao inicializar sessao."
+        console.error("[AUTH ERROR]", message)
+
+        if (mounted && bootstrapRunRef.current === currentRun) {
+          setSession(null)
+          setUser(null)
+          setProfile(null)
+        }
+      } finally {
+        if (mounted && bootstrapRunRef.current === currentRun) {
+          setLoading(false)
+          console.log("[BOOT] finished")
+        }
+      }
     }
 
     void bootstrap()
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    } = supabase.auth.onAuthStateChange(async (_event, nextSession) => {
       if (!mounted) return
 
-      setLoading(true)
-      await applyAuthState(session ?? null)
-
-      if (mounted) setLoading(false)
+      await syncAuthState(nextSession ?? null)
     })
 
     return () => {
       mounted = false
       subscription.unsubscribe()
     }
-  }, [supabase])
+  }, [supabase, supabaseEnabled, syncAuthState])
 
   const signIn = async ({ email, password }: SignInPayload) => {
-    if (!shouldUseSupabase() || !supabase) {
+    if (!supabaseEnabled || !supabase) {
       return { error: "Supabase nao esta configurado neste ambiente.", user: null, profile: null, session: null }
     }
 
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+      const { data, error } = await withTimeout(
+        supabase.auth.signInWithPassword({ email, password }),
+        BOOTSTRAP_TIMEOUT_MS,
+        "Auth login timeout.",
+      )
 
       if (error) {
         console.error("[AUTH ERROR]", error.message)
         return { error: error.message, user: null, profile: null, session: null }
       }
 
-      const ensuredProfile = await applyAuthState(data.session ?? null)
+      const ensuredProfile = await syncAuthState(data.session ?? null)
       return { error: null, user: data.user ?? null, profile: ensuredProfile, session: data.session ?? null }
     } catch (error) {
       const message = error instanceof Error ? error.message : "Erro inesperado no login."
       console.error("[AUTH ERROR]", message)
       return { error: message, user: null, profile: null, session: null }
-    } finally {
-      setLoading(false)
     }
   }
 
   const signUp = async ({ email, password, name, phone, role, metadata }: SignUpPayload) => {
-    const supabaseEnvOk = shouldUseSupabase() && Boolean(supabase)
+    const supabaseEnvOk = supabaseEnabled && Boolean(supabase)
     console.log("Supabase env ok", supabaseEnvOk)
 
     if (!supabaseEnvOk || !supabase) {
@@ -149,19 +193,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     console.log("signUp started")
+
     try {
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            name,
-            phone,
-            role,
-            ...metadata,
+      const { data, error } = await withTimeout(
+        supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            data: {
+              name,
+              phone,
+              role,
+              ...metadata,
+            },
           },
-        },
-      })
+        }),
+        BOOTSTRAP_TIMEOUT_MS,
+        "Auth signup timeout.",
+      )
 
       if (error) {
         console.error("signUp error", error.message)
@@ -169,37 +218,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return { error: error.message, user: null, profile: null, session: null }
       }
 
-      const ensuredProfile = data.user ? await ensureProfile(data.user, supabase) : null
-      setSession(data.session ?? null)
-      setUser(data.user ?? null)
-      setProfile(ensuredProfile)
-
-      console.log("[AUTH] session user", data.user?.id ?? null)
-      console.log("[AUTH] metadata", data.user?.user_metadata ?? null)
-      console.log("[AUTH] profile loaded", ensuredProfile)
-
+      const ensuredProfile = await syncAuthState(data.session ?? null)
       console.log("signUp success")
-      return { error: null, user: data.user ?? null, profile: ensuredProfile, session: data.session ?? null }
+
+      return {
+        error: null,
+        user: data.user ?? null,
+        profile: ensuredProfile,
+        session: data.session ?? null,
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : "Erro inesperado no cadastro."
       console.error("signUp error", message)
       console.error("[AUTH ERROR]", message)
       return { error: message, user: null, profile: null, session: null }
-    } finally {
-      setLoading(false)
     }
   }
 
   const signOut = async () => {
-    setLoading(true)
-    if (shouldUseSupabase() && supabase) {
-      await supabase.auth.signOut()
+    if (supabaseEnabled && supabase) {
+      try {
+        await withTimeout(supabase.auth.signOut(), BOOTSTRAP_TIMEOUT_MS, "Auth signout timeout.")
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Falha ao encerrar sessao."
+        console.error("[AUTH ERROR]", message)
+      }
     }
 
     setUser(null)
     setSession(null)
     setProfile(null)
-    setLoading(false)
   }
 
   return (

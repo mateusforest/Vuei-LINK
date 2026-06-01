@@ -24,8 +24,9 @@ export default function LoginPage() {
   const canSubmit = email.trim().length > 0 && password.length >= 6
 
   useEffect(() => {
-    if (!loading && user) {
-      router.replace(getRedirectByRole((profile?.role ?? user.user_metadata?.role) as AppRole | undefined))
+    const resolvedRole = (profile?.role ?? user?.user_metadata?.role) as AppRole | undefined
+    if (!loading && user && resolvedRole) {
+      router.replace(getRedirectByRole(resolvedRole))
     }
   }, [loading, profile?.role, router, user])
 
@@ -295,7 +296,7 @@ export default function LoginPage() {
                 {/* Botão Entrar */}
                 <Button
                   type="submit"
-                  disabled={isLoading || loading || !canSubmit}
+                  disabled={isLoading || !canSubmit}
                   className="w-full h-12 bg-gradient-to-r from-[#5de0e6] to-[#004aad] hover:opacity-90 text-white font-medium rounded-xl transition-all duration-300 shadow-lg shadow-[#5de0e6]/20"
                 >
                   {isLoading ? (

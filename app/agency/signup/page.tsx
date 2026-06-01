@@ -43,8 +43,8 @@ export default function AgencySignupPage() {
     acceptTerms
 
   useEffect(() => {
-    if (!loading && user) {
-      const detectedRole = (profile?.role ?? user.user_metadata?.role ?? "traveler") as "traveler" | "agency_owner" | "agency_member" | "master"
+    const detectedRole = (profile?.role ?? user?.user_metadata?.role) as "traveler" | "agency_owner" | "agency_member" | "master" | undefined
+    if (!loading && user && detectedRole) {
       router.replace(getRedirectByRole(detectedRole))
     }
   }, [loading, profile?.role, router, user])
@@ -449,7 +449,7 @@ export default function AgencySignupPage() {
                 {/* Botão */}
                 <Button
                   type="submit"
-                  disabled={isLoading || loading || !canSubmit}
+                  disabled={isLoading || !canSubmit}
                   className="w-full h-12 bg-gradient-to-r from-[#5de0e6] to-[#004aad] hover:opacity-90 text-white font-medium rounded-xl transition-all duration-300 shadow-lg shadow-[#5de0e6]/20 mt-4"
                 >
                   {isLoading ? (

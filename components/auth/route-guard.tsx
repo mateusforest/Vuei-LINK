@@ -16,19 +16,24 @@ export function RouteGuard({
 }) {
   const router = useRouter()
   const { user, profile, loading } = useAuth()
+  const resolvedRole = profile?.role ?? (typeof user?.user_metadata?.role === "string" ? (user.user_metadata.role as UserRole) : null)
+  const resolvedProfile = resolvedRole ? { role: resolvedRole } : null
 
   useEffect(() => {
     if (!shouldUseSupabase() || loading) return
 
     if (!user) {
+      console.log("[BOOT] redirecting", "/login")
       router.replace("/login")
       return
     }
 
-    if (profile && !canAccessRole(profile, allowedRoles)) {
-      router.replace(getRedirectByRole(profile.role))
+    if (resolvedProfile && !canAccessRole(resolvedProfile, allowedRoles)) {
+      const target = getRedirectByRole(resolvedRole)
+      console.log("[BOOT] redirecting", target)
+      router.replace(target)
     }
-  }, [allowedRoles, loading, profile, router, user])
+  }, [allowedRoles, loading, resolvedProfile, resolvedRole, router, user])
 
   if (!shouldUseSupabase()) return <>{children}</>
 
@@ -40,7 +45,7 @@ export function RouteGuard({
     )
   }
 
-  if (!user || (profile && !canAccessRole(profile, allowedRoles))) {
+  if (!user || (resolvedProfile && !canAccessRole(resolvedProfile, allowedRoles))) {
     return null
   }
 

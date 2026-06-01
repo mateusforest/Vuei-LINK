@@ -36,8 +36,9 @@ export default function SignupPage() {
     acceptTerms
 
   useEffect(() => {
-    if (!loading && user) {
-      router.replace(getRedirectByRole(profile?.role ?? (user.user_metadata?.role as any)))
+    const resolvedRole = profile?.role ?? (user?.user_metadata?.role as any)
+    if (!loading && user && resolvedRole) {
+      router.replace(getRedirectByRole(resolvedRole))
     }
   }, [loading, profile?.role, router, user])
 
@@ -373,7 +374,7 @@ export default function SignupPage() {
                 {/* Botão */}
                 <Button
                   type="submit"
-                  disabled={isLoading || loading || !canSubmit}
+                  disabled={isLoading || !canSubmit}
                   className="w-full h-12 bg-gradient-to-r from-[#5de0e6] to-[#004aad] hover:opacity-90 text-white font-medium rounded-xl transition-all duration-300 shadow-lg shadow-[#5de0e6]/20 mt-6"
                 >
                   {isLoading ? (

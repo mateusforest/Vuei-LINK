@@ -5,6 +5,7 @@ import type { CreditBalance, CreditTransaction, Trip as CanonicalTrip, TripStatu
 import { useAuth } from "@/contexts/auth-context"
 import { createTrip as createTripInRepository, listTripsByUser } from "@/lib/repositories/trips-repository"
 import { shouldUseSupabase } from "@/lib/data-source"
+import { withTimeout } from "@/lib/async/with-timeout"
 import { clearPendingTrip, readPendingTrip } from "@/lib/pending-trip"
 import {
   buildUniqueTripSlug,
@@ -206,6 +207,7 @@ function inferCompanionsFromCount(count: number) {
 
 const STORAGE_KEY = "vuei_trips"
 const CREDITS_KEY = "vuei_credits"
+const TRIPS_BOOT_TIMEOUT_MS = 10_000
 
 export function TripsProvider({ children }: { children: ReactNode }) {
   // Mantemos a persistencia local nesta fase para nao alterar o fluxo aprovado.
@@ -293,11 +295,16 @@ export function TripsProvider({ children }: { children: ReactNode }) {
     let mounted = true
 
     const syncRemoteTrips = async () => {
+      console.log("[BOOT] started")
       console.log("[TRIPS] loading user trips", user.id)
       setLoadingTrips(true)
 
       try {
-        const result = await listTripsByUser(user.id)
+        const result = await withTimeout(
+          listTripsByUser(user.id),
+          TRIPS_BOOT_TIMEOUT_MS,
+          "Trips bootstrap timeout.",
+        )
         if (!mounted) return
 
         if (result.source !== "supabase") {
@@ -314,6 +321,7 @@ export function TripsProvider({ children }: { children: ReactNode }) {
         )
 
         console.log("[TRIPS] loaded trips", remoteTrips.length)
+        console.log("[BOOT] trips loaded", remoteTrips.length)
         setTrips(remoteTrips)
         setActiveTripState((current) => {
           if (current) {
@@ -350,6 +358,7 @@ export function TripsProvider({ children }: { children: ReactNode }) {
           setActiveTripState(nextTrip)
           clearPendingTrip()
           console.log("[TRIPS] loaded trips", remoteTrips.length + 1)
+          console.log("[BOOT] trips loaded", remoteTrips.length + 1)
         }
       } catch (error) {
         const message = error instanceof Error ? error.message : "Falha ao carregar viagens."
@@ -357,6 +366,7 @@ export function TripsProvider({ children }: { children: ReactNode }) {
       } finally {
         if (mounted) {
           setLoadingTrips(false)
+          console.log("[BOOT] finished")
         }
       }
     }

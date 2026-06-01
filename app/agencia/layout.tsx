@@ -42,6 +42,7 @@ import { AgencyProvider, useAgency } from "@/contexts/agency-context"
 import { RouteGuard } from "@/components/auth/route-guard"
 import { useAuth } from "@/contexts/auth-context"
 import { getAgencyByOwner } from "@/lib/repositories/agencies-repository"
+import { withTimeout } from "@/lib/async/with-timeout"
 import type { Agency } from "@/types"
 
 const navItems = [
@@ -120,9 +121,19 @@ function AgencyLayoutInner({ children }: { children: React.ReactNode }) {
     let active = true
 
     const loadAgency = async () => {
-      const result = await getAgencyByOwner(user.id)
-      if (active) {
-        setAgencyProfile(result.data)
+      try {
+        const result = await withTimeout(getAgencyByOwner(user.id), 10_000, "Agency bootstrap timeout.")
+        if (active) {
+          setAgencyProfile(result.data)
+          console.log("[BOOT] agency loaded", result.data?.id ?? null)
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Falha ao carregar agencia."
+        console.error("[AUTH ERROR]", message)
+        if (active) {
+          setAgencyProfile(null)
+          console.log("[BOOT] agency loaded", null)
+        }
       }
     }
 
