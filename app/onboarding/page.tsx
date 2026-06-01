@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useAuth } from "@/contexts/auth-context"
 import { getRedirectByRole } from "@/lib/auth/role-redirect"
+import { writePendingTrip } from "@/lib/pending-trip"
 
 const steps = [
   { id: 1, title: "Nome", description: "Como podemos te chamar?" },
@@ -71,7 +72,26 @@ export default function OnboardingPage() {
   const handleComplete = async () => {
     setIsLoading(true)
     await new Promise(resolve => setTimeout(resolve, 2000))
-    router.push(user ? getRedirectByRole(profile?.role) : "/portal")
+
+    if (user) {
+      router.push(getRedirectByRole(profile?.role))
+      return
+    }
+
+    const selectedDestination = formData.destination === "other"
+      ? formData.customDestination
+      : popularDestinations.find((destination) => destination.id === formData.destination)?.name ?? ""
+
+    if (selectedDestination) {
+      writePendingTrip({
+        title: selectedDestination,
+        destination: selectedDestination,
+        style: formData.travelStyle || undefined,
+        travelersCount: 1,
+      })
+    }
+
+    router.push("/signup")
   }
 
   const canProceed = () => {

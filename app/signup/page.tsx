@@ -70,7 +70,10 @@ export default function SignupPage() {
         return
       }
 
-      router.replace(getRedirectByRole(result.profile?.role ?? profile?.role))
+      const redirectPath = getRedirectByRole(result.profile?.role ?? profile?.role)
+      console.log("[AUTH] role detectada", result.profile?.role ?? profile?.role ?? null)
+      console.log("[AUTH] redirect destino", redirectPath)
+      router.replace(redirectPath)
     } finally {
       setIsLoading(false)
     }

@@ -6,7 +6,8 @@ import { useParams } from "next/navigation"
 import { motion, AnimatePresence, useScroll, useTransform } from "framer-motion"
 import { extractAgencyStorageState } from "@/lib/mappers/agency-mappers"
 import { extractTripsStoragePayload } from "@/lib/mappers/trip-mappers"
-import { getTripBySlug } from "@/lib/repositories/trips-repository"
+import { shouldUseSupabase } from "@/lib/data-source"
+import { getTripByAdminToken, getTripByPublicToken, getTripBySlug } from "@/lib/repositories/trips-repository"
 import {
   Plane, Hotel, MapPin, FileText, MessageCircle, Share2, WifiOff, 
   ChevronRight, Calendar, Clock, Users, Sun, Cloud, Thermometer,
@@ -158,109 +159,26 @@ function BottomSheet({ open, onClose, children, title }: { open: boolean; onClos
   )
 }
 
-// Mock data for the trip
+const DEFAULT_HERO_IMAGE = "https://images.unsplash.com/photo-1488646953014-85cb44e25828?w=1920&q=80"
+
 const initialTripData = {
-  id: "paris-2024",
-  destination: "Paris",
-  country: "Franca",
+  id: "trip-default",
+  destination: "Minha Viagem",
+  country: "A definir",
   countryFlag: "🇫🇷",
-  dates: { start: "15 Jun 2024", end: "25 Jun 2024" },
-  daysUntil: 12,
+  dates: { start: "A definir", end: "A definir" },
+  daysUntil: 0,
   status: "upcoming",
   travelers: [
     { name: "Joao Silva", avatar: "/placeholder.svg?height=40&width=40", role: "principal" },
     { name: "Maria Silva", avatar: "/placeholder.svg?height=40&width=40", role: "acompanhante" },
   ],
-  weather: { temp: 22, condition: "Parcialmente nublado", icon: Cloud },
-  heroImage: "https://images.unsplash.com/photo-1502602898657-3e91760cbb34?w=1920&q=80",
-  flights: [
-    {
-      id: 1,
-      type: "ida",
-      airline: "Air France",
-      flightNumber: "AF 458",
-      origin: { code: "GRU", city: "Sao Paulo", time: "22:30" },
-      destination: { code: "CDG", city: "Paris", time: "14:45+1" },
-      date: "15 Jun 2024",
-      terminal: "2E",
-      gate: "K45",
-      seat: "12A",
-      status: "confirmed",
-      duration: "11h 15min"
-    },
-    {
-      id: 2,
-      type: "volta",
-      airline: "Air France",
-      flightNumber: "AF 457",
-      origin: { code: "CDG", city: "Paris", time: "18:20" },
-      destination: { code: "GRU", city: "Sao Paulo", time: "01:35+1" },
-      date: "25 Jun 2024",
-      terminal: "2E",
-      gate: "L22",
-      seat: "14A",
-      status: "confirmed",
-      duration: "11h 15min"
-    }
-  ],
-  hotel: {
-    name: "Le Marais Boutique Hotel",
-    stars: 4,
-    address: "15 Rue de Rivoli, 75004 Paris",
-    checkIn: "15 Jun 2024 - 15:00",
-    checkOut: "25 Jun 2024 - 11:00",
-    nights: 10,
-    room: "Deluxe com vista",
-    phone: "+33 1 42 78 55 44",
-    confirmationCode: "HT789456",
-    image: "https://images.unsplash.com/photo-1566073771259-6a8506099945?w=800&q=80",
-    amenities: ["Wi-Fi", "Cafe da manha", "Ar condicionado", "Cofre"]
-  },
-  itinerary: [
-    {
-      day: 1,
-      date: "15 Jun",
-      title: "Chegada em Paris",
-      items: [
-        { id: 1, time: "14:45", title: "Chegada no Aeroporto CDG", type: "flight", icon: "Plane" },
-        { id: 2, time: "16:30", title: "Transfer para o hotel", type: "transport", icon: "Navigation" },
-        { id: 3, time: "18:00", title: "Check-in Le Marais Hotel", type: "hotel", icon: "Hotel" },
-        { id: 4, time: "20:00", title: "Jantar no Cafe de Flore", type: "food", icon: "Star" }
-      ]
-    },
-    {
-      day: 2,
-      date: "16 Jun",
-      title: "Torre Eiffel e Arredores",
-      items: [
-        { id: 5, time: "09:00", title: "Cafe da manha no hotel", type: "food", icon: "Star" },
-        { id: 6, time: "10:30", title: "Visita a Torre Eiffel", type: "attraction", icon: "MapPin", highlight: true },
-        { id: 7, time: "13:00", title: "Almoco no Trocadero", type: "food", icon: "Star" },
-        { id: 8, time: "15:00", title: "Cruzeiro pelo Rio Sena", type: "experience", icon: "Heart" },
-        { id: 9, time: "19:00", title: "Jantar em Montmartre", type: "food", icon: "Star" }
-      ]
-    },
-    {
-      day: 3,
-      date: "17 Jun",
-      title: "Louvre e Centro Historico",
-      items: [
-        { id: 10, time: "09:30", title: "Museu do Louvre", type: "attraction", icon: "MapPin", highlight: true },
-        { id: 11, time: "13:00", title: "Almoco no Palais Royal", type: "food", icon: "Star" },
-        { id: 12, time: "15:00", title: "Jardins das Tulherias", type: "attraction", icon: "MapPin" },
-        { id: 13, time: "17:00", title: "Champs-Elysees e Arco do Triunfo", type: "attraction", icon: "MapPin" }
-      ]
-    }
-  ],
-  documents: [
-    { id: 1, name: "Passaporte - Joao", type: "passport", private: true, protected: true },
-    { id: 2, name: "Passaporte - Maria", type: "passport", private: true, protected: true },
-    { id: 3, name: "Visto Schengen", type: "visa", private: true, protected: true },
-    { id: 4, name: "Seguro Viagem", type: "insurance", private: false, protected: false },
-    { id: 5, name: "Voucher Hotel", type: "voucher", private: false, protected: false },
-    { id: 6, name: "Reserva Louvre", type: "ticket", private: false, protected: false },
-    { id: 7, name: "Reserva Torre Eiffel", type: "ticket", private: false, protected: false },
-  ],
+  weather: { temp: null, condition: "A definir", icon: Cloud },
+  heroImage: DEFAULT_HERO_IMAGE,
+  flights: [],
+  hotel: null,
+  itinerary: [],
+  documents: [],
   quickInfo: {
     currency: { name: "Euro", symbol: "€", rate: "R$ 5,40" },
     language: "Frances",
@@ -269,8 +187,8 @@ const initialTripData = {
     embassy: "+33 1 45 61 63 00"
   },
   credits: { balance: 47, used: 3, total: 50 },
-  adminLink: "vuei.app/viagem/paris-2024?admin=true",
-  shareLink: "vuei.app/viagem/paris-2024"
+  adminLink: "vuei.app/viagem/minha-viagem?admin=true",
+  shareLink: "vuei.app/v/minha-viagem"
 }
 
 function parseTripDestination(destination?: string) {
@@ -339,16 +257,32 @@ function buildTravelers(count?: number) {
   }))
 }
 
+function buildQuickInfo(country?: string) {
+  return {
+    currency: { name: "A definir", symbol: "-", rate: "A definir" },
+    language: country ? `Idioma local de ${country}` : "A definir",
+    timezone: "A definir",
+    emergency: "A definir",
+    embassy: "A definir",
+  }
+}
+
 function buildTripDataFromStoredTrip(storedTrip: any) {
   const { city, country } = parseTripDestination(storedTrip.destination)
   const start = formatTripDate(storedTrip.startDate)
   const end = formatTripDate(storedTrip.endDate)
-  const travelers = buildTravelers(storedTrip.passengersCount)
+  const travelers = Array.isArray(storedTrip.travelers) && storedTrip.travelers.length > 0
+    ? storedTrip.travelers
+    : buildTravelers(storedTrip.passengersCount ?? storedTrip.travelersCount)
+  const hotel = storedTrip.hotel ?? storedTrip.accommodation ?? null
+  const flights = Array.isArray(storedTrip.flights) ? storedTrip.flights : []
+  const itinerary = Array.isArray(storedTrip.itinerary) ? storedTrip.itinerary : []
+  const documents = Array.isArray(storedTrip.documents) ? storedTrip.documents : []
 
   return {
     ...initialTripData,
     id: storedTrip.slug || storedTrip.id || initialTripData.id,
-    destination: city,
+    destination: city || storedTrip.title || "Minha Viagem",
     country: storedTrip.country || country || initialTripData.country,
     countryFlag: getCountryFlag(storedTrip.country || country),
     dates: {
@@ -358,30 +292,26 @@ function buildTripDataFromStoredTrip(storedTrip: any) {
     daysUntil: calculateDaysUntil(storedTrip.startDate),
     status: storedTrip.status || initialTripData.status,
     travelers,
-    heroImage: storedTrip.coverImage || initialTripData.heroImage,
-    hotel: {
-      ...initialTripData.hotel,
-      name: city ? `Hospedagem em ${city}` : initialTripData.hotel.name,
-      address: storedTrip.destination || initialTripData.hotel.address,
-      checkIn: start ? `${start} - 15:00` : initialTripData.hotel.checkIn,
-      checkOut: end ? `${end} - 11:00` : initialTripData.hotel.checkOut,
-    },
-    itinerary: initialTripData.itinerary.map((day, index) => ({
-      ...day,
-      title:
-        index === 0
-          ? `Chegada em ${city}`
-          : index === 1
-            ? `Experiencias em ${city}`
-            : `Descobertas em ${city}`,
-    })),
-    documents: initialTripData.documents.map((document, index) => ({
-      ...document,
-      name:
-        index === 0
-          ? `Voucher - ${storedTrip.name || city}`
-          : document.name,
-    })),
+    heroImage: storedTrip.coverImage || DEFAULT_HERO_IMAGE,
+    hotel: hotel
+      ? {
+          name: hotel.name || `Hospedagem em ${city || storedTrip.destination || "sua viagem"}`,
+          stars: hotel.stars || 0,
+          address: hotel.address || storedTrip.destination || "A definir",
+          checkIn: hotel.checkIn || (start ? `${start} - 15:00` : "A definir"),
+          checkOut: hotel.checkOut || (end ? `${end} - 11:00` : "A definir"),
+          nights: hotel.nights || 0,
+          room: hotel.room || "",
+          phone: hotel.phone || "",
+          confirmationCode: hotel.confirmationCode || "",
+          image: hotel.image || DEFAULT_HERO_IMAGE,
+          amenities: Array.isArray(hotel.amenities) ? hotel.amenities : [],
+        }
+      : null,
+    itinerary,
+    documents,
+    flights,
+    quickInfo: buildQuickInfo(storedTrip.country || country),
     adminLink: storedTrip.adminLink || initialTripData.adminLink,
     shareLink: storedTrip.shareLink || initialTripData.shareLink,
   }
@@ -431,7 +361,7 @@ function StatusBadge({ status, daysUntil }: { status: string; daysUntil: number 
     ongoing: { label: "Viagem em andamento", icon: Play, className: "bg-emerald-500/10 text-emerald-400 border-emerald-500/30" },
     completed: { label: "Viagem finalizada", icon: Check, className: "bg-[#004aad]/10 text-[#004aad] border-[#004aad]/30" }
   }
-  const config = configs[status as keyof typeof configs]
+  const config = configs[status as keyof typeof configs] ?? configs.upcoming
   const Icon = config.icon
 
   return (
@@ -565,7 +495,7 @@ function TripHero({ tripData, onEditTrip }: { tripData: any; onEditTrip: () => v
               <tripData.weather.icon className="w-5 h-5 text-[#5de0e6]" />
               <div>
                 <p className="text-xs text-white/50">Clima</p>
-                <p className="text-sm text-white font-medium">{tripData.weather.temp}°C</p>
+                <p className="text-sm text-white font-medium">{typeof tripData.weather.temp === "number" ? `${tripData.weather.temp}°C` : "A definir"}</p>
               </div>
             </div>
           </motion.div>
@@ -591,12 +521,12 @@ function TripHero({ tripData, onEditTrip }: { tripData: any; onEditTrip: () => v
 }
 
 // Quick access cards
-function QuickAccessCards({ onNavigate }: { onNavigate: (section: string) => void }) {
+function QuickAccessCards({ tripData, onNavigate }: { tripData: any; onNavigate: (section: string) => void }) {
   const cards = [
-    { id: "flights", icon: Plane, label: "Passagens", color: "from-[#5de0e6] to-[#5de0e6]/50", count: 2 },
-    { id: "hotel", icon: Hotel, label: "Hospedagem", color: "from-[#004aad] to-[#004aad]/50", count: 1 },
-    { id: "itinerary", icon: MapPin, label: "Roteiro", color: "from-[#5de0e6] to-[#004aad]", count: 3 },
-    { id: "documents", icon: FileText, label: "Documentos", color: "from-[#004aad] to-[#5de0e6]", count: 7 },
+    { id: "flights", icon: Plane, label: "Passagens", color: "from-[#5de0e6] to-[#5de0e6]/50", count: tripData.flights.length },
+    { id: "hotel", icon: Hotel, label: "Hospedagem", color: "from-[#004aad] to-[#004aad]/50", count: tripData.hotel ? 1 : 0 },
+    { id: "itinerary", icon: MapPin, label: "Roteiro", color: "from-[#5de0e6] to-[#004aad]", count: tripData.itinerary.length },
+    { id: "documents", icon: FileText, label: "Documentos", color: "from-[#004aad] to-[#5de0e6]", count: tripData.documents.length },
     { id: "concierge", icon: MessageCircle, label: "Concierge", color: "from-[#5de0e6] to-[#5de0e6]/50", badge: "IA" },
     { id: "offline", icon: WifiOff, label: "Offline", color: "from-[#004aad] to-[#004aad]/50" },
   ]
@@ -944,6 +874,7 @@ function FlightsSection({ tripData, onUpdateFlight, onAddFlight }: { tripData: a
   const [addingFlight, setAddingFlight] = useState(false)
   const { isAdmin } = useContext(PermissionContext)
   const { showToast } = useToast()
+  const flights = Array.isArray(tripData.flights) ? tripData.flights : []
 
   const handleSaveFlight = (data: any) => {
     onUpdateFlight(data.id, data)
@@ -960,7 +891,7 @@ function FlightsSection({ tripData, onUpdateFlight, onAddFlight }: { tripData: a
             </div>
             <div>
               <h2 className="text-xl font-semibold text-white">Passagens</h2>
-              <p className="text-sm text-white/40">{tripData.flights.length} voos confirmados</p>
+              <p className="text-sm text-white/40">{flights.length} voos confirmados</p>
             </div>
           </div>
           {isAdmin && (
@@ -971,8 +902,13 @@ function FlightsSection({ tripData, onUpdateFlight, onAddFlight }: { tripData: a
           )}
         </motion.div>
 
+        {flights.length === 0 ? (
+          <div className="rounded-3xl border border-white/[0.06] bg-white/[0.02] p-6 text-sm text-white/50">
+            Nenhuma passagem adicionada.
+          </div>
+        ) : (
         <div className="grid sm:grid-cols-2 gap-4">
-          {tripData.flights.map((flight: any, i: number) => (
+          {flights.map((flight: any, i: number) => (
             <FlightCard 
               key={flight.id} 
               flight={flight} 
@@ -982,6 +918,7 @@ function FlightsSection({ tripData, onUpdateFlight, onAddFlight }: { tripData: a
             />
           ))}
         </div>
+        )}
       </div>
 
       <EditFlightModal open={!!editingFlight} onClose={() => setEditingFlight(null)} flight={editingFlight} onSave={handleSaveFlight} />
@@ -1239,6 +1176,7 @@ function HotelSection({ tripData, onUpdateHotel }: { tripData: any; onUpdateHote
   const [addingVoucher, setAddingVoucher] = useState(false)
   const { isAdmin } = useContext(PermissionContext)
   const { showToast } = useToast()
+  const hotel = tripData.hotel
 
   return (
     <section id="hotel" className="py-12 px-4">
@@ -1250,7 +1188,7 @@ function HotelSection({ tripData, onUpdateHotel }: { tripData: any; onUpdateHote
             </div>
             <div>
               <h2 className="text-xl font-semibold text-white">Hospedagem</h2>
-              <p className="text-sm text-white/40">{tripData.hotel.nights} noites</p>
+              <p className="text-sm text-white/40">{hotel ? `${hotel.nights} noites` : "Nenhuma hospedagem cadastrada"}</p>
             </div>
           </div>
           {isAdmin && (
@@ -1261,20 +1199,25 @@ function HotelSection({ tripData, onUpdateHotel }: { tripData: any; onUpdateHote
           )}
         </motion.div>
 
+        {!hotel ? (
+          <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="rounded-3xl border border-white/[0.06] bg-white/[0.02] p-6 text-sm text-white/50">
+            Nenhuma hospedagem adicionada.
+          </motion.div>
+        ) : (
         <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="relative rounded-3xl overflow-hidden bg-white/[0.02] backdrop-blur-xl border border-white/[0.06]">
           <div className="relative h-48 sm:h-64">
-            <Image src={tripData.hotel.image} alt={tripData.hotel.name} fill className="object-cover" />
+            <Image src={hotel.image} alt={hotel.name} fill className="object-cover" />
             <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent" />
             <div className="absolute top-4 right-4 flex items-center gap-1 px-3 py-1.5 rounded-full bg-black/50 backdrop-blur-md">
-              {[...Array(tripData.hotel.stars)].map((_, i) => (
+              {[...Array(hotel.stars)].map((_, i) => (
                 <Star key={i} className="w-3 h-3 fill-[#5de0e6] text-[#5de0e6]" />
               ))}
             </div>
             <div className="absolute bottom-4 left-4 right-4">
-              <h3 className="text-xl font-semibold text-white">{tripData.hotel.name}</h3>
+              <h3 className="text-xl font-semibold text-white">{hotel.name}</h3>
               <div className="flex items-center gap-2 mt-1 text-white/60">
                 <MapPin className="w-3 h-3" />
-                <span className="text-sm">{tripData.hotel.address}</span>
+                <span className="text-sm">{hotel.address}</span>
               </div>
             </div>
           </div>
@@ -1283,16 +1226,16 @@ function HotelSection({ tripData, onUpdateHotel }: { tripData: any; onUpdateHote
             <div className="grid grid-cols-2 gap-4 mb-4">
               <div className="p-3 rounded-xl bg-white/[0.03]">
                 <p className="text-[10px] text-white/40 uppercase tracking-wider">Check-in</p>
-                <p className="text-sm text-white font-medium mt-1">{tripData.hotel.checkIn}</p>
+                <p className="text-sm text-white font-medium mt-1">{hotel.checkIn}</p>
               </div>
               <div className="p-3 rounded-xl bg-white/[0.03]">
                 <p className="text-[10px] text-white/40 uppercase tracking-wider">Check-out</p>
-                <p className="text-sm text-white font-medium mt-1">{tripData.hotel.checkOut}</p>
+                <p className="text-sm text-white font-medium mt-1">{hotel.checkOut}</p>
               </div>
             </div>
 
             <div className="flex flex-wrap gap-2 mb-4">
-              {tripData.hotel.amenities.map((amenity: string) => (
+              {hotel.amenities.map((amenity: string) => (
                 <span key={amenity} className="px-3 py-1 text-xs text-white/60 bg-white/[0.05] rounded-full">{amenity}</span>
               ))}
             </div>
@@ -1300,7 +1243,7 @@ function HotelSection({ tripData, onUpdateHotel }: { tripData: any; onUpdateHote
             <div className="flex items-center justify-between pt-4 border-t border-white/[0.06]">
               <div className="flex items-center gap-2 text-white/40">
                 <Phone className="w-4 h-4" />
-                <span className="text-sm">{tripData.hotel.phone}</span>
+                <span className="text-sm">{hotel.phone}</span>
               </div>
               <Button size="sm" variant="ghost" onClick={() => setAddingVoucher(true)} className="text-[#5de0e6] hover:bg-[#5de0e6]/10">
                 <Upload className="w-4 h-4 mr-2" />
@@ -1309,9 +1252,10 @@ function HotelSection({ tripData, onUpdateHotel }: { tripData: any; onUpdateHote
             </div>
           </div>
         </motion.div>
+        )}
       </div>
 
-      <EditHotelModal open={editing} onClose={() => setEditing(false)} hotel={tripData.hotel} onSave={(data) => { onUpdateHotel(data); showToast("Hotel atualizado!", "success"); setEditing(false) }} />
+      <EditHotelModal open={!!hotel && editing} onClose={() => setEditing(false)} hotel={hotel ?? {}} onSave={(data) => { onUpdateHotel(data); showToast("Hotel atualizado!", "success"); setEditing(false) }} />
       <AddVoucherModal open={addingVoucher} onClose={() => setAddingVoucher(false)} onSave={() => { showToast("Voucher anexado!", "success"); setAddingVoucher(false) }} />
     </section>
   )
@@ -1428,8 +1372,9 @@ function ItinerarySection({ tripData, onUpdateItinerary }: { tripData: any; onUp
   const [addingItem, setAddingItem] = useState(false)
   const { isAdmin } = useContext(PermissionContext)
   const { showToast } = useToast()
+  const itinerary = Array.isArray(tripData.itinerary) ? tripData.itinerary : []
 
-  const activeItinerary = tripData.itinerary.find((d: any) => d.day === activeDay)
+  const activeItinerary = itinerary.find((d: any) => d.day === activeDay)
 
   return (
     <section id="itinerary" className="py-12 px-4">
@@ -1441,7 +1386,7 @@ function ItinerarySection({ tripData, onUpdateItinerary }: { tripData: any; onUp
             </div>
             <div>
               <h2 className="text-xl font-semibold text-white">Roteiro</h2>
-              <p className="text-sm text-white/40">{tripData.itinerary.length} dias planejados</p>
+              <p className="text-sm text-white/40">{itinerary.length} dias planejados</p>
             </div>
           </div>
           {isAdmin && (
@@ -1452,8 +1397,14 @@ function ItinerarySection({ tripData, onUpdateItinerary }: { tripData: any; onUp
           )}
         </motion.div>
 
+        {itinerary.length === 0 ? (
+          <div className="rounded-3xl border border-white/[0.06] bg-white/[0.02] p-6 text-sm text-white/50">
+            Nenhum roteiro criado.
+          </div>
+        ) : (
+        <>
         <div className="flex gap-2 mb-6 overflow-x-auto pb-2 scrollbar-hide">
-          {tripData.itinerary.map((day: any) => (
+          {itinerary.map((day: any) => (
             <motion.button
               key={day.day}
               onClick={() => setActiveDay(day.day)}
@@ -1535,6 +1486,8 @@ function ItinerarySection({ tripData, onUpdateItinerary }: { tripData: any; onUp
             </motion.div>
           )}
         </AnimatePresence>
+        </>
+        )}
       </div>
 
       <EditItineraryItemModal 
@@ -1883,8 +1836,9 @@ function DocumentsSection({ tripData, onAddDocument }: { tripData: any; onAddDoc
   const { isAdmin } = useContext(PermissionContext)
   const { showToast } = useToast()
 
-  const publicDocs = tripData.documents.filter((d: any) => !d.private)
-  const privateDocs = tripData.documents.filter((d: any) => d.private)
+  const documents = Array.isArray(tripData.documents) ? tripData.documents : []
+  const publicDocs = documents.filter((d: any) => !d.private)
+  const privateDocs = documents.filter((d: any) => d.private)
 
   const getDocIcon = (type: string) => {
     switch (type) {
@@ -1911,7 +1865,7 @@ function DocumentsSection({ tripData, onAddDocument }: { tripData: any; onAddDoc
             </div>
             <div>
               <h2 className="text-xl font-semibold text-white">Documentos</h2>
-              <p className="text-sm text-white/40">{tripData.documents.length} arquivos</p>
+              <p className="text-sm text-white/40">{documents.length} arquivos</p>
             </div>
           </div>
           {isAdmin && (
@@ -1922,6 +1876,11 @@ function DocumentsSection({ tripData, onAddDocument }: { tripData: any; onAddDoc
           )}
         </motion.div>
 
+        {documents.length === 0 ? (
+          <div className="rounded-3xl border border-white/[0.06] bg-white/[0.02] p-6 text-sm text-white/50">
+            Nenhum documento adicionado.
+          </div>
+        ) : (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
           {publicDocs.map((doc: any, i: number) => (
             <motion.button
@@ -1941,8 +1900,9 @@ function DocumentsSection({ tripData, onAddDocument }: { tripData: any; onAddDoc
             </motion.button>
           ))}
         </div>
+        )}
 
-        {isAdmin && (
+        {isAdmin && privateDocs.length > 0 && (
           <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="p-5 rounded-2xl bg-gradient-to-br from-white/[0.02] to-transparent border border-white/[0.06]">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
@@ -2182,25 +2142,26 @@ function ConciergeSection({ tripData, onOpenCredits }: { tripData: any; onOpenCr
   const [open, setOpen] = useState(false)
   const [message, setMessage] = useState("")
   const [messages, setMessages] = useState([
-    { role: "assistant", content: "Ola! Sou o concierge IA da sua viagem para Paris. Como posso ajudar?" }
+    { role: "assistant", content: `Ola! Sou o concierge da sua viagem para ${tripData.destination}. Posso ajudar com informacoes reais que ja estejam adicionadas.` }
   ])
   const [typing, setTyping] = useState(false)
   const { isAdmin } = useContext(PermissionContext)
-  const { showToast } = useToast()
+  const hasFlights = Array.isArray(tripData.flights) && tripData.flights.length > 0
+  const hasHotel = Boolean(tripData.hotel)
+  const hasItinerary = Array.isArray(tripData.itinerary) && tripData.itinerary.length > 0
+
+  useEffect(() => {
+    setMessages([
+      { role: "assistant", content: `Ola! Sou o concierge da sua viagem para ${tripData.destination}. Posso ajudar com informacoes reais que ja estejam adicionadas.` }
+    ])
+  }, [tripData.destination])
 
   const suggestions = [
-    "Qual hotel eu vou ficar?",
-    "Mostra meu roteiro do dia 2",
-    "Onde fica meu portao de embarque?",
-    "Preciso de visto?"
+    "Mostrar hospedagem",
+    "Mostrar roteiro",
+    "Mostrar passagens",
+    "Mostrar documentos"
   ]
-
-  const mockResponses: Record<string, string> = {
-    "qual hotel eu vou ficar?": `Voce ficara hospedado no ${tripData.hotel.name}, localizado em ${tripData.hotel.address}. O check-in e dia ${tripData.hotel.checkIn} e o check-out ${tripData.hotel.checkOut}. O hotel possui ${tripData.hotel.amenities.join(", ")}.`,
-    "mostra meu roteiro do dia 2": `No dia 2 (16 Jun), o tema e "Torre Eiffel e Arredores". Voce comeca com cafe da manha no hotel as 09:00, visita a Torre Eiffel as 10:30 (destaque do dia!), almoco no Trocadero as 13:00, cruzeiro pelo Rio Sena as 15:00 e jantar em Montmartre as 19:00.`,
-    "onde fica meu portao de embarque?": `Seu voo de ida ${tripData.flights[0].flightNumber} embarca no Terminal ${tripData.flights[0].terminal}, Portao ${tripData.flights[0].gate}. Seu assento e ${tripData.flights[0].seat}.`,
-    "preciso de visto?": `Para cidadaos brasileiros visitando a Franca, e necessario o Visto Schengen para estadias superiores a 90 dias. Para sua viagem de ${tripData.hotel.nights} dias, nao e necessario visto de turismo. Basta o passaporte com validade de 6 meses.`
-  }
 
   const handleSend = () => {
     if (!message.trim()) return
@@ -2211,7 +2172,25 @@ function ConciergeSection({ tripData, onOpenCredits }: { tripData: any; onOpenCr
     setTyping(true)
     
     setTimeout(() => {
-      const response = mockResponses[userMessage] || "Entendi sua pergunta! Deixa eu verificar as informacoes da sua viagem... Seu voo sai de Sao Paulo-Guarulhos as 22:30 do dia 15 de junho. Posso ajudar com mais alguma coisa?"
+      let response = "Ainda nao encontrei dados reais suficientes nessa viagem para responder com precisao."
+
+      if (userMessage.includes("hosped")) {
+        response = hasHotel
+          ? `Sua hospedagem atual e ${tripData.hotel.name}. Check-in: ${tripData.hotel.checkIn}. Check-out: ${tripData.hotel.checkOut}.`
+          : "Ainda nao ha hospedagem real adicionada."
+      } else if (userMessage.includes("roteiro")) {
+        response = hasItinerary
+          ? `Seu roteiro possui ${tripData.itinerary.length} dias planejados. Abra a secao de roteiro para ver os detalhes reais.`
+          : "Ainda nao ha roteiro real criado."
+      } else if (userMessage.includes("passag")) {
+        response = hasFlights
+          ? `Sua viagem possui ${tripData.flights.length} passagem(ns) adicionada(s).`
+          : "Ainda nao ha passagens reais adicionadas."
+      } else if (userMessage.includes("document")) {
+        response = Array.isArray(tripData.documents) && tripData.documents.length > 0
+          ? `Sua viagem possui ${tripData.documents.length} documento(s) real(is) cadastrado(s).`
+          : "Ainda nao ha documentos reais adicionados."
+      }
       setMessages(prev => [...prev, { role: "assistant", content: response }])
       setTyping(false)
     }, 1500)
@@ -2866,6 +2845,8 @@ export default function TripPage() {
   const params = useParams<{ id: string }>()
   const [tripData, setTripData] = useState(initialTripData)
   const [isAdmin, setIsAdmin] = useState(false)
+  const [isLoadingTrip, setIsLoadingTrip] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "info" } | null>(null)
   const [shareOpen, setShareOpen] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
@@ -2879,12 +2860,25 @@ export default function TripPage() {
 
     const routeSlug = typeof params?.id === "string" ? params.id : initialTripData.id
     const searchParams = new URLSearchParams(window.location.search)
-    const isAdminView = searchParams.get("admin") === "true"
+    const adminToken = searchParams.get("adminToken")
+    const publicToken = searchParams.get("token") || searchParams.get("publicToken")
+    const isAdminView = Boolean(adminToken) || searchParams.get("admin") === "true"
     setIsAdmin(isAdminView)
 
     const loadTrip = async () => {
+      setIsLoadingTrip(true)
+      setLoadError(null)
+      console.log("[TRIP] carregando link", routeSlug)
+
+      const useSupabase = shouldUseSupabase()
+
       try {
-        const repositoryTrip = await getTripBySlug(routeSlug)
+        const repositoryTrip = adminToken
+          ? await getTripByAdminToken(adminToken)
+          : publicToken
+            ? await getTripByPublicToken(publicToken)
+            : await getTripBySlug(routeSlug)
+
         if (repositoryTrip.data) {
           setTripData(
             buildTripDataFromStoredTrip({
@@ -2900,12 +2894,31 @@ export default function TripPage() {
               coverImage: repositoryTrip.data.coverImage ?? undefined,
               adminLink: repositoryTrip.data.adminLink,
               shareLink: repositoryTrip.data.publicLink,
+              flights: repositoryTrip.data.flights,
+              hotel: repositoryTrip.data.accommodations?.[0] ?? null,
+              itinerary: repositoryTrip.data.itinerary,
+              documents: repositoryTrip.data.documents,
+              travelersCount: repositoryTrip.data.travelersCount,
             })
           )
+          setIsLoadingTrip(false)
           return
         }
-      } catch {
-        // segue para fallback local
+        if (useSupabase) {
+          const message = repositoryTrip.error || "Viagem nao encontrada ou link expirado."
+          console.error("[TRIP] erro ao carregar link", message)
+          setLoadError("Viagem nao encontrada ou link expirado.")
+          setIsLoadingTrip(false)
+          return
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Falha ao carregar viagem."
+        console.error("[TRIP] erro ao carregar link", message)
+        if (useSupabase) {
+          setLoadError("Viagem nao encontrada ou link expirado.")
+          setIsLoadingTrip(false)
+          return
+        }
       }
 
       try {
@@ -2916,10 +2929,16 @@ export default function TripPage() {
 
         if (matchedTrip) {
           setTripData(buildTripDataFromStoredTrip(matchedTrip))
+          setIsLoadingTrip(false)
+          return
         }
-      } catch {
-        // fallback silencioso para o mock default
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Falha ao carregar viagem local."
+        console.error("[TRIP] erro ao carregar link", message)
       }
+
+      setLoadError("Viagem nao encontrada ou link expirado.")
+      setIsLoadingTrip(false)
     }
 
     void loadTrip()
@@ -2989,6 +3008,32 @@ export default function TripPage() {
     showToast("Configuracoes da viagem atualizadas.", "success")
   }
 
+  if (isLoadingTrip) {
+    return (
+      <main className="min-h-screen bg-black text-white flex items-center justify-center px-4">
+        <div className="rounded-3xl border border-white/[0.06] bg-white/[0.02] px-6 py-5 text-sm text-white/60">
+          Carregando viagem...
+        </div>
+      </main>
+    )
+  }
+
+  if (loadError) {
+    return (
+      <main className="min-h-screen bg-black text-white flex items-center justify-center px-4">
+        <div className="max-w-md rounded-3xl border border-white/[0.06] bg-white/[0.02] p-8 text-center">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-white/[0.04]">
+            <AlertCircle className="h-6 w-6 text-[#5de0e6]" />
+          </div>
+          <h1 className="text-xl font-semibold text-white">Viagem nao encontrada ou link expirado.</h1>
+          <p className="mt-3 text-sm text-white/50">
+            Confira se o link esta correto ou peca um novo compartilhamento.
+          </p>
+        </div>
+      </main>
+    )
+  }
+
   return (
     <PermissionContext.Provider value={{ isAdmin, setIsAdmin }}>
       <ToastContext.Provider value={{ showToast }}>
@@ -2999,7 +3044,7 @@ export default function TripPage() {
 
           <TripHeader tripData={tripData} onOpenShare={() => setShareOpen(true)} onOpenMenu={() => setMenuOpen(true)} />
           <TripHero tripData={tripData} onEditTrip={() => setEditTripOpen(true)} />
-          <QuickAccessCards onNavigate={handleNavigate} />
+          <QuickAccessCards tripData={tripData} onNavigate={handleNavigate} />
   <FlightsSection tripData={tripData} onUpdateFlight={handleUpdateFlight} onAddFlight={handleAddFlight} />
   <HotelSection tripData={tripData} onUpdateHotel={handleUpdateHotel} />
   <ItinerarySection tripData={tripData} onUpdateItinerary={handleUpdateItinerary} />

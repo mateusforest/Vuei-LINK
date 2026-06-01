@@ -232,7 +232,7 @@ export default function PortalHomePage() {
             <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-[#5de0e6] to-[#004aad]">
               <Plane size={28} className="text-white" />
             </div>
-            <h2 className="mb-2 text-xl font-bold">Crie sua primeira viagem</h2>
+            <h2 className="mb-2 text-xl font-bold">Nenhuma viagem criada ainda.</h2>
             <p className="mb-6 text-sm text-muted-foreground">
               Organize tudo em um unico link: roteiro, documentos, passagens e mais.
             </p>

@@ -35,7 +35,8 @@ export default function AgencySignupPage() {
 
   useEffect(() => {
     if (!loading && user) {
-      router.replace(getRedirectByRole(profile?.role))
+      const detectedRole = (profile?.role ?? user.user_metadata?.role ?? "traveler") as "traveler" | "agency_owner" | "agency_member" | "master"
+      router.replace(getRedirectByRole(detectedRole))
     }
   }, [loading, profile?.role, router, user])
 
@@ -109,10 +110,12 @@ export default function AgencySignupPage() {
         return
       }
 
-      console.log("[AGENCY SIGNUP] agency created", agencyResult.data?.id ?? null)
+      console.log("[AGENCY] agency criada", agencyResult.data?.id ?? null)
       await refreshProfile()
+      console.log("[AUTH] role detectada", "agency_owner")
+      console.log("[AUTH] redirect destino", "/agency")
       console.log("[CADASTRO] signUp success")
-      router.replace(getRedirectByRole(result.profile?.role ?? "agency_owner"))
+      router.replace("/agency")
     } catch (error) {
       const message = error instanceof Error ? error.message : "Erro inesperado ao criar conta."
       console.error("[CADASTRO] signUp error", message)

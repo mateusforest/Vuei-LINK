@@ -34,6 +34,7 @@ import { useTrips, type Trip } from "@/contexts/trips-context"
 import { useAuth } from "@/contexts/auth-context"
 import { createTrip as createTripInRepository } from "@/lib/repositories/trips-repository"
 import { shouldUseSupabase } from "@/lib/data-source"
+import { writePendingTrip } from "@/lib/pending-trip"
 
 const fadeInUp = {
   initial: { opacity: 0, y: 20 },
@@ -88,6 +89,7 @@ export default function CriarViagemPage() {
   const [isComplete, setIsComplete] = useState(false)
   const [createdTrip, setCreatedTrip] = useState<Trip | null>(null)
   const [copiedLink, setCopiedLink] = useState<string | null>(null)
+  const [errorMessage, setErrorMessage] = useState("")
 
   const totalSteps = 5
   const progress = (step / totalSteps) * 100
@@ -121,9 +123,7 @@ export default function CriarViagemPage() {
 
   const createTrip = async () => {
     setIsCreating(true)
-    
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 2000))
+    setErrorMessage("")
 
     let newTrip: Trip
 
@@ -140,8 +140,13 @@ export default function CriarViagemPage() {
         travelersCount: companionTypes.find(c => c.id === formData.companions)?.count || 1,
       })
 
-      if (result.source === "supabase") {
+      if (result.source === "supabase" && result.data) {
         newTrip = syncTripFromBackend(result.data)
+      } else if (result.error) {
+        console.error("[AUTH ERROR]", result.error)
+        setErrorMessage(result.error)
+        setIsCreating(false)
+        return
       } else {
         newTrip = addTrip({
           name: formData.name,
@@ -156,6 +161,18 @@ export default function CriarViagemPage() {
           status: "upcoming"
         })
       }
+    } else if (shouldUseSupabase() && !user) {
+      writePendingTrip({
+        title: formData.name,
+        destination: formData.destination,
+        startDate: formData.startDate,
+        endDate: formData.endDate,
+        style: formData.style,
+        travelersCount: companionTypes.find(c => c.id === formData.companions)?.count || 1,
+      })
+      setIsCreating(false)
+      router.push("/signup")
+      return
     } else {
       newTrip = addTrip({
         name: formData.name,
@@ -525,22 +542,25 @@ export default function CriarViagemPage() {
 
       {/* Navigation Buttons */}
       {!isComplete && !isCreating && (
-        <div className="flex gap-3 pt-8 mt-auto">
-          <Button 
-            variant="outline" 
-            className="flex-1 rounded-xl border-border/50"
-            onClick={handleBack}
-          >
-            Voltar
-          </Button>
-          <Button 
-            className="flex-1 rounded-xl bg-gradient-to-r from-[#5de0e6] to-[#004aad] text-white border-0 disabled:opacity-50"
-            onClick={handleNext}
-            disabled={!canProceed()}
-          >
-            {step === totalSteps ? 'Criar Viagem' : 'Continuar'}
-            <ChevronRight size={18} className="ml-1" />
-          </Button>
+        <div className="pt-8 mt-auto">
+          {errorMessage && <p className="mb-3 text-center text-sm text-red-400">{errorMessage}</p>}
+          <div className="flex gap-3">
+            <Button 
+              variant="outline" 
+              className="flex-1 rounded-xl border-border/50"
+              onClick={handleBack}
+            >
+              Voltar
+            </Button>
+            <Button 
+              className="flex-1 rounded-xl bg-gradient-to-r from-[#5de0e6] to-[#004aad] text-white border-0 disabled:opacity-50"
+              onClick={handleNext}
+              disabled={!canProceed()}
+            >
+              {step === totalSteps ? 'Criar Viagem' : 'Continuar'}
+              <ChevronRight size={18} className="ml-1" />
+            </Button>
+          </div>
         </div>
       )}
 

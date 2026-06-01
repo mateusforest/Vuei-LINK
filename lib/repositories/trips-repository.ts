@@ -19,6 +19,13 @@ export interface CreateTripPayload extends Partial<Omit<Trip, "id" | "slug" | "c
   destination?: string
 }
 
+interface RepositoryTripResult {
+  source: "local" | "supabase" | "supabase-placeholder"
+  data: Trip | null
+  error?: string | null
+  config?: ReturnType<typeof createSupabaseBrowserClientPlaceholder>
+}
+
 function readStoredTrips() {
   return [...normalizeLegacyTrips(), ...normalizeLegacyAgencyTrips()]
 }
@@ -210,8 +217,24 @@ export async function listTrips(params?: ListTripsParams) {
           data: data.map(mapTripRowToTrip),
         }
       }
-    } catch {
-      // fallback local silencioso
+      if (error) {
+        console.error("[AUTH ERROR]", error.message)
+        return {
+          source: "supabase" as const,
+          config: createSupabaseBrowserClientPlaceholder(),
+          data: [],
+          error: error.message,
+        }
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Falha ao listar viagens."
+      console.error("[AUTH ERROR]", message)
+      return {
+        source: "supabase" as const,
+        config: createSupabaseBrowserClientPlaceholder(),
+        data: [],
+        error: message,
+      }
     }
   }
 
@@ -239,8 +262,24 @@ export async function getTripBySlug(slug: string) {
           data: mapTripRowToTrip(data),
         }
       }
-    } catch {
-      // fallback abaixo
+      if (error) {
+        console.error("[TRIP] erro ao carregar link", error.message)
+      }
+      return {
+        source: "supabase" as const,
+        config: createSupabaseBrowserClientPlaceholder(),
+        data: null,
+        error: error?.message ?? null,
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Falha ao carregar viagem."
+      console.error("[TRIP] erro ao carregar link", message)
+      return {
+        source: "supabase" as const,
+        config: createSupabaseBrowserClientPlaceholder(),
+        data: null,
+        error: message,
+      }
     }
   }
 
@@ -249,11 +288,71 @@ export async function getTripBySlug(slug: string) {
 }
 
 export async function getTripByAdminToken(token: string) {
+  const supabase = createSupabaseBrowserClient()
+
+  if (shouldUseSupabase() && supabase) {
+    try {
+      const { data, error } = await supabase.from("trips").select("*").eq("admin_token", token).maybeSingle()
+      if (!error && data) {
+        return {
+          source: "supabase" as const,
+          config: createSupabaseBrowserClientPlaceholder(),
+          data: mapTripRowToTrip(data),
+        }
+      }
+      return {
+        source: "supabase" as const,
+        config: createSupabaseBrowserClientPlaceholder(),
+        data: null,
+        error: error?.message ?? null,
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Falha ao carregar viagem admin."
+      console.error("[TRIP] erro ao carregar link", message)
+      return {
+        source: "supabase" as const,
+        config: createSupabaseBrowserClientPlaceholder(),
+        data: null,
+        error: message,
+      }
+    }
+  }
+
   const result = await listTrips()
   return { ...result, data: result.data.find((trip) => trip.adminToken === token) ?? null }
 }
 
 export async function getTripByPublicToken(token: string) {
+  const supabase = createSupabaseBrowserClient()
+
+  if (shouldUseSupabase() && supabase) {
+    try {
+      const { data, error } = await supabase.from("trips").select("*").eq("public_token", token).maybeSingle()
+      if (!error && data) {
+        return {
+          source: "supabase" as const,
+          config: createSupabaseBrowserClientPlaceholder(),
+          data: mapTripRowToTrip(data),
+        }
+      }
+      return {
+        source: "supabase" as const,
+        config: createSupabaseBrowserClientPlaceholder(),
+        data: null,
+        error: error?.message ?? null,
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Falha ao carregar viagem publica."
+      console.error("[TRIP] erro ao carregar link", message)
+      return {
+        source: "supabase" as const,
+        config: createSupabaseBrowserClientPlaceholder(),
+        data: null,
+        error: message,
+      }
+    }
+  }
+
   const result = await listTrips()
   return { ...result, data: result.data.find((trip) => trip.publicToken === token) ?? null }
 }
@@ -262,6 +361,12 @@ export async function createTrip(payload: CreateTripPayload) {
   const currentTrips = readStoredTrips()
   const trip = buildTrip(payload, currentTrips)
   const supabase = createSupabaseBrowserClient()
+
+  console.log("[TRIP] criando viagem", {
+    ownerType: payload.ownerType ?? "traveler",
+    ownerUserId: payload.ownerUserId ?? null,
+    destination: payload.destination ?? null,
+  })
 
   if (shouldUseSupabase() && supabase) {
     try {
@@ -300,19 +405,38 @@ export async function createTrip(payload: CreateTripPayload) {
       const { data, error } = await supabase.from("trips").insert(insertPayload).select("*").single()
 
       if (!error && data) {
+        console.log("[TRIP] viagem criada", data.id)
         return {
           source: "supabase" as const,
           config: createSupabaseBrowserClientPlaceholder(),
           data: mapTripRowToTrip(data),
+          error: null,
         }
       }
-    } catch {
-      // fallback local abaixo
+      if (error) {
+        console.error("[AUTH ERROR]", error.message)
+        return {
+          source: "supabase" as const,
+          config: createSupabaseBrowserClientPlaceholder(),
+          data: null,
+          error: error.message,
+        }
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Falha ao criar viagem."
+      console.error("[AUTH ERROR]", message)
+      return {
+        source: "supabase" as const,
+        config: createSupabaseBrowserClientPlaceholder(),
+        data: null,
+        error: message,
+      }
     }
   }
 
   writeLocalTrips([trip, ...currentTrips])
-  return { source: "local" as const, data: trip }
+  console.log("[TRIP] viagem criada", trip.id)
+  return { source: "local" as const, data: trip, error: null }
 }
 
 export async function updateTrip(id: string, payload: Partial<Trip>) {

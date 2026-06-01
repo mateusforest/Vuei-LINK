@@ -3,7 +3,9 @@
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from "react"
 import type { CreditBalance, CreditTransaction, Trip as CanonicalTrip, TripStatus } from "@/types"
 import { useAuth } from "@/contexts/auth-context"
-import { listTripsByUser } from "@/lib/repositories/trips-repository"
+import { createTrip as createTripInRepository, listTripsByUser } from "@/lib/repositories/trips-repository"
+import { shouldUseSupabase } from "@/lib/data-source"
+import { clearPendingTrip, readPendingTrip } from "@/lib/pending-trip"
 import {
   buildUniqueTripSlug,
   extractTripsStoragePayload,
@@ -224,16 +226,21 @@ export function TripsProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (typeof window === "undefined") return
 
-    const storedTripsPayload = extractTripsStoragePayload(window.localStorage.getItem(STORAGE_KEY))
-    const normalizedTrips = normalizeTripLinks(
-      storedTripsPayload.trips.map((storedTrip) => {
-        const canonicalTrip = mapStoredTripToTrip({ ...storedTrip, ownerType: "traveler" })
-        return mapCanonicalTripToLegacyTrip(canonicalTrip, storedTrip.companions || "sozinho")
-      })
-    )
-    setTrips(normalizedTrips)
-    if (normalizedTrips.length > 0) {
-      setActiveTripState(normalizedTrips[0])
+    if (!shouldUseSupabase()) {
+      const storedTripsPayload = extractTripsStoragePayload(window.localStorage.getItem(STORAGE_KEY))
+      const normalizedTrips = normalizeTripLinks(
+        storedTripsPayload.trips.map((storedTrip) => {
+          const canonicalTrip = mapStoredTripToTrip({ ...storedTrip, ownerType: "traveler" })
+          return mapCanonicalTripToLegacyTrip(canonicalTrip, storedTrip.companions || "sozinho")
+        })
+      )
+      setTrips(normalizedTrips)
+      if (normalizedTrips.length > 0) {
+        setActiveTripState(normalizedTrips[0])
+      }
+    } else {
+      setTrips([])
+      setActiveTripState(null)
     }
 
     const defaultCreditsState: LegacyCreditsState = {
@@ -252,6 +259,7 @@ export function TripsProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!isLoaded || typeof window === "undefined") return
+    if (shouldUseSupabase()) return
 
     const payload: PersistedTripsPayload = {
       schemaVersion: TRIP_STORAGE_SCHEMA_VERSION,
@@ -274,26 +282,46 @@ export function TripsProvider({ children }: { children: ReactNode }) {
   }, [credits, isLoaded])
 
   useEffect(() => {
-    if (!isLoaded || loading || !user) return
+    if (!isLoaded || loading || !user || !shouldUseSupabase()) return
 
     let mounted = true
 
     const syncRemoteTrips = async () => {
       const result = await listTripsByUser(user.id)
-      if (!mounted || result.source !== "supabase" || result.data.length === 0) return
+      if (!mounted || result.source !== "supabase") return
 
       const remoteTrips = result.data.map((trip) =>
         mapCanonicalTripToLegacyTrip(trip, inferCompanionsFromCount(trip.travelersCount))
       )
 
-      setTrips((prev) => {
-        const merged = [...remoteTrips, ...prev]
-        return merged.filter(
-          (trip, index, array) =>
-            index === array.findIndex((item) => item.id === trip.id || item.slug === trip.slug)
-        )
+      setTrips(remoteTrips)
+      setActiveTripState(remoteTrips[0] ?? null)
+
+      const pendingTrip = readPendingTrip()
+      if (!pendingTrip) return
+
+      const pendingResult = await createTripInRepository({
+        title: pendingTrip.title,
+        destination: pendingTrip.destination,
+        startDate: pendingTrip.startDate,
+        endDate: pendingTrip.endDate,
+        style: pendingTrip.style,
+        travelersCount: pendingTrip.travelersCount,
+        ownerType: "traveler",
+        ownerUserId: user.id,
+        status: "upcoming",
       })
-      setActiveTripState((prev) => prev ?? remoteTrips[0] ?? null)
+
+      if (pendingResult.source === "supabase" && pendingResult.data) {
+        const nextTrip = mapCanonicalTripToLegacyTrip(
+          pendingResult.data,
+          inferCompanionsFromCount(pendingResult.data.travelersCount)
+        )
+
+        setTrips((prev) => [nextTrip, ...prev.filter((trip) => trip.id !== nextTrip.id)])
+        setActiveTripState(nextTrip)
+        clearPendingTrip()
+      }
     }
 
     void syncRemoteTrips()
