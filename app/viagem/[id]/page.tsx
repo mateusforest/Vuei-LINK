@@ -8,6 +8,11 @@ import { extractAgencyStorageState } from "@/lib/mappers/agency-mappers"
 import { extractTripsStoragePayload } from "@/lib/mappers/trip-mappers"
 import { shouldUseSupabase } from "@/lib/data-source"
 import { getTripByAdminToken, getTripByPublicToken, getTripBySlug } from "@/lib/repositories/trips-repository"
+import { createDocumentMetadata, getSignedDocumentUrl, listDocumentsByTrip, listPublicTripDocuments, uploadDocumentFile } from "@/lib/repositories/documents-repository"
+import { getTripHotel, upsertTripHotel } from "@/lib/repositories/trip-hotels-repository"
+import { validateDocumentFile } from "@/lib/files/file-validation"
+import { getDestinationCoverImage, getDestinationMetadata } from "@/lib/trip-destination"
+import { useAuth } from "@/contexts/auth-context"
 import {
   Plane, Hotel, MapPin, FileText, MessageCircle, Share2, WifiOff, 
   ChevronRight, Calendar, Clock, Users, Sun, Cloud, Thermometer,
@@ -159,7 +164,7 @@ function BottomSheet({ open, onClose, children, title }: { open: boolean; onClos
   )
 }
 
-const DEFAULT_HERO_IMAGE = "https://images.unsplash.com/photo-1488646953014-85cb44e25828?w=1920&q=80"
+const DEFAULT_HERO_IMAGE = getDestinationCoverImage()
 
 const initialTripData = {
   id: "trip-default",
@@ -257,14 +262,8 @@ function buildTravelers(count?: number) {
   }))
 }
 
-function buildQuickInfo(country?: string) {
-  return {
-    currency: { name: "A definir", symbol: "-", rate: "A definir" },
-    language: country ? `Idioma local de ${country}` : "A definir",
-    timezone: "A definir",
-    emergency: "A definir",
-    embassy: "A definir",
-  }
+function buildQuickInfo(destination?: string, country?: string, city?: string) {
+  return getDestinationMetadata(destination, country, city)
 }
 
 function buildTripDataFromStoredTrip(storedTrip: any) {
@@ -278,6 +277,11 @@ function buildTripDataFromStoredTrip(storedTrip: any) {
   const flights = Array.isArray(storedTrip.flights) ? storedTrip.flights : []
   const itinerary = Array.isArray(storedTrip.itinerary) ? storedTrip.itinerary : []
   const documents = Array.isArray(storedTrip.documents) ? storedTrip.documents : []
+  const heroImage = storedTrip.coverImage || getDestinationCoverImage(storedTrip.destination, storedTrip.city || city, storedTrip.country || country)
+  const quickInfo = buildQuickInfo(storedTrip.destination, storedTrip.country || country, storedTrip.city || city)
+
+  console.log("[LINK] cover resolved", heroImage)
+  console.log("[LINK] metadata resolved", quickInfo)
 
   return {
     ...initialTripData,
@@ -292,7 +296,7 @@ function buildTripDataFromStoredTrip(storedTrip: any) {
     daysUntil: calculateDaysUntil(storedTrip.startDate),
     status: storedTrip.status || initialTripData.status,
     travelers,
-    heroImage: storedTrip.coverImage || DEFAULT_HERO_IMAGE,
+    heroImage,
     hotel: hotel
       ? {
           name: hotel.name || `Hospedagem em ${city || storedTrip.destination || "sua viagem"}`,
@@ -304,14 +308,17 @@ function buildTripDataFromStoredTrip(storedTrip: any) {
           room: hotel.room || "",
           phone: hotel.phone || "",
           confirmationCode: hotel.confirmationCode || "",
-          image: hotel.image || DEFAULT_HERO_IMAGE,
+          image: hotel.image || heroImage,
           amenities: Array.isArray(hotel.amenities) ? hotel.amenities : [],
         }
       : null,
     itinerary,
-    documents,
+    documents: documents.map((document: any) => ({
+      ...document,
+      private: document.private ?? document.isPrivate ?? document.visibility === "private",
+    })),
     flights,
-    quickInfo: buildQuickInfo(storedTrip.country || country),
+    quickInfo,
     adminLink: storedTrip.adminLink || initialTripData.adminLink,
     shareLink: storedTrip.shareLink || initialTripData.shareLink,
   }
@@ -522,8 +529,12 @@ function TripHero({ tripData, onEditTrip }: { tripData: any; onEditTrip: () => v
 
 // Quick access cards
 function QuickAccessCards({ tripData, onNavigate }: { tripData: any; onNavigate: (section: string) => void }) {
+  const ticketDocuments = Array.isArray(tripData.documents)
+    ? tripData.documents.filter((document: any) => document.type === "ticket")
+    : []
+
   const cards = [
-    { id: "flights", icon: Plane, label: "Passagens", color: "from-[#5de0e6] to-[#5de0e6]/50", count: tripData.flights.length },
+    { id: "flights", icon: Plane, label: "Passagens", color: "from-[#5de0e6] to-[#5de0e6]/50", count: tripData.flights.length || ticketDocuments.length },
     { id: "hotel", icon: Hotel, label: "Hospedagem", color: "from-[#004aad] to-[#004aad]/50", count: tripData.hotel ? 1 : 0 },
     { id: "itinerary", icon: MapPin, label: "Roteiro", color: "from-[#5de0e6] to-[#004aad]", count: tripData.itinerary.length },
     { id: "documents", icon: FileText, label: "Documentos", color: "from-[#004aad] to-[#5de0e6]", count: tripData.documents.length },
@@ -868,13 +879,14 @@ function QRCodeModal({ open, onClose, flight }: { open: boolean; onClose: () => 
 }
 
 // Flights Section
-function FlightsSection({ tripData, onUpdateFlight, onAddFlight }: { tripData: any; onUpdateFlight: (id: number, data: any) => void; onAddFlight: (data: any) => void }) {
+function FlightsSection({ tripData, onUpdateFlight, onAddFlight, tripId, ownerUserId, agencyId }: { tripData: any; onUpdateFlight: (id: number, data: any) => void; onAddFlight: (data: any) => void; tripId: string; ownerUserId: string | null; agencyId: string | null }) {
   const [editingFlight, setEditingFlight] = useState<any>(null)
   const [viewingQR, setViewingQR] = useState<any>(null)
   const [addingFlight, setAddingFlight] = useState(false)
   const { isAdmin } = useContext(PermissionContext)
   const { showToast } = useToast()
   const flights = Array.isArray(tripData.flights) ? tripData.flights : []
+  const ticketDocuments = Array.isArray(tripData.documents) ? tripData.documents.filter((document: any) => document.type === "ticket") : []
 
   const handleSaveFlight = (data: any) => {
     onUpdateFlight(data.id, data)
@@ -891,18 +903,18 @@ function FlightsSection({ tripData, onUpdateFlight, onAddFlight }: { tripData: a
             </div>
             <div>
               <h2 className="text-xl font-semibold text-white">Passagens</h2>
-              <p className="text-sm text-white/40">{flights.length} voos confirmados</p>
+              <p className="text-sm text-white/40">{flights.length > 0 ? `${flights.length} voos confirmados` : `${ticketDocuments.length} passagem(ns) anexada(s)`}</p>
             </div>
           </div>
           {isAdmin && (
             <Button size="sm" variant="ghost" className="text-[#5de0e6] hover:bg-[#5de0e6]/10" onClick={() => setAddingFlight(true)}>
               <Plus className="w-4 h-4 mr-2" />
-              Adicionar
+              Anexar
             </Button>
           )}
         </motion.div>
 
-        {flights.length === 0 ? (
+        {flights.length === 0 && ticketDocuments.length === 0 ? (
           <div className="rounded-3xl border border-white/[0.06] bg-white/[0.02] p-6 text-sm text-white/50">
             Nenhuma passagem adicionada.
           </div>
@@ -917,254 +929,116 @@ function FlightsSection({ tripData, onUpdateFlight, onAddFlight }: { tripData: a
               onViewQR={() => setViewingQR(flight)}
             />
           ))}
+          {ticketDocuments.map((document: any) => (
+            <div key={document.id} className="rounded-3xl border border-white/[0.06] bg-white/[0.02] p-5">
+              <p className="text-sm font-medium text-white">{document.name}</p>
+              <p className="mt-2 text-xs text-white/40">Arquivo de passagem anexado</p>
+              <p className="mt-1 text-xs text-white/30">{document.mimeType || "Nao informado"}</p>
+            </div>
+          ))}
         </div>
         )}
       </div>
 
       <EditFlightModal open={!!editingFlight} onClose={() => setEditingFlight(null)} flight={editingFlight} onSave={handleSaveFlight} />
       <QRCodeModal open={!!viewingQR} onClose={() => setViewingQR(null)} flight={viewingQR} />
-      <AddFlightModal open={addingFlight} onClose={() => setAddingFlight(false)} onSave={(data) => { onAddFlight(data); showToast("Passagem adicionada!", "success"); setAddingFlight(false) }} />
+      <AddFlightModal open={addingFlight} onClose={() => setAddingFlight(false)} tripId={tripId} ownerUserId={ownerUserId} agencyId={agencyId} onSave={(data) => { onAddFlight(data); showToast("Arquivo anexado. A leitura automatica estara disponivel em breve.", "info"); setAddingFlight(false) }} />
     </section>
   )
 }
 
-// Add Flight Modal with AI reading
-function AddFlightModal({ open, onClose, onSave }: { open: boolean; onClose: () => void; onSave: (data: any) => void }) {
-  const [mode, setMode] = useState<"upload" | "manual">("upload")
+// Add Flight Modal
+function AddFlightModal({ open, onClose, onSave, tripId, ownerUserId, agencyId }: { open: boolean; onClose: () => void; onSave: (data: any) => void; tripId: string; ownerUserId: string | null; agencyId: string | null }) {
   const [uploading, setUploading] = useState(false)
-  const [analyzing, setAnalyzing] = useState(false)
-  const [analyzed, setAnalyzed] = useState(false)
-  const [formData, setFormData] = useState({
-    type: "ida",
-    airline: "",
-    flightNumber: "",
-    origin: { code: "", city: "", time: "" },
-    destination: { code: "", city: "", time: "" },
-    date: "",
-    terminal: "",
-    gate: "",
-    seat: "",
-    duration: "",
-    status: "confirmed"
-  })
+  const [fileName, setFileName] = useState("")
+  const [error, setError] = useState("")
 
-  const handleFileUpload = () => {
+  const handleFileUpload = async (file?: File | null) => {
+    if (!file) return
+
+    console.log("[TICKET] file selected", file.name)
+    setError("")
+    const validation = validateDocumentFile(file)
+    if (!validation.valid) {
+      setError(validation.error || "Arquivo invalido.")
+      return
+    }
+
     setUploading(true)
-    setTimeout(() => {
-      setUploading(false)
-      setAnalyzing(true)
-      setTimeout(() => {
-        setAnalyzing(false)
-        setAnalyzed(true)
-        setFormData({
-          type: "ida",
-          airline: "LATAM Airlines",
-          flightNumber: "LA 8084",
-          origin: { code: "GRU", city: "Sao Paulo", time: "23:55" },
-          destination: { code: "CDG", city: "Paris", time: "16:20+1" },
-          date: "20 Jul 2024",
-          terminal: "3",
-          gate: "E12",
-          seat: "18A",
-          duration: "11h 25min",
-          status: "confirmed"
-        })
-      }, 2000)
-    }, 1000)
-  }
 
-  const handleSave = () => {
-    onSave({ ...formData, id: Date.now() })
-    setFormData({
-      type: "ida",
-      airline: "",
-      flightNumber: "",
-      origin: { code: "", city: "", time: "" },
-      destination: { code: "", city: "", time: "" },
-      date: "",
-      terminal: "",
-      gate: "",
-      seat: "",
-      duration: "",
-      status: "confirmed"
+    const path = `${tripId}/tickets/${Date.now()}-${file.name.replace(/\s+/g, "-")}`
+    const uploadResult = await uploadDocumentFile(file, path)
+    if (uploadResult.error || !uploadResult.data) {
+      console.error("[TICKET] upload error", uploadResult.error)
+      setError(uploadResult.error || "Nao foi possivel anexar a passagem.")
+      setUploading(false)
+      return
+    }
+
+    const metadataResult = await createDocumentMetadata({
+      tripId,
+      clientId: null,
+      agencyId,
+      ownerUserId,
+      name: fileName.trim() || file.name.replace(/\.[^.]+$/, ""),
+      type: "ticket",
+      filePath: uploadResult.data.path,
+      fileUrl: uploadResult.data.fileUrl,
+      mimeType: file.type,
+      size: file.size,
+      isPrivate: false,
+      visibility: "public_trip",
+      aiExtractedData: {},
     })
-    setAnalyzed(false)
-    setMode("upload")
+
+    if (metadataResult.error || !metadataResult.data) {
+      console.error("[TICKET] upload error", metadataResult.error)
+      setError(metadataResult.error || "Nao foi possivel registrar a passagem.")
+      setUploading(false)
+      return
+    }
+
+    console.log("[TICKET] upload success", metadataResult.data.id)
+    onSave(metadataResult.data)
+    setUploading(false)
+    setFileName("")
   }
 
   return (
-    <Modal open={open} onClose={onClose} title="Adicionar Passagem">
+    <Modal open={open} onClose={onClose} title="Anexar Passagem">
       <div className="space-y-4">
-        <div className="flex gap-2 p-1 rounded-xl bg-white/[0.03]">
-          <button
-            onClick={() => setMode("upload")}
-            className={cn(
-              "flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-all",
-              mode === "upload" ? "bg-gradient-to-r from-[#5de0e6]/20 to-[#004aad]/20 text-white" : "text-white/40 hover:text-white/60"
-            )}
-          >
-            <Upload className="w-4 h-4 inline mr-2" />
-            Anexar
-          </button>
-          <button
-            onClick={() => setMode("manual")}
-            className={cn(
-              "flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-all",
-              mode === "manual" ? "bg-gradient-to-r from-[#5de0e6]/20 to-[#004aad]/20 text-white" : "text-white/40 hover:text-white/60"
-            )}
-          >
-            <Edit3 className="w-4 h-4 inline mr-2" />
-            Manual
-          </button>
+        <div>
+          <label className="text-xs text-white/50 uppercase tracking-wider">Nome do arquivo</label>
+          <input
+            type="text"
+            value={fileName}
+            onChange={(e) => setFileName(e.target.value)}
+            placeholder="Ex: Embarque Nova York"
+            className="w-full mt-1 px-4 py-3 rounded-xl bg-white/[0.05] border border-white/[0.08] text-white placeholder:text-white/30 focus:outline-none focus:border-[#5de0e6]/50"
+          />
         </div>
 
-        {mode === "upload" && !analyzed && (
-          <div 
-            onClick={handleFileUpload}
-            className="p-8 rounded-xl border-2 border-dashed border-white/10 hover:border-[#5de0e6]/30 transition-colors text-center cursor-pointer"
-          >
-            {uploading ? (
-              <div className="flex flex-col items-center gap-3">
-                <div className="w-8 h-8 border-2 border-white/30 border-t-[#5de0e6] rounded-full animate-spin" />
-                <p className="text-sm text-white/60">Enviando arquivo...</p>
-              </div>
-            ) : analyzing ? (
-              <div className="flex flex-col items-center gap-3">
-                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#5de0e6]/20 to-[#004aad]/20 flex items-center justify-center">
-                  <Sparkles className="w-6 h-6 text-[#5de0e6] animate-pulse" />
-                </div>
-                <p className="text-sm text-white/80 font-medium">IA analisando passagem...</p>
-                <p className="text-xs text-white/40">Extraindo informacoes do documento</p>
-              </div>
-            ) : (
-              <>
-                <Upload className="w-8 h-8 mx-auto text-white/40 mb-3" />
-                <p className="text-sm text-white/60">Arraste um arquivo ou clique para selecionar</p>
-                <p className="text-xs text-white/30 mt-1">PDF, PNG, JPG ou print de tela</p>
-                <p className="text-xs text-[#5de0e6]/60 mt-2">A IA preenchera os dados automaticamente</p>
-              </>
-            )}
-          </div>
-        )}
-
-        {(mode === "manual" || analyzed) && (
-          <>
-            {analyzed && (
-              <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                <p className="text-sm text-emerald-400">Dados extraidos pela IA - verifique e confirme</p>
-              </div>
-            )}
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="text-xs text-white/50 uppercase tracking-wider">Tipo</label>
-                <select
-                  value={formData.type}
-                  onChange={(e) => setFormData({ ...formData, type: e.target.value })}
-                  className="w-full mt-1 px-4 py-3 rounded-xl bg-[#0a0a0a] border border-white/[0.08] text-white focus:outline-none focus:border-[#5de0e6]/50 appearance-none"
-                  style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='rgba(255,255,255,0.4)'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center', backgroundSize: '16px' }}
-                >
-                  <option value="ida" className="bg-[#0a0a0a] text-white">Ida</option>
-                  <option value="volta" className="bg-[#0a0a0a] text-white">Volta</option>
-                </select>
-              </div>
-              <div>
-                <label className="text-xs text-white/50 uppercase tracking-wider">Companhia</label>
-                <input
-                  type="text"
-                  value={formData.airline}
-                  onChange={(e) => setFormData({ ...formData, airline: e.target.value })}
-                  placeholder="Ex: LATAM"
-                  className="w-full mt-1 px-4 py-3 rounded-xl bg-white/[0.05] border border-white/[0.08] text-white placeholder:text-white/30 focus:outline-none focus:border-[#5de0e6]/50"
-                />
-              </div>
+        <label className="block p-8 rounded-xl border-2 border-dashed border-white/10 hover:border-[#5de0e6]/30 transition-colors text-center cursor-pointer">
+          {uploading ? (
+            <div className="flex flex-col items-center gap-3">
+              <div className="w-8 h-8 border-2 border-white/30 border-t-[#5de0e6] rounded-full animate-spin" />
+              <p className="text-sm text-white/60">Enviando arquivo...</p>
             </div>
+          ) : (
+            <>
+              <Upload className="w-8 h-8 mx-auto text-white/40 mb-3" />
+              <p className="text-sm text-white/60">Clique para selecionar a passagem</p>
+              <p className="text-xs text-white/30 mt-1">PDF, PNG, JPG ou JPEG ate 10MB</p>
+            </>
+          )}
+          <input type="file" accept=".pdf,.png,.jpg,.jpeg" className="hidden" onChange={(e) => void handleFileUpload(e.target.files?.[0])} />
+        </label>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="text-xs text-white/50 uppercase tracking-wider">Numero do Voo</label>
-                <input
-                  type="text"
-                  value={formData.flightNumber}
-                  onChange={(e) => setFormData({ ...formData, flightNumber: e.target.value })}
-                  placeholder="Ex: LA 8084"
-                  className="w-full mt-1 px-4 py-3 rounded-xl bg-white/[0.05] border border-white/[0.08] text-white placeholder:text-white/30 focus:outline-none focus:border-[#5de0e6]/50"
-                />
-              </div>
-              <div>
-                <label className="text-xs text-white/50 uppercase tracking-wider">Data</label>
-                <input
-                  type="text"
-                  value={formData.date}
-                  onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-                  placeholder="Ex: 20 Jul 2024"
-                  className="w-full mt-1 px-4 py-3 rounded-xl bg-white/[0.05] border border-white/[0.08] text-white placeholder:text-white/30 focus:outline-none focus:border-[#5de0e6]/50"
-                />
-              </div>
-            </div>
+        <div className="rounded-xl border border-white/[0.08] bg-white/[0.03] p-4">
+          <p className="text-sm text-white/70">Arquivo anexado. A leitura automatica estara disponivel em breve.</p>
+        </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="text-xs text-white/50 uppercase tracking-wider">Origem (Codigo)</label>
-                <input
-                  type="text"
-                  value={formData.origin.code}
-                  onChange={(e) => setFormData({ ...formData, origin: { ...formData.origin, code: e.target.value } })}
-                  placeholder="Ex: GRU"
-                  className="w-full mt-1 px-4 py-3 rounded-xl bg-white/[0.05] border border-white/[0.08] text-white placeholder:text-white/30 focus:outline-none focus:border-[#5de0e6]/50"
-                />
-              </div>
-              <div>
-                <label className="text-xs text-white/50 uppercase tracking-wider">Destino (Codigo)</label>
-                <input
-                  type="text"
-                  value={formData.destination.code}
-                  onChange={(e) => setFormData({ ...formData, destination: { ...formData.destination, code: e.target.value } })}
-                  placeholder="Ex: CDG"
-                  className="w-full mt-1 px-4 py-3 rounded-xl bg-white/[0.05] border border-white/[0.08] text-white placeholder:text-white/30 focus:outline-none focus:border-[#5de0e6]/50"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-3 gap-4">
-              <div>
-                <label className="text-xs text-white/50 uppercase tracking-wider">Terminal</label>
-                <input
-                  type="text"
-                  value={formData.terminal}
-                  onChange={(e) => setFormData({ ...formData, terminal: e.target.value })}
-                  placeholder="Ex: 3"
-                  className="w-full mt-1 px-4 py-3 rounded-xl bg-white/[0.05] border border-white/[0.08] text-white placeholder:text-white/30 focus:outline-none focus:border-[#5de0e6]/50"
-                />
-              </div>
-              <div>
-                <label className="text-xs text-white/50 uppercase tracking-wider">Portao</label>
-                <input
-                  type="text"
-                  value={formData.gate}
-                  onChange={(e) => setFormData({ ...formData, gate: e.target.value })}
-                  placeholder="Ex: E12"
-                  className="w-full mt-1 px-4 py-3 rounded-xl bg-white/[0.05] border border-white/[0.08] text-white placeholder:text-white/30 focus:outline-none focus:border-[#5de0e6]/50"
-                />
-              </div>
-              <div>
-                <label className="text-xs text-white/50 uppercase tracking-wider">Assento</label>
-                <input
-                  type="text"
-                  value={formData.seat}
-                  onChange={(e) => setFormData({ ...formData, seat: e.target.value })}
-                  placeholder="Ex: 18A"
-                  className="w-full mt-1 px-4 py-3 rounded-xl bg-white/[0.05] border border-white/[0.08] text-white placeholder:text-white/30 focus:outline-none focus:border-[#5de0e6]/50"
-                />
-              </div>
-            </div>
-
-            <Button onClick={handleSave} disabled={!formData.airline || !formData.flightNumber} className="w-full bg-gradient-to-r from-[#5de0e6] to-[#004aad] hover:opacity-90 text-white border-0 disabled:opacity-50">
-              Adicionar Passagem
-            </Button>
-          </>
-        )}
+        {error && <p className="text-sm text-red-300">{error}</p>}
       </div>
     </Modal>
   )
@@ -1173,9 +1047,7 @@ function AddFlightModal({ open, onClose, onSave }: { open: boolean; onClose: () 
 // Hotel Section
 function HotelSection({ tripData, onUpdateHotel }: { tripData: any; onUpdateHotel: (data: any) => void }) {
   const [editing, setEditing] = useState(false)
-  const [addingVoucher, setAddingVoucher] = useState(false)
   const { isAdmin } = useContext(PermissionContext)
-  const { showToast } = useToast()
   const hotel = tripData.hotel
 
   return (
@@ -1194,7 +1066,7 @@ function HotelSection({ tripData, onUpdateHotel }: { tripData: any; onUpdateHote
           {isAdmin && (
             <Button size="sm" variant="ghost" className="text-[#5de0e6] hover:bg-[#5de0e6]/10" onClick={() => setEditing(true)}>
               <Edit3 className="w-4 h-4 mr-2" />
-              Editar
+              {hotel ? "Editar" : "Adicionar"}
             </Button>
           )}
         </motion.div>
@@ -1245,57 +1117,15 @@ function HotelSection({ tripData, onUpdateHotel }: { tripData: any; onUpdateHote
                 <Phone className="w-4 h-4" />
                 <span className="text-sm">{hotel.phone}</span>
               </div>
-              <Button size="sm" variant="ghost" onClick={() => setAddingVoucher(true)} className="text-[#5de0e6] hover:bg-[#5de0e6]/10">
-                <Upload className="w-4 h-4 mr-2" />
-                Anexar Voucher
-              </Button>
+              <span className="text-sm text-white/40">{hotel.confirmationCode || "Reserva nao informada"}</span>
             </div>
           </div>
         </motion.div>
         )}
       </div>
 
-      <EditHotelModal open={!!hotel && editing} onClose={() => setEditing(false)} hotel={hotel ?? {}} onSave={(data) => { onUpdateHotel(data); showToast("Hotel atualizado!", "success"); setEditing(false) }} />
-      <AddVoucherModal open={addingVoucher} onClose={() => setAddingVoucher(false)} onSave={() => { showToast("Voucher anexado!", "success"); setAddingVoucher(false) }} />
+      <EditHotelModal open={editing} onClose={() => setEditing(false)} hotel={hotel ?? {}} onSave={(data) => { void onUpdateHotel(data); setEditing(false) }} />
     </section>
-  )
-}
-
-// Add Voucher Modal
-function AddVoucherModal({ open, onClose, onSave }: { open: boolean; onClose: () => void; onSave: () => void }) {
-  const [uploading, setUploading] = useState(false)
-
-  const handleUpload = () => {
-    setUploading(true)
-    setTimeout(() => {
-      setUploading(false)
-      onSave()
-    }, 1500)
-  }
-
-  return (
-    <Modal open={open} onClose={onClose} title="Anexar Voucher">
-      <div className="space-y-4">
-        <div 
-          onClick={handleUpload}
-          className="p-8 rounded-xl border-2 border-dashed border-white/10 hover:border-[#5de0e6]/30 transition-colors text-center cursor-pointer"
-        >
-          {uploading ? (
-            <div className="flex flex-col items-center gap-3">
-              <div className="w-8 h-8 border-2 border-white/30 border-t-[#5de0e6] rounded-full animate-spin" />
-              <p className="text-sm text-white/60">Enviando voucher...</p>
-            </div>
-          ) : (
-            <>
-              <Upload className="w-8 h-8 mx-auto text-white/40 mb-3" />
-              <p className="text-sm text-white/60">Arraste o voucher ou clique para selecionar</p>
-              <p className="text-xs text-white/30 mt-1">PDF, PNG, JPG ate 10MB</p>
-            </>
-          )}
-        </div>
-        <p className="text-xs text-white/30 text-center">O voucher ficara disponivel para acesso rapido na hospedagem</p>
-      </div>
-    </Modal>
   )
 }
 
@@ -1304,7 +1134,7 @@ function EditHotelModal({ open, onClose, hotel, onSave }: { open: boolean; onClo
   const [formData, setFormData] = useState(hotel)
 
   useEffect(() => {
-    if (hotel) setFormData(hotel)
+    setFormData(hotel || {})
   }, [hotel])
 
   return (
@@ -1357,6 +1187,23 @@ function EditHotelModal({ open, onClose, hotel, onSave }: { open: boolean; onClo
             className="w-full mt-1 px-4 py-3 rounded-xl bg-white/[0.05] border border-white/[0.08] text-white focus:outline-none focus:border-[#5de0e6]/50"
           />
         </div>
+        <div>
+          <label className="text-xs text-white/50 uppercase tracking-wider">Codigo da Reserva</label>
+          <input
+            type="text"
+            value={formData.confirmationCode || ""}
+            onChange={(e) => setFormData({ ...formData, confirmationCode: e.target.value })}
+            className="w-full mt-1 px-4 py-3 rounded-xl bg-white/[0.05] border border-white/[0.08] text-white focus:outline-none focus:border-[#5de0e6]/50"
+          />
+        </div>
+        <div>
+          <label className="text-xs text-white/50 uppercase tracking-wider">Observacoes</label>
+          <textarea
+            value={formData.notes || ""}
+            onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+            className="w-full mt-1 min-h-24 px-4 py-3 rounded-xl bg-white/[0.05] border border-white/[0.08] text-white focus:outline-none focus:border-[#5de0e6]/50"
+          />
+        </div>
         <Button onClick={() => onSave(formData)} className="w-full mt-4 bg-gradient-to-r from-[#5de0e6] to-[#004aad] hover:opacity-90 text-white border-0">
           Salvar Alteracoes
         </Button>
@@ -1375,6 +1222,35 @@ function ItinerarySection({ tripData, onUpdateItinerary }: { tripData: any; onUp
   const itinerary = Array.isArray(tripData.itinerary) ? tripData.itinerary : []
 
   const activeItinerary = itinerary.find((d: any) => d.day === activeDay)
+
+  const upsertItineraryDay = (dayNumber: number, updater: (currentItems: any[]) => any[]) => {
+    const existingDay = itinerary.find((entry: any) => entry.day === dayNumber)
+    const nextItems = updater(Array.isArray(existingDay?.items) ? existingDay.items : [])
+
+    if (!existingDay) {
+      onUpdateItinerary([
+        ...itinerary,
+        {
+          day: dayNumber,
+          date: `Dia ${dayNumber}`,
+          title: `Dia ${dayNumber}`,
+          items: nextItems,
+        },
+      ])
+      return
+    }
+
+    onUpdateItinerary(
+      itinerary.map((entry: any) =>
+        entry.day === dayNumber
+          ? {
+              ...entry,
+              items: nextItems,
+            }
+          : entry,
+      ),
+    )
+  }
 
   return (
     <section id="itinerary" className="py-12 px-4">
@@ -1495,10 +1371,14 @@ function ItinerarySection({ tripData, onUpdateItinerary }: { tripData: any; onUp
         onClose={() => setEditingItem(null)} 
         item={editingItem} 
         onSave={(data) => { 
+          upsertItineraryDay(activeDay, (items) =>
+            items.map((item: any) => (item.id === editingItem.id ? { ...item, ...data } : item)),
+          )
           showToast("Atividade atualizada!", "success"); 
           setEditingItem(null) 
         }}
         onDelete={() => {
+          upsertItineraryDay(activeDay, (items) => items.filter((item: any) => item.id !== editingItem.id))
           showToast("Atividade removida!", "success");
           setEditingItem(null)
         }}
@@ -1508,11 +1388,15 @@ function ItinerarySection({ tripData, onUpdateItinerary }: { tripData: any; onUp
   onClose={() => setAddingItem(false)}
   day={activeDay}
   onSave={(data) => {
+  upsertItineraryDay(activeDay, (items) => [
+  ...items,
+  {
+  id: Date.now(),
+  icon: data.type === "food" ? "UtensilsCrossed" : data.type === "transport" ? "Car" : "MapPin",
+  ...data,
+  },
+  ])
   showToast("Atividade adicionada!", "success");
-  setAddingItem(false)
-  }}
-  onGenerateAI={(data) => {
-  showToast("Roteiro gerado com IA!", "success");
   setAddingItem(false)
   }}
   />
@@ -1590,244 +1474,101 @@ function EditItineraryItemModal({ open, onClose, item, onSave, onDelete }: { ope
   )
 }
 
-// Add Itinerary Item Modal - Now with AI, Upload and Manual options
-function AddItineraryItemModal({ open, onClose, day, onSave, onGenerateAI }: { open: boolean; onClose: () => void; day: number; onSave: (data: any) => void; onGenerateAI: (data: any) => void }) {
-  const [mode, setMode] = useState<"ai" | "upload" | "manual">("ai")
+// Add Itinerary Item Modal
+function AddItineraryItemModal({ open, onClose, day, onSave }: { open: boolean; onClose: () => void; day: number; onSave: (data: any) => void }) {
   const [formData, setFormData] = useState({ title: "", time: "", type: "attraction", highlight: false })
-  const [aiForm, setAiForm] = useState({ days: "3", destination: "", preferences: "", style: "equilibrado", budget: "medio" })
-  const [generating, setGenerating] = useState(false)
-  const [uploading, setUploading] = useState(false)
-  const [analyzing, setAnalyzing] = useState(false)
-
-  const handleGenerateAI = () => {
-    setGenerating(true)
-    setTimeout(() => {
-      setGenerating(false)
-      onGenerateAI(aiForm)
-      onClose()
-    }, 3000)
-  }
-
-  const handleUpload = () => {
-    setUploading(true)
-    setTimeout(() => {
-      setUploading(false)
-      setAnalyzing(true)
-      setTimeout(() => {
-        setAnalyzing(false)
-        onGenerateAI({ imported: true })
-        onClose()
-      }, 2500)
-    }, 1000)
-  }
 
   return (
     <Modal open={open} onClose={onClose} title="Adicionar ao Roteiro">
       <div className="space-y-4">
-        <div className="flex gap-1 p-1 rounded-xl bg-white/[0.03]">
-          <button
-            onClick={() => setMode("ai")}
-            className={cn(
-              "flex-1 py-2 px-2 rounded-lg text-xs font-medium transition-all flex items-center justify-center gap-1",
-              mode === "ai" ? "bg-gradient-to-r from-[#5de0e6]/20 to-[#004aad]/20 text-white" : "text-white/40 hover:text-white/60"
-            )}
-          >
-            <Sparkles className="w-3 h-3" />
-            Criar com IA
-          </button>
-          <button
-            onClick={() => setMode("upload")}
-            className={cn(
-              "flex-1 py-2 px-2 rounded-lg text-xs font-medium transition-all flex items-center justify-center gap-1",
-              mode === "upload" ? "bg-gradient-to-r from-[#5de0e6]/20 to-[#004aad]/20 text-white" : "text-white/40 hover:text-white/60"
-            )}
-          >
-            <Upload className="w-3 h-3" />
-            Anexar
-          </button>
-          <button
-            onClick={() => setMode("manual")}
-            className={cn(
-              "flex-1 py-2 px-2 rounded-lg text-xs font-medium transition-all flex items-center justify-center gap-1",
-              mode === "manual" ? "bg-gradient-to-r from-[#5de0e6]/20 to-[#004aad]/20 text-white" : "text-white/40 hover:text-white/60"
-            )}
-          >
-            <Edit3 className="w-3 h-3" />
-            Manual
-          </button>
+        <div className="flex items-center gap-3 p-3 rounded-xl bg-white/[0.03]">
+          <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#5de0e6]/20 to-[#004aad]/20 flex items-center justify-center">
+            <Calendar className="w-5 h-5 text-[#5de0e6]" />
+          </div>
+          <div>
+            <p className="text-sm font-medium text-white">Dia {day}</p>
+            <p className="text-xs text-white/40">Adicione atividades manualmente. A geracao automatica ainda nao esta conectada.</p>
+          </div>
         </div>
 
-        {mode === "ai" && (
-          <div className="space-y-4">
-            <div className="p-4 rounded-xl bg-gradient-to-br from-[#5de0e6]/10 to-[#004aad]/10 border border-[#5de0e6]/20">
-              <div className="flex items-center gap-2 mb-2">
-                <Sparkles className="w-4 h-4 text-[#5de0e6]" />
-                <p className="text-sm text-white font-medium">Roteiro Inteligente</p>
-              </div>
-              <p className="text-xs text-white/50">A IA criara um roteiro personalizado baseado nas suas preferencias</p>
-            </div>
+        <div>
+          <label className="text-xs text-white/50 uppercase tracking-wider">Titulo</label>
+          <input
+            type="text"
+            value={formData.title}
+            onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+            placeholder="Ex: Passeio pela cidade"
+            className="w-full mt-1 px-4 py-3 rounded-xl bg-white/[0.05] border border-white/[0.08] text-white placeholder:text-white/30 focus:outline-none focus:border-[#5de0e6]/50"
+          />
+        </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="text-xs text-white/50 uppercase tracking-wider">Quantidade de dias</label>
-                <select
-                  value={aiForm.days}
-                  onChange={(e) => setAiForm({ ...aiForm, days: e.target.value })}
-                  className="w-full mt-1 px-4 py-3 rounded-xl bg-[#0a0a0a] border border-white/[0.08] text-white focus:outline-none focus:border-[#5de0e6]/50 appearance-none"
-                  style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='rgba(255,255,255,0.4)'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center', backgroundSize: '16px' }}
-                >
-                  {[1,2,3,4,5,6,7,10,14].map(d => (
-                    <option key={d} value={d} className="bg-[#0a0a0a] text-white">{d} {d === 1 ? 'dia' : 'dias'}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="text-xs text-white/50 uppercase tracking-wider">Destino</label>
-                <input
-                  type="text"
-                  value={aiForm.destination}
-                  onChange={(e) => setAiForm({ ...aiForm, destination: e.target.value })}
-                  placeholder="Ex: Paris"
-                  className="w-full mt-1 px-4 py-3 rounded-xl bg-white/[0.05] border border-white/[0.08] text-white placeholder:text-white/30 focus:outline-none focus:border-[#5de0e6]/50"
-                />
-              </div>
-            </div>
+        <div>
+          <label className="text-xs text-white/50 uppercase tracking-wider">Horario</label>
+          <input
+            type="time"
+            value={formData.time}
+            onChange={(e) => setFormData({ ...formData, time: e.target.value })}
+            className="w-full mt-1 px-4 py-3 rounded-xl bg-[#0a0a0a] border border-white/[0.08] text-white focus:outline-none focus:border-[#5de0e6]/50"
+          />
+        </div>
 
-            <div>
-              <label className="text-xs text-white/50 uppercase tracking-wider">Estilo da viagem</label>
-              <select
-                value={aiForm.style}
-                onChange={(e) => setAiForm({ ...aiForm, style: e.target.value })}
-                className="w-full mt-1 px-4 py-3 rounded-xl bg-[#0a0a0a] border border-white/[0.08] text-white focus:outline-none focus:border-[#5de0e6]/50 appearance-none"
-                style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='rgba(255,255,255,0.4)'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center', backgroundSize: '16px' }}
-              >
-                <option value="relaxado" className="bg-[#0a0a0a] text-white">Relaxado - Poucas atividades</option>
-                <option value="equilibrado" className="bg-[#0a0a0a] text-white">Equilibrado - Mix ideal</option>
-                <option value="intenso" className="bg-[#0a0a0a] text-white">Intenso - Aproveitar tudo</option>
-              </select>
-            </div>
+        <div>
+          <label className="text-xs text-white/50 uppercase tracking-wider">Tipo</label>
+          <select
+            value={formData.type}
+            onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+            className="w-full mt-1 px-4 py-3 rounded-xl bg-[#0a0a0a] border border-white/[0.08] text-white focus:outline-none focus:border-[#5de0e6]/50 appearance-none"
+            style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='rgba(255,255,255,0.4)'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center', backgroundSize: '16px' }}
+          >
+            <option value="attraction" className="bg-[#0a0a0a] text-white">Atracao</option>
+            <option value="food" className="bg-[#0a0a0a] text-white">Alimentacao</option>
+            <option value="transport" className="bg-[#0a0a0a] text-white">Transporte</option>
+            <option value="hotel" className="bg-[#0a0a0a] text-white">Hospedagem</option>
+            <option value="experience" className="bg-[#0a0a0a] text-white">Experiencia</option>
+          </select>
+        </div>
 
-            <div>
-              <label className="text-xs text-white/50 uppercase tracking-wider">Orcamento</label>
-              <select
-                value={aiForm.budget}
-                onChange={(e) => setAiForm({ ...aiForm, budget: e.target.value })}
-                className="w-full mt-1 px-4 py-3 rounded-xl bg-[#0a0a0a] border border-white/[0.08] text-white focus:outline-none focus:border-[#5de0e6]/50 appearance-none"
-                style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='rgba(255,255,255,0.4)'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center', backgroundSize: '16px' }}
-              >
-                <option value="baixo" className="bg-[#0a0a0a] text-white">Economico</option>
-                <option value="medio" className="bg-[#0a0a0a] text-white">Moderado</option>
-                <option value="alto" className="bg-[#0a0a0a] text-white">Premium</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="text-xs text-white/50 uppercase tracking-wider">Preferencias (opcional)</label>
-              <input
-                type="text"
-                value={aiForm.preferences}
-                onChange={(e) => setAiForm({ ...aiForm, preferences: e.target.value })}
-                placeholder="Ex: museus, gastronomia, compras..."
-                className="w-full mt-1 px-4 py-3 rounded-xl bg-white/[0.05] border border-white/[0.08] text-white placeholder:text-white/30 focus:outline-none focus:border-[#5de0e6]/50"
-              />
-            </div>
-
-            <Button onClick={handleGenerateAI} disabled={generating || !aiForm.destination} className="w-full bg-gradient-to-r from-[#5de0e6] to-[#004aad] hover:opacity-90 text-white border-0 disabled:opacity-50">
-              {generating ? (
-                <div className="flex items-center gap-2">
-                  <Sparkles className="w-4 h-4 animate-pulse" />
-                  Gerando roteiro...
-                </div>
-              ) : (
-                <>
-                  <Sparkles className="w-4 h-4 mr-2" />
-                  Gerar Roteiro com IA
-                </>
-              )}
-            </Button>
+        <label className="flex items-center gap-3 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={formData.highlight}
+            onChange={(e) => setFormData({ ...formData, highlight: e.target.checked })}
+            className="sr-only"
+          />
+          <div className={cn(
+            "w-10 h-6 rounded-full transition-colors relative",
+            formData.highlight ? "bg-gradient-to-r from-[#5de0e6] to-[#004aad]" : "bg-white/10"
+          )}>
+            <div className={cn(
+              "absolute top-1 w-4 h-4 rounded-full bg-white transition-transform",
+              formData.highlight ? "translate-x-5" : "translate-x-1"
+            )} />
           </div>
-        )}
+          <span className="text-sm text-white">Destacar como atividade principal</span>
+        </label>
 
-        {mode === "upload" && (
-          <div className="space-y-4">
-            <div 
-              onClick={handleUpload}
-              className="p-8 rounded-xl border-2 border-dashed border-white/10 hover:border-[#5de0e6]/30 transition-colors text-center cursor-pointer"
-            >
-              {uploading ? (
-                <div className="flex flex-col items-center gap-3">
-                  <div className="w-8 h-8 border-2 border-white/30 border-t-[#5de0e6] rounded-full animate-spin" />
-                  <p className="text-sm text-white/60">Enviando arquivo...</p>
-                </div>
-              ) : analyzing ? (
-                <div className="flex flex-col items-center gap-3">
-                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#5de0e6]/20 to-[#004aad]/20 flex items-center justify-center">
-                    <Sparkles className="w-6 h-6 text-[#5de0e6] animate-pulse" />
-                  </div>
-                  <p className="text-sm text-white/80 font-medium">IA analisando roteiro...</p>
-                  <p className="text-xs text-white/40">Extraindo atividades e horarios</p>
-                </div>
-              ) : (
-                <>
-                  <Upload className="w-8 h-8 mx-auto text-white/40 mb-3" />
-                  <p className="text-sm text-white/60">Arraste seu roteiro ou clique para selecionar</p>
-                  <p className="text-xs text-white/30 mt-1">PDF, imagem ou print de tela</p>
-                  <p className="text-xs text-[#5de0e6]/60 mt-2">A IA extraira as informacoes automaticamente</p>
-                </>
-              )}
-            </div>
-          </div>
-        )}
-
-        {mode === "manual" && (
-          <div className="space-y-4">
-            <div>
-              <label className="text-xs text-white/50 uppercase tracking-wider">Titulo</label>
-              <input
-                type="text"
-                value={formData.title}
-                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                placeholder="Ex: Visita ao Museu do Louvre"
-                className="w-full mt-1 px-4 py-3 rounded-xl bg-white/[0.05] border border-white/[0.08] text-white placeholder:text-white/30 focus:outline-none focus:border-[#5de0e6]/50"
-              />
-            </div>
-            <div>
-              <label className="text-xs text-white/50 uppercase tracking-wider">Horario</label>
-              <input
-                type="text"
-                value={formData.time}
-                onChange={(e) => setFormData({ ...formData, time: e.target.value })}
-                placeholder="Ex: 14:30"
-                className="w-full mt-1 px-4 py-3 rounded-xl bg-white/[0.05] border border-white/[0.08] text-white placeholder:text-white/30 focus:outline-none focus:border-[#5de0e6]/50"
-              />
-            </div>
-            <div>
-              <label className="text-xs text-white/50 uppercase tracking-wider">Tipo</label>
-              <select
-                value={formData.type}
-                onChange={(e) => setFormData({ ...formData, type: e.target.value })}
-                className="w-full mt-1 px-4 py-3 rounded-xl bg-[#0a0a0a] border border-white/[0.08] text-white focus:outline-none focus:border-[#5de0e6]/50 appearance-none"
-                style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='rgba(255,255,255,0.4)'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center', backgroundSize: '16px' }}
-              >
-                <option value="attraction" className="bg-[#0a0a0a] text-white">Atracao</option>
-                <option value="food" className="bg-[#0a0a0a] text-white">Alimentacao</option>
-                <option value="transport" className="bg-[#0a0a0a] text-white">Transporte</option>
-                <option value="hotel" className="bg-[#0a0a0a] text-white">Hospedagem</option>
-                <option value="experience" className="bg-[#0a0a0a] text-white">Experiencia</option>
-              </select>
-            </div>
-            <Button onClick={() => onSave(formData)} className="w-full bg-gradient-to-r from-[#5de0e6] to-[#004aad] hover:opacity-90 text-white border-0">
-              Adicionar Atividade
-            </Button>
-          </div>
-        )}
+        <div className="flex gap-3">
+          <Button onClick={onClose} variant="ghost" className="flex-1 bg-white/[0.03] text-white hover:bg-white/[0.06]">
+            Cancelar
+          </Button>
+          <Button
+            onClick={() => {
+              onSave(formData)
+              onClose()
+            }}
+            disabled={!formData.title || !formData.time}
+            className="flex-1 bg-gradient-to-r from-[#5de0e6] to-[#004aad] hover:opacity-90 text-white border-0"
+          >
+            Adicionar Atividade
+          </Button>
+        </div>
       </div>
     </Modal>
   )
 }
 
 // Documents Section
-function DocumentsSection({ tripData, onAddDocument }: { tripData: any; onAddDocument: (data: any) => void }) {
+function DocumentsSection({ tripData, onAddDocument, tripId, ownerUserId, agencyId }: { tripData: any; onAddDocument: (data: any) => void; tripId: string; ownerUserId: string | null; agencyId: string | null }) {
   const [showPrivate, setShowPrivate] = useState(false)
   const [unlocked, setUnlocked] = useState(false)
   const [addingDoc, setAddingDoc] = useState(false)
@@ -1965,7 +1706,7 @@ function DocumentsSection({ tripData, onAddDocument }: { tripData: any; onAddDoc
 
       <PinModal open={pinModal} onClose={() => setPinModal(false)} onSuccess={() => { setUnlocked(true); setPinModal(false); showToast("Documentos desbloqueados!", "success") }} />
       <ViewDocumentModal open={!!viewingDoc} onClose={() => setViewingDoc(null)} document={viewingDoc} />
-      <AddDocumentModal open={addingDoc} onClose={() => setAddingDoc(false)} onSave={(data) => { onAddDocument(data); showToast("Documento adicionado!", "success"); setAddingDoc(false) }} />
+      <AddDocumentModal open={addingDoc} onClose={() => setAddingDoc(false)} tripId={tripId} ownerUserId={ownerUserId} agencyId={agencyId} onSave={(data) => { onAddDocument(data); showToast("Documento adicionado!", "success"); setAddingDoc(false) }} />
     </section>
   )
 }
@@ -2045,7 +1786,12 @@ function ViewDocumentModal({ open, onClose, document }: { open: boolean; onClose
         </div>
 
         <div className="flex gap-3 mt-6">
-          <Button className="flex-1 bg-gradient-to-r from-[#5de0e6] to-[#004aad] hover:opacity-90 text-white border-0">
+          <Button className="flex-1 bg-gradient-to-r from-[#5de0e6] to-[#004aad] hover:opacity-90 text-white border-0" onClick={async () => {
+            const urlResult = document.filePath ? await getSignedDocumentUrl(document.filePath) : { data: document.fileUrl, error: null }
+            if (urlResult.data) {
+              window.open(urlResult.data, "_blank", "noopener,noreferrer")
+            }
+          }}>
             <Download className="w-4 h-4 mr-2" />
             Baixar
           </Button>
@@ -2059,26 +1805,68 @@ function ViewDocumentModal({ open, onClose, document }: { open: boolean; onClose
 }
 
 // Add Document Modal
-function AddDocumentModal({ open, onClose, onSave }: { open: boolean; onClose: () => void; onSave: (data: any) => void }) {
+function AddDocumentModal({ open, onClose, onSave, tripId, ownerUserId, agencyId }: { open: boolean; onClose: () => void; onSave: (data: any) => void; tripId: string; ownerUserId: string | null; agencyId: string | null }) {
   const [formData, setFormData] = useState({ name: "", type: "voucher", private: false })
   const [uploading, setUploading] = useState(false)
+  const [error, setError] = useState("")
 
-  const handleUpload = () => {
+  const handleUpload = async (file?: File | null) => {
+    if (!file) return
+    console.log("[DOCUMENT] file selected", file.name)
+    setError("")
+    const validation = validateDocumentFile(file)
+    if (!validation.valid) {
+      setError(validation.error || "Arquivo invalido.")
+      return
+    }
+
     setUploading(true)
-    setTimeout(() => {
+    const path = `${tripId}/documents/${Date.now()}-${file.name.replace(/\s+/g, "-")}`
+    const uploadResult = await uploadDocumentFile(file, path)
+    if (uploadResult.error || !uploadResult.data) {
+      console.error("[DOCUMENT] upload error", uploadResult.error)
+      setError(uploadResult.error || "Nao foi possivel anexar o documento.")
       setUploading(false)
-      onSave(formData)
-    }, 1500)
+      return
+    }
+
+    const metadataResult = await createDocumentMetadata({
+      tripId,
+      clientId: null,
+      agencyId,
+      ownerUserId,
+      name: formData.name.trim() || file.name.replace(/\.[^.]+$/, ""),
+      type: formData.type,
+      filePath: uploadResult.data.path,
+      fileUrl: uploadResult.data.fileUrl,
+      mimeType: file.type,
+      size: file.size,
+      isPrivate: formData.private,
+      visibility: formData.private ? "private" : "public_trip",
+      aiExtractedData: {},
+    })
+
+    if (metadataResult.error || !metadataResult.data) {
+      console.error("[DOCUMENT] upload error", metadataResult.error)
+      setError(metadataResult.error || "Nao foi possivel registrar o documento.")
+      setUploading(false)
+      return
+    }
+
+    console.log("[DOCUMENT] upload success", metadataResult.data.id)
+    setUploading(false)
+    onSave(metadataResult.data)
   }
 
   return (
     <Modal open={open} onClose={onClose} title="Adicionar Documento">
       <div className="space-y-4">
-        <div className="p-8 rounded-xl border-2 border-dashed border-white/10 hover:border-[#5de0e6]/30 transition-colors text-center cursor-pointer">
+        <label className="block p-8 rounded-xl border-2 border-dashed border-white/10 hover:border-[#5de0e6]/30 transition-colors text-center cursor-pointer">
           <Upload className="w-8 h-8 mx-auto text-white/40 mb-3" />
-          <p className="text-sm text-white/60">Arraste um arquivo ou clique para selecionar</p>
+          <p className="text-sm text-white/60">Clique para selecionar um arquivo</p>
           <p className="text-xs text-white/30 mt-1">PDF, PNG, JPG ate 10MB</p>
-        </div>
+          <input type="file" accept=".pdf,.png,.jpg,.jpeg" className="hidden" onChange={(e) => void handleUpload(e.target.files?.[0])} />
+        </label>
 
         <div>
           <label className="text-xs text-white/50 uppercase tracking-wider">Nome do documento</label>
@@ -2121,6 +1909,7 @@ function AddDocumentModal({ open, onClose, onSave }: { open: boolean; onClose: (
             <p className="text-xs text-white/40">Nao aparece no link compartilhavel</p>
           </div>
         </div>
+        {error && <p className="text-sm text-red-300">{error}</p>}
 
         <Button onClick={handleUpload} disabled={uploading || !formData.name} className="w-full bg-gradient-to-r from-[#5de0e6] to-[#004aad] hover:opacity-90 text-white border-0 disabled:opacity-50">
           {uploading ? (
@@ -2674,11 +2463,11 @@ function QuickInfoSection({ tripData }: { tripData: any }) {
   const { showToast } = useToast()
 
   const infoCards = [
-    { id: "currency", icon: "💶", label: "Moeda", value: tripData.quickInfo.currency.name, sub: `1 ${tripData.quickInfo.currency.symbol} = ${tripData.quickInfo.currency.rate}`, detail: "Taxa de cambio atualizada. Recomendamos levar Euros em especie e usar cartao internacional." },
-    { id: "language", icon: "🗣️", label: "Idioma", value: tripData.quickInfo.language, detail: "O frances e o idioma oficial. Ingles e amplamente falado em areas turisticas." },
-    { id: "timezone", icon: "🕐", label: "Fuso Horario", value: tripData.quickInfo.timezone, detail: "Paris esta 4 horas a frente do horario de Brasilia (GMT+2)." },
-    { id: "emergency", icon: "🆘", label: "Emergencia", value: tripData.quickInfo.emergency, detail: "Numero unico de emergencia europeu. Funciona para policia, bombeiros e ambulancia." },
-    { id: "embassy", icon: "🏛️", label: "Embaixada BR", value: tripData.quickInfo.embassy, detail: "Embaixada do Brasil em Paris. Aberta de segunda a sexta, 9h-13h e 14h30-17h." },
+    { id: "currency", icon: "💶", label: "Moeda", value: tripData.quickInfo.currency.name, sub: `1 ${tripData.quickInfo.currency.symbol} = ${tripData.quickInfo.currency.rate}`, detail: "Cotacao e disponibilidade podem variar. Consulte fontes locais antes da viagem." },
+    { id: "language", icon: "🗣️", label: "Idioma", value: tripData.quickInfo.language, detail: "As informacoes de idioma sao exibidas com base no destino informado da viagem." },
+    { id: "timezone", icon: "🕐", label: "Fuso Horario", value: tripData.quickInfo.timezone, detail: "O fuso horario e apresentado a partir do destino configurado. Confirme horarios finais com a operacao da viagem." },
+    { id: "emergency", icon: "🆘", label: "Emergencia", value: tripData.quickInfo.emergency, detail: "Use este numero para emergencias locais quando houver confirmacao do destino." },
+    { id: "embassy", icon: "🏛️", label: "Embaixada BR", value: tripData.quickInfo.embassy, detail: "Contato consular exibido conforme o destino informado. Se estiver indisponivel, mantenha os contatos da sua agencia." },
   ]
 
   return (
@@ -2843,6 +2632,7 @@ function TripFooter() {
 // Main page component
 export default function TripPage() {
   const params = useParams<{ id: string }>()
+  const { user, profile } = useAuth()
   const [tripData, setTripData] = useState(initialTripData)
   const [isAdmin, setIsAdmin] = useState(false)
   const [isLoadingTrip, setIsLoadingTrip] = useState(true)
@@ -2880,6 +2670,12 @@ export default function TripPage() {
             : await getTripBySlug(routeSlug)
 
         if (repositoryTrip.data) {
+          const documentsResult = isAdminView
+            ? await listDocumentsByTrip(repositoryTrip.data.id)
+            : await listPublicTripDocuments(repositoryTrip.data.id)
+          const hotelResult = await getTripHotel(repositoryTrip.data.id)
+
+          console.log("[LINK] trip loaded", repositoryTrip.data.id)
           setTripData(
             buildTripDataFromStoredTrip({
               id: repositoryTrip.data.id,
@@ -2895,9 +2691,18 @@ export default function TripPage() {
               adminLink: repositoryTrip.data.adminLink,
               shareLink: repositoryTrip.data.publicLink,
               flights: repositoryTrip.data.flights,
-              hotel: repositoryTrip.data.accommodations?.[0] ?? null,
+              hotel: hotelResult.data
+                ? {
+                    name: hotelResult.data.name,
+                    address: hotelResult.data.address,
+                    checkIn: hotelResult.data.checkIn,
+                    checkOut: hotelResult.data.checkOut,
+                    confirmationCode: hotelResult.data.confirmationCode,
+                    notes: hotelResult.data.notes,
+                  }
+                : repositoryTrip.data.accommodations?.[0] ?? null,
               itinerary: repositoryTrip.data.itinerary,
-              documents: repositoryTrip.data.documents,
+              documents: documentsResult.data,
               travelersCount: repositoryTrip.data.travelersCount,
             })
           )
@@ -2937,6 +2742,7 @@ export default function TripPage() {
         console.error("[TRIP] erro ao carregar link", message)
       }
 
+      console.log("[LINK] trip not found", routeSlug)
       setLoadError("Viagem nao encontrada ou link expirado.")
       setIsLoadingTrip(false)
     }
@@ -2979,12 +2785,58 @@ export default function TripPage() {
   const handleAddFlight = (data: any) => {
     setTripData(prev => ({
       ...prev,
-      flights: [...prev.flights, { ...data, id: Date.now() }]
+      documents: [...prev.documents, { ...data, private: data.private ?? false }]
     }))
   }
 
-  const handleUpdateHotel = (data: any) => {
-    setTripData(prev => ({ ...prev, hotel: data }))
+  const handleUpdateHotel = async (data: any) => {
+    console.log("[HOTEL] create started")
+
+    if (!tripData.id) {
+      showToast("Viagem nao encontrada para salvar a hospedagem.", "error")
+      return
+    }
+
+    const result = await upsertTripHotel({
+      tripId: tripData.id,
+      name: data.name,
+      address: data.address,
+      checkIn: data.checkIn,
+      checkOut: data.checkOut,
+      confirmationCode: data.confirmationCode,
+      notes: data.notes,
+    })
+
+    if (result.error || !result.data) {
+      console.error("[HOTEL] error", result.error)
+      showToast(
+        result.error?.includes("relation")
+          ? "Tabela trip_hotels ainda nao existe. Rode o SQL supabase/trip_hotels.sql."
+          : result.error || "Nao foi possivel salvar a hospedagem.",
+        "error"
+      )
+      return
+    }
+
+    console.log("[HOTEL] success", result.data.id)
+    setTripData(prev => ({
+      ...prev,
+      hotel: {
+        name: result.data!.name,
+        address: result.data!.address,
+        checkIn: result.data!.checkIn,
+        checkOut: result.data!.checkOut,
+        confirmationCode: result.data!.confirmationCode,
+        notes: result.data!.notes,
+        stars: prev.hotel?.stars || 0,
+        nights: prev.hotel?.nights || 0,
+        room: prev.hotel?.room || "",
+        phone: prev.hotel?.phone || "",
+        image: prev.hotel?.image || prev.heroImage,
+        amenities: prev.hotel?.amenities || [],
+      }
+    }))
+    showToast("Hospedagem salva com sucesso.", "success")
   }
 
   const handleUpdateItinerary = (data: any) => {
@@ -2994,7 +2846,7 @@ export default function TripPage() {
   const handleAddDocument = (data: any) => {
     setTripData(prev => ({
       ...prev,
-      documents: [...prev.documents, { ...data, id: prev.documents.length + 1 }]
+      documents: [...prev.documents, { ...data, private: data.private ?? data.isPrivate ?? false }]
     }))
   }
 
@@ -3045,10 +2897,10 @@ export default function TripPage() {
           <TripHeader tripData={tripData} onOpenShare={() => setShareOpen(true)} onOpenMenu={() => setMenuOpen(true)} />
           <TripHero tripData={tripData} onEditTrip={() => setEditTripOpen(true)} />
           <QuickAccessCards tripData={tripData} onNavigate={handleNavigate} />
-  <FlightsSection tripData={tripData} onUpdateFlight={handleUpdateFlight} onAddFlight={handleAddFlight} />
+  <FlightsSection tripData={tripData} onUpdateFlight={handleUpdateFlight} onAddFlight={handleAddFlight} tripId={tripData.id} ownerUserId={user?.id ?? profile?.id ?? null} agencyId={profile?.agencyId ?? null} />
   <HotelSection tripData={tripData} onUpdateHotel={handleUpdateHotel} />
   <ItinerarySection tripData={tripData} onUpdateItinerary={handleUpdateItinerary} />
-  <DocumentsSection tripData={tripData} onAddDocument={handleAddDocument} />
+  <DocumentsSection tripData={tripData} onAddDocument={handleAddDocument} tripId={tripData.id} ownerUserId={user?.id ?? profile?.id ?? null} agencyId={profile?.agencyId ?? null} />
   <ConciergeSection tripData={tripData} onOpenCredits={() => setCreditsOpen(true)} />
           <OfflineSection />
           <QuickInfoSection tripData={tripData} />
