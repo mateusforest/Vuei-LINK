@@ -46,6 +46,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setSession(nextSession)
     setUser(nextUser)
 
+    console.log("[AUTH] initial session", nextSession?.user?.id ?? null)
     console.log("[AUTH] session user", nextUser?.id ?? null)
     console.log("[AUTH] metadata", nextUser?.user_metadata ?? null)
 
@@ -70,7 +71,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       data: { session: currentSession },
     } = await supabase.auth.getSession()
 
+    setLoading(true)
     await applyAuthState(currentSession ?? null)
+    setLoading(false)
   }
 
   useEffect(() => {
@@ -82,6 +85,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     const bootstrap = async () => {
+      setLoading(true)
       const {
         data: { session: currentSession },
       } = await supabase.auth.getSession()
@@ -99,6 +103,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (!mounted) return
 
+      setLoading(true)
       await applyAuthState(session ?? null)
 
       if (mounted) setLoading(false)
@@ -115,7 +120,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return { error: "Supabase nao esta configurado neste ambiente.", user: null, profile: null, session: null }
     }
 
-    setLoading(true)
     try {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password })
 
@@ -145,8 +149,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     console.log("signUp started")
-    setLoading(true)
-
     try {
       const { data, error } = await supabase.auth.signUp({
         email,
@@ -189,6 +191,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const signOut = async () => {
+    setLoading(true)
     if (shouldUseSupabase() && supabase) {
       await supabase.auth.signOut()
     }
@@ -196,6 +199,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null)
     setSession(null)
     setProfile(null)
+    setLoading(false)
   }
 
   return (

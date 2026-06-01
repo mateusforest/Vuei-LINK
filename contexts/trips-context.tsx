@@ -51,6 +51,7 @@ interface TripsContextCredits {
 interface TripsContextType {
   trips: Trip[]
   activeTrip: Trip | null
+  loadingTrips: boolean
   credits: TripsContextCredits
   addTrip: (trip: Omit<Trip, "id" | "slug" | "adminLink" | "shareLink" | "createdAt" | "coverImage">) => Trip
   syncTripFromBackend: (trip: CanonicalTrip) => Trip
@@ -222,6 +223,7 @@ export function TripsProvider({ children }: { children: ReactNode }) {
     ...buildCanonicalCredits(150, defaultCreditsHistory),
   }))
   const [isLoaded, setIsLoaded] = useState(false)
+  const [loadingTrips, setLoadingTrips] = useState(false)
 
   useEffect(() => {
     if (typeof window === "undefined") return
@@ -238,9 +240,6 @@ export function TripsProvider({ children }: { children: ReactNode }) {
       if (normalizedTrips.length > 0) {
         setActiveTripState(normalizedTrips[0])
       }
-    } else {
-      setTrips([])
-      setActiveTripState(null)
     }
 
     const defaultCreditsState: LegacyCreditsState = {
@@ -282,47 +281,83 @@ export function TripsProvider({ children }: { children: ReactNode }) {
   }, [credits, isLoaded])
 
   useEffect(() => {
-    if (!isLoaded || loading || !user || !shouldUseSupabase()) return
+    if (!isLoaded || loading || !shouldUseSupabase()) return
+
+    if (!user) {
+      setTrips([])
+      setActiveTripState(null)
+      setLoadingTrips(false)
+      return
+    }
 
     let mounted = true
 
     const syncRemoteTrips = async () => {
-      const result = await listTripsByUser(user.id)
-      if (!mounted || result.source !== "supabase") return
+      console.log("[TRIPS] loading user trips", user.id)
+      setLoadingTrips(true)
 
-      const remoteTrips = result.data.map((trip) =>
-        mapCanonicalTripToLegacyTrip(trip, inferCompanionsFromCount(trip.travelersCount))
-      )
+      try {
+        const result = await listTripsByUser(user.id)
+        if (!mounted) return
 
-      setTrips(remoteTrips)
-      setActiveTripState(remoteTrips[0] ?? null)
+        if (result.source !== "supabase") {
+          return
+        }
 
-      const pendingTrip = readPendingTrip()
-      if (!pendingTrip) return
+        if (result.error) {
+          console.error("[TRIPS] load error", result.error)
+          return
+        }
 
-      const pendingResult = await createTripInRepository({
-        title: pendingTrip.title,
-        destination: pendingTrip.destination,
-        startDate: pendingTrip.startDate,
-        endDate: pendingTrip.endDate,
-        style: pendingTrip.style,
-        travelersCount: pendingTrip.travelersCount,
-        ownerType: "traveler",
-        ownerUserId: user.id,
-        status: "draft",
-        visibility: "private",
-        creditsSummary: { balance: null, used: null, total: null },
-      })
-
-      if (pendingResult.source === "supabase" && pendingResult.data) {
-        const nextTrip = mapCanonicalTripToLegacyTrip(
-          pendingResult.data,
-          inferCompanionsFromCount(pendingResult.data.travelersCount)
+        const remoteTrips = result.data.map((trip) =>
+          mapCanonicalTripToLegacyTrip(trip, inferCompanionsFromCount(trip.travelersCount))
         )
 
-        setTrips((prev) => [nextTrip, ...prev.filter((trip) => trip.id !== nextTrip.id)])
-        setActiveTripState(nextTrip)
-        clearPendingTrip()
+        console.log("[TRIPS] loaded trips", remoteTrips.length)
+        setTrips(remoteTrips)
+        setActiveTripState((current) => {
+          if (current) {
+            const matched = remoteTrips.find((trip) => trip.id === current.id || trip.slug === current.slug)
+            if (matched) return matched
+          }
+          return remoteTrips[0] ?? null
+        })
+
+        const pendingTrip = readPendingTrip()
+        if (!pendingTrip) return
+
+        const pendingResult = await createTripInRepository({
+          title: pendingTrip.title,
+          destination: pendingTrip.destination,
+          startDate: pendingTrip.startDate,
+          endDate: pendingTrip.endDate,
+          style: pendingTrip.style,
+          travelersCount: pendingTrip.travelersCount,
+          ownerType: "traveler",
+          ownerUserId: user.id,
+          status: "draft",
+          visibility: "private",
+          creditsSummary: { balance: null, used: null, total: null },
+        })
+
+        if (pendingResult.source === "supabase" && pendingResult.data) {
+          const nextTrip = mapCanonicalTripToLegacyTrip(
+            pendingResult.data,
+            inferCompanionsFromCount(pendingResult.data.travelersCount)
+          )
+
+          setTrips((prev) => [nextTrip, ...prev.filter((trip) => trip.id !== nextTrip.id)])
+          setActiveTripState(nextTrip)
+          clearPendingTrip()
+          console.log("[TRIPS] loaded trips", remoteTrips.length + 1)
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Falha ao carregar viagens."
+        console.error("[TRIPS] load error", message)
+      } finally {
+        if (mounted) {
+          setLoadingTrips(false)
+        }
       }
     }
 
@@ -430,6 +465,7 @@ export function TripsProvider({ children }: { children: ReactNode }) {
       value={{
         trips,
         activeTrip,
+        loadingTrips,
         credits,
         addTrip,
         syncTripFromBackend,

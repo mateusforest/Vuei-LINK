@@ -91,7 +91,7 @@ function Toast({ message, visible }: { message: string; visible: boolean }) {
 
 export default function PortalHomePage() {
   const router = useRouter()
-  const { trips, activeTrip } = useTrips()
+  const { trips, activeTrip, loadingTrips } = useTrips()
   const { profile, loading } = useAuth()
   const [showNoTripModal, setShowNoTripModal] = useState(false)
   const [copiedLink, setCopiedLink] = useState<string | null>(null)
@@ -137,12 +137,16 @@ export default function PortalHomePage() {
           {loading || !firstName ? "Ola" : <>Ola, <span className="vuei-gradient-text">{firstName}</span></>}
         </h1>
         <p className="text-muted-foreground">
-          {trips.length > 0 ? "Seu link de viagem esta pronto para abrir, copiar e compartilhar." : "Crie sua primeira viagem para comecar."}
+          {loadingTrips ? "Carregando suas viagens..." : trips.length > 0 ? "Seu link de viagem esta pronto para abrir, copiar e compartilhar." : "Crie sua primeira viagem para comecar."}
         </p>
       </motion.div>
 
       <motion.div variants={fadeInUp}>
-        {activeTrip ? (
+        {loadingTrips ? (
+          <Card className="border-border/50 bg-card/50 p-8 text-center">
+            <p className="text-sm text-muted-foreground">Carregando viagens...</p>
+          </Card>
+        ) : activeTrip ? (
           <Card className="relative overflow-hidden border-border/50 bg-card/50">
             <div className="absolute inset-0">
               <Image
