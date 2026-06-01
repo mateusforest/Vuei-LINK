@@ -4,7 +4,7 @@ import { ensureProfile } from "@/lib/auth/ensure-profile"
 import { normalizeLegacyAgencyTrips, normalizeLegacyTrips } from "@/lib/local-storage-migration"
 import { createSupabaseBrowserClient, createSupabaseBrowserClientPlaceholder } from "@/lib/supabase/client"
 import { buildUniqueTripSlug, mapStoredTripToTrip, slugifyTripBase, type LegacyStoredTrip } from "@/lib/mappers/trip-mappers"
-import { generateAdminLink, generatePublicLink, generateSecureToken } from "@/lib/security/link-tokens"
+import { buildAdminTripUrl, buildPublicTripUrl, generateSecureToken } from "@/lib/security/link-tokens"
 import type { Database } from "@/lib/supabase/types"
 
 export interface ListTripsParams {
@@ -52,8 +52,8 @@ function mapTripRowToTrip(row: Database["public"]["Tables"]["trips"]["Row"]): Tr
     clientId: row.client_id,
     adminToken: row.admin_token,
     publicToken: row.public_token,
-    adminLink: row.admin_link || `vuei.app${generateAdminLink(row.slug, row.admin_token || "")}`,
-    publicLink: row.public_link || `vuei.app${generatePublicLink(row.slug, row.public_token || "")}`,
+    adminLink: buildAdminTripUrl(row.slug),
+    publicLink: buildPublicTripUrl(row.slug),
     coverImage: row.cover_image,
     visibility: row.visibility,
     travelersCount: row.travelers_count,
@@ -388,8 +388,8 @@ export async function createTrip(payload: CreateTripPayload) {
 
       const adminToken = trip.adminToken || generateSecureToken()
       const publicToken = trip.publicToken || generateSecureToken()
-      const adminLink = `vuei.app${generateAdminLink(trip.slug, adminToken)}`
-      const publicLink = `vuei.app${generatePublicLink(trip.slug, publicToken)}`
+      const adminLink = buildAdminTripUrl(trip.slug)
+      const publicLink = buildPublicTripUrl(trip.slug)
       const parsedDestination = parseDestinationParts(trip.destination)
 
       const insertPayload: Database["public"]["Tables"]["trips"]["Insert"] = {

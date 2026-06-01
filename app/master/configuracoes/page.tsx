@@ -32,6 +32,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { useMaster } from "@/contexts/master-context"
+import { getAppUrl } from "@/lib/app-url"
 
 const fadeInUp = {
   initial: { opacity: 0, y: 20 },
@@ -158,7 +159,7 @@ export default function MasterConfiguracoesPage() {
                   <div className="space-y-2">
                     <label className="text-sm font-medium text-foreground">Domínio</label>
                     <Input
-                      defaultValue="vuei.app"
+                      defaultValue={getAppUrl()}
                       className="bg-black/40 border-white/10 focus:border-primary/50"
                     />
                   </div>

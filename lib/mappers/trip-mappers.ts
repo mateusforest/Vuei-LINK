@@ -9,7 +9,7 @@ import type {
   TripStatus,
   TripVisibility,
 } from "@/types"
-import { generateAdminLink, generatePublicLink, generateSecureToken } from "@/lib/security/link-tokens"
+import { buildAdminTripUrl, buildPublicTripUrl, generateSecureToken } from "@/lib/security/link-tokens"
 import { mapTripToAdminView, mapTripToPublicView } from "@/lib/mappers/trip-view-mappers"
 
 export interface LegacyStoredTrip {
@@ -132,8 +132,8 @@ function normalizeLinks(slug: string, trip?: LegacyStoredTrip) {
   return {
     adminToken,
     publicToken,
-    adminLink: trip?.adminLink || `vuei.app${generateAdminLink(slug, adminToken)}`,
-    publicLink: trip?.publicLink || trip?.shareLink || `vuei.app${generatePublicLink(slug, publicToken)}`,
+    adminLink: buildAdminTripUrl(slug),
+    publicLink: buildPublicTripUrl(slug),
   }
 }
 

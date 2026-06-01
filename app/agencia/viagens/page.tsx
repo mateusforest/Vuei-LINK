@@ -126,7 +126,7 @@ function LinksModal({ open, onClose, trip }: { open: boolean; onClose: () => voi
               variant="ghost" 
               size="icon" 
               className="h-8 w-8"
-              onClick={() => window.open(`/viagem/${trip.slug}?admin=true`, "_blank")}
+              onClick={() => window.open(`/viagem/${trip.slug}/admin`, "_blank")}
             >
               <ExternalLink className="w-4 h-4" />
             </Button>
@@ -368,7 +368,7 @@ export default function TripsPage() {
                             variant="ghost" 
                             size="sm" 
                             className="h-8 gap-1 px-2 text-xs text-muted-foreground hover:text-foreground"
-                            onClick={() => window.open(`/viagem/${trip.slug}?admin=true`, "_blank")}
+                            onClick={() => window.open(`/viagem/${trip.slug}/admin`, "_blank")}
                           >
                             <Eye className="h-3.5 w-3.5" />
                             Abrir

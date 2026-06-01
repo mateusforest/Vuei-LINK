@@ -2,6 +2,8 @@
 
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react"
 import type { AgencyPlanCode, CreditPackage, TripStatus } from "@/types"
+import { getAppUrl } from "@/lib/app-url"
+import { buildAdminTripUrl, buildPublicTripUrl } from "@/lib/security/link-tokens"
 
 // Types
 interface Agency {
@@ -202,6 +204,7 @@ interface MasterContextType {
 }
 
 const MasterContext = createContext<MasterContextType | null>(null)
+const masterSupportEmail = `admin@${new URL(getAppUrl()).hostname.replace(/^www\./, "")}`
 
 // O portal master permanece mockado nesta fase.
 // A agregacao via repositories sera feita depois que os portais de usuario e agencia migrarem com seguranca.
@@ -308,7 +311,7 @@ const initialUsers: User[] = [
   {
     id: "u4",
     name: "Admin Master",
-    email: "admin@vuei.app",
+    email: masterSupportEmail,
     type: "admin",
     status: "active",
     plan: "enterprise",
@@ -332,8 +335,8 @@ const initialTrips: MasterTrip[] = [
     agencyId: "ag1",
     agencyName: "Viagens Premium",
     userName: "Cliente Premium",
-    adminLink: "vuei.app/v/paris-lm-admin",
-    shareLink: "vuei.app/v/paris-lm",
+    adminLink: buildAdminTripUrl("paris-lm"),
+    shareLink: buildPublicTripUrl("paris-lm"),
     documentsCount: 8,
     creditsUsed: 45
   },
@@ -348,8 +351,8 @@ const initialTrips: MasterTrip[] = [
     origin: "user",
     userId: "u1",
     userName: "Joao Viajante",
-    adminLink: "vuei.app/v/tokyo-adv-admin",
-    shareLink: "vuei.app/v/tokyo-adv",
+    adminLink: buildAdminTripUrl("tokyo-adv"),
+    shareLink: buildPublicTripUrl("tokyo-adv"),
     documentsCount: 12,
     creditsUsed: 78
   },
@@ -365,8 +368,8 @@ const initialTrips: MasterTrip[] = [
     agencyId: "ag2",
     agencyName: "Destinos Incriveis",
     userName: "Familia Santos",
-    adminLink: "vuei.app/v/cancun-fam-admin",
-    shareLink: "vuei.app/v/cancun-fam",
+    adminLink: buildAdminTripUrl("cancun-fam"),
+    shareLink: buildPublicTripUrl("cancun-fam"),
     documentsCount: 6,
     creditsUsed: 32
   }

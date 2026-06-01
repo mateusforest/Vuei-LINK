@@ -15,6 +15,7 @@ import {
   type LegacyAgencyTrip,
 } from "@/lib/mappers/trip-mappers"
 import { mapCreditHistoryToTransactions, mapLegacyCreditsToCreditBalance } from "@/lib/mappers/credit-mappers"
+import { buildAdminTripUrl, buildPublicTripUrl } from "@/lib/security/link-tokens"
 
 export interface Client extends Pick<CanonicalClient, "id" | "name"> {
   id: string
@@ -198,8 +199,8 @@ function normalizeTripLinks(trips: AgencyTrip[]): AgencyTrip[] {
     return {
       ...trip,
       slug,
-      adminLink: `vuei.app/viagem/${slug}?admin=true`,
-      shareLink: `vuei.app/viagem/${slug}`,
+      adminLink: buildAdminTripUrl(slug),
+      shareLink: buildPublicTripUrl(slug),
     }
   })
 }
@@ -268,8 +269,8 @@ const initialTrips: AgencyTrip[] = [
     passengersCount: 2,
     status: "upcoming",
     coverImage: "https://images.unsplash.com/photo-1502602898657-3e91760cbb34?w=800&q=80",
-    adminLink: "vuei.app/viagem/lua-de-mel-em-paris?admin=true",
-    shareLink: "vuei.app/viagem/lua-de-mel-em-paris",
+    adminLink: buildAdminTripUrl("lua-de-mel-em-paris"),
+    shareLink: buildPublicTripUrl("lua-de-mel-em-paris"),
     createdAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
   },
   {
@@ -287,8 +288,8 @@ const initialTrips: AgencyTrip[] = [
     passengersCount: 4,
     status: "upcoming",
     coverImage: "https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?w=800&q=80",
-    adminLink: "vuei.app/viagem/ferias-em-tokyo?admin=true",
-    shareLink: "vuei.app/viagem/ferias-em-tokyo",
+    adminLink: buildAdminTripUrl("ferias-em-tokyo"),
+    shareLink: buildPublicTripUrl("ferias-em-tokyo"),
     createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
   },
 ]
@@ -457,8 +458,8 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
       city,
       country,
       coverImage: getImageForDestination(data.destination),
-      adminLink: `vuei.app/viagem/${slug}?admin=true`,
-      shareLink: `vuei.app/viagem/${slug}`,
+      adminLink: buildAdminTripUrl(slug),
+      shareLink: buildPublicTripUrl(slug),
       createdAt: new Date().toISOString(),
     }
 

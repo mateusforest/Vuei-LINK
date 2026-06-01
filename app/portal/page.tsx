@@ -98,13 +98,13 @@ export default function PortalHomePage() {
   const firstName = profile?.name?.trim().split(" ")[0]
 
   const copyLink = (link: string, type: string) => {
-    navigator.clipboard.writeText(`https://${link}`)
+    navigator.clipboard.writeText(link)
     setCopiedLink(type)
     setTimeout(() => setCopiedLink(null), 2000)
   }
 
   const shareTrip = async (link: string) => {
-    const url = `https://${link}`
+    const url = link
 
     if (navigator.share) {
       try {
@@ -207,7 +207,7 @@ export default function PortalHomePage() {
               <div className="flex flex-wrap gap-3">
                 <Button
                   className="border-0 bg-gradient-to-r from-[#5de0e6] to-[#004aad] text-white"
-                  onClick={() => router.push(`/viagem/${activeTrip.slug}?admin=true`)}
+                  onClick={() => router.push(`/viagem/${activeTrip.slug}/admin`)}
                 >
                   <ExternalLink size={16} className="mr-2" />
                   Abrir viagem
@@ -267,7 +267,7 @@ export default function PortalHomePage() {
                 <div className="flex flex-col gap-4 md:flex-row md:items-center">
                   <div
                     className="relative h-20 w-full overflow-hidden rounded-xl md:h-16 md:w-24 md:shrink-0"
-                    onClick={() => router.push(`/viagem/${trip.slug}?admin=true`)}
+                    onClick={() => router.push(`/viagem/${trip.slug}/admin`)}
                   >
                     <Image src={trip.coverImage} alt={trip.destination} fill className="object-cover" />
                   </div>
@@ -279,7 +279,7 @@ export default function PortalHomePage() {
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    <Button variant="outline" className="border-border/50" onClick={() => router.push(`/viagem/${trip.slug}?admin=true`)}>
+                    <Button variant="outline" className="border-border/50" onClick={() => router.push(`/viagem/${trip.slug}/admin`)}>
                       Abrir viagem
                     </Button>
                     <Button variant="outline" className="border-border/50" onClick={() => copyLink(trip.adminLink, "admin")}>

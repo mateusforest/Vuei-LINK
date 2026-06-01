@@ -55,7 +55,7 @@ export default function CompartilharPage() {
   })
 
   const copyToClipboard = (text: string, type: 'admin' | 'share') => {
-    navigator.clipboard.writeText(`https://${text}`)
+    navigator.clipboard.writeText(text)
     if (type === 'admin') {
       setAdminCopied(true)
       setShareFeedback("Link administrador copiado.")
@@ -104,7 +104,7 @@ export default function CompartilharPage() {
   }
 
   const trip = activeTrip || trips[0]
-  const shareUrl = `https://${trip.shareLink}`
+  const shareUrl = trip.shareLink
 
   const handleShareAction = (channel: "qr" | "whatsapp" | "email") => {
     const encodedUrl = encodeURIComponent(shareUrl)

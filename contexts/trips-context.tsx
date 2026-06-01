@@ -7,6 +7,7 @@ import { createTrip as createTripInRepository, listTripsByUser } from "@/lib/rep
 import { shouldUseSupabase } from "@/lib/data-source"
 import { withTimeout } from "@/lib/async/with-timeout"
 import { clearPendingTrip, readPendingTrip } from "@/lib/pending-trip"
+import { buildAdminTripUrl, buildPublicTripUrl } from "@/lib/security/link-tokens"
 import {
   buildUniqueTripSlug,
   extractTripsStoragePayload,
@@ -141,8 +142,8 @@ function normalizeTripLinks(trips: Trip[]): Trip[] {
     return {
       ...trip,
       slug,
-      adminLink: `vuei.app/viagem/${slug}?admin=true`,
-      shareLink: `vuei.app/viagem/${slug}`,
+      adminLink: buildAdminTripUrl(slug),
+      shareLink: buildPublicTripUrl(slug),
     }
   })
 }
@@ -392,8 +393,8 @@ export function TripsProvider({ children }: { children: ReactNode }) {
       country,
       passengersCount: getPassengersCount(tripData.companions),
       coverImage: getImageForDestination(tripData.destination),
-      adminLink: `vuei.app/viagem/${slug}?admin=true`,
-      shareLink: `vuei.app/viagem/${slug}`,
+      adminLink: buildAdminTripUrl(slug),
+      shareLink: buildPublicTripUrl(slug),
       createdAt: new Date().toISOString(),
     }
 

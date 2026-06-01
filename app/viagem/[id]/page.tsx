@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, createContext, useContext } from "react"
 import Image from "next/image"
-import { useParams } from "next/navigation"
+import { useParams, usePathname } from "next/navigation"
 import { motion, AnimatePresence, useScroll, useTransform } from "framer-motion"
 import { extractAgencyStorageState } from "@/lib/mappers/agency-mappers"
 import { extractTripsStoragePayload } from "@/lib/mappers/trip-mappers"
@@ -13,6 +13,7 @@ import { getTripHotel, upsertTripHotel } from "@/lib/repositories/trip-hotels-re
 import { validateDocumentFile } from "@/lib/files/file-validation"
 import { getDestinationCoverImage, getDestinationMetadata } from "@/lib/trip-destination"
 import { useAuth } from "@/contexts/auth-context"
+import { buildAdminTripUrl, buildPublicTripUrl, isAdminLinkMode } from "@/lib/security/link-tokens"
 import {
   Plane, Hotel, MapPin, FileText, MessageCircle, Share2, WifiOff, 
   ChevronRight, Calendar, Clock, Users, Sun, Cloud, Thermometer,
@@ -192,8 +193,8 @@ const initialTripData = {
     embassy: "+33 1 45 61 63 00"
   },
   credits: { balance: 47, used: 3, total: 50 },
-  adminLink: "vuei.app/viagem/minha-viagem?admin=true",
-  shareLink: "vuei.app/v/minha-viagem"
+  adminLink: buildAdminTripUrl("minha-viagem"),
+  shareLink: buildPublicTripUrl("minha-viagem")
 }
 
 function parseTripDestination(destination?: string) {
@@ -285,7 +286,7 @@ function buildTripDataFromStoredTrip(storedTrip: any) {
 
   return {
     ...initialTripData,
-    id: storedTrip.slug || storedTrip.id || initialTripData.id,
+    id: storedTrip.id || storedTrip.slug || initialTripData.id,
     destination: city || storedTrip.title || "Minha Viagem",
     country: storedTrip.country || country || initialTripData.country,
     countryFlag: getCountryFlag(storedTrip.country || country),
@@ -2093,7 +2094,7 @@ function ShareModal({ open, onClose, tripData }: { open: boolean; onClose: () =>
           <p className="text-xs text-white/40 mb-3">Acesso completo a todos os documentos</p>
           <div className="flex items-center gap-2 p-3 rounded-xl bg-black/30">
             <code className="flex-1 text-xs text-white/60 truncate">{tripData.adminLink}</code>
-            <Button size="sm" variant="ghost" onClick={() => handleCopy("admin", `https://${tripData.adminLink}`)} className="text-[#5de0e6]">
+            <Button size="sm" variant="ghost" onClick={() => handleCopy("admin", tripData.adminLink)} className="text-[#5de0e6]">
               {copied === "admin" ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
             </Button>
           </div>
@@ -2107,7 +2108,7 @@ function ShareModal({ open, onClose, tripData }: { open: boolean; onClose: () =>
           <p className="text-xs text-white/40 mb-3">Sem documentos privados</p>
           <div className="flex items-center gap-2 p-3 rounded-xl bg-white/[0.03]">
             <code className="flex-1 text-xs text-white/60 truncate">{tripData.shareLink}</code>
-            <Button size="sm" variant="ghost" onClick={() => handleCopy("public", `https://${tripData.shareLink}`)} className="text-white/60">
+            <Button size="sm" variant="ghost" onClick={() => handleCopy("public", tripData.shareLink)} className="text-white/60">
               {copied === "public" ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
             </Button>
           </div>
@@ -2116,10 +2117,23 @@ function ShareModal({ open, onClose, tripData }: { open: boolean; onClose: () =>
         <div className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.06]">
           <p className="text-sm text-white font-medium mb-2">Compartilhar via</p>
           <div className="flex gap-3">
-            <button onClick={() => showToast("Abrindo WhatsApp...", "info")} className="flex-1 p-3 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 text-sm font-medium transition-colors">
+            <button
+              onClick={() => {
+                const shareText = encodeURIComponent(`Acompanhe a viagem: ${tripData.shareLink}`)
+                window.open(`https://wa.me/?text=${shareText}`, "_blank", "noopener,noreferrer")
+              }}
+              className="flex-1 p-3 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 text-sm font-medium transition-colors"
+            >
               WhatsApp
             </button>
-            <button onClick={() => showToast("Abrindo Email...", "info")} className="flex-1 p-3 rounded-xl bg-white/[0.05] hover:bg-white/10 border border-white/10 text-white/60 text-sm font-medium transition-colors">
+            <button
+              onClick={() => {
+                const subject = encodeURIComponent(`Viagem ${tripData.destination}`)
+                const body = encodeURIComponent(`Acompanhe a viagem por aqui: ${tripData.shareLink}`)
+                window.location.href = `mailto:?subject=${subject}&body=${body}`
+              }}
+              className="flex-1 p-3 rounded-xl bg-white/[0.05] hover:bg-white/10 border border-white/10 text-white/60 text-sm font-medium transition-colors"
+            >
               Email
             </button>
           </div>
@@ -2632,6 +2646,7 @@ function TripFooter() {
 // Main page component
 export default function TripPage() {
   const params = useParams<{ id: string }>()
+  const pathname = usePathname()
   const { user, profile } = useAuth()
   const [tripData, setTripData] = useState(initialTripData)
   const [isAdmin, setIsAdmin] = useState(false)
@@ -2652,7 +2667,7 @@ export default function TripPage() {
     const searchParams = new URLSearchParams(window.location.search)
     const adminToken = searchParams.get("adminToken")
     const publicToken = searchParams.get("token") || searchParams.get("publicToken")
-    const isAdminView = Boolean(adminToken) || searchParams.get("admin") === "true"
+    const isAdminView = isAdminLinkMode(searchParams, pathname)
     setIsAdmin(isAdminView)
 
     const loadTrip = async () => {
@@ -2748,7 +2763,7 @@ export default function TripPage() {
     }
 
     void loadTrip()
-  }, [params])
+  }, [params, pathname])
 
   const showToast = (message: string, type: "success" | "error" | "info" = "success") => {
     setToast({ message, type })

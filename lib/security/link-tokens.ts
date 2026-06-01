@@ -1,3 +1,5 @@
+import { buildAbsoluteAppUrl } from "@/lib/app-url"
+
 export function generateSecureToken() {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
     return crypto.randomUUID().replace(/-/g, "") + crypto.randomUUID().replace(/-/g, "")
@@ -6,16 +8,27 @@ export function generateSecureToken() {
   return `${Date.now().toString(36)}${Math.random().toString(36).slice(2)}${Math.random().toString(36).slice(2)}`
 }
 
-export function generateAdminLink(slug: string, token: string) {
-  return `/viagem/${slug}?adminToken=${encodeURIComponent(token)}`
+export function generateAdminLink(slug: string) {
+  return `/viagem/${slug}/admin`
 }
 
-export function generatePublicLink(slug: string, token: string) {
-  return `/v/${slug}?token=${encodeURIComponent(token)}`
+export function generatePublicLink(slug: string) {
+  return `/v/${slug}`
 }
 
-export function isAdminLinkMode(params: URLSearchParams | { get: (key: string) => string | null }) {
-  return Boolean(params.get("adminToken")) || params.get("admin") === "true"
+export function buildAdminTripUrl(slug: string) {
+  return buildAbsoluteAppUrl(generateAdminLink(slug))
+}
+
+export function buildPublicTripUrl(slug: string) {
+  return buildAbsoluteAppUrl(generatePublicLink(slug))
+}
+
+export function isAdminLinkMode(
+  params: URLSearchParams | { get: (key: string) => string | null },
+  pathname?: string | null,
+) {
+  return Boolean(pathname?.endsWith("/admin")) || Boolean(params.get("adminToken")) || params.get("admin") === "true"
 }
 
 export function isPublicLinkMode(params: URLSearchParams | { get: (key: string) => string | null }) {

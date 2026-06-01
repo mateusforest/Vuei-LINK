@@ -533,7 +533,7 @@ export default function CriarViagemPage() {
                 </Button>
                 <Button 
                   className="flex-1 rounded-xl bg-gradient-to-r from-[#5de0e6] to-[#004aad] text-white border-0"
-                  onClick={() => router.push(`/viagem/${createdTrip.slug}?admin=true`)}
+                  onClick={() => router.push(`/viagem/${createdTrip.slug}/admin`)}
                 >
                   <ExternalLink size={16} className="mr-2" />
                   Ver Viagem
