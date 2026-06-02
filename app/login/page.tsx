@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useAuth } from "@/contexts/auth-context"
 import { getRedirectByRole } from "@/lib/auth/role-redirect"
+import { getSafeRedirectFromWindow } from "@/lib/auth/safe-redirect"
 
 type AppRole = "traveler" | "agency_owner" | "agency_member" | "master"
 
@@ -21,16 +22,15 @@ export default function LoginPage() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [errors, setErrors] = useState<{ email?: string; password?: string; auth?: string }>({})
-  const [safeRedirect, setSafeRedirect] = useState<string | null>(null)
+  const [safeRedirect, setSafeRedirect] = useState<string | null | undefined>(undefined)
   const canSubmit = email.trim().length > 0 && password.length >= 6
 
   useEffect(() => {
-    if (typeof window === "undefined") return
-    const requestedRedirect = new URLSearchParams(window.location.search).get("redirect")
-    setSafeRedirect(requestedRedirect && requestedRedirect.startsWith("/") ? requestedRedirect : null)
+    setSafeRedirect(getSafeRedirectFromWindow())
   }, [])
 
   useEffect(() => {
+    if (safeRedirect === undefined) return
     const resolvedRole = (profile?.role ?? user?.user_metadata?.role) as AppRole | undefined
     if (!loading && user && resolvedRole) {
       router.replace(safeRedirect || getRedirectByRole(resolvedRole))

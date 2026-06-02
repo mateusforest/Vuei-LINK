@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input"
 import { Checkbox } from "@/components/ui/checkbox"
 import { useAuth } from "@/contexts/auth-context"
 import { getRedirectByRole } from "@/lib/auth/role-redirect"
+import { getSafeRedirectFromWindow } from "@/lib/auth/safe-redirect"
 
 export default function SignupPage() {
   const router = useRouter()
@@ -19,6 +20,7 @@ export default function SignupPage() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [acceptTerms, setAcceptTerms] = useState(false)
+  const [safeRedirect, setSafeRedirect] = useState<string | null | undefined>(undefined)
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -36,11 +38,16 @@ export default function SignupPage() {
     acceptTerms
 
   useEffect(() => {
+    setSafeRedirect(getSafeRedirectFromWindow())
+  }, [])
+
+  useEffect(() => {
+    if (safeRedirect === undefined) return
     const resolvedRole = profile?.role ?? (user?.user_metadata?.role as any)
     if (!loading && user && resolvedRole) {
-      router.replace(getRedirectByRole(resolvedRole))
+      router.replace(safeRedirect || getRedirectByRole(resolvedRole))
     }
-  }, [loading, profile?.role, router, user])
+  }, [loading, profile?.role, router, safeRedirect, user])
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {}
@@ -84,7 +91,7 @@ export default function SignupPage() {
       }
 
       const detectedRole = result.profile?.role ?? profile?.role ?? (result.user?.user_metadata?.role as any)
-      const redirectPath = getRedirectByRole(detectedRole)
+      const redirectPath = safeRedirect || getRedirectByRole(detectedRole)
       console.log("[AUTH] role detected", detectedRole ?? null)
       console.log("[AUTH] redirect target", redirectPath)
       router.replace(redirectPath)

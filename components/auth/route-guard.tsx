@@ -1,10 +1,11 @@
 "use client"
 
 import { useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import type { UserRole } from "@/types"
 import { useAuth } from "@/contexts/auth-context"
 import { canAccessRole, getRedirectByRole } from "@/lib/auth/role-redirect"
+import { buildLoginRedirectTarget } from "@/lib/auth/safe-redirect"
 import { shouldUseSupabase } from "@/lib/data-source"
 
 export function RouteGuard({
@@ -15,6 +16,7 @@ export function RouteGuard({
   children: React.ReactNode
 }) {
   const router = useRouter()
+  const pathname = usePathname()
   const { user, profile, loading } = useAuth()
   const resolvedRole = profile?.role ?? (typeof user?.user_metadata?.role === "string" ? (user.user_metadata.role as UserRole) : null)
   const resolvedProfile = resolvedRole ? { role: resolvedRole } : null
@@ -23,8 +25,9 @@ export function RouteGuard({
     if (!shouldUseSupabase() || loading) return
 
     if (!user) {
-      console.log("[BOOT] redirecting", "/login")
-      router.replace("/login")
+      const target = buildLoginRedirectTarget(pathname)
+      console.log("[BOOT] redirecting", target)
+      router.replace(target)
       return
     }
 
@@ -33,7 +36,7 @@ export function RouteGuard({
       console.log("[BOOT] redirecting", target)
       router.replace(target)
     }
-  }, [allowedRoles, loading, resolvedProfile, resolvedRole, router, user])
+  }, [allowedRoles, loading, pathname, resolvedProfile, resolvedRole, router, user])
 
   if (!shouldUseSupabase()) return <>{children}</>
 

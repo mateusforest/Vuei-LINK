@@ -44,11 +44,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(supabaseEnabled)
   const supabase = useMemo(() => createSupabaseBrowserClient(), [])
   const bootstrapRunRef = useRef(0)
+  const profileRef = useRef<Profile | null>(null)
+  const sessionSignatureRef = useRef<string | null>(null)
 
   const loadProfile = useCallback(
     async (nextUser: User | null) => {
       if (!nextUser || !supabase) {
         setProfile(null)
+        profileRef.current = null
         console.log("[BOOT] profile loaded", null)
         return null
       }
@@ -61,15 +64,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         )
 
         setProfile(ensuredProfile)
+        profileRef.current = ensuredProfile
         console.log("[BOOT] profile loaded", ensuredProfile?.id ?? null)
         console.log("[AUTH] profile loaded", ensuredProfile)
         return ensuredProfile
       } catch (error) {
         const message = error instanceof Error ? error.message : "Falha ao carregar profile."
         console.error("[AUTH ERROR]", message)
-        setProfile(null)
-        console.log("[BOOT] profile loaded", null)
-        return null
+        console.log("[BOOT] profile loaded", profileRef.current?.id ?? null)
+        return profileRef.current
       }
     },
     [supabase],
@@ -78,6 +81,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const syncAuthState = useCallback(
     async (nextSession: Session | null) => {
       const nextUser = nextSession?.user ?? null
+      const nextSignature = nextSession?.access_token ?? nextUser?.id ?? "guest"
+      const isSameSession = sessionSignatureRef.current === nextSignature
 
       setSession(nextSession)
       setUser(nextUser)
@@ -86,6 +91,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.log("[AUTH] session user", nextUser?.id ?? null)
       console.log("[AUTH] metadata", nextUser?.user_metadata ?? null)
 
+      if (!nextUser) {
+        sessionSignatureRef.current = nextSignature
+        setProfile(null)
+        profileRef.current = null
+        console.log("[BOOT] profile loaded", null)
+        return null
+      }
+
+      if (isSameSession && profileRef.current?.id === nextUser.id) {
+        console.log("[BOOT] profile loaded", profileRef.current.id)
+        console.log("[AUTH] profile loaded", profileRef.current)
+        return profileRef.current
+      }
+
+      sessionSignatureRef.current = nextSignature
       return loadProfile(nextUser)
     },
     [loadProfile],
@@ -94,6 +114,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const refreshProfile = useCallback(async () => {
     if (!supabaseEnabled || !supabase) {
       setProfile(null)
+      profileRef.current = null
       return
     }
 

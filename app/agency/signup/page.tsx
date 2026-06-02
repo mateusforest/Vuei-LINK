@@ -12,6 +12,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useAuth } from "@/contexts/auth-context"
 import { getRedirectByRole } from "@/lib/auth/role-redirect"
+import { getSafeRedirectFromWindow } from "@/lib/auth/safe-redirect"
 import { createAgency } from "@/lib/repositories/agencies-repository"
 
 export default function AgencySignupPage() {
@@ -22,6 +23,7 @@ export default function AgencySignupPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [acceptTerms, setAcceptTerms] = useState(false)
   const [acceptNews, setAcceptNews] = useState(false)
+  const [safeRedirect, setSafeRedirect] = useState<string | null | undefined>(undefined)
   const [formData, setFormData] = useState({
     agencyName: "",
     responsibleName: "",
@@ -43,11 +45,16 @@ export default function AgencySignupPage() {
     acceptTerms
 
   useEffect(() => {
+    setSafeRedirect(getSafeRedirectFromWindow())
+  }, [])
+
+  useEffect(() => {
+    if (safeRedirect === undefined) return
     const detectedRole = (profile?.role ?? user?.user_metadata?.role) as "traveler" | "agency_owner" | "agency_member" | "master" | undefined
     if (!loading && user && detectedRole) {
-      router.replace(getRedirectByRole(detectedRole))
+      router.replace(safeRedirect || getRedirectByRole(detectedRole))
     }
-  }, [loading, profile?.role, router, user])
+  }, [loading, profile?.role, router, safeRedirect, user])
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {}
@@ -122,9 +129,9 @@ export default function AgencySignupPage() {
       console.log("[AGENCY] agency criada", agencyResult.data?.id ?? null)
       await refreshProfile()
       console.log("[AUTH] role detectada", "agency_owner")
-      console.log("[AUTH] redirect destino", "/agency")
+      console.log("[AUTH] redirect destino", safeRedirect || "/agency")
       console.log("[CADASTRO] signUp success")
-      router.replace("/agency")
+      router.replace(safeRedirect || "/agency")
     } catch (error) {
       const message = error instanceof Error ? error.message : "Erro inesperado ao criar conta."
       console.error("[CADASTRO] signUp error", message)
