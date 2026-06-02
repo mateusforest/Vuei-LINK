@@ -351,6 +351,48 @@ export interface Database {
           updated_at?: string
         }
       }
+      trip_hotels: {
+        Row: {
+          id: string
+          trip_id: string
+          name: string | null
+          hotel_name: string | null
+          address: string | null
+          check_in: string | null
+          check_out: string | null
+          confirmation_code: string | null
+          confirmation_number: string | null
+          notes: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          trip_id: string
+          name?: string | null
+          hotel_name?: string | null
+          address?: string | null
+          check_in?: string | null
+          check_out?: string | null
+          confirmation_code?: string | null
+          confirmation_number?: string | null
+          notes?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          trip_id?: string
+          name?: string | null
+          hotel_name?: string | null
+          address?: string | null
+          check_in?: string | null
+          check_out?: string | null
+          confirmation_code?: string | null
+          confirmation_number?: string | null
+          notes?: string | null
+          updated_at?: string
+        }
+      }
       trips: {
         Row: {
           id: string

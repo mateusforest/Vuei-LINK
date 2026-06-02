@@ -992,6 +992,10 @@ function AddFlightModal({ open, onClose, onSave, tripId, ownerUserId, agencyId }
 
   const handleFileUpload = async (file?: File | null) => {
     if (!file) return
+    if (!ownerUserId) {
+      setError("Entre com a conta proprietaria para anexar passagens nesta viagem.")
+      return
+    }
 
     console.log("[TICKET] file selected", file.name)
     setError("")
@@ -1003,7 +1007,7 @@ function AddFlightModal({ open, onClose, onSave, tripId, ownerUserId, agencyId }
 
     setUploading(true)
 
-    const path = `${tripId}/tickets/${Date.now()}-${file.name.replace(/\s+/g, "-")}`
+    const path = `${ownerUserId}/${tripId}/tickets/${Date.now()}-${file.name.replace(/\s+/g, "-")}`
     const uploadResult = await uploadDocumentFile(file, path)
     if (uploadResult.error || !uploadResult.data) {
       console.error("[TICKET] upload error", uploadResult.error)
@@ -1937,6 +1941,10 @@ function AddDocumentModal({ open, onClose, onSave, tripId, ownerUserId, agencyId
 
   const handleUpload = async (file?: File | null) => {
     if (!file) return
+    if (!ownerUserId) {
+      setError("Entre com a conta proprietaria para anexar documentos nesta viagem.")
+      return
+    }
     console.log("[DOCUMENT] file selected", file.name)
     setError("")
     const validation = validateDocumentFile(file)
@@ -1946,7 +1954,7 @@ function AddDocumentModal({ open, onClose, onSave, tripId, ownerUserId, agencyId
     }
 
     setUploading(true)
-    const path = `${tripId}/documents/${Date.now()}-${file.name.replace(/\s+/g, "-")}`
+    const path = `${ownerUserId}/${tripId}/documents/${Date.now()}-${file.name.replace(/\s+/g, "-")}`
     const uploadResult = await uploadDocumentFile(file, path)
     if (uploadResult.error || !uploadResult.data) {
       console.error("[DOCUMENT] upload error", uploadResult.error)

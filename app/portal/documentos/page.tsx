@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { motion } from "framer-motion"
+import { useRouter } from "next/navigation"
 import {
   AlertCircle,
   CheckCircle2,
@@ -49,6 +50,11 @@ import {
   type DocumentMetadataPayload,
 } from "@/lib/repositories/documents-repository"
 import { formatFileSize, getDocumentTypeFromMime, validateDocumentFile } from "@/lib/files/file-validation"
+import {
+  authenticateQuickAccessBiometric,
+  getQuickAccessMethods,
+  verifyQuickAccessPin,
+} from "@/lib/auth/quick-access"
 import type { Document, DocumentVisibility } from "@/types"
 
 const fadeInUp = {
@@ -71,6 +77,7 @@ function getDocumentIcon(type: string) {
 }
 
 export default function DocumentosPage() {
+  const router = useRouter()
   const { activeTrip, trips } = useTrips()
   const { profile } = useAuth()
   const [documents, setDocuments] = useState<Document[]>([])
@@ -79,10 +86,12 @@ export default function DocumentosPage() {
   const [showPinModal, setShowPinModal] = useState(false)
   const [pinVerified, setPinVerified] = useState(false)
   const [pin, setPin] = useState("")
+  const [isUnlocking, setIsUnlocking] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [toastMessage, setToastMessage] = useState("")
   const [errorMessage, setErrorMessage] = useState("")
+  const [pinErrorMessage, setPinErrorMessage] = useState("")
   const [uploadForm, setUploadForm] = useState({
     name: "",
     type: "other",
@@ -90,6 +99,11 @@ export default function DocumentosPage() {
   })
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const currentTrip = activeTrip ?? trips[0] ?? null
+  const quickAccessOwnerId = profile?.id ?? null
+  const quickAccessMethods = useMemo(
+    () => getQuickAccessMethods(quickAccessOwnerId),
+    [quickAccessOwnerId],
+  )
 
   useEffect(() => {
     if (!toastMessage) return
@@ -133,14 +147,74 @@ export default function DocumentosPage() {
   const sharedDocuments = useMemo(() => documents.filter((document) => !document.isPrivate), [documents])
 
   const handleViewPrivate = () => {
-    if (!pinVerified) setShowPinModal(true)
+    if (!pinVerified) {
+      setPinErrorMessage("")
+      setShowPinModal(true)
+    }
   }
 
-  const verifyPin = () => {
-    if (pin.length === 4) {
+  const verifyPin = async () => {
+    if (!quickAccessOwnerId) {
+      setPinErrorMessage("Faca login novamente para liberar documentos privados neste dispositivo.")
+      return
+    }
+
+    if (!quickAccessMethods.pinEnabled) {
+      setPinErrorMessage("Acesso rapido por PIN nao configurado neste dispositivo. Configure em Configuracoes.")
+      return
+    }
+
+    setIsUnlocking(true)
+    setPinErrorMessage("")
+
+    try {
+      const isValid = await verifyQuickAccessPin(quickAccessOwnerId, pin)
+      if (!isValid) {
+        setPinErrorMessage("PIN invalido.")
+        return
+      }
+
       setPinVerified(true)
       setShowPinModal(false)
       setPin("")
+      setToastMessage("Documentos privados liberados neste dispositivo.")
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Nao foi possivel validar o PIN neste dispositivo."
+      setPinErrorMessage(message)
+    } finally {
+      setIsUnlocking(false)
+    }
+  }
+
+  const handleBiometricUnlock = async () => {
+    if (!quickAccessOwnerId) {
+      setPinErrorMessage("Faca login novamente para liberar documentos privados neste dispositivo.")
+      return
+    }
+
+    if (!quickAccessMethods.biometricEnabled) {
+      setPinErrorMessage("Biometria nao configurada neste dispositivo.")
+      return
+    }
+
+    setIsUnlocking(true)
+    setPinErrorMessage("")
+
+    try {
+      const authenticated = await authenticateQuickAccessBiometric(quickAccessOwnerId)
+      if (!authenticated) {
+        setPinErrorMessage("Nao foi possivel validar a biometria neste dispositivo.")
+        return
+      }
+
+      setPinVerified(true)
+      setShowPinModal(false)
+      setToastMessage("Documentos privados liberados neste dispositivo.")
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Nao foi possivel validar a biometria."
+      setPinErrorMessage(message)
+    } finally {
+      setIsUnlocking(false)
     }
   }
 
@@ -173,7 +247,8 @@ export default function DocumentosPage() {
     try {
       const safeName = uploadForm.name.trim() || selectedFile.name.replace(/\.[^.]+$/, "")
       const visibility: DocumentVisibility = uploadForm.isPrivate ? "private" : "public_trip"
-      const filePath = `${currentTrip.id}/${Date.now()}-${selectedFile.name.replace(/\s+/g, "-")}`
+      const safeFileName = selectedFile.name.replace(/\s+/g, "-")
+      const filePath = `${profile.id}/${currentTrip.id}/documents/${Date.now()}-${safeFileName}`
 
       const uploadResult = await uploadDocumentFile(selectedFile, filePath)
       if (uploadResult.error || !uploadResult.data) {
@@ -423,21 +498,52 @@ export default function DocumentosPage() {
               <Fingerprint size={20} className="text-primary" />
               Verificacao de seguranca
             </DialogTitle>
-            <DialogDescription>Digite um PIN de 4 digitos para liberar os documentos privados neste dispositivo.</DialogDescription>
+            <DialogDescription>
+              Desbloqueie os documentos privados com o acesso rapido configurado neste dispositivo.
+            </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 py-2">
-            <Input
-              type="password"
-              maxLength={4}
-              value={pin}
-              onChange={(event) => setPin(event.target.value.replace(/\D/g, "").slice(0, 4))}
-              placeholder="0000"
-              className="text-center text-2xl tracking-[0.6em]"
-            />
-            <Button className="w-full" onClick={verifyPin} disabled={pin.length !== 4}>
-              Liberar documentos
-            </Button>
+            {quickAccessMethods.pinEnabled ? (
+              <>
+                <Input
+                  type="password"
+                  maxLength={4}
+                  value={pin}
+                  onChange={(event) => setPin(event.target.value.replace(/\D/g, "").slice(0, 4))}
+                  placeholder="0000"
+                  className="text-center text-2xl tracking-[0.6em]"
+                />
+                <Button className="w-full" onClick={() => void verifyPin()} disabled={pin.length !== 4 || isUnlocking}>
+                  {isUnlocking ? "Validando..." : "Usar PIN"}
+                </Button>
+              </>
+            ) : (
+              <Card className="border-border/50 bg-muted/20 p-4 text-sm text-muted-foreground">
+                Acesso rapido por PIN nao configurado neste dispositivo. Configure em Configuracoes para liberar documentos privados aqui.
+              </Card>
+            )}
+
+            {quickAccessMethods.biometricEnabled && (
+              <Button variant="outline" className="w-full" onClick={() => void handleBiometricUnlock()} disabled={isUnlocking}>
+                <Fingerprint size={16} className="mr-2" />
+                {isUnlocking ? "Validando..." : "Usar Face ID / biometria"}
+              </Button>
+            )}
+
+            {!quickAccessMethods.pinEnabled && !quickAccessMethods.biometricEnabled && (
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={() => router.push("/portal/configuracoes?quickAccess=1&returnTo=%2Fportal%2Fdocumentos")}
+              >
+                Configurar acesso rapido neste dispositivo
+              </Button>
+            )}
+
+            {pinErrorMessage && (
+              <p className="text-sm text-red-300">{pinErrorMessage}</p>
+            )}
           </div>
         </DialogContent>
       </Dialog>

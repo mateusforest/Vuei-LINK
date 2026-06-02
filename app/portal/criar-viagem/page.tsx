@@ -198,7 +198,7 @@ export default function CriarViagemPage() {
   }
 
   const copyLink = (link: string, type: string) => {
-    navigator.clipboard.writeText(`https://${link}`)
+    navigator.clipboard.writeText(link)
     setCopiedLink(type)
     setTimeout(() => setCopiedLink(null), 2000)
   }

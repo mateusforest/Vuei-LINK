@@ -1,5 +1,6 @@
 import { createSupabaseBrowserClient } from "@/lib/supabase/client"
 import { shouldUseSupabase } from "@/lib/data-source"
+import type { Database } from "@/lib/supabase/types"
 
 export interface TripHotelPayload {
   tripId: string
@@ -33,15 +34,19 @@ export interface TripHotelRecord {
   updatedAt: string
 }
 
-function mapRow(row: any): TripHotelRecord {
+type TripHotelRow = Database["public"]["Tables"]["trip_hotels"]["Row"]
+type TripHotelInsert = Database["public"]["Tables"]["trip_hotels"]["Insert"]
+type TripHotelUpdate = Database["public"]["Tables"]["trip_hotels"]["Update"]
+
+function mapRow(row: TripHotelRow): TripHotelRecord {
   return {
     id: row.id,
     tripId: row.trip_id,
-    name: row.name,
+    name: row.name ?? row.hotel_name ?? "",
     address: row.address ?? null,
     checkIn: row.check_in ?? null,
     checkOut: row.check_out ?? null,
-    confirmationCode: row.confirmation_code ?? null,
+    confirmationCode: row.confirmation_code ?? row.confirmation_number ?? null,
     notes: row.notes ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -96,7 +101,7 @@ export async function createTripHotel(payload: TripHotelPayload) {
       check_out: payload.checkOut ?? null,
       confirmation_code: payload.confirmationCode ?? null,
       notes: payload.notes ?? null,
-    })
+    } satisfies TripHotelInsert)
     .select("*")
     .single()
 
@@ -122,7 +127,7 @@ export async function updateTripHotel(id: string, payload: TripHotelUpdatePayloa
       check_out: payload.checkOut ?? null,
       confirmation_code: payload.confirmationCode ?? null,
       notes: payload.notes ?? null,
-    })
+    } satisfies TripHotelUpdate)
     .eq("id", id)
     .select("*")
     .single()
