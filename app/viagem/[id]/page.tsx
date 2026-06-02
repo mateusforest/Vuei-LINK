@@ -15,6 +15,11 @@ import { getDestinationCoverImage, getDestinationMetadata } from "@/lib/trip-des
 import { useAuth } from "@/contexts/auth-context"
 import { buildAdminTripUrl, buildPublicTripUrl, isAdminLinkMode } from "@/lib/security/link-tokens"
 import {
+  authenticateQuickAccessBiometric,
+  getQuickAccessMethods,
+  verifyQuickAccessPin,
+} from "@/lib/auth/quick-access"
+import {
   Plane, Hotel, MapPin, FileText, MessageCircle, Share2, WifiOff, 
   ChevronRight, Calendar, Clock, Users, Sun, Cloud, Thermometer,
   Shield, Lock, Fingerprint, Download, Copy, Check, Send, Sparkles,
@@ -34,8 +39,9 @@ const AGENCY_STORAGE_KEY = "vuei_agency"
 // Permission context
 const PermissionContext = createContext<{
   isAdmin: boolean
+  canWrite: boolean
   setIsAdmin: (v: boolean) => void
-}>({ isAdmin: true, setIsAdmin: () => {} })
+}>({ isAdmin: true, canWrite: true, setIsAdmin: () => {} })
 
 // Toast context
 const ToastContext = createContext<{
@@ -1635,7 +1641,21 @@ function AddItineraryItemModal({ open, onClose, day, onSave }: { open: boolean; 
 }
 
 // Documents Section
-function DocumentsSection({ tripData, onAddDocument, tripId, ownerUserId, agencyId }: { tripData: any; onAddDocument: (data: any) => void; tripId: string; ownerUserId: string | null; agencyId: string | null }) {
+function DocumentsSection({
+  tripData,
+  onAddDocument,
+  tripId,
+  ownerUserId,
+  agencyId,
+  tripOwnerUserId,
+}: {
+  tripData: any
+  onAddDocument: (data: any) => void
+  tripId: string
+  ownerUserId: string | null
+  agencyId: string | null
+  tripOwnerUserId: string | null
+}) {
   const [showPrivate, setShowPrivate] = useState(false)
   const [unlocked, setUnlocked] = useState(false)
   const [addingDoc, setAddingDoc] = useState(false)
@@ -1771,7 +1791,16 @@ function DocumentsSection({ tripData, onAddDocument, tripId, ownerUserId, agency
         </div>
       </div>
 
-      <PinModal open={pinModal} onClose={() => setPinModal(false)} onSuccess={() => { setUnlocked(true); setPinModal(false); showToast("Documentos desbloqueados!", "success") }} />
+      <PinModal
+        open={pinModal}
+        onClose={() => setPinModal(false)}
+        ownerUserId={tripOwnerUserId}
+        onSuccess={() => {
+          setUnlocked(true)
+          setPinModal(false)
+          showToast("Documentos desbloqueados!", "success")
+        }}
+      />
       <ViewDocumentModal open={!!viewingDoc} onClose={() => setViewingDoc(null)} document={viewingDoc} />
       <AddDocumentModal open={addingDoc} onClose={() => setAddingDoc(false)} tripId={tripId} ownerUserId={ownerUserId} agencyId={agencyId} onSave={(data) => { onAddDocument(data); showToast("Documento adicionado!", "success"); setAddingDoc(false) }} />
     </section>
@@ -1779,13 +1808,41 @@ function DocumentsSection({ tripData, onAddDocument, tripId, ownerUserId, agency
 }
 
 // PIN Modal
-function PinModal({ open, onClose, onSuccess }: { open: boolean; onClose: () => void; onSuccess: () => void }) {
+function PinModal({
+  open,
+  onClose,
+  onSuccess,
+  ownerUserId,
+}: {
+  open: boolean
+  onClose: () => void
+  onSuccess: () => void
+  ownerUserId: string | null
+}) {
   const [pin, setPin] = useState("")
+  const [error, setError] = useState("")
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
-  const handleSubmit = () => {
-    if (pin.length === 4) {
+  const handleSubmit = async () => {
+    if (pin.length !== 4 || !ownerUserId) return
+
+    setIsSubmitting(true)
+    setError("")
+
+    try {
+      const isValid = await verifyQuickAccessPin(ownerUserId, pin)
+      if (!isValid) {
+        setError("PIN invalido")
+        return
+      }
+
       onSuccess()
       setPin("")
+    } catch (pinError) {
+      const message = pinError instanceof Error ? pinError.message : "Acesso rapido nao configurado neste dispositivo"
+      setError(message)
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
@@ -1814,10 +1871,11 @@ function PinModal({ open, onClose, onSuccess }: { open: boolean; onClose: () => 
           className="w-full px-4 py-3 rounded-xl bg-white/[0.05] border border-white/[0.08] text-white text-center text-xl tracking-[1em] focus:outline-none focus:border-[#5de0e6]/50"
           placeholder="• • • •"
         />
-        <Button onClick={handleSubmit} disabled={pin.length !== 4} className="w-full mt-4 bg-gradient-to-r from-[#5de0e6] to-[#004aad] hover:opacity-90 text-white border-0 disabled:opacity-50">
+        {error && <p className="mt-4 text-sm text-red-300">{error}</p>}
+        <Button onClick={() => void handleSubmit()} disabled={isSubmitting || pin.length !== 4 || !ownerUserId} className="w-full mt-4 bg-gradient-to-r from-[#5de0e6] to-[#004aad] hover:opacity-90 text-white border-0 disabled:opacity-50">
           Desbloquear
         </Button>
-        <p className="text-xs text-white/30 mt-4">Use 1234 para testar</p>
+        <p className="text-xs text-white/30 mt-4">O PIN desta area usa a configuracao de acesso rapido salva neste dispositivo.</p>
       </div>
     </Modal>
   )
@@ -2740,6 +2798,136 @@ function TripFooter() {
   )
 }
 
+function QuickAccessGate({
+  tripName,
+  ownerUserId,
+  pinEnabled,
+  biometricEnabled,
+  onUnlock,
+  onLogin,
+}: {
+  tripName: string
+  ownerUserId: string
+  pinEnabled: boolean
+  biometricEnabled: boolean
+  onUnlock: () => void
+  onLogin: () => void
+}) {
+  const [pin, setPin] = useState("")
+  const [error, setError] = useState("")
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
+  const handlePinUnlock = async () => {
+    setIsSubmitting(true)
+    setError("")
+
+    try {
+      const isValid = await verifyQuickAccessPin(ownerUserId, pin)
+      if (!isValid) {
+        setError("PIN invalido")
+        return
+      }
+
+      onUnlock()
+    } catch (unlockError) {
+      const message = unlockError instanceof Error ? unlockError.message : "Acesso rapido nao configurado neste dispositivo"
+      setError(message)
+    } finally {
+      setIsSubmitting(false)
+      setPin("")
+    }
+  }
+
+  const handleBiometricUnlock = async () => {
+    setIsSubmitting(true)
+    setError("")
+
+    try {
+      const success = await authenticateQuickAccessBiometric(ownerUserId)
+      if (!success) {
+        setError("Nao foi possivel validar a biometria neste dispositivo.")
+        return
+      }
+
+      onUnlock()
+    } catch (unlockError) {
+      const message = unlockError instanceof Error ? unlockError.message : "Biometria indisponivel neste dispositivo."
+      setError(message)
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  return (
+    <main className="min-h-screen bg-black text-white flex items-center justify-center px-4">
+      <div className="w-full max-w-md rounded-3xl border border-white/[0.06] bg-white/[0.02] p-8 shadow-2xl">
+        <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-[#5de0e6]/20 to-[#004aad]/20">
+          <Lock className="h-8 w-8 text-[#5de0e6]" />
+        </div>
+        <h1 className="text-center text-xl font-semibold text-white">Desbloqueie para editar esta viagem</h1>
+        <p className="mt-3 text-center text-sm text-white/55">
+          {tripName || "Viagem"} detectada. Use o acesso rapido configurado neste dispositivo ou entre com login.
+        </p>
+
+        <div className="mt-6 space-y-3">
+          {biometricEnabled && (
+            <Button
+              onClick={() => void handleBiometricUnlock()}
+              disabled={isSubmitting}
+              className="w-full bg-gradient-to-r from-[#5de0e6] to-[#004aad] text-white border-0 hover:opacity-90"
+            >
+              <Fingerprint className="mr-2 h-4 w-4" />
+              Usar Face ID / biometria
+            </Button>
+          )}
+
+          {pinEnabled && (
+            <div className="space-y-3 rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4">
+              <Label className="text-white/70">Usar PIN</Label>
+              <Input
+                type="password"
+                inputMode="numeric"
+                maxLength={4}
+                placeholder="0000"
+                value={pin}
+                onChange={(event) => setPin(event.target.value.replace(/\D/g, "").slice(0, 4))}
+                className="text-center text-xl tracking-[0.6em]"
+              />
+              <Button
+                onClick={() => void handlePinUnlock()}
+                disabled={isSubmitting || pin.length !== 4}
+                className="w-full bg-white/[0.06] text-white hover:bg-white/[0.12]"
+              >
+                Desbloquear com PIN
+              </Button>
+            </div>
+          )}
+
+          {!pinEnabled && !biometricEnabled && (
+            <div className="rounded-2xl border border-amber-500/20 bg-amber-500/10 p-4 text-sm text-amber-300">
+              Acesso rapido nao configurado neste dispositivo.
+            </div>
+          )}
+
+          {error && (
+            <div className="rounded-2xl border border-red-500/20 bg-red-500/10 p-4 text-sm text-red-300">
+              {error}
+            </div>
+          )}
+        </div>
+
+        <Button
+          variant="outline"
+          onClick={onLogin}
+          className="mt-5 w-full border-white/[0.08] bg-transparent text-white/80 hover:bg-white/[0.06]"
+        >
+          Entrar com login
+        </Button>
+      </div>
+    </main>
+  )
+}
+
 // Main page component
 export default function TripPage() {
   const params = useParams<{ id: string }>()
@@ -2748,6 +2936,7 @@ export default function TripPage() {
   const { user, profile, loading: authLoading } = useAuth()
   const [tripData, setTripData] = useState(initialTripData)
   const [isAdmin, setIsAdmin] = useState(false)
+  const [canWrite, setCanWrite] = useState(false)
   const [isLoadingTrip, setIsLoadingTrip] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "info" } | null>(null)
@@ -2757,6 +2946,10 @@ export default function TripPage() {
   const [travelersOpen, setTravelersOpen] = useState(false)
   const [tripSettingsOpen, setTripSettingsOpen] = useState(false)
   const [creditsOpen, setCreditsOpen] = useState(false)
+  const [tripOwnerUserId, setTripOwnerUserId] = useState<string | null>(null)
+  const [quickAccessOwnerId, setQuickAccessOwnerId] = useState<string | null>(null)
+  const [quickAccessMethods, setQuickAccessMethods] = useState({ pinEnabled: false, biometricEnabled: false })
+  const [quickAccessUnlocked, setQuickAccessUnlocked] = useState(false)
 
   useEffect(() => {
     if (typeof window === "undefined") return
@@ -2774,6 +2967,7 @@ export default function TripPage() {
     }
 
     setIsAdmin(false)
+    setCanWrite(false)
 
     const loadTrip = async () => {
       setIsLoadingTrip(true)
@@ -2791,25 +2985,68 @@ export default function TripPage() {
             : await getTripBySlug(routeSlug)
 
         if (repositoryTrip.data) {
+          setTripOwnerUserId(repositoryTrip.data.ownerUserId ?? null)
           const isOwner = Boolean(user?.id && repositoryTrip.data.ownerUserId && user.id === repositoryTrip.data.ownerUserId)
+          const resolvedQuickAccess = getQuickAccessMethods(repositoryTrip.data.ownerUserId)
+          const hasQuickAccess =
+            Boolean(repositoryTrip.data.ownerUserId) &&
+            resolvedQuickAccess.configured &&
+            quickAccessOwnerId === repositoryTrip.data.ownerUserId &&
+            quickAccessUnlocked
 
           if (isAdminRoute && !user) {
-            const redirectTarget = pathname || `/viagem/${routeSlug}/admin`
-            router.replace(`/login?redirect=${encodeURIComponent(redirectTarget)}`)
-            return
+            if (repositoryTrip.data.ownerUserId && resolvedQuickAccess.configured) {
+              setQuickAccessOwnerId(repositoryTrip.data.ownerUserId)
+              setQuickAccessMethods({
+                pinEnabled: resolvedQuickAccess.pinEnabled,
+                biometricEnabled: resolvedQuickAccess.biometricEnabled,
+              })
+
+              if (!quickAccessUnlocked) {
+                setTripData(
+                  buildTripDataFromStoredTrip({
+                    id: repositoryTrip.data.id,
+                    slug: repositoryTrip.data.slug,
+                    name: repositoryTrip.data.title,
+                    destination: repositoryTrip.data.destination,
+                    country: repositoryTrip.data.country ?? undefined,
+                    startDate: repositoryTrip.data.startDate ?? undefined,
+                    endDate: repositoryTrip.data.endDate ?? undefined,
+                    passengersCount: repositoryTrip.data.travelersCount,
+                    status: repositoryTrip.data.status,
+                    coverImage: repositoryTrip.data.coverImage ?? undefined,
+                    adminLink: repositoryTrip.data.adminLink,
+                    shareLink: repositoryTrip.data.publicLink,
+                    flights: repositoryTrip.data.flights,
+                    hotels: [],
+                    itinerary: repositoryTrip.data.itinerary,
+                    documents: [],
+                    travelersCount: repositoryTrip.data.travelersCount,
+                  }),
+                )
+                setIsLoadingTrip(false)
+                return
+              }
+            } else {
+              const redirectTarget = pathname || `/viagem/${routeSlug}/admin`
+              router.replace(`/login?redirect=${encodeURIComponent(redirectTarget)}`)
+              return
+            }
           }
 
-          if (isAdminRoute && !isOwner) {
+          if (isAdminRoute && !isOwner && !hasQuickAccess) {
             console.error("[TRIP] erro ao carregar link", "Usuario sem permissao para editar a viagem.")
             setLoadError("Voce nao tem permissao para editar esta viagem.")
             setIsLoadingTrip(false)
             return
           }
 
-          const canEditTrip = isAdminRoute && isOwner
+          const canEditTrip = isAdminRoute && (isOwner || hasQuickAccess)
+          const canWriteTrip = isAdminRoute && isOwner
           setIsAdmin(canEditTrip)
+          setCanWrite(canWriteTrip)
 
-          const documentsResult = canEditTrip
+          const documentsResult = canWriteTrip
             ? await listDocumentsByTrip(repositoryTrip.data.id)
             : await listPublicTripDocuments(repositoryTrip.data.id)
           const hotelsResult = await listTripHotels(repositoryTrip.data.id)
@@ -2822,6 +3059,7 @@ export default function TripPage() {
               name: repositoryTrip.data.title,
               destination: repositoryTrip.data.destination,
               country: repositoryTrip.data.country ?? undefined,
+              city: repositoryTrip.data.city ?? undefined,
               startDate: repositoryTrip.data.startDate ?? undefined,
               endDate: repositoryTrip.data.endDate ?? undefined,
               passengersCount: repositoryTrip.data.travelersCount,
@@ -2896,10 +3134,16 @@ export default function TripPage() {
     }
 
     void loadTrip()
-  }, [params, pathname, router, user?.id, authLoading])
+  }, [params, pathname, router, user?.id, authLoading, quickAccessOwnerId, quickAccessUnlocked])
 
   const showToast = (message: string, type: "success" | "error" | "info" = "success") => {
     setToast({ message, type })
+  }
+
+  const handleRequireAuthenticatedAdmin = () => {
+    const routeSlug = typeof params?.id === "string" ? params.id : tripData.id
+    const target = pathname || `/viagem/${routeSlug}/admin`
+    router.replace(`/login?redirect=${encodeURIComponent(target)}`)
   }
 
   const handleNavigate = (section: string) => {
@@ -2942,6 +3186,12 @@ export default function TripPage() {
 
     if (!tripData.id) {
       showToast("Viagem nao encontrada para salvar a hospedagem.", "error")
+      return
+    }
+
+    if (!canWrite) {
+      showToast("Entre com login para salvar alteracoes desta viagem.", "info")
+      handleRequireAuthenticatedAdmin()
       return
     }
 
@@ -2999,6 +3249,13 @@ export default function TripPage() {
 
   const handleDeleteHotel = async (hotelId: string) => {
     console.log("[HOTEL] delete started")
+
+    if (!canWrite) {
+      showToast("Entre com login para excluir hospedagens desta viagem.", "info")
+      handleRequireAuthenticatedAdmin()
+      return
+    }
+
     const result = await deleteTripHotel(hotelId)
 
     if (!result.success) {
@@ -3024,6 +3281,12 @@ export default function TripPage() {
   }
 
   const handleAddDocument = (data: any) => {
+    if (!canWrite) {
+      showToast("Entre com login para anexar documentos nesta viagem.", "info")
+      handleRequireAuthenticatedAdmin()
+      return
+    }
+
     setTripData(prev => ({
       ...prev,
       documents: [...prev.documents, { ...data, private: data.private ?? data.isPrivate ?? false }]
@@ -3068,8 +3331,24 @@ export default function TripPage() {
     )
   }
 
+  if ((pathname?.endsWith("/admin") ?? false) && !user && quickAccessOwnerId && !quickAccessUnlocked) {
+    return (
+      <QuickAccessGate
+        tripName={tripData.destination}
+        ownerUserId={quickAccessOwnerId}
+        pinEnabled={quickAccessMethods.pinEnabled}
+        biometricEnabled={quickAccessMethods.biometricEnabled}
+        onUnlock={() => {
+          setQuickAccessUnlocked(true)
+          setToast({ message: "Acesso rapido liberado neste dispositivo.", type: "success" })
+        }}
+        onLogin={handleRequireAuthenticatedAdmin}
+      />
+    )
+  }
+
   return (
-    <PermissionContext.Provider value={{ isAdmin, setIsAdmin }}>
+    <PermissionContext.Provider value={{ isAdmin, canWrite, setIsAdmin }}>
       <ToastContext.Provider value={{ showToast }}>
         <main className="min-h-screen bg-black text-white">
           <div className="fixed inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-[#004aad]/10 via-transparent to-transparent pointer-events-none" />
@@ -3082,7 +3361,7 @@ export default function TripPage() {
   <FlightsSection tripData={tripData} onUpdateFlight={handleUpdateFlight} onAddFlight={handleAddFlight} tripId={tripData.id} ownerUserId={user?.id ?? profile?.id ?? null} agencyId={profile?.agencyId ?? null} />
   <HotelSection tripData={tripData} onSaveHotel={handleSaveHotel} onDeleteHotel={handleDeleteHotel} />
   <ItinerarySection tripData={tripData} onUpdateItinerary={handleUpdateItinerary} />
-  <DocumentsSection tripData={tripData} onAddDocument={handleAddDocument} tripId={tripData.id} ownerUserId={user?.id ?? profile?.id ?? null} agencyId={profile?.agencyId ?? null} />
+  <DocumentsSection tripData={tripData} onAddDocument={handleAddDocument} tripId={tripData.id} ownerUserId={user?.id ?? profile?.id ?? null} agencyId={profile?.agencyId ?? null} tripOwnerUserId={tripOwnerUserId} />
   <ConciergeSection tripData={tripData} onOpenCredits={() => setCreditsOpen(true)} />
           <OfflineSection />
           <QuickInfoSection tripData={tripData} />

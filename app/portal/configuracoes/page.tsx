@@ -38,6 +38,13 @@ import { useAuth } from "@/contexts/auth-context"
 import { shouldUseSupabase } from "@/lib/data-source"
 import { updateProfile as updateProfileRepository } from "@/lib/repositories/profiles-repository"
 import { createSupabaseBrowserClient } from "@/lib/supabase/client"
+import {
+  disableQuickAccessBiometric,
+  disableQuickAccessPin,
+  isBiometricQuickAccessSupported,
+  registerQuickAccessBiometric,
+  saveQuickAccessPin,
+} from "@/lib/auth/quick-access"
 
 const fadeInUp = {
   initial: { opacity: 0, y: 20 },
@@ -65,12 +72,11 @@ const defaultProfile = {
 }
 
 const defaultSettings = {
-  faceId: true,
-  pinEnabled: true,
+  faceId: false,
+  pinEnabled: false,
   notifications: true,
   darkMode: true,
   language: "pt-BR",
-  pin: "1234",
 }
 
 function SettingsToast({ message }: { message: string }) {
@@ -106,6 +112,7 @@ export default function ConfiguracoesPage() {
   const [photoPreview, setPhotoPreview] = useState("")
   const [photoFile, setPhotoFile] = useState<File | null>(null)
   const [pinForm, setPinForm] = useState({ pin: "", confirmPin: "" })
+  const biometricSupported = isBiometricQuickAccessSupported()
 
   useEffect(() => {
     if (typeof window === "undefined") return
@@ -280,13 +287,50 @@ export default function ConfiguracoesPage() {
     }
   }
 
-  const handleSavePin = () => {
+  const handleSavePin = async () => {
     if (pinForm.pin.length !== 4 || pinForm.pin !== pinForm.confirmPin) return
 
-    setSettings((prev) => ({ ...prev, pinEnabled: true, pin: pinForm.pin }))
-    setPinForm({ pin: "", confirmPin: "" })
-    setShowPinModal(false)
-    showToast("PIN salvo com sucesso.")
+    if (!authProfile?.id) {
+      setActionError("Faca login novamente para configurar o PIN neste dispositivo.")
+      return
+    }
+
+    console.log("[SETTINGS] save started")
+    setIsSavingSettings(true)
+    setActionError("")
+
+    try {
+      await saveQuickAccessPin(authProfile.id, pinForm.pin)
+
+      if (shouldUseSupabase() && authProfile) {
+        const result = await updateProfileRepository(authProfile.id, {
+          settings: {
+            language: authProfile.settings?.language ?? settings.language,
+            darkMode: authProfile.settings?.darkMode ?? settings.darkMode,
+            notificationsEnabled: settings.notifications,
+            biometricEnabled: settings.faceId,
+            pinEnabled: true,
+          },
+        })
+
+        if (!result.data) {
+          throw new Error("Nao foi possivel salvar a configuracao de PIN.")
+        }
+
+        await refreshProfile()
+      }
+
+      setSettings((prev) => ({ ...prev, pinEnabled: true }))
+      setPinForm({ pin: "", confirmPin: "" })
+      setShowPinModal(false)
+      showToast("PIN salvo com sucesso.")
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Nao foi possivel configurar o PIN."
+      console.error("[PROFILE] save error", message)
+      setActionError(message)
+    } finally {
+      setIsSavingSettings(false)
+    }
   }
 
   const handleSignOut = async () => {
@@ -300,6 +344,20 @@ export default function ConfiguracoesPage() {
     setActionError("")
 
     try {
+      if (!authProfile?.id) {
+        throw new Error("Faca login novamente para configurar a biometria.")
+      }
+
+      if (settings.faceId) {
+        if (!biometricSupported) {
+          throw new Error("Biometria indisponivel neste dispositivo ou navegador.")
+        }
+
+        await registerQuickAccessBiometric(authProfile.id, authProfile.name || authProfile.email)
+      } else {
+        disableQuickAccessBiometric(authProfile.id)
+      }
+
       if (shouldUseSupabase() && authProfile) {
         const result = await updateProfileRepository(authProfile.id, {
           settings: {
@@ -322,6 +380,55 @@ export default function ConfiguracoesPage() {
       showToast(settings.faceId ? "Biometria ativada." : "Biometria desativada.")
     } catch (error) {
       const message = error instanceof Error ? error.message : "Nao foi possivel salvar a configuracao."
+      console.error("[PROFILE] save error", message)
+      setSettings((prev) => ({ ...prev, faceId: authProfile?.settings?.biometricEnabled ?? false }))
+      setActionError(message)
+    } finally {
+      setIsSavingSettings(false)
+    }
+  }
+
+  const handleTogglePinPreference = async () => {
+    if (!authProfile?.id) {
+      setActionError("Faca login novamente para atualizar a protecao por PIN.")
+      return
+    }
+
+    if (!settings.pinEnabled) {
+      showToast("Defina um novo PIN para ativar o acesso rapido neste dispositivo.")
+      return
+    }
+
+    console.log("[SETTINGS] save started")
+    setIsSavingSettings(true)
+    setActionError("")
+
+    try {
+      disableQuickAccessPin(authProfile.id)
+
+      if (shouldUseSupabase()) {
+        const result = await updateProfileRepository(authProfile.id, {
+          settings: {
+            language: authProfile.settings?.language ?? settings.language,
+            darkMode: authProfile.settings?.darkMode ?? settings.darkMode,
+            notificationsEnabled: settings.notifications,
+            biometricEnabled: settings.faceId,
+            pinEnabled: false,
+          },
+        })
+
+        if (!result.data) {
+          throw new Error("Nao foi possivel desativar a protecao por PIN.")
+        }
+
+        await refreshProfile()
+      }
+
+      setSettings((prev) => ({ ...prev, pinEnabled: false }))
+      setPinForm({ pin: "", confirmPin: "" })
+      showToast("PIN desativado neste dispositivo.")
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Nao foi possivel atualizar a protecao por PIN."
       console.error("[PROFILE] save error", message)
       setActionError(message)
     } finally {
@@ -588,6 +695,11 @@ export default function ConfiguracoesPage() {
                 Quando ativado, o Vuei salva sua preferencia e pode solicitar biometria do dispositivo em fluxos suportados.
               </p>
             </div>
+            {!biometricSupported && (
+              <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 p-4 text-sm text-amber-300">
+                Este navegador ou dispositivo ainda nao oferece suporte confiavel a WebAuthn/passkey para o Vuei. Voce pode usar PIN neste dispositivo ou entrar com login.
+              </div>
+            )}
             <div className="flex items-center justify-between rounded-xl border border-border/50 p-4">
               <div>
                 <p className="font-medium">Protecao biometrica</p>
@@ -638,10 +750,8 @@ export default function ConfiguracoesPage() {
             <Button
               variant="outline"
               className="w-full"
-              onClick={() => {
-                setSettings((prev) => ({ ...prev, pinEnabled: !prev.pinEnabled }))
-                showToast(settings.pinEnabled ? "PIN desativado." : "PIN sera exigido apos salvar.")
-              }}
+              onClick={() => void handleTogglePinPreference()}
+              disabled={isSavingSettings}
             >
               {settings.pinEnabled ? "Desativar PIN atual" : "Ativar protecao por PIN"}
             </Button>
@@ -651,10 +761,10 @@ export default function ConfiguracoesPage() {
               </Button>
               <Button
                 className="flex-1 bg-gradient-to-r from-primary to-secondary text-primary-foreground"
-                onClick={handleSavePin}
-                disabled={pinForm.pin.length !== 4 || pinForm.pin !== pinForm.confirmPin}
+                onClick={() => void handleSavePin()}
+                disabled={isSavingSettings || pinForm.pin.length !== 4 || pinForm.pin !== pinForm.confirmPin}
               >
-                Salvar
+                {isSavingSettings ? "Salvando..." : "Salvar"}
               </Button>
             </div>
           </div>
