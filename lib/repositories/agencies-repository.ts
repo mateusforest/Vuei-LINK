@@ -4,7 +4,7 @@ import { createSupabaseBrowserClient, createSupabaseBrowserClientPlaceholder } f
 import type { Database } from "@/lib/supabase/types"
 import { mapAgencySettingsToAgency } from "@/lib/mappers/agency-mappers"
 
-interface AgencyMember {
+export interface AgencyMember {
   id: string
   agencyId: string
   profileId: string
@@ -231,6 +231,23 @@ export async function getAgencyById(id: string) {
   }
 }
 
+export async function listAgencies() {
+  if (shouldUseSupabase()) {
+    const client = createSupabaseBrowserClient()
+    if (client) {
+      const { data, error } = await client.from("agencies").select("*").order("created_at", { ascending: false })
+      if (error) {
+        console.error("[AUTH ERROR]", error.message)
+        return { source: "supabase" as const, data: [] as Agency[], error: error.message }
+      }
+      return { source: "supabase" as const, data: (data ?? []).map(mapAgencyRowToAgency), error: null }
+    }
+  }
+
+  const agency = buildAgency()
+  return { source: "local" as const, data: agency ? [agency] : [], error: null }
+}
+
 export async function getAgencyBySlug(slug: string) {
   if (shouldUseSupabase()) {
     const client = createSupabaseBrowserClient()
@@ -359,6 +376,35 @@ export async function listAgencyMembers(agencyId: string) {
   }
 
   return { source: "local" as const, data: buildAgencyMembers(agencyId) }
+}
+
+export async function listAllAgencyMembers() {
+  if (shouldUseSupabase()) {
+    const client = createSupabaseBrowserClient()
+    if (client) {
+      const { data, error } = await client.from("agency_members").select("*").order("created_at", { ascending: false })
+      if (error) {
+        console.error("[AUTH ERROR]", error.message)
+        return { source: "supabase" as const, data: [] as AgencyMember[], error: error.message }
+      }
+
+      return {
+        source: "supabase" as const,
+        data: (data ?? []).map((member) => ({
+          id: member.id,
+          agencyId: member.agency_id,
+          profileId: member.profile_id,
+          role: member.role,
+          status: member.status,
+          createdAt: member.created_at,
+        })),
+        error: null,
+      }
+    }
+  }
+
+  const agency = buildAgency()
+  return { source: "local" as const, data: agency ? buildAgencyMembers(agency.id) : [], error: null }
 }
 
 export async function addAgencyMember(payload: Omit<AgencyMember, "id" | "createdAt">) {

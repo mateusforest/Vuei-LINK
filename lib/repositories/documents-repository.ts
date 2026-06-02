@@ -150,6 +150,40 @@ export async function listDocumentsByTrip(tripId: string) {
   }
 }
 
+export async function listDocuments(params?: { tripId?: string; clientId?: string; agencyId?: string; ownerUserId?: string }) {
+  if (shouldUseSupabase()) {
+    const client = createSupabaseBrowserClient()
+    if (client) {
+      let query = client.from("documents").select("*").order("created_at", { ascending: false })
+
+      if (params?.tripId) query = query.eq("trip_id", params.tripId)
+      if (params?.clientId) query = query.eq("client_id", params.clientId)
+      if (params?.agencyId) query = query.eq("agency_id", params.agencyId)
+      if (params?.ownerUserId) query = query.eq("owner_user_id", params.ownerUserId)
+
+      const { data, error } = await query
+
+      if (error) {
+        return { source: "supabase" as const, data: [] as Document[], error: error.message }
+      }
+
+      return { source: "supabase" as const, data: (data ?? []).map(mapDocumentRowToDocument), error: null }
+    }
+  }
+
+  return {
+    source: "local" as const,
+    data: readLocalDocuments().filter((document) => {
+      if (params?.tripId && document.tripId !== params.tripId) return false
+      if (params?.clientId && document.clientId !== params.clientId) return false
+      if (params?.agencyId && document.agencyId !== params.agencyId) return false
+      if (params?.ownerUserId && document.ownerUserId !== params.ownerUserId) return false
+      return true
+    }),
+    error: null,
+  }
+}
+
 export async function listDocumentsByClient(clientId: string) {
   if (shouldUseSupabase()) {
     const client = createSupabaseBrowserClient()

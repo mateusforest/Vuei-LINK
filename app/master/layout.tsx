@@ -72,7 +72,7 @@ export default function MasterLayout({ children }: { children: React.ReactNode }
 function MasterLayoutInner({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const router = useRouter()
-  const { signOut } = useAuth()
+  const { signOut, profile } = useAuth()
   const [collapsed, setCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
@@ -80,7 +80,7 @@ function MasterLayoutInner({ children }: { children: React.ReactNode }) {
   const [searchQuery, setSearchQuery] = useState("")
   const [notificationsOpen, setNotificationsOpen] = useState(false)
   
-  const { credits, notifications, markNotificationRead, markAllNotificationsRead, searchGlobal, stats } = useMaster()
+  const { credits, notifications, markNotificationRead, markAllNotificationsRead, searchGlobal } = useMaster()
   const unreadCount = notifications.filter(n => !n.read).length
   const searchResults = searchQuery.length > 1 ? searchGlobal(searchQuery) : { agencies: [], users: [], trips: [] }
   const hasResults = searchResults.agencies.length > 0 || searchResults.users.length > 0 || searchResults.trips.length > 0
@@ -118,6 +118,14 @@ function MasterLayoutInner({ children }: { children: React.ReactNode }) {
     else if (type === "user") router.push(`/master/usuarios?id=${id}`)
     else if (type === "trip") router.push(`/master/viagens?id=${id}`)
   }
+
+  const profileName = profile?.name || profile?.email || "Master"
+  const profileInitials = profileName
+    .split(" ")
+    .map((part) => part[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase()
 
   const handleSignOut = async () => {
     await signOut()
@@ -501,11 +509,11 @@ function MasterLayoutInner({ children }: { children: React.ReactNode }) {
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="h-9 gap-2 px-2 hover:bg-white/5">
                   <Avatar className="h-7 w-7 border border-white/10">
-                    <AvatarImage src="/placeholder.svg" />
-                    <AvatarFallback className="bg-gradient-to-br from-primary to-accent text-[10px] font-semibold text-white">AD</AvatarFallback>
+                    <AvatarImage src={profile?.avatarUrl || undefined} />
+                    <AvatarFallback className="bg-gradient-to-br from-primary to-accent text-[10px] font-semibold text-white">{profileInitials}</AvatarFallback>
                   </Avatar>
                   <div className="hidden md:flex flex-col items-start">
-                    <span className="text-xs font-medium">Admin</span>
+                    <span className="text-xs font-medium">{profileName}</span>
                     <span className="text-[10px] text-muted-foreground">Master</span>
                   </div>
                 </Button>

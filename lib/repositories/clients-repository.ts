@@ -84,6 +84,33 @@ export async function listClients(agencyId: string) {
   return { source: "local" as const, data: getClients(agencyId), error: null }
 }
 
+export async function listAllClients() {
+  if (shouldUseSupabase()) {
+    const client = createSupabaseBrowserClient()
+    if (client) {
+      const { data, error } = await client.from("clients").select("*").order("created_at", { ascending: false })
+      if (error) {
+        console.error("[AUTH ERROR]", error.message)
+        return {
+          source: "supabase" as const,
+          config: createSupabaseBrowserClientPlaceholder(),
+          data: [] as Client[],
+          error: error.message,
+        }
+      }
+
+      return {
+        source: "supabase" as const,
+        config: createSupabaseBrowserClientPlaceholder(),
+        data: (data ?? []).map(mapClientRowToClient),
+        error: null,
+      }
+    }
+  }
+
+  return { source: "local" as const, data: getClients(null), error: null }
+}
+
 export async function getClientById(id: string) {
   if (shouldUseSupabase()) {
     const client = createSupabaseBrowserClient()
