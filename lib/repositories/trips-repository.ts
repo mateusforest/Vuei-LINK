@@ -403,7 +403,7 @@ export async function createTrip(payload: CreateTripPayload) {
         city: trip.city ?? parsedDestination.city,
         start_date: trip.startDate,
         end_date: trip.endDate,
-        status: trip.status === "draft" ? "draft" : "draft",
+        status: trip.status ?? "draft",
         style: trip.style,
         owner_type: trip.ownerType,
         owner_user_id: trip.ownerUserId,
@@ -522,16 +522,40 @@ export async function updateTrip(id: string, payload: Partial<Trip>) {
 }
 
 export async function deleteTrip(id: string) {
-  if (shouldUseSupabase()) {
-    return {
-      source: "supabase-placeholder" as const,
-      config: createSupabaseBrowserClientPlaceholder(),
-      success: true,
+  const supabase = createSupabaseBrowserClient()
+
+  if (shouldUseSupabase() && supabase) {
+    try {
+      const { error } = await supabase.from("trips").delete().eq("id", id)
+
+      if (!error) {
+        return {
+          source: "supabase" as const,
+          config: createSupabaseBrowserClientPlaceholder(),
+          success: true,
+          error: null,
+        }
+      }
+
+      return {
+        source: "supabase" as const,
+        config: createSupabaseBrowserClientPlaceholder(),
+        success: false,
+        error: error.message,
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Falha ao remover viagem."
+      return {
+        source: "supabase" as const,
+        config: createSupabaseBrowserClientPlaceholder(),
+        success: false,
+        error: message,
+      }
     }
   }
 
   writeLocalTrips(readStoredTrips().filter((trip) => trip.id !== id))
-  return { source: "local" as const, success: true }
+  return { source: "local" as const, success: true, error: null }
 }
 
 export async function listTripsByUser(userId: string) {

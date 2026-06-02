@@ -76,7 +76,7 @@ function Modal({ open, onClose, title, children }: { open: boolean; onClose: () 
 }
 
 // New Client Modal
-function NewClientModal({ open, onClose, onSave }: { open: boolean; onClose: () => void; onSave: (client: Omit<Client, "id" | "createdAt">) => void }) {
+function NewClientModal({ open, onClose, onSave }: { open: boolean; onClose: () => void; onSave: (client: Omit<Client, "id" | "createdAt">) => Promise<void> }) {
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -86,9 +86,9 @@ function NewClientModal({ open, onClose, onSave }: { open: boolean; onClose: () 
     status: "active" as const
   })
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!formData.name || !formData.email) return
-    onSave(formData)
+    await onSave(formData)
     setFormData({ name: "", email: "", phone: "", document: "", notes: "", status: "active" })
     onClose()
   }
@@ -154,7 +154,7 @@ function UploadDocModal({ open, onClose, clients, trips, onSave }: {
   onClose: () => void
   clients: Client[]
   trips: AgencyTrip[]
-  onSave: (data: { name: string; type: string; clientId?: string; tripId?: string; isPrivate: boolean }) => void
+  onSave: (data: { name: string; type: string; clientId?: string; tripId?: string; isPrivate: boolean }) => Promise<void>
 }) {
   const [uploading, setUploading] = useState(false)
   const [formData, setFormData] = useState({
@@ -165,14 +165,12 @@ function UploadDocModal({ open, onClose, clients, trips, onSave }: {
     isPrivate: false
   })
 
-  const handleUpload = () => {
+  const handleUpload = async () => {
     setUploading(true)
-    setTimeout(() => {
-      setUploading(false)
-      onSave(formData)
-      setFormData({ name: "", type: "voucher", clientId: "", tripId: "", isPrivate: false })
-      onClose()
-    }, 1500)
+    await onSave(formData)
+    setUploading(false)
+    setFormData({ name: "", type: "voucher", clientId: "", tripId: "", isPrivate: false })
+    onClose()
   }
 
   return (
@@ -433,7 +431,7 @@ function GenerateItineraryModal({ open, onClose, clients, trips, onGenerate }: {
 export default function AgencyDashboard() {
   const router = useRouter()
   const { user, profile } = useAuth()
-  const { clients, trips, credits, activities, conciergeRequests, addClient, addDocument, useCredits } = useAgency()
+  const { clients, trips, credits, activities, conciergeRequests, addClient, addDocument, useCredits, isUsingRealData } = useAgency()
   const [newClientOpen, setNewClientOpen] = useState(false)
   const [uploadDocOpen, setUploadDocOpen] = useState(false)
   const [generateItineraryOpen, setGenerateItineraryOpen] = useState(false)
@@ -470,18 +468,22 @@ export default function AgencyDashboard() {
     { label: "Creditos IA", value: credits.balance.toString(), icon: Sparkles, trend: `${credits.plan}`, color: "from-accent/80 to-primary/80" },
   ]
 
-  const handleNewClient = (data: Omit<Client, "id" | "createdAt">) => {
-    addClient(data)
+  const handleNewClient = async (data: Omit<Client, "id" | "createdAt">) => {
+    await addClient(data)
   }
 
-  const handleUploadDoc = (data: { name: string; type: string; clientId?: string; tripId?: string; isPrivate: boolean }) => {
-    addDocument({
+  const handleUploadDoc = async (data: { name: string; type: string; clientId?: string; tripId?: string; isPrivate: boolean }) => {
+    const created = await addDocument({
       name: data.name,
       type: data.type as any,
       clientId: data.clientId,
       tripId: data.tripId,
       isPrivate: data.isPrivate
     })
+
+    if (!created && isUsingRealData) {
+      window.alert("Nenhum dado real ainda foi salvo nesta acao. Verifique o upload de arquivo da area de documentos da agencia.")
+    }
   }
 
   const handleGenerateItinerary = () => {

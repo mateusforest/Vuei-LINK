@@ -1,6 +1,6 @@
 "use client"
 
-import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from "react"
+import { createContext, useContext, useState, useEffect, useCallback, useMemo, type ReactNode } from "react"
 import type { Client as CanonicalClient, CreditBalance, CreditTransaction, Trip as CanonicalTrip, TripStatus } from "@/types"
 import {
   AGENCY_STORAGE_SCHEMA_VERSION,
@@ -16,6 +16,12 @@ import {
 } from "@/lib/mappers/trip-mappers"
 import { mapCreditHistoryToTransactions, mapLegacyCreditsToCreditBalance } from "@/lib/mappers/credit-mappers"
 import { buildAdminTripUrl, buildPublicTripUrl } from "@/lib/security/link-tokens"
+import { useAuth } from "@/contexts/auth-context"
+import { shouldUseSupabase } from "@/lib/data-source"
+import { createClient as createClientRecord, deleteClient as deleteClientRecord, listClients, updateClient as updateClientRecord } from "@/lib/repositories/clients-repository"
+import { getAgencyById, getAgencyByOwner } from "@/lib/repositories/agencies-repository"
+import { deleteDocument as deleteDocumentRecord, listDocumentsByTrip } from "@/lib/repositories/documents-repository"
+import { createTrip as createTripRecord, deleteTrip as deleteTripRecord, listTripsByAgency, updateTrip as updateTripRecord } from "@/lib/repositories/trips-repository"
 
 export interface Client extends Pick<CanonicalClient, "id" | "name"> {
   id: string
@@ -111,19 +117,19 @@ interface AgencyCredits {
 
 interface AgencyContextType {
   clients: Client[]
-  addClient: (data: Omit<Client, "id" | "createdAt">) => Client
-  updateClient: (id: string, data: Partial<Client>) => void
-  deleteClient: (id: string) => void
+  addClient: (data: Omit<Client, "id" | "createdAt">) => Promise<Client | null>
+  updateClient: (id: string, data: Partial<Client>) => Promise<Client | null>
+  deleteClient: (id: string) => Promise<boolean>
   getClientById: (id: string) => Client | undefined
   trips: AgencyTrip[]
-  addTrip: (data: Omit<AgencyTrip, "id" | "slug" | "adminLink" | "shareLink" | "createdAt" | "coverImage">) => AgencyTrip
-  updateTrip: (id: string, data: Partial<AgencyTrip>) => void
-  deleteTrip: (id: string) => void
+  addTrip: (data: Omit<AgencyTrip, "id" | "slug" | "adminLink" | "shareLink" | "createdAt" | "coverImage">) => Promise<AgencyTrip | null>
+  updateTrip: (id: string, data: Partial<AgencyTrip>) => Promise<AgencyTrip | null>
+  deleteTrip: (id: string) => Promise<boolean>
   getTripById: (id: string) => AgencyTrip | undefined
   getTripsByClient: (clientId: string) => AgencyTrip[]
   documents: AgencyDocument[]
-  addDocument: (data: Omit<AgencyDocument, "id" | "createdAt">) => AgencyDocument
-  deleteDocument: (id: string) => void
+  addDocument: (data: Omit<AgencyDocument, "id" | "createdAt">) => Promise<AgencyDocument | null>
+  deleteDocument: (id: string) => Promise<boolean>
   getDocumentsByTrip: (tripId: string) => AgencyDocument[]
   getDocumentsByClient: (clientId: string) => AgencyDocument[]
   conciergeRequests: ConciergeRequest[]
@@ -139,6 +145,8 @@ interface AgencyContextType {
   addCredits: (amount: number) => void
   activities: Activity[]
   addActivity: (action: string, description: string, type: Activity["type"]) => void
+  agencyId: string | null
+  isUsingRealData: boolean
 }
 
 const AgencyContext = createContext<AgencyContextType | undefined>(undefined)
@@ -330,15 +338,24 @@ const initialActivities: Activity[] = [
 ]
 
 export function AgencyProvider({ children }: { children: ReactNode }) {
-  // O contexto segue como fonte local principal nesta etapa.
-  // Repositories canônicos foram adicionados para a migracao futura sem quebrar as telas atuais.
-  const [clients, setClients] = useState<Client[]>(initialClients)
-  const [trips, setTrips] = useState<AgencyTrip[]>(initialTrips)
+  const { user, profile } = useAuth()
+  const isUsingRealData = shouldUseSupabase()
+  const [agencyId, setAgencyId] = useState<string | null>(null)
+  const [clients, setClients] = useState<Client[]>(isUsingRealData ? [] : initialClients)
+  const [trips, setTrips] = useState<AgencyTrip[]>(isUsingRealData ? [] : initialTrips)
   const [documents, setDocuments] = useState<AgencyDocument[]>([])
-  const [conciergeRequests, setConciergeRequests] = useState<ConciergeRequest[]>(initialConciergeRequests)
-  const [teamMembers, setTeamMembers] = useState<TeamMember[]>(initialTeamMembers)
-  const [activities, setActivities] = useState<Activity[]>(initialActivities)
+  const [conciergeRequests, setConciergeRequests] = useState<ConciergeRequest[]>(isUsingRealData ? [] : initialConciergeRequests)
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>(isUsingRealData ? [] : initialTeamMembers)
+  const [activities, setActivities] = useState<Activity[]>(isUsingRealData ? [] : initialActivities)
   const [credits, setCredits] = useState<AgencyCredits>(() => {
+    if (isUsingRealData) {
+      return {
+        balance: 0,
+        plan: "starter",
+        history: [],
+        ...buildCanonicalCredits(0, []),
+      }
+    }
     const history = [{ action: "Plano Professional", amount: 500, date: new Date().toISOString(), source: "Sistema" }]
     return {
       balance: 500,
@@ -348,9 +365,14 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
     }
   })
   const [isLoaded, setIsLoaded] = useState(false)
+  const clientNameById = useMemo(() => new Map(clients.map((client) => [client.id, client.name])), [clients])
 
   useEffect(() => {
     if (typeof window === "undefined") return
+    if (isUsingRealData) {
+      setIsLoaded(true)
+      return
+    }
 
     const stored = extractAgencyStorageState<AgencyTrip, AgencyDocument, ConciergeRequest, TeamMember, Activity, AgencyCredits>(
       window.localStorage.getItem(AGENCY_STORAGE_KEY)
@@ -393,10 +415,10 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
     }
 
     setIsLoaded(true)
-  }, [])
+  }, [isUsingRealData])
 
   useEffect(() => {
-    if (!isLoaded || typeof window === "undefined") return
+    if (!isLoaded || typeof window === "undefined" || isUsingRealData) return
 
     const payload: PersistedAgencyState = {
       schemaVersion: AGENCY_STORAGE_SCHEMA_VERSION,
@@ -409,7 +431,134 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
       credits,
     }
     window.localStorage.setItem(AGENCY_STORAGE_KEY, JSON.stringify(payload))
-  }, [clients, trips, documents, conciergeRequests, teamMembers, activities, credits, isLoaded])
+  }, [clients, trips, documents, conciergeRequests, teamMembers, activities, credits, isLoaded, isUsingRealData])
+
+  useEffect(() => {
+    if (!isUsingRealData) return
+    if (!user?.id) {
+      setAgencyId(null)
+      setClients([])
+      setTrips([])
+      setDocuments([])
+      setConciergeRequests([])
+      setTeamMembers([])
+      setActivities([])
+      setCredits({
+        balance: 0,
+        plan: "starter",
+        history: [],
+        ...buildCanonicalCredits(0, []),
+      })
+      setIsLoaded(true)
+      return
+    }
+
+    let active = true
+
+    const loadAgencyWorkspace = async () => {
+      const agencyResult = profile?.agencyId ? await getAgencyById(profile.agencyId) : await getAgencyByOwner(user.id)
+      const resolvedAgency = agencyResult.data
+
+      if (!active) return
+
+      if (!resolvedAgency) {
+        setAgencyId(null)
+        setClients([])
+        setTrips([])
+        setDocuments([])
+        setConciergeRequests([])
+        setTeamMembers([])
+        setActivities([])
+        setCredits({
+          balance: 0,
+          plan: "starter",
+          history: [],
+          ...buildCanonicalCredits(0, []),
+        })
+        setIsLoaded(true)
+        return
+      }
+
+      const [clientsResult, tripsResult] = await Promise.all([
+        listClients(resolvedAgency.id),
+        listTripsByAgency(resolvedAgency.id),
+      ])
+
+      if (!active) return
+
+      const mappedClients: Client[] = (clientsResult.data ?? []).map((client) => ({
+        id: client.id,
+        name: client.name,
+        email: client.email ?? "",
+        phone: client.phone ?? "",
+        document: client.document ?? undefined,
+        notes: client.notes ?? undefined,
+        status: client.status === "inactive" ? "inactive" : "active",
+        createdAt: client.createdAt,
+        updatedAt: client.updatedAt,
+      }))
+
+      const tripClientNameMap = new Map(mappedClients.map((client) => [client.id, client.name]))
+      const canonicalTrips = tripsResult.data ?? []
+      const mappedTrips = canonicalTrips.map((trip) =>
+        mapCanonicalTripToAgencyTrip(trip, trip.clientId ? tripClientNameMap.get(trip.clientId) ?? "" : "")
+      )
+
+      const documentsByTrip = await Promise.all(
+        canonicalTrips.map(async (trip) => {
+          const result = await listDocumentsByTrip(trip.id)
+          return result.data ?? []
+        })
+      )
+
+      if (!active) return
+
+      const mappedDocuments: AgencyDocument[] = documentsByTrip.flat().map((document) => ({
+        id: document.id,
+        tripId: document.tripId ?? undefined,
+        clientId: document.clientId ?? undefined,
+        name: document.name,
+        type:
+          document.type === "voucher" ||
+          document.type === "ticket" ||
+          document.type === "passport" ||
+          document.type === "visa" ||
+          document.type === "insurance" ||
+          document.type === "itinerary"
+            ? document.type
+            : "other",
+        isPrivate: document.isPrivate,
+        fileUrl: document.fileUrl ?? undefined,
+        createdAt: document.createdAt,
+      }))
+
+      const history =
+        resolvedAgency.creditsBalance > 0
+          ? [{ action: "Saldo da agencia", amount: resolvedAgency.creditsBalance, date: new Date().toISOString(), source: "Supabase" }]
+          : []
+
+      setAgencyId(resolvedAgency.id)
+      setClients(mappedClients)
+      setTrips(mappedTrips)
+      setDocuments(mappedDocuments)
+      setConciergeRequests([])
+      setTeamMembers([])
+      setActivities([])
+      setCredits({
+        balance: resolvedAgency.creditsBalance,
+        plan: resolvedAgency.plan === "pro" ? "professional" : resolvedAgency.plan,
+        history,
+        ...buildCanonicalCredits(resolvedAgency.creditsBalance, history),
+      })
+      setIsLoaded(true)
+    }
+
+    void loadAgencyWorkspace()
+
+    return () => {
+      active = false
+    }
+  }, [isUsingRealData, profile?.agencyId, user?.id])
 
   const addActivity = useCallback((action: string, description: string, type: Activity["type"]) => {
     const newActivity: Activity = {
@@ -422,7 +571,36 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
     setActivities((prev) => [newActivity, ...prev.slice(0, 49)])
   }, [])
 
-  const addClient = useCallback((data: Omit<Client, "id" | "createdAt">) => {
+  const addClient = useCallback(async (data: Omit<Client, "id" | "createdAt">) => {
+    if (isUsingRealData && agencyId) {
+      const result = await createClientRecord({
+        agencyId,
+        name: data.name,
+        email: data.email || null,
+        phone: data.phone || null,
+        document: data.document || null,
+        notes: data.notes || null,
+        status: data.status === "inactive" ? "inactive" : "active",
+      })
+
+      if (!result.data) return null
+
+      const newClient: Client = {
+        id: result.data.id,
+        name: result.data.name,
+        email: result.data.email ?? "",
+        phone: result.data.phone ?? "",
+        document: result.data.document ?? undefined,
+        notes: result.data.notes ?? undefined,
+        status: result.data.status === "inactive" ? "inactive" : "active",
+        createdAt: result.data.createdAt,
+        updatedAt: result.data.updatedAt,
+      }
+
+      setClients((prev) => [newClient, ...prev])
+      return newClient
+    }
+
     const newClient: Client = {
       ...data,
       id: `client-${Date.now()}`,
@@ -431,21 +609,94 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
     setClients((prev) => [newClient, ...prev])
     addActivity("Cliente cadastrado", newClient.name, "client")
     return newClient
-  }, [addActivity])
+  }, [addActivity, agencyId, isUsingRealData])
 
-  const updateClient = useCallback((id: string, data: Partial<Client>) => {
-    setClients((prev) => prev.map((client) => (client.id === id ? { ...client, ...data } : client)))
-  }, [])
+  const updateClient = useCallback(async (id: string, data: Partial<Client>) => {
+    if (isUsingRealData) {
+      const result = await updateClientRecord(id, {
+        name: data.name,
+        email: data.email ?? null,
+        phone: data.phone ?? null,
+        document: data.document ?? null,
+        notes: data.notes ?? null,
+        status: data.status === "inactive" ? "inactive" : data.status,
+      })
 
-  const deleteClient = useCallback((id: string) => {
+      if (!result.data) return null
+
+      const updatedClient: Client = {
+        id: result.data.id,
+        name: result.data.name,
+        email: result.data.email ?? "",
+        phone: result.data.phone ?? "",
+        document: result.data.document ?? undefined,
+        notes: result.data.notes ?? undefined,
+        status: result.data.status === "inactive" ? "inactive" : "active",
+        createdAt: result.data.createdAt,
+        updatedAt: result.data.updatedAt,
+      }
+
+      setClients((prev) => prev.map((client) => (client.id === id ? updatedClient : client)))
+      return updatedClient
+    }
+
+    let updatedClient: Client | null = null
+    setClients((prev) =>
+      prev.map((client) => {
+        if (client.id !== id) return client
+        updatedClient = { ...client, ...data }
+        return updatedClient
+      })
+    )
+    return updatedClient
+  }, [isUsingRealData])
+
+  const deleteClient = useCallback(async (id: string) => {
+    if (isUsingRealData) {
+      const result = await deleteClientRecord(id)
+      if (!result.success) return false
+      setClients((prev) => prev.filter((item) => item.id !== id))
+      return true
+    }
+
     const client = clients.find((item) => item.id === id)
     setClients((prev) => prev.filter((item) => item.id !== id))
     if (client) addActivity("Cliente removido", client.name, "client")
-  }, [clients, addActivity])
+    return true
+  }, [addActivity, clients, isUsingRealData])
 
   const getClientById = useCallback((id: string) => clients.find((client) => client.id === id), [clients])
 
-  const addTrip = useCallback((data: Omit<AgencyTrip, "id" | "slug" | "adminLink" | "shareLink" | "createdAt" | "coverImage">) => {
+  const addTrip = useCallback(async (data: Omit<AgencyTrip, "id" | "slug" | "adminLink" | "shareLink" | "createdAt" | "coverImage">) => {
+    if (isUsingRealData && agencyId) {
+      const result = await createTripRecord({
+        title: data.name,
+        destination: data.destination,
+        country: data.country,
+        city: data.city,
+        startDate: data.startDate,
+        endDate: data.endDate,
+        style: data.style,
+        travelersCount: data.passengersCount,
+        status: data.status,
+        ownerType: "agency",
+        ownerUserId: user?.id ?? null,
+        agencyId,
+        clientId: data.clientId || null,
+        coverImage: getImageForDestination(data.destination),
+      })
+
+      if (!result.data) return null
+
+      const mappedTrip = mapCanonicalTripToAgencyTrip(
+        result.data,
+        data.clientName || (data.clientId ? clientNameById.get(data.clientId) ?? "" : "")
+      )
+
+      setTrips((prev) => [mappedTrip, ...prev])
+      return mappedTrip
+    }
+
     const { city, country } = parseDestination(data.destination)
     const baseSlug = slugifyTripBase(data.name, data.destination)
     const slug = buildUniqueTripSlug(baseSlug, trips.map((trip) => trip.slug))
@@ -466,23 +717,69 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
     setTrips((prev) => [newTrip, ...prev])
     addActivity("Viagem criada", `${data.name} para ${data.clientName}`, "trip")
     return newTrip
-  }, [addActivity, trips])
+  }, [addActivity, agencyId, clientNameById, isUsingRealData, trips, user?.id])
 
-  const updateTrip = useCallback((id: string, data: Partial<AgencyTrip>) => {
-    setTrips((prev) => prev.map((trip) => (trip.id === id ? { ...trip, ...data } : trip)))
-  }, [])
+  const updateTrip = useCallback(async (id: string, data: Partial<AgencyTrip>) => {
+    if (isUsingRealData) {
+      const result = await updateTripRecord(id, {
+        title: data.name,
+        destination: data.destination,
+        country: data.country,
+        city: data.city,
+        startDate: data.startDate,
+        endDate: data.endDate,
+        style: data.style,
+        travelersCount: data.passengersCount,
+        status: data.status,
+        coverImage: data.coverImage,
+        clientId: data.clientId,
+      })
 
-  const deleteTrip = useCallback((id: string) => {
+      if (!result.data) return null
+
+      const mappedTrip = mapCanonicalTripToAgencyTrip(
+        result.data,
+        data.clientName || (result.data.clientId ? clientNameById.get(result.data.clientId) ?? "" : "")
+      )
+
+      setTrips((prev) => prev.map((trip) => (trip.id === id ? mappedTrip : trip)))
+      return mappedTrip
+    }
+
+    let updatedTrip: AgencyTrip | null = null
+    setTrips((prev) =>
+      prev.map((trip) => {
+        if (trip.id !== id) return trip
+        updatedTrip = { ...trip, ...data }
+        return updatedTrip
+      })
+    )
+    return updatedTrip
+  }, [clientNameById, isUsingRealData])
+
+  const deleteTrip = useCallback(async (id: string) => {
+    if (isUsingRealData) {
+      const result = await deleteTripRecord(id)
+      if (!result.success) return false
+      setTrips((prev) => prev.filter((item) => item.id !== id))
+      setDocuments((prev) => prev.filter((document) => document.tripId !== id))
+      return true
+    }
+
     const trip = trips.find((item) => item.id === id)
     setTrips((prev) => prev.filter((item) => item.id !== id))
     if (trip) addActivity("Viagem removida", trip.name, "trip")
-  }, [trips, addActivity])
+    return true
+  }, [addActivity, isUsingRealData, trips])
 
   const getTripById = useCallback((id: string) => trips.find((trip) => trip.id === id), [trips])
-
   const getTripsByClient = useCallback((clientId: string) => trips.filter((trip) => trip.clientId === clientId), [trips])
 
-  const addDocument = useCallback((data: Omit<AgencyDocument, "id" | "createdAt">) => {
+  const addDocument = useCallback(async (data: Omit<AgencyDocument, "id" | "createdAt">) => {
+    if (isUsingRealData) {
+      return null
+    }
+
     const newDocument: AgencyDocument = {
       ...data,
       id: `doc-${Date.now()}`,
@@ -491,14 +788,21 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
     setDocuments((prev) => [newDocument, ...prev])
     addActivity("Documento enviado", data.name, "document")
     return newDocument
-  }, [addActivity])
+  }, [addActivity, agencyId, isUsingRealData, user?.id])
 
-  const deleteDocument = useCallback((id: string) => {
+  const deleteDocument = useCallback(async (id: string) => {
+    if (isUsingRealData) {
+      const result = await deleteDocumentRecord(id)
+      if (!result.success) return false
+      setDocuments((prev) => prev.filter((document) => document.id !== id))
+      return true
+    }
+
     setDocuments((prev) => prev.filter((document) => document.id !== id))
-  }, [])
+    return true
+  }, [isUsingRealData])
 
   const getDocumentsByTrip = useCallback((tripId: string) => documents.filter((document) => document.tripId === tripId), [documents])
-
   const getDocumentsByClient = useCallback((clientId: string) => documents.filter((document) => document.clientId === clientId), [documents])
 
   const addConciergeRequest = useCallback((data: Omit<ConciergeRequest, "id" | "createdAt">) => {
@@ -609,6 +913,8 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
         addCredits,
         activities,
         addActivity,
+        agencyId,
+        isUsingRealData,
       }}
     >
       {children}

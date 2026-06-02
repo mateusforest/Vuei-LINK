@@ -76,7 +76,7 @@ function Modal({ open, onClose, title, children }: { open: boolean; onClose: () 
 function NewClientModal({ open, onClose, onSave, editClient }: { 
   open: boolean
   onClose: () => void
-  onSave: (client: Omit<Client, "id" | "createdAt">) => void
+  onSave: (client: Omit<Client, "id" | "createdAt">) => Promise<void>
   editClient?: Client | null
 }) {
   const [formData, setFormData] = useState({
@@ -88,9 +88,9 @@ function NewClientModal({ open, onClose, onSave, editClient }: {
     status: editClient?.status || ("active" as const)
   })
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!formData.name || !formData.email) return
-    onSave(formData)
+    await onSave(formData)
     setFormData({ name: "", email: "", phone: "", document: "", notes: "", status: "active" })
     onClose()
   }
@@ -263,18 +263,18 @@ export default function ClientsPage() {
     return { status: "idle", trip: null }
   }
 
-  const handleSaveClient = (data: Omit<Client, "id" | "createdAt">) => {
+  const handleSaveClient = async (data: Omit<Client, "id" | "createdAt">) => {
     if (editClient) {
-      updateClient(editClient.id, data)
+      await updateClient(editClient.id, data)
       setEditClient(null)
     } else {
-      addClient(data)
+      await addClient(data)
     }
   }
 
-  const handleDeleteClient = (id: string) => {
+  const handleDeleteClient = async (id: string) => {
     if (confirm("Tem certeza que deseja remover este cliente?")) {
-      deleteClient(id)
+      await deleteClient(id)
     }
   }
 

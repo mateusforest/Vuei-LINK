@@ -80,12 +80,11 @@ function CreateTripPageContent() {
     }
   }, [clientIdParam, getClientById])
 
-  const handleNext = () => {
+  const handleNext = async () => {
     if (currentStep < steps.length) {
       setCurrentStep(currentStep + 1)
     } else {
-      // Create trip
-      const newTrip = addTrip({
+      const newTrip = await addTrip({
         clientId: formData.clientId || `temp-${Date.now()}`,
         clientName: formData.clientName,
         name: `Viagem para ${formData.destination}`,
@@ -98,8 +97,10 @@ function CreateTripPageContent() {
         passengersCount: formData.passengersCount,
         status: "upcoming"
       })
-      setCreatedTrip(newTrip)
-      setCompleted(true)
+      if (newTrip) {
+        setCreatedTrip(newTrip)
+        setCompleted(true)
+      }
     }
   }
 

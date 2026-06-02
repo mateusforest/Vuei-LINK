@@ -51,7 +51,7 @@ export default function LinksPage() {
   )
 
   const handleCopy = (text: string, id: string) => {
-    navigator.clipboard.writeText(`https://${text}`)
+    navigator.clipboard.writeText(text)
     setCopiedId(id)
     setTimeout(() => setCopiedId(null), 2000)
   }
@@ -239,12 +239,12 @@ export default function LinksPage() {
                               <Copy className="h-4 w-4" />
                             )}
                           </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={() => window.open(`/viagem/${trip.slug}`, "_blank")}
-                          >
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={() => window.open(trip.shareLink || `/v/${trip.slug}`, "_blank")}
+                            >
                             <ExternalLink className="h-4 w-4" />
                           </Button>
                         </div>

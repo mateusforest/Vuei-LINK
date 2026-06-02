@@ -63,7 +63,7 @@ const getFileIcon = (type: string) => {
 }
 
 export default function DocumentsPage() {
-  const { documents, clients, trips, addDocument, deleteDocument, getClientById, getTripById } = useAgency()
+  const { documents, clients, trips, addDocument, deleteDocument, getClientById, getTripById, isUsingRealData } = useAgency()
   const [searchQuery, setSearchQuery] = useState("")
   const [filter, setFilter] = useState("all")
   const [privacyFilter, setPrivacyFilter] = useState<"all" | "private" | "shared">("all")
@@ -93,26 +93,31 @@ export default function DocumentsPage() {
     return matchesSearch && matchesType && matchesPrivacy
   })
 
-  const handleUpload = () => {
+  const handleUpload = async () => {
     if (!uploadData.name) return
     setUploading(true)
-    setTimeout(() => {
-      addDocument({
-        name: uploadData.name,
-        type: uploadData.type,
-        clientId: uploadData.clientId || undefined,
-        tripId: uploadData.tripId || undefined,
-        isPrivate: uploadData.isPrivate
-      })
-      setUploading(false)
+    const created = await addDocument({
+      name: uploadData.name,
+      type: uploadData.type,
+      clientId: uploadData.clientId || undefined,
+      tripId: uploadData.tripId || undefined,
+      isPrivate: uploadData.isPrivate
+    })
+    setUploading(false)
+    if (created) {
       setUploadModalOpen(false)
       setUploadData({ name: "", type: "voucher", clientId: "", tripId: "", isPrivate: false })
-    }, 1500)
+      return
+    }
+
+    if (isUsingRealData) {
+      window.alert("Nenhum dado real ainda foi salvo nesta area. O upload real da agencia depende do envio de arquivo nesta etapa.")
+    }
   }
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (confirm("Tem certeza que deseja excluir este documento?")) {
-      deleteDocument(id)
+      await deleteDocument(id)
     }
   }
 
@@ -339,9 +344,19 @@ export default function DocumentsPage() {
               onDrop={(e) => {
                 e.preventDefault()
                 setDragOver(false)
+                if (isUsingRealData) {
+                  window.alert("Upload real desta area ainda depende da selecao de arquivo nesta etapa.")
+                  return
+                }
                 setUploadData({ ...uploadData, name: "documento-upload.pdf" })
               }}
-              onClick={() => setUploadData({ ...uploadData, name: "documento-upload.pdf" })}
+              onClick={() => {
+                if (isUsingRealData) {
+                  window.alert("Upload real desta area ainda depende da selecao de arquivo nesta etapa.")
+                  return
+                }
+                setUploadData({ ...uploadData, name: "documento-upload.pdf" })
+              }}
             >
               {uploading ? (
                 <div className="flex flex-col items-center gap-3">

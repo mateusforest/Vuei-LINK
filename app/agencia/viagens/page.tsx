@@ -159,7 +159,7 @@ function LinksModal({ open, onClose, trip }: { open: boolean; onClose: () => voi
               variant="ghost" 
               size="icon" 
               className="h-8 w-8"
-              onClick={() => window.open(`/viagem/${trip.slug}`, "_blank")}
+                            onClick={() => window.open(trip.shareLink || `/v/${trip.slug}`, "_blank")}
             >
               <ExternalLink className="w-4 h-4" />
             </Button>
@@ -189,9 +189,9 @@ export default function TripsPage() {
     return date.toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" })
   }
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (confirm("Tem certeza que deseja remover esta viagem?")) {
-      deleteTrip(id)
+      await deleteTrip(id)
     }
   }
 
