@@ -274,13 +274,75 @@ function buildQuickInfo(destination?: string, country?: string, city?: string) {
   return getDestinationMetadata(destination, country, city)
 }
 
+function normalizeQuickInfo(quickInfo?: any) {
+  const currency = quickInfo?.currency ?? {}
+
+  return {
+    currency: {
+      name: currency?.name || "Nao informado",
+      symbol: currency?.symbol || "-",
+      rate: currency?.rate || "Nao informado",
+    },
+    language: quickInfo?.language || "Nao informado",
+    timezone: quickInfo?.timezone || "Nao informado",
+    emergency: quickInfo?.emergency || "Nao informado",
+    embassy: quickInfo?.embassy || "Nao informado",
+  }
+}
+
+function normalizeTravelers(travelers?: any, fallbackCount?: number) {
+  if (Array.isArray(travelers) && travelers.length > 0) {
+    return travelers.map((traveler, index) => ({
+      name: traveler?.name || (index === 0 ? "Viajante Principal" : `Acompanhante ${index}`),
+      avatar: traveler?.avatar || "/placeholder.svg?height=40&width=40",
+      role: traveler?.role || (index === 0 ? "principal" : "acompanhante"),
+    }))
+  }
+
+  return buildTravelers(fallbackCount)
+}
+
+function normalizeTripViewData(tripData: any) {
+  const travelers = normalizeTravelers(tripData?.travelers, tripData?.travelersCount)
+  const flights = Array.isArray(tripData?.flights) ? tripData.flights : []
+  const hotels = Array.isArray(tripData?.hotels) ? tripData.hotels : tripData?.hotel ? [tripData.hotel] : []
+  const itinerary = Array.isArray(tripData?.itinerary) ? tripData.itinerary : []
+  const documents = Array.isArray(tripData?.documents) ? tripData.documents : []
+  const weatherIcon =
+    typeof tripData?.weather?.icon === "function" || typeof tripData?.weather?.icon === "object"
+      ? tripData.weather.icon
+      : Cloud
+
+  return {
+    ...tripData,
+    destination: tripData?.destination || "Minha Viagem",
+    country: tripData?.country || "Nao informado",
+    countryFlag: tripData?.countryFlag || "🌍",
+    dates: {
+      start: tripData?.dates?.start || "A definir",
+      end: tripData?.dates?.end || "A definir",
+    },
+    travelers,
+    flights,
+    hotels,
+    hotel: hotels[0] ?? tripData?.hotel ?? null,
+    itinerary,
+    documents,
+    heroImage: tripData?.heroImage || DEFAULT_HERO_IMAGE,
+    weather: {
+      temp: typeof tripData?.weather?.temp === "number" ? tripData.weather.temp : null,
+      condition: tripData?.weather?.condition || "A definir",
+      icon: weatherIcon,
+    },
+    quickInfo: normalizeQuickInfo(tripData?.quickInfo),
+  }
+}
+
 function buildTripDataFromStoredTrip(storedTrip: any) {
   const { city, country } = parseTripDestination(storedTrip.destination)
   const start = formatTripDate(storedTrip.startDate)
   const end = formatTripDate(storedTrip.endDate)
-  const travelers = Array.isArray(storedTrip.travelers) && storedTrip.travelers.length > 0
-    ? storedTrip.travelers
-    : buildTravelers(storedTrip.passengersCount ?? storedTrip.travelersCount)
+  const travelers = normalizeTravelers(storedTrip.travelers, storedTrip.passengersCount ?? storedTrip.travelersCount)
   const hotels = Array.isArray(storedTrip.hotels)
     ? storedTrip.hotels
     : storedTrip.hotel
@@ -298,7 +360,7 @@ function buildTripDataFromStoredTrip(storedTrip: any) {
   console.log("[LINK] cover resolved", heroImage)
   console.log("[LINK] metadata resolved", quickInfo)
 
-  return {
+  return normalizeTripViewData({
     ...initialTripData,
     id: storedTrip.id || storedTrip.slug || initialTripData.id,
     destination: city || storedTrip.title || "Minha Viagem",
@@ -337,7 +399,7 @@ function buildTripDataFromStoredTrip(storedTrip: any) {
     quickInfo,
     adminLink: storedTrip.adminLink || initialTripData.adminLink,
     shareLink: storedTrip.shareLink || initialTripData.shareLink,
-  }
+  })
 }
 
 const iconMap: Record<string, any> = {
@@ -403,6 +465,7 @@ function StatusBadge({ status, daysUntil }: { status: string; daysUntil: number 
 function TripHeader({ tripData, onOpenShare, onOpenMenu }: { tripData: any; onOpenShare: () => void; onOpenMenu: () => void }) {
   const [scrolled, setScrolled] = useState(false)
   const { isAdmin } = useContext(PermissionContext)
+  const travelers = Array.isArray(tripData?.travelers) ? tripData.travelers : []
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 50)
@@ -439,7 +502,7 @@ function TripHeader({ tripData, onOpenShare, onOpenMenu }: { tripData: any; onOp
           </Button>
           
           <button onClick={onOpenMenu} className="flex -space-x-2">
-            {tripData.travelers.slice(0, 2).map((t: any, i: number) => (
+            {travelers.slice(0, 2).map((t: any, i: number) => (
               <div 
                 key={i}
                 className="w-8 h-8 rounded-full bg-gradient-to-br from-[#5de0e6] to-[#004aad] border-2 border-black flex items-center justify-center text-xs font-bold text-white"
@@ -461,6 +524,8 @@ function TripHero({ tripData, onEditTrip }: { tripData: any; onEditTrip: () => v
   const y = useTransform(scrollYProgress, [0, 1], ["0%", "30%"])
   const opacity = useTransform(scrollYProgress, [0, 0.5], [1, 0])
   const { isAdmin } = useContext(PermissionContext)
+  const travelersCount = Array.isArray(tripData?.travelers) ? tripData.travelers.length : 0
+  const WeatherIcon = tripData?.weather?.icon || Cloud
 
   return (
     <motion.section ref={ref} className="relative h-[85vh] min-h-[600px] overflow-hidden">
@@ -510,12 +575,12 @@ function TripHero({ tripData, onEditTrip }: { tripData: any; onEditTrip: () => v
               <Users className="w-5 h-5 text-[#5de0e6]" />
               <div>
                 <p className="text-xs text-white/50">Viajantes</p>
-                <p className="text-sm text-white font-medium">{tripData.travelers.length} pessoas</p>
+                <p className="text-sm text-white font-medium">{travelersCount} pessoas</p>
               </div>
             </div>
 
             <div className="flex items-center gap-3 px-4 py-3 rounded-2xl bg-white/5 backdrop-blur-md border border-white/10">
-              <tripData.weather.icon className="w-5 h-5 text-[#5de0e6]" />
+              <WeatherIcon className="w-5 h-5 text-[#5de0e6]" />
               <div>
                 <p className="text-xs text-white/50">Clima</p>
                 <p className="text-sm text-white font-medium">{typeof tripData.weather.temp === "number" ? `${tripData.weather.temp}°C` : "A definir"}</p>
@@ -548,12 +613,15 @@ function QuickAccessCards({ tripData, onNavigate }: { tripData: any; onNavigate:
   const ticketDocuments = Array.isArray(tripData.documents)
     ? tripData.documents.filter((document: any) => document.type === "ticket")
     : []
+  const flightsCount = Array.isArray(tripData?.flights) ? tripData.flights.length : 0
+  const itineraryCount = Array.isArray(tripData?.itinerary) ? tripData.itinerary.length : 0
+  const documentsCount = Array.isArray(tripData?.documents) ? tripData.documents.length : 0
 
   const cards = [
-    { id: "flights", icon: Plane, label: "Passagens", color: "from-[#5de0e6] to-[#5de0e6]/50", count: tripData.flights.length || ticketDocuments.length },
+    { id: "flights", icon: Plane, label: "Passagens", color: "from-[#5de0e6] to-[#5de0e6]/50", count: flightsCount || ticketDocuments.length },
     { id: "hotel", icon: Hotel, label: "Hospedagem", color: "from-[#004aad] to-[#004aad]/50", count: Array.isArray(tripData.hotels) ? tripData.hotels.length : tripData.hotel ? 1 : 0 },
-    { id: "itinerary", icon: MapPin, label: "Roteiro", color: "from-[#5de0e6] to-[#004aad]", count: tripData.itinerary.length },
-    { id: "documents", icon: FileText, label: "Documentos", color: "from-[#004aad] to-[#5de0e6]", count: tripData.documents.length },
+    { id: "itinerary", icon: MapPin, label: "Roteiro", color: "from-[#5de0e6] to-[#004aad]", count: itineraryCount },
+    { id: "documents", icon: FileText, label: "Documentos", color: "from-[#004aad] to-[#5de0e6]", count: documentsCount },
     { id: "concierge", icon: MessageCircle, label: "Concierge", color: "from-[#5de0e6] to-[#5de0e6]/50", badge: "IA" },
     { id: "offline", icon: WifiOff, label: "Offline", color: "from-[#004aad] to-[#004aad]/50" },
   ]
@@ -895,7 +963,7 @@ function QRCodeModal({ open, onClose, flight }: { open: boolean; onClose: () => 
 }
 
 // Flights Section
-function FlightsSection({ tripData, onUpdateFlight, onAddFlight, tripId, ownerUserId, agencyId }: { tripData: any; onUpdateFlight: (id: number, data: any) => void; onAddFlight: (data: any) => void; tripId: string; ownerUserId: string | null; agencyId: string | null }) {
+function FlightsSection({ tripData, onUpdateFlight, onAddFlight, tripId, ownerUserId, agencyId, ensureSensitiveAccess }: { tripData: any; onUpdateFlight: (id: number, data: any) => void; onAddFlight: (data: any) => void; tripId: string; ownerUserId: string | null; agencyId: string | null; ensureSensitiveAccess: () => boolean }) {
   const [editingFlight, setEditingFlight] = useState<any>(null)
   const [viewingQR, setViewingQR] = useState<any>(null)
   const [addingFlight, setAddingFlight] = useState(false)
@@ -1656,6 +1724,8 @@ function DocumentsSection({
   ownerUserId,
   agencyId,
   tripOwnerUserId,
+  profileSettings,
+  ensureSensitiveAccess,
 }: {
   tripData: any
   onAddDocument: (data: any) => void
@@ -1663,6 +1733,8 @@ function DocumentsSection({
   ownerUserId: string | null
   agencyId: string | null
   tripOwnerUserId: string | null
+  profileSettings: any
+  ensureSensitiveAccess: () => boolean
 }) {
   const [showPrivate, setShowPrivate] = useState(false)
   const [unlocked, setUnlocked] = useState(false)
@@ -1803,7 +1875,7 @@ function DocumentsSection({
         open={pinModal}
         onClose={() => setPinModal(false)}
         ownerUserId={tripOwnerUserId}
-        profileSettings={profile?.settings ?? null}
+        profileSettings={profileSettings ?? null}
         onSuccess={() => {
           setUnlocked(true)
           setPinModal(false)
@@ -2682,14 +2754,14 @@ function OfflineSection() {
 // Quick Info Section
 function QuickInfoSection({ tripData }: { tripData: any }) {
   const [expanded, setExpanded] = useState<string | null>(null)
-  const { showToast } = useToast()
+  const quickInfo = normalizeQuickInfo(tripData?.quickInfo)
 
   const infoCards = [
-    { id: "currency", icon: "💶", label: "Moeda", value: tripData.quickInfo.currency.name, sub: `1 ${tripData.quickInfo.currency.symbol} = ${tripData.quickInfo.currency.rate}`, detail: "Cotacao e disponibilidade podem variar. Consulte fontes locais antes da viagem." },
-    { id: "language", icon: "🗣️", label: "Idioma", value: tripData.quickInfo.language, detail: "As informacoes de idioma sao exibidas com base no destino informado da viagem." },
-    { id: "timezone", icon: "🕐", label: "Fuso Horario", value: tripData.quickInfo.timezone, detail: "O fuso horario e apresentado a partir do destino configurado. Confirme horarios finais com a operacao da viagem." },
-    { id: "emergency", icon: "🆘", label: "Emergencia", value: tripData.quickInfo.emergency, detail: "Use este numero para emergencias locais quando houver confirmacao do destino." },
-    { id: "embassy", icon: "🏛️", label: "Embaixada BR", value: tripData.quickInfo.embassy, detail: "Contato consular exibido conforme o destino informado. Se estiver indisponivel, mantenha os contatos da sua agencia." },
+    { id: "currency", icon: "💶", label: "Moeda", value: quickInfo.currency.name, sub: `1 ${quickInfo.currency.symbol} = ${quickInfo.currency.rate}`, detail: "Cotacao e disponibilidade podem variar. Consulte fontes locais antes da viagem." },
+    { id: "language", icon: "🗣️", label: "Idioma", value: quickInfo.language, detail: "As informacoes de idioma sao exibidas com base no destino informado da viagem." },
+    { id: "timezone", icon: "🕐", label: "Fuso Horario", value: quickInfo.timezone, detail: "O fuso horario e apresentado a partir do destino configurado. Confirme horarios finais com a operacao da viagem." },
+    { id: "emergency", icon: "🆘", label: "Emergencia", value: quickInfo.emergency, detail: "Use este numero para emergencias locais quando houver confirmacao do destino." },
+    { id: "embassy", icon: "🏛️", label: "Embaixada BR", value: quickInfo.embassy, detail: "Contato consular exibido conforme o destino informado. Se estiver indisponivel, mantenha os contatos da sua agencia." },
   ]
 
   return (
@@ -3002,11 +3074,11 @@ function SensitiveAccessModal({
 
 // Main page component
 export default function TripPage() {
-  const params = useParams<{ id: string }>()
+  const params = useParams<{ id?: string; slug?: string }>()
   const pathname = usePathname()
   const router = useRouter()
   const { user, profile, loading: authLoading } = useAuth()
-  const [tripData, setTripData] = useState(initialTripData)
+  const [tripData, setTripData] = useState(() => normalizeTripViewData(initialTripData))
   const [isAdmin, setIsAdmin] = useState(false)
   const [canWrite, setCanWrite] = useState(false)
   const [isLoadingTrip, setIsLoadingTrip] = useState(true)
@@ -3026,12 +3098,17 @@ export default function TripPage() {
   useEffect(() => {
     setSensitiveAccessGranted(false)
     pendingSensitiveActionRef.current = null
-  }, [tripOwnerUserId, user?.id, params?.id])
+  }, [tripOwnerUserId, user?.id, params?.id, params?.slug])
 
   useEffect(() => {
     if (typeof window === "undefined") return
 
-    const routeSlug = typeof params?.id === "string" ? params.id : initialTripData.id
+    const routeSlug =
+      typeof params?.id === "string"
+        ? params.id
+        : typeof params?.slug === "string"
+          ? params.slug
+          : initialTripData.id
     const searchParams = new URLSearchParams(window.location.search)
     const adminToken = searchParams.get("adminToken")
     const publicToken = searchParams.get("token") || searchParams.get("publicToken")
@@ -3160,14 +3237,19 @@ export default function TripPage() {
     }
 
     void loadTrip()
-  }, [params, pathname, router, user?.id, authLoading])
+  }, [params?.id, params?.slug, pathname, user?.id, authLoading])
 
   const showToast = (message: string, type: "success" | "error" | "info" = "success") => {
     setToast({ message, type })
   }
 
   const handleRequireAuthenticatedAdmin = () => {
-    const routeSlug = typeof params?.id === "string" ? params.id : tripData.id
+    const routeSlug =
+      typeof params?.id === "string"
+        ? params.id
+        : typeof params?.slug === "string"
+          ? params.slug
+          : tripData.id
     const target = pathname || `/viagem/${routeSlug}/admin`
     router.replace(`/login?redirect=${encodeURIComponent(target)}`)
   }
@@ -3209,7 +3291,12 @@ export default function TripPage() {
   }
 
   const handleConfigureQuickAccess = () => {
-    const routeSlug = typeof params?.id === "string" ? params.id : tripData.id
+    const routeSlug =
+      typeof params?.id === "string"
+        ? params.id
+        : typeof params?.slug === "string"
+          ? params.slug
+          : tripData.id
     const target = pathname || `/viagem/${routeSlug}/admin`
     const quickAccessTarget = `/portal/configuracoes?quickAccess=1&returnTo=${encodeURIComponent(target)}`
     router.replace(`/login?redirect=${encodeURIComponent(quickAccessTarget)}`)
@@ -3431,10 +3518,10 @@ export default function TripPage() {
           <TripHeader tripData={tripData} onOpenShare={() => setShareOpen(true)} onOpenMenu={() => setMenuOpen(true)} />
           <TripHero tripData={tripData} onEditTrip={() => setEditTripOpen(true)} />
           <QuickAccessCards tripData={tripData} onNavigate={handleNavigate} />
-  <FlightsSection tripData={tripData} onUpdateFlight={handleUpdateFlight} onAddFlight={handleAddFlight} tripId={tripData.id} ownerUserId={user?.id ?? profile?.id ?? null} agencyId={profile?.agencyId ?? null} />
+  <FlightsSection tripData={tripData} onUpdateFlight={handleUpdateFlight} onAddFlight={handleAddFlight} tripId={tripData.id} ownerUserId={user?.id ?? profile?.id ?? null} agencyId={profile?.agencyId ?? null} ensureSensitiveAccess={ensureSensitiveAccess} />
   <HotelSection tripData={tripData} onSaveHotel={handleSaveHotel} onDeleteHotel={handleDeleteHotel} />
   <ItinerarySection tripData={tripData} onUpdateItinerary={handleUpdateItinerary} />
-  <DocumentsSection tripData={tripData} onAddDocument={handleAddDocument} tripId={tripData.id} ownerUserId={user?.id ?? profile?.id ?? null} agencyId={profile?.agencyId ?? null} tripOwnerUserId={tripOwnerUserId} />
+  <DocumentsSection tripData={tripData} onAddDocument={handleAddDocument} tripId={tripData.id} ownerUserId={user?.id ?? profile?.id ?? null} agencyId={profile?.agencyId ?? null} tripOwnerUserId={tripOwnerUserId} profileSettings={profile?.settings ?? null} ensureSensitiveAccess={ensureSensitiveAccess} />
   <ConciergeSection tripData={tripData} onOpenCredits={() => setCreditsOpen(true)} />
           <OfflineSection />
           <QuickInfoSection tripData={tripData} />
