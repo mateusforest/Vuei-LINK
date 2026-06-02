@@ -72,7 +72,7 @@ const STORAGE_KEY = "vuei_agencia_configuracoes_frontend"
 export default function SettingsPage() {
   const router = useRouter()
   const { signOut, user, profile } = useAuth()
-  const { credits } = useAgency()
+  const { credits, agency, setupIncomplete, workspaceError } = useAgency()
   const [activeSection, setActiveSection] = useState("agency")
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -170,7 +170,7 @@ export default function SettingsPage() {
     if (shouldUseSupabase() && user?.id) {
       const currentAgency = await getAgencyByOwner(user.id)
       if (currentAgency.data) {
-        await updateAgencyRepository(currentAgency.data.id, {
+        const updateResult = await updateAgencyRepository(currentAgency.data.id, {
           name: agencyData.name,
           logo: agencyData.logo,
           plan: agencyData.plan.toLowerCase() as "starter" | "pro" | "enterprise",
@@ -193,6 +193,16 @@ export default function SettingsPage() {
             logoUrl: agencyData.logo || null,
           },
         })
+
+        if (!updateResult.data) {
+          setSaving(false)
+          showToast(updateResult.error || "Nao foi possivel salvar a agencia no Supabase.")
+          return
+        }
+      } else {
+        setSaving(false)
+        showToast(currentAgency.error || "Agencia nao encontrada no Supabase.")
+        return
       }
     } else {
       await new Promise((resolve) => setTimeout(resolve, 700))
@@ -234,6 +244,22 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-6 pb-20 lg:pb-0">
+      {setupIncomplete && (
+        <Card className="border-amber-500/20 bg-amber-500/5">
+          <CardContent className="p-4 text-sm text-amber-200">
+            Sua conta de agencia existe, mas a agencia ainda nao foi persistida corretamente no Supabase.
+          </CardContent>
+        </Card>
+      )}
+
+      {!setupIncomplete && workspaceError && (
+        <Card className="border-red-500/20 bg-red-500/5">
+          <CardContent className="p-4 text-sm text-red-300">
+            {workspaceError}
+          </CardContent>
+        </Card>
+      )}
+
       <div>
         <h1 className="text-2xl font-bold text-foreground">Configuracoes</h1>
         <p className="mt-1 text-muted-foreground">Gerencie sua agencia</p>
@@ -367,7 +393,7 @@ export default function SettingsPage() {
                       </div>
                     </div>
                   </div>
-                  <Button className="gap-2 bg-gradient-to-r from-primary to-accent text-white" onClick={() => handleSave("Logo da agencia salva com sucesso.")} disabled={saving}>
+                  <Button className="gap-2 bg-gradient-to-r from-primary to-accent text-white" onClick={() => handleSave("Logo da agencia salva com sucesso.")} disabled={saving || (shouldUseSupabase() && !agency)}>
                     <Save className="h-4 w-4" />
                     Salvar Branding
                   </Button>
@@ -462,7 +488,9 @@ export default function SettingsPage() {
                     <div>
                       <Badge className="bg-primary text-white">Plano {agencyData.plan}</Badge>
                       <p className="mt-2 text-2xl font-bold text-foreground">R$ 199/mes</p>
-                      <p className="text-sm text-muted-foreground">Renovacao em 15 Jul 2026</p>
+              <p className="text-sm text-muted-foreground">
+                {agency ? "Plano salvo na agencia real do Supabase" : "Plano ainda nao vinculado a uma agencia real"}
+              </p>
                     </div>
                     <Button variant="outline" className="border-white/10" onClick={() => setShowPlanModal(true)}>
                       Alterar Plano
@@ -515,7 +543,17 @@ export default function SettingsPage() {
               <Button variant="outline" className="flex-1 border-white/10" onClick={() => setShowPhotoModal(false)}>
                 Cancelar
               </Button>
-              <Button className="flex-1 bg-gradient-to-r from-primary to-accent text-white" onClick={() => { setShowPhotoModal(false); showToast("Foto da agencia atualizada."); }}>
+              <Button
+                className="flex-1 bg-gradient-to-r from-primary to-accent text-white"
+                onClick={() => {
+                  setShowPhotoModal(false)
+                  if (shouldUseSupabase() && !agency) {
+                    showToast("Agencia nao encontrada no Supabase para salvar a foto.")
+                    return
+                  }
+                  void handleSave("Foto da agencia atualizada.")
+                }}
+              >
                 Salvar foto
               </Button>
             </div>
@@ -584,7 +622,7 @@ export default function SettingsPage() {
                     onClick={() => {
                       setAgencyData((prev) => ({ ...prev, plan: plan.name }))
                       setShowPlanModal(false)
-                      showToast(`Plano ${plan.name} selecionado.`)
+                      showToast(shouldUseSupabase() ? `Plano ${plan.name} selecionado. Clique em salvar para persistir.` : `Plano ${plan.name} selecionado.`)
                     }}
                   >
                     Selecionar plano

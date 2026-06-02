@@ -387,6 +387,15 @@ export async function createTrip(payload: CreateTripPayload) {
         await ensureProfile(authUser, supabase)
       }
 
+      if (payload.ownerType === "agency" && !payload.agencyId) {
+        return {
+          source: "supabase" as const,
+          config: createSupabaseBrowserClientPlaceholder(),
+          data: null,
+          error: "agency_id obrigatorio para criar viagem da agencia.",
+        }
+      }
+
       const adminToken = trip.adminToken || generateSecureToken()
       const publicToken = trip.publicToken || generateSecureToken()
       const adminLink = buildAdminTripUrl(trip.slug)
@@ -414,7 +423,7 @@ export async function createTrip(payload: CreateTripPayload) {
         admin_link: adminLink,
         public_link: publicLink,
         cover_image: resolvedCoverImage,
-        visibility: "private",
+        visibility: trip.ownerType === "agency" ? "public" : "private",
         travelers_count: trip.travelersCount || 1,
         permissions: trip.permissions ?? {},
         credits_summary: {},
@@ -453,6 +462,15 @@ export async function createTrip(payload: CreateTripPayload) {
         data: null,
         error: message,
       }
+    }
+  }
+
+  if (shouldUseSupabase()) {
+    return {
+      source: "supabase-placeholder" as const,
+      config: createSupabaseBrowserClientPlaceholder(),
+      data: null,
+      error: "Supabase browser client indisponivel.",
     }
   }
 
@@ -499,10 +517,28 @@ export async function updateTrip(id: string, payload: Partial<Trip>) {
           source: "supabase" as const,
           config: createSupabaseBrowserClientPlaceholder(),
           data: mapTripRowToTrip(data),
+          error: null,
+        }
+      }
+      if (error) {
+        return {
+          source: "supabase" as const,
+          config: createSupabaseBrowserClientPlaceholder(),
+          data: null,
+          error: error.message,
         }
       }
     } catch {
-      // fallback local abaixo
+      // retorno controlado abaixo
+    }
+  }
+
+  if (shouldUseSupabase()) {
+    return {
+      source: "supabase-placeholder" as const,
+      config: createSupabaseBrowserClientPlaceholder(),
+      data: null,
+      error: "Supabase browser client indisponivel.",
     }
   }
 
@@ -551,6 +587,15 @@ export async function deleteTrip(id: string) {
         success: false,
         error: message,
       }
+    }
+  }
+
+  if (shouldUseSupabase()) {
+    return {
+      source: "supabase-placeholder" as const,
+      config: createSupabaseBrowserClientPlaceholder(),
+      success: false,
+      error: "Supabase browser client indisponivel.",
     }
   }
 

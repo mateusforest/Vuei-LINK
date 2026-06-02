@@ -136,6 +136,15 @@ export async function getClientById(id: string) {
 
 export async function createClient(payload: Omit<Client, "id" | "createdAt" | "updatedAt"> & { agencyId: string | null }) {
   if (shouldUseSupabase()) {
+    if (!payload.agencyId) {
+      return {
+        source: "supabase" as const,
+        config: createSupabaseBrowserClientPlaceholder(),
+        data: null as Client | null,
+        error: "agency_id obrigatorio para criar cliente da agencia.",
+      }
+    }
+
     const client = createSupabaseBrowserClient()
     if (client) {
       const insertPayload: Database["public"]["Tables"]["clients"]["Insert"] = {
@@ -284,6 +293,13 @@ export async function deleteClient(id: string) {
       }
 
       return { source: "supabase" as const, config: createSupabaseBrowserClientPlaceholder(), success: true, error: null }
+    }
+
+    return {
+      source: "supabase-placeholder" as const,
+      config: createSupabaseBrowserClientPlaceholder(),
+      success: false,
+      error: "Supabase browser client indisponivel.",
     }
   }
 

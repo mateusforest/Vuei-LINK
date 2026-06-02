@@ -22,6 +22,8 @@ import { createClient as createClientRecord, deleteClient as deleteClientRecord,
 import { getAgencyById, getAgencyByOwner } from "@/lib/repositories/agencies-repository"
 import { deleteDocument as deleteDocumentRecord, listDocumentsByTrip } from "@/lib/repositories/documents-repository"
 import { createTrip as createTripRecord, deleteTrip as deleteTripRecord, listTripsByAgency, updateTrip as updateTripRecord } from "@/lib/repositories/trips-repository"
+import { updateProfile as updateProfileRecord } from "@/lib/repositories/profiles-repository"
+import type { Agency } from "@/types"
 
 export interface Client extends Pick<CanonicalClient, "id" | "name"> {
   id: string
@@ -146,7 +148,10 @@ interface AgencyContextType {
   activities: Activity[]
   addActivity: (action: string, description: string, type: Activity["type"]) => void
   agencyId: string | null
+  agency: Agency | null
   isUsingRealData: boolean
+  setupIncomplete: boolean
+  workspaceError: string | null
 }
 
 const AgencyContext = createContext<AgencyContextType | undefined>(undefined)
@@ -340,7 +345,10 @@ const initialActivities: Activity[] = [
 export function AgencyProvider({ children }: { children: ReactNode }) {
   const { user, profile } = useAuth()
   const isUsingRealData = shouldUseSupabase()
+  const [agency, setAgency] = useState<Agency | null>(null)
   const [agencyId, setAgencyId] = useState<string | null>(null)
+  const [setupIncomplete, setSetupIncomplete] = useState(false)
+  const [workspaceError, setWorkspaceError] = useState<string | null>(null)
   const [clients, setClients] = useState<Client[]>(isUsingRealData ? [] : initialClients)
   const [trips, setTrips] = useState<AgencyTrip[]>(isUsingRealData ? [] : initialTrips)
   const [documents, setDocuments] = useState<AgencyDocument[]>([])
@@ -436,7 +444,10 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!isUsingRealData) return
     if (!user?.id) {
+      setAgency(null)
       setAgencyId(null)
+      setSetupIncomplete(false)
+      setWorkspaceError(null)
       setClients([])
       setTrips([])
       setDocuments([])
@@ -462,7 +473,14 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
       if (!active) return
 
       if (!resolvedAgency) {
+        setAgency(null)
         setAgencyId(null)
+        setSetupIncomplete(profile?.role === "agency_owner")
+        setWorkspaceError(
+          profile?.role === "agency_owner"
+            ? "Sua conta de agencia foi criada, mas a agencia ainda nao foi persistida corretamente no Supabase."
+            : agencyResult.error ?? null
+        )
         setClients([])
         setTrips([])
         setDocuments([])
@@ -477,6 +495,17 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
         })
         setIsLoaded(true)
         return
+      }
+
+      if (profile?.agencyId !== resolvedAgency.id && profile?.id) {
+        const profileUpdate = await updateProfileRecord(profile.id, {
+          agencyId: resolvedAgency.id,
+          role: profile.role === "agency_member" ? "agency_member" : "agency_owner",
+        })
+
+        if (!profileUpdate.data && profileUpdate.error) {
+          console.error("[AUTH ERROR]", profileUpdate.error)
+        }
       }
 
       const [clientsResult, tripsResult] = await Promise.all([
@@ -537,7 +566,12 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
           ? [{ action: "Saldo da agencia", amount: resolvedAgency.creditsBalance, date: new Date().toISOString(), source: "Supabase" }]
           : []
 
+      setAgency(resolvedAgency)
       setAgencyId(resolvedAgency.id)
+      setSetupIncomplete(false)
+      setWorkspaceError(
+        clientsResult.error || tripsResult.error || agencyResult.error || null
+      )
       setClients(mappedClients)
       setTrips(mappedTrips)
       setDocuments(mappedDocuments)
@@ -558,7 +592,7 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
     return () => {
       active = false
     }
-  }, [isUsingRealData, profile?.agencyId, user?.id])
+  }, [isUsingRealData, profile?.agencyId, profile?.id, profile?.role, user?.id])
 
   const addActivity = useCallback((action: string, description: string, type: Activity["type"]) => {
     const newActivity: Activity = {
@@ -572,7 +606,14 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const addClient = useCallback(async (data: Omit<Client, "id" | "createdAt">) => {
-    if (isUsingRealData && agencyId) {
+    if (isUsingRealData) {
+      if (!agencyId) {
+        const message = "Agencia nao configurada no Supabase. Finalize o cadastro da agencia antes de criar clientes."
+        setWorkspaceError(message)
+        console.error("[AUTH ERROR]", message)
+        return null
+      }
+
       const result = await createClientRecord({
         agencyId,
         name: data.name,
@@ -583,7 +624,10 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
         status: data.status === "inactive" ? "inactive" : "active",
       })
 
-      if (!result.data) return null
+      if (!result.data) {
+        setWorkspaceError(result.error ?? "Nao foi possivel criar o cliente no Supabase.")
+        return null
+      }
 
       const newClient: Client = {
         id: result.data.id,
@@ -597,6 +641,7 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
         updatedAt: result.data.updatedAt,
       }
 
+      setWorkspaceError(null)
       setClients((prev) => [newClient, ...prev])
       return newClient
     }
@@ -622,7 +667,10 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
         status: data.status === "inactive" ? "inactive" : data.status,
       })
 
-      if (!result.data) return null
+      if (!result.data) {
+        setWorkspaceError(result.error ?? "Nao foi possivel atualizar o cliente no Supabase.")
+        return null
+      }
 
       const updatedClient: Client = {
         id: result.data.id,
@@ -636,6 +684,7 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
         updatedAt: result.data.updatedAt,
       }
 
+      setWorkspaceError(null)
       setClients((prev) => prev.map((client) => (client.id === id ? updatedClient : client)))
       return updatedClient
     }
@@ -654,7 +703,11 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
   const deleteClient = useCallback(async (id: string) => {
     if (isUsingRealData) {
       const result = await deleteClientRecord(id)
-      if (!result.success) return false
+      if (!result.success) {
+        setWorkspaceError(result.error ?? "Nao foi possivel remover o cliente no Supabase.")
+        return false
+      }
+      setWorkspaceError(null)
       setClients((prev) => prev.filter((item) => item.id !== id))
       return true
     }
@@ -668,7 +721,14 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
   const getClientById = useCallback((id: string) => clients.find((client) => client.id === id), [clients])
 
   const addTrip = useCallback(async (data: Omit<AgencyTrip, "id" | "slug" | "adminLink" | "shareLink" | "createdAt" | "coverImage">) => {
-    if (isUsingRealData && agencyId) {
+    if (isUsingRealData) {
+      if (!agencyId) {
+        const message = "Agencia nao configurada no Supabase. Finalize o cadastro da agencia antes de criar viagens."
+        setWorkspaceError(message)
+        console.error("[AUTH ERROR]", message)
+        return null
+      }
+
       const result = await createTripRecord({
         title: data.name,
         destination: data.destination,
@@ -684,15 +744,20 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
         agencyId,
         clientId: data.clientId || null,
         coverImage: getImageForDestination(data.destination),
+        visibility: "public",
       })
 
-      if (!result.data) return null
+      if (!result.data) {
+        setWorkspaceError(result.error ?? "Nao foi possivel criar a viagem no Supabase.")
+        return null
+      }
 
       const mappedTrip = mapCanonicalTripToAgencyTrip(
         result.data,
         data.clientName || (data.clientId ? clientNameById.get(data.clientId) ?? "" : "")
       )
 
+      setWorkspaceError(null)
       setTrips((prev) => [mappedTrip, ...prev])
       return mappedTrip
     }
@@ -735,13 +800,17 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
         clientId: data.clientId,
       })
 
-      if (!result.data) return null
+      if (!result.data) {
+        setWorkspaceError(result.error ?? "Nao foi possivel atualizar a viagem no Supabase.")
+        return null
+      }
 
       const mappedTrip = mapCanonicalTripToAgencyTrip(
         result.data,
         data.clientName || (result.data.clientId ? clientNameById.get(result.data.clientId) ?? "" : "")
       )
 
+      setWorkspaceError(null)
       setTrips((prev) => prev.map((trip) => (trip.id === id ? mappedTrip : trip)))
       return mappedTrip
     }
@@ -760,7 +829,11 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
   const deleteTrip = useCallback(async (id: string) => {
     if (isUsingRealData) {
       const result = await deleteTripRecord(id)
-      if (!result.success) return false
+      if (!result.success) {
+        setWorkspaceError(result.error ?? "Nao foi possivel remover a viagem no Supabase.")
+        return false
+      }
+      setWorkspaceError(null)
       setTrips((prev) => prev.filter((item) => item.id !== id))
       setDocuments((prev) => prev.filter((document) => document.tripId !== id))
       return true
@@ -777,6 +850,7 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
 
   const addDocument = useCallback(async (data: Omit<AgencyDocument, "id" | "createdAt">) => {
     if (isUsingRealData) {
+      setWorkspaceError("O upload operacional da agencia ainda depende do fluxo real de arquivo nesta etapa.")
       return null
     }
 
@@ -793,7 +867,11 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
   const deleteDocument = useCallback(async (id: string) => {
     if (isUsingRealData) {
       const result = await deleteDocumentRecord(id)
-      if (!result.success) return false
+      if (!result.success) {
+        setWorkspaceError(result.error ?? "Nao foi possivel remover o documento no Supabase.")
+        return false
+      }
+      setWorkspaceError(null)
       setDocuments((prev) => prev.filter((document) => document.id !== id))
       return true
     }
@@ -914,7 +992,10 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
         activities,
         addActivity,
         agencyId,
+        agency,
         isUsingRealData,
+        setupIncomplete,
+        workspaceError,
       }}
     >
       {children}

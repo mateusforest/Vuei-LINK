@@ -171,7 +171,7 @@ function LinksModal({ open, onClose, trip }: { open: boolean; onClose: () => voi
 }
 
 export default function TripsPage() {
-  const { trips, deleteTrip, getDocumentsByTrip, conciergeRequests } = useAgency()
+  const { trips, deleteTrip, getDocumentsByTrip, conciergeRequests, setupIncomplete, workspaceError } = useAgency()
   const [searchQuery, setSearchQuery] = useState("")
   const [filter, setFilter] = useState<"all" | "upcoming" | "ongoing" | "completed">("all")
   const [linksTrip, setLinksTrip] = useState<AgencyTrip | null>(null)
@@ -191,7 +191,10 @@ export default function TripsPage() {
 
   const handleDelete = async (id: string) => {
     if (confirm("Tem certeza que deseja remover esta viagem?")) {
-      await deleteTrip(id)
+      const removed = await deleteTrip(id)
+      if (!removed && workspaceError) {
+        window.alert(workspaceError)
+      }
     }
   }
 
@@ -205,6 +208,22 @@ export default function TripsPage() {
 
   return (
     <div className="space-y-6 pb-20 lg:pb-0">
+      {setupIncomplete && (
+        <Card className="border-amber-500/20 bg-amber-500/5">
+          <CardContent className="p-4 text-sm text-amber-200">
+            Sua agencia ainda nao foi persistida corretamente no Supabase. Finalize o cadastro antes de operar viagens reais.
+          </CardContent>
+        </Card>
+      )}
+
+      {!setupIncomplete && workspaceError && (
+        <Card className="border-red-500/20 bg-red-500/5">
+          <CardContent className="p-4 text-sm text-red-300">
+            {workspaceError}
+          </CardContent>
+        </Card>
+      )}
+
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>

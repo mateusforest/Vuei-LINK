@@ -51,10 +51,11 @@ export default function AgencySignupPage() {
   useEffect(() => {
     if (safeRedirect === undefined) return
     const detectedRole = (profile?.role ?? user?.user_metadata?.role) as "traveler" | "agency_owner" | "agency_member" | "master" | undefined
-    if (!loading && user && detectedRole) {
+    const hasRealAgency = Boolean(profile?.agencyId)
+    if (!loading && user && detectedRole && (detectedRole !== "agency_owner" || hasRealAgency)) {
       router.replace(safeRedirect || getRedirectByRole(detectedRole))
     }
-  }, [loading, profile?.role, router, safeRedirect, user])
+  }, [loading, profile?.agencyId, profile?.role, router, safeRedirect, user])
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {}

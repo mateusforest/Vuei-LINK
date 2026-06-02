@@ -37,7 +37,7 @@ import {
 import { useAgency, type AgencyTrip } from "@/contexts/agency-context"
 
 export default function LinksPage() {
-  const { trips } = useAgency()
+  const { trips, setupIncomplete, workspaceError } = useAgency()
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedLink, setSelectedLink] = useState<AgencyTrip | null>(null)
   const [settingsModalOpen, setSettingsModalOpen] = useState(false)
@@ -82,6 +82,22 @@ export default function LinksPage() {
 
   return (
     <div className="space-y-6 pb-20 lg:pb-0">
+      {setupIncomplete && (
+        <Card className="border-amber-500/20 bg-amber-500/5">
+          <CardContent className="p-4 text-sm text-amber-200">
+            Os links so ficam disponiveis depois que a agencia e as viagens forem persistidas corretamente no Supabase.
+          </CardContent>
+        </Card>
+      )}
+
+      {!setupIncomplete && workspaceError && (
+        <Card className="border-red-500/20 bg-red-500/5">
+          <CardContent className="p-4 text-sm text-red-300">
+            {workspaceError}
+          </CardContent>
+        </Card>
+      )}
+
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold text-foreground">Links Compartilhaveis</h1>

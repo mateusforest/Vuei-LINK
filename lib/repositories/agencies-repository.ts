@@ -24,6 +24,12 @@ interface CreateAgencyPayload {
   agentsCount?: string | null
 }
 
+interface RepositoryAgencyResult {
+  source: "local" | "supabase" | "supabase-placeholder"
+  data: Agency | null
+  error: string | null
+}
+
 interface AgencyConfigState {
   agencyData?: {
     name?: string
@@ -156,7 +162,7 @@ export async function createAgency(payload: CreateAgencyPayload) {
     if (client) {
       const existingAgency = await getAgencyByOwner(payload.ownerUserId)
       if (existingAgency.data) {
-        return existingAgency
+        return { source: existingAgency.source, data: existingAgency.data, error: null } satisfies RepositoryAgencyResult
       }
 
       const slug = await buildUniqueAgencySlug(payload.name, client)
@@ -196,14 +202,34 @@ export async function createAgency(payload: CreateAgencyPayload) {
 
       if (membershipError) {
         console.error("[AUTH ERROR]", membershipError.message)
+        await client.from("agencies").delete().eq("id", data.id)
+        return {
+          source: "supabase" as const,
+          data: null,
+          error: `Agencia criada, mas falhou ao criar o vinculo do owner: ${membershipError.message}`,
+        }
       }
 
       const { error: profileError } = await client.from("profiles").update({ agency_id: data.id, role: "agency_owner" }).eq("id", payload.ownerUserId)
       if (profileError) {
         console.error("[AUTH ERROR]", profileError.message)
+        await client.from("agency_members").delete().eq("agency_id", data.id).eq("profile_id", payload.ownerUserId)
+        await client.from("agencies").delete().eq("id", data.id)
+        return {
+          source: "supabase" as const,
+          data: null,
+          error: `Agencia criada, mas falhou ao atualizar o profile: ${profileError.message}`,
+        }
       }
 
       return { source: "supabase" as const, data: mapAgencyRowToAgency(data), error: null }
+    }
+
+    return {
+      source: "supabase-placeholder" as const,
+      config: createSupabaseBrowserClientPlaceholder(),
+      data: null,
+      error: "Supabase browser client indisponivel.",
     }
   }
 
@@ -218,9 +244,16 @@ export async function getAgencyById(id: string) {
       const { data, error } = await client.from("agencies").select("*").eq("id", id).maybeSingle()
       if (error) {
         console.error("[AUTH ERROR]", error.message)
-        return { source: "supabase" as const, data: null }
+        return { source: "supabase" as const, data: null, error: error.message }
       }
-      return { source: "supabase" as const, data: data ? mapAgencyRowToAgency(data) : null }
+      return { source: "supabase" as const, data: data ? mapAgencyRowToAgency(data) : null, error: null }
+    }
+
+    return {
+      source: "supabase-placeholder" as const,
+      data: null,
+      error: "Supabase browser client indisponivel.",
+      config: createSupabaseBrowserClientPlaceholder(),
     }
   }
 
@@ -228,6 +261,7 @@ export async function getAgencyById(id: string) {
   return {
     source: "local" as const,
     data: agency.id === id ? agency : null,
+    error: null,
   }
 }
 
@@ -255,9 +289,16 @@ export async function getAgencyBySlug(slug: string) {
       const { data, error } = await client.from("agencies").select("*").eq("slug", slug).maybeSingle()
       if (error) {
         console.error("[AUTH ERROR]", error.message)
-        return { source: "supabase" as const, data: null }
+        return { source: "supabase" as const, data: null, error: error.message }
       }
-      return { source: "supabase" as const, data: data ? mapAgencyRowToAgency(data) : null }
+      return { source: "supabase" as const, data: data ? mapAgencyRowToAgency(data) : null, error: null }
+    }
+
+    return {
+      source: "supabase-placeholder" as const,
+      data: null,
+      error: "Supabase browser client indisponivel.",
+      config: createSupabaseBrowserClientPlaceholder(),
     }
   }
 
@@ -265,6 +306,7 @@ export async function getAgencyBySlug(slug: string) {
   return {
     source: "local" as const,
     data: agency.slug === slug ? agency : null,
+    error: null,
   }
 }
 
@@ -275,9 +317,16 @@ export async function getAgencyByOwner(userId: string) {
       const { data, error } = await client.from("agencies").select("*").eq("owner_user_id", userId).maybeSingle()
       if (error) {
         console.error("[AUTH ERROR]", error.message)
-        return { source: "supabase" as const, data: null }
+        return { source: "supabase" as const, data: null, error: error.message }
       }
-      return { source: "supabase" as const, data: data ? mapAgencyRowToAgency(data) : null }
+      return { source: "supabase" as const, data: data ? mapAgencyRowToAgency(data) : null, error: null }
+    }
+
+    return {
+      source: "supabase-placeholder" as const,
+      data: null,
+      error: "Supabase browser client indisponivel.",
+      config: createSupabaseBrowserClientPlaceholder(),
     }
   }
 
@@ -285,6 +334,7 @@ export async function getAgencyByOwner(userId: string) {
   return {
     source: "local" as const,
     data: agency.ownerUserId === userId ? agency : agency.ownerUserId === null ? agency : null,
+    error: null,
   }
 }
 
@@ -320,10 +370,17 @@ export async function updateAgency(id: string, payload: Partial<Agency>) {
       const { data, error } = await client.from("agencies").update(updatePayload).eq("id", id).select("*").maybeSingle()
       if (error) {
         console.error("[AUTH ERROR]", error.message)
-        return { source: "supabase" as const, data: null }
+        return { source: "supabase" as const, data: null, error: error.message }
       }
 
-      return { source: "supabase" as const, data: data ? mapAgencyRowToAgency(data) : null }
+      return { source: "supabase" as const, data: data ? mapAgencyRowToAgency(data) : null, error: null }
+    }
+
+    return {
+      source: "supabase-placeholder" as const,
+      data: null,
+      error: "Supabase browser client indisponivel.",
+      config: createSupabaseBrowserClientPlaceholder(),
     }
   }
 
@@ -348,7 +405,7 @@ export async function updateAgency(id: string, payload: Partial<Agency>) {
     window.localStorage.setItem("vuei_agencia_configuracoes_frontend", JSON.stringify(nextConfig))
   }
 
-  return { source: "local" as const, data: buildAgency() }
+  return { source: "local" as const, data: buildAgency(), error: null }
 }
 
 export async function listAgencyMembers(agencyId: string) {
@@ -426,7 +483,7 @@ export async function addAgencyMember(payload: Omit<AgencyMember, "id" | "create
 
       if (error) {
         console.error("[AUTH ERROR]", error.message)
-        return { source: "supabase" as const, data: null as AgencyMember | null }
+        return { source: "supabase" as const, data: null as AgencyMember | null, error: error.message }
       }
 
       return {
@@ -441,7 +498,15 @@ export async function addAgencyMember(payload: Omit<AgencyMember, "id" | "create
           name: payload.name,
           email: payload.email,
         },
+        error: null,
       }
+    }
+
+    return {
+      source: "supabase-placeholder" as const,
+      data: null as AgencyMember | null,
+      error: "Supabase browser client indisponivel.",
+      config: createSupabaseBrowserClientPlaceholder(),
     }
   }
 
@@ -466,7 +531,7 @@ export async function addAgencyMember(payload: Omit<AgencyMember, "id" | "create
     window.localStorage.setItem("vuei_agency", JSON.stringify(nextWorkspace))
   }
 
-  return { source: "local" as const, data: member }
+  return { source: "local" as const, data: member, error: null }
 }
 
 export async function updateAgencyMember(id: string, payload: Partial<AgencyMember>) {
@@ -480,7 +545,7 @@ export async function updateAgencyMember(id: string, payload: Partial<AgencyMemb
 
       if (error) {
         console.error("[AUTH ERROR]", error.message)
-        return { source: "supabase" as const, data: null as AgencyMember | null }
+        return { source: "supabase" as const, data: null as AgencyMember | null, error: error.message }
       }
 
       return {
@@ -495,7 +560,15 @@ export async function updateAgencyMember(id: string, payload: Partial<AgencyMemb
               createdAt: data.created_at,
             }
           : null,
+        error: null,
       }
+    }
+
+    return {
+      source: "supabase-placeholder" as const,
+      data: null as AgencyMember | null,
+      error: "Supabase browser client indisponivel.",
+      config: createSupabaseBrowserClientPlaceholder(),
     }
   }
 
@@ -521,5 +594,5 @@ export async function updateAgencyMember(id: string, payload: Partial<AgencyMemb
     window.localStorage.setItem("vuei_agency", JSON.stringify({ ...workspace, teamMembers }))
   }
 
-  return { source: "local" as const, data: updatedMember }
+  return { source: "local" as const, data: updatedMember, error: null }
 }

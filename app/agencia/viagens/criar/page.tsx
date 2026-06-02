@@ -47,12 +47,13 @@ function CreateTripPageContent() {
   const searchParams = useSearchParams()
   const clientIdParam = searchParams.get("clientId")
   
-  const { clients, addTrip, getClientById } = useAgency()
+  const { clients, addTrip, getClientById, setupIncomplete, workspaceError } = useAgency()
   const [currentStep, setCurrentStep] = useState(1)
   const [completed, setCompleted] = useState(false)
   const [createdTrip, setCreatedTrip] = useState<AgencyTrip | null>(null)
   const [copiedAdmin, setCopiedAdmin] = useState(false)
   const [copiedShare, setCopiedShare] = useState(false)
+  const [submitError, setSubmitError] = useState("")
   
   const [formData, setFormData] = useState({
     clientId: clientIdParam || "",
@@ -84,6 +85,7 @@ function CreateTripPageContent() {
     if (currentStep < steps.length) {
       setCurrentStep(currentStep + 1)
     } else {
+      setSubmitError("")
       const newTrip = await addTrip({
         clientId: formData.clientId || `temp-${Date.now()}`,
         clientName: formData.clientName,
@@ -100,6 +102,8 @@ function CreateTripPageContent() {
       if (newTrip) {
         setCreatedTrip(newTrip)
         setCompleted(true)
+      } else {
+        setSubmitError(workspaceError || "Nao foi possivel criar a viagem no Supabase.")
       }
     }
   }
@@ -270,6 +274,22 @@ function CreateTripPageContent() {
 
   return (
     <div className="mx-auto max-w-2xl pb-20 lg:pb-0">
+      {setupIncomplete && (
+        <Card className="mb-6 border-amber-500/20 bg-amber-500/5">
+          <CardContent className="p-4 text-sm text-amber-200">
+            Sua agencia ainda nao foi persistida corretamente no Supabase. Finalize o cadastro da agencia antes de criar viagens reais.
+          </CardContent>
+        </Card>
+      )}
+
+      {!setupIncomplete && workspaceError && (
+        <Card className="mb-6 border-red-500/20 bg-red-500/5">
+          <CardContent className="p-4 text-sm text-red-300">
+            {workspaceError}
+          </CardContent>
+        </Card>
+      )}
+
       {/* Header */}
       <div className="mb-8">
         <Link href="/agencia/viagens">
@@ -541,6 +561,12 @@ function CreateTripPageContent() {
           </AnimatePresence>
 
           {/* Navigation */}
+          {submitError && (
+            <div className="mt-6 rounded-xl border border-red-500/20 bg-red-500/5 px-4 py-3 text-sm text-red-300">
+              {submitError}
+            </div>
+          )}
+
           <div className="mt-8 flex justify-between">
             <Button
               variant="outline"

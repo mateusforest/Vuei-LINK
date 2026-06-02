@@ -76,7 +76,7 @@ function Modal({ open, onClose, title, children }: { open: boolean; onClose: () 
 }
 
 // New Client Modal
-function NewClientModal({ open, onClose, onSave }: { open: boolean; onClose: () => void; onSave: (client: Omit<Client, "id" | "createdAt">) => Promise<void> }) {
+function NewClientModal({ open, onClose, onSave }: { open: boolean; onClose: () => void; onSave: (client: Omit<Client, "id" | "createdAt">) => Promise<boolean> }) {
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -88,7 +88,8 @@ function NewClientModal({ open, onClose, onSave }: { open: boolean; onClose: () 
 
   const handleSubmit = async () => {
     if (!formData.name || !formData.email) return
-    await onSave(formData)
+    const saved = await onSave(formData)
+    if (!saved) return
     setFormData({ name: "", email: "", phone: "", document: "", notes: "", status: "active" })
     onClose()
   }
@@ -154,7 +155,7 @@ function UploadDocModal({ open, onClose, clients, trips, onSave }: {
   onClose: () => void
   clients: Client[]
   trips: AgencyTrip[]
-  onSave: (data: { name: string; type: string; clientId?: string; tripId?: string; isPrivate: boolean }) => Promise<void>
+  onSave: (data: { name: string; type: string; clientId?: string; tripId?: string; isPrivate: boolean }) => Promise<boolean>
 }) {
   const [uploading, setUploading] = useState(false)
   const [formData, setFormData] = useState({
@@ -167,8 +168,9 @@ function UploadDocModal({ open, onClose, clients, trips, onSave }: {
 
   const handleUpload = async () => {
     setUploading(true)
-    await onSave(formData)
+    const saved = await onSave(formData)
     setUploading(false)
+    if (!saved) return
     setFormData({ name: "", type: "voucher", clientId: "", tripId: "", isPrivate: false })
     onClose()
   }
@@ -431,7 +433,7 @@ function GenerateItineraryModal({ open, onClose, clients, trips, onGenerate }: {
 export default function AgencyDashboard() {
   const router = useRouter()
   const { user, profile } = useAuth()
-  const { clients, trips, credits, activities, conciergeRequests, addClient, addDocument, useCredits, isUsingRealData } = useAgency()
+  const { clients, trips, credits, activities, conciergeRequests, addClient, addDocument, useCredits, isUsingRealData, setupIncomplete, workspaceError } = useAgency()
   const [newClientOpen, setNewClientOpen] = useState(false)
   const [uploadDocOpen, setUploadDocOpen] = useState(false)
   const [generateItineraryOpen, setGenerateItineraryOpen] = useState(false)
@@ -469,7 +471,12 @@ export default function AgencyDashboard() {
   ]
 
   const handleNewClient = async (data: Omit<Client, "id" | "createdAt">) => {
-    await addClient(data)
+    const created = await addClient(data)
+    if (!created) {
+      window.alert(workspaceError || "Nao foi possivel salvar o cliente no Supabase.")
+      return false
+    }
+    return true
   }
 
   const handleUploadDoc = async (data: { name: string; type: string; clientId?: string; tripId?: string; isPrivate: boolean }) => {
@@ -483,7 +490,10 @@ export default function AgencyDashboard() {
 
     if (!created && isUsingRealData) {
       window.alert("Nenhum dado real ainda foi salvo nesta acao. Verifique o upload de arquivo da area de documentos da agencia.")
+      return false
     }
+
+    return Boolean(created)
   }
 
   const handleGenerateItinerary = () => {
@@ -527,6 +537,22 @@ export default function AgencyDashboard() {
       animate="visible"
       className="space-y-6 pb-20 lg:pb-0"
     >
+      {setupIncomplete && (
+        <Card className="border-amber-500/20 bg-amber-500/5">
+          <CardContent className="p-4 text-sm text-amber-200">
+            Sua conta de agencia foi criada, mas a estrutura da agencia ainda nao foi persistida corretamente no Supabase.
+          </CardContent>
+        </Card>
+      )}
+
+      {!setupIncomplete && workspaceError && (
+        <Card className="border-red-500/20 bg-red-500/5">
+          <CardContent className="p-4 text-sm text-red-300">
+            {workspaceError}
+          </CardContent>
+        </Card>
+      )}
+
       {/* Welcome Section */}
       <motion.div variants={itemVariants} className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
