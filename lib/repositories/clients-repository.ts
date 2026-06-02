@@ -106,6 +106,13 @@ export async function listAllClients() {
         error: null,
       }
     }
+
+    return {
+      source: "supabase-placeholder" as const,
+      config: createSupabaseBrowserClientPlaceholder(),
+      data: [] as Client[],
+      error: "Supabase browser client indisponivel.",
+    }
   }
 
   return { source: "local" as const, data: getClients(null), error: null }
@@ -122,6 +129,13 @@ export async function getClientById(id: string) {
       }
 
       return { source: "supabase" as const, data: data ? mapClientRowToClient(data) : null, error: null }
+    }
+
+    return {
+      source: "supabase-placeholder" as const,
+      config: createSupabaseBrowserClientPlaceholder(),
+      data: null as Client | null,
+      error: "Supabase browser client indisponivel.",
     }
   }
 
@@ -346,6 +360,13 @@ export async function listClientsWithTrips(agencyId: string) {
         data: clients,
         error: null,
       }
+    }
+
+    return {
+      source: "supabase-placeholder" as const,
+      config: createSupabaseBrowserClientPlaceholder(),
+      data: [] as ClientWithTrips[],
+      error: "Supabase browser client indisponivel.",
     }
   }
 

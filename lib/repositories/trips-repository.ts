@@ -251,6 +251,15 @@ export async function listTrips(params?: ListTripsParams) {
     }
   }
 
+  if (shouldUseSupabase()) {
+    return {
+      source: "supabase-placeholder" as const,
+      config: createSupabaseBrowserClientPlaceholder(),
+      data: [] as Trip[],
+      error: "Supabase browser client indisponivel.",
+    }
+  }
+
   return {
     source: "local" as const,
     data: filterTrips(readStoredTrips(), params),

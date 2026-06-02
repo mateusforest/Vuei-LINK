@@ -276,6 +276,13 @@ export async function listAgencies() {
       }
       return { source: "supabase" as const, data: (data ?? []).map(mapAgencyRowToAgency), error: null }
     }
+
+    return {
+      source: "supabase-placeholder" as const,
+      data: [] as Agency[],
+      error: "Supabase browser client indisponivel.",
+      config: createSupabaseBrowserClientPlaceholder(),
+    }
   }
 
   const agency = buildAgency()
@@ -415,7 +422,7 @@ export async function listAgencyMembers(agencyId: string) {
       const { data, error } = await client.from("agency_members").select("*").eq("agency_id", agencyId)
       if (error) {
         console.error("[AUTH ERROR]", error.message)
-        return { source: "supabase" as const, data: [] as AgencyMember[] }
+        return { source: "supabase" as const, data: [] as AgencyMember[], error: error.message }
       }
 
       return {
@@ -428,11 +435,19 @@ export async function listAgencyMembers(agencyId: string) {
           status: member.status,
           createdAt: member.created_at,
         })),
+        error: null,
       }
+    }
+
+    return {
+      source: "supabase-placeholder" as const,
+      data: [] as AgencyMember[],
+      error: "Supabase browser client indisponivel.",
+      config: createSupabaseBrowserClientPlaceholder(),
     }
   }
 
-  return { source: "local" as const, data: buildAgencyMembers(agencyId) }
+  return { source: "local" as const, data: buildAgencyMembers(agencyId), error: null }
 }
 
 export async function listAllAgencyMembers() {

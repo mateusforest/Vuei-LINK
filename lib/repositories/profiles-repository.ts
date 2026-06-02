@@ -69,15 +69,22 @@ export async function getProfile(id: string) {
       const { data, error } = await client.from("profiles").select("*").eq("id", id).maybeSingle()
       if (error) {
         console.error("[AUTH ERROR]", error.message)
-        return { source: "supabase" as const, data: null }
+        return { source: "supabase" as const, data: null, error: error.message }
       }
 
-      return { source: "supabase" as const, data: data ? mapProfileRowToProfile(data) : null }
+      return { source: "supabase" as const, data: data ? mapProfileRowToProfile(data) : null, error: null }
+    }
+
+    return {
+      source: "supabase-placeholder" as const,
+      config: createSupabaseBrowserClientPlaceholder(),
+      data: null,
+      error: "Supabase browser client indisponivel.",
     }
   }
 
   const profile = buildLocalProfile()
-  return { source: "local" as const, data: profile.id === id ? profile : null }
+  return { source: "local" as const, data: profile.id === id ? profile : null, error: null }
 }
 
 export async function getProfileByEmail(email: string) {
@@ -87,15 +94,22 @@ export async function getProfileByEmail(email: string) {
       const { data, error } = await client.from("profiles").select("*").eq("email", email).maybeSingle()
       if (error) {
         console.error("[AUTH ERROR]", error.message)
-        return { source: "supabase" as const, data: null }
+        return { source: "supabase" as const, data: null, error: error.message }
       }
 
-      return { source: "supabase" as const, data: data ? mapProfileRowToProfile(data) : null }
+      return { source: "supabase" as const, data: data ? mapProfileRowToProfile(data) : null, error: null }
+    }
+
+    return {
+      source: "supabase-placeholder" as const,
+      config: createSupabaseBrowserClientPlaceholder(),
+      data: null,
+      error: "Supabase browser client indisponivel.",
     }
   }
 
   const profile = buildLocalProfile()
-  return { source: "local" as const, data: profile.email === email ? profile : null }
+  return { source: "local" as const, data: profile.email === email ? profile : null, error: null }
 }
 
 export async function createProfile(payload: Omit<Profile, "createdAt" | "updatedAt">) {
@@ -271,19 +285,20 @@ export async function listProfiles(params?: ListProfilesParams) {
       const { data, error } = await query
       if (error) {
         console.error("[AUTH ERROR]", error.message)
-        return { source: "supabase" as const, data: [] as Profile[] }
+        return { source: "supabase" as const, data: [] as Profile[], error: error.message }
       }
-      return { source: "supabase" as const, data: (data ?? []).map(mapProfileRowToProfile) }
+      return { source: "supabase" as const, data: (data ?? []).map(mapProfileRowToProfile), error: null }
     }
 
     return {
       source: "supabase-placeholder" as const,
       config: createSupabaseBrowserClientPlaceholder(),
-      data: filtered,
+      data: [] as Profile[],
+      error: "Supabase browser client indisponivel.",
     }
   }
 
-  return { source: "local" as const, data: filtered }
+  return { source: "local" as const, data: filtered, error: null }
 }
 
 export async function listProfilesByAgency(agencyId: string) {
@@ -293,12 +308,19 @@ export async function listProfilesByAgency(agencyId: string) {
       const { data, error } = await client.from("profiles").select("*").eq("agency_id", agencyId)
       if (error) {
         console.error("[AUTH ERROR]", error.message)
-        return { source: "supabase" as const, data: [] as Profile[] }
+        return { source: "supabase" as const, data: [] as Profile[], error: error.message }
       }
-      return { source: "supabase" as const, data: (data ?? []).map(mapProfileRowToProfile) }
+      return { source: "supabase" as const, data: (data ?? []).map(mapProfileRowToProfile), error: null }
+    }
+
+    return {
+      source: "supabase-placeholder" as const,
+      config: createSupabaseBrowserClientPlaceholder(),
+      data: [] as Profile[],
+      error: "Supabase browser client indisponivel.",
     }
   }
 
   const profiles = [buildLocalProfile()].filter((profile) => profile.agencyId === agencyId)
-  return { source: "local" as const, data: profiles }
+  return { source: "local" as const, data: profiles, error: null }
 }

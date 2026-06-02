@@ -169,6 +169,13 @@ export async function listDocuments(params?: { tripId?: string; clientId?: strin
 
       return { source: "supabase" as const, data: (data ?? []).map(mapDocumentRowToDocument), error: null }
     }
+
+    return {
+      source: "supabase-placeholder" as const,
+      config: createSupabaseBrowserClientPlaceholder(),
+      data: [] as Document[],
+      error: "Supabase browser client indisponivel.",
+    }
   }
 
   return {
@@ -199,6 +206,13 @@ export async function listDocumentsByClient(clientId: string) {
       }
 
       return { source: "supabase" as const, data: (data ?? []).map(mapDocumentRowToDocument), error: null }
+    }
+
+    return {
+      source: "supabase-placeholder" as const,
+      config: createSupabaseBrowserClientPlaceholder(),
+      data: [] as Document[],
+      error: "Supabase browser client indisponivel.",
     }
   }
 
@@ -409,6 +423,13 @@ export async function listPublicTripDocuments(tripId: string) {
       }
 
       return { source: "supabase" as const, data: (data ?? []).map(mapDocumentRowToDocument), error: null }
+    }
+
+    return {
+      source: "supabase-placeholder" as const,
+      config: createSupabaseBrowserClientPlaceholder(),
+      data: [] as Document[],
+      error: "Supabase browser client indisponivel.",
     }
   }
 

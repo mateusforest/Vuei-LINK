@@ -8,6 +8,7 @@ import { listAllClients } from "@/lib/repositories/clients-repository"
 import { listTrips } from "@/lib/repositories/trips-repository"
 import { listDocuments } from "@/lib/repositories/documents-repository"
 import { shouldUseSupabase } from "@/lib/data-source"
+import { useAuth } from "@/contexts/auth-context"
 
 interface Agency {
   id: string
@@ -428,6 +429,7 @@ function buildMasterState(data: {
 }
 
 export function MasterProvider({ children }: { children: ReactNode }) {
+  const { user, profile, loading } = useAuth()
   const [state, setState] = useState<MasterState>(INITIAL_STATE)
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [settings, setSettings] = useState<MasterSettings>(INITIAL_SETTINGS)
@@ -436,6 +438,8 @@ export function MasterProvider({ children }: { children: ReactNode }) {
     let active = true
 
     async function loadMasterData() {
+      if (loading) return
+
       if (!shouldUseSupabase()) {
         if (!active) return
         setState(INITIAL_STATE)
@@ -449,6 +453,13 @@ export function MasterProvider({ children }: { children: ReactNode }) {
             createdAt: new Date().toISOString(),
           },
         ])
+        return
+      }
+
+      if (!user || profile?.role !== "master") {
+        if (!active) return
+        setState(INITIAL_STATE)
+        setNotifications([])
         return
       }
 
@@ -488,6 +499,16 @@ export function MasterProvider({ children }: { children: ReactNode }) {
               id: "agencies-error",
               title: "Falha ao ler agencias",
               message: agenciesResult.error,
+              type: "error",
+              read: false,
+              createdAt: new Date().toISOString(),
+            }
+          : null,
+        membersResult.error
+          ? {
+              id: "members-error",
+              title: "Falha ao ler membros de agencias",
+              message: membersResult.error,
               type: "error",
               read: false,
               createdAt: new Date().toISOString(),
@@ -534,7 +555,7 @@ export function MasterProvider({ children }: { children: ReactNode }) {
     return () => {
       active = false
     }
-  }, [])
+  }, [loading, profile?.role, user?.id])
 
   const credits = useMemo<MasterCredits>(
     () => ({
