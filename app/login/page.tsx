@@ -21,14 +21,21 @@ export default function LoginPage() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [errors, setErrors] = useState<{ email?: string; password?: string; auth?: string }>({})
+  const [safeRedirect, setSafeRedirect] = useState<string | null>(null)
   const canSubmit = email.trim().length > 0 && password.length >= 6
+
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    const requestedRedirect = new URLSearchParams(window.location.search).get("redirect")
+    setSafeRedirect(requestedRedirect && requestedRedirect.startsWith("/") ? requestedRedirect : null)
+  }, [])
 
   useEffect(() => {
     const resolvedRole = (profile?.role ?? user?.user_metadata?.role) as AppRole | undefined
     if (!loading && user && resolvedRole) {
-      router.replace(getRedirectByRole(resolvedRole))
+      router.replace(safeRedirect || getRedirectByRole(resolvedRole))
     }
-  }, [loading, profile?.role, router, user])
+  }, [loading, profile?.role, router, safeRedirect, user])
 
   const validateForm = () => {
     const newErrors: { email?: string; password?: string } = {}
@@ -59,7 +66,7 @@ export default function LoginPage() {
       }
 
       const detectedRole = (result.profile?.role ?? profile?.role ?? result.user?.user_metadata?.role) as AppRole | undefined
-      const redirectPath = getRedirectByRole(detectedRole)
+      const redirectPath = safeRedirect || getRedirectByRole(detectedRole)
       console.log("[AUTH] role detected", detectedRole ?? null)
       console.log("[AUTH] redirect target", redirectPath)
       router.replace(redirectPath)

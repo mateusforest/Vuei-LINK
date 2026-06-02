@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, createContext, useContext } from "react"
 import Image from "next/image"
-import { useParams, usePathname } from "next/navigation"
+import { useParams, usePathname, useRouter } from "next/navigation"
 import { motion, AnimatePresence, useScroll, useTransform } from "framer-motion"
 import { extractAgencyStorageState } from "@/lib/mappers/agency-mappers"
 import { extractTripsStoragePayload } from "@/lib/mappers/trip-mappers"
@@ -2744,6 +2744,7 @@ function TripFooter() {
 export default function TripPage() {
   const params = useParams<{ id: string }>()
   const pathname = usePathname()
+  const router = useRouter()
   const { user, profile, loading: authLoading } = useAuth()
   const [tripData, setTripData] = useState(initialTripData)
   const [isAdmin, setIsAdmin] = useState(false)
@@ -2793,9 +2794,8 @@ export default function TripPage() {
           const isOwner = Boolean(user?.id && repositoryTrip.data.ownerUserId && user.id === repositoryTrip.data.ownerUserId)
 
           if (isAdminRoute && !user) {
-            console.error("[TRIP] erro ao carregar link", "Acesso admin exige autenticacao.")
-            setLoadError("Faca login para acessar o modo administrador desta viagem.")
-            setIsLoadingTrip(false)
+            const redirectTarget = pathname || `/viagem/${routeSlug}/admin`
+            router.replace(`/login?redirect=${encodeURIComponent(redirectTarget)}`)
             return
           }
 
@@ -2896,7 +2896,7 @@ export default function TripPage() {
     }
 
     void loadTrip()
-  }, [params, pathname, user?.id, authLoading])
+  }, [params, pathname, router, user?.id, authLoading])
 
   const showToast = (message: string, type: "success" | "error" | "info" = "success") => {
     setToast({ message, type })
@@ -3057,9 +3057,11 @@ export default function TripPage() {
           <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-white/[0.04]">
             <AlertCircle className="h-6 w-6 text-[#5de0e6]" />
           </div>
-          <h1 className="text-xl font-semibold text-white">Viagem nao encontrada ou link expirado.</h1>
+          <h1 className="text-xl font-semibold text-white">{loadError}</h1>
           <p className="mt-3 text-sm text-white/50">
-            Confira se o link esta correto ou peca um novo compartilhamento.
+            {loadError === "Voce nao tem permissao para editar esta viagem."
+              ? "Entre com a conta proprietaria da viagem para acessar o modo administrador."
+              : "Confira se o link esta correto ou peca um novo compartilhamento."}
           </p>
         </div>
       </main>
