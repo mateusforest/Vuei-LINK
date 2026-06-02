@@ -3095,6 +3095,7 @@ export default function TripPage() {
   const pathname = usePathname()
   const router = useRouter()
   const { user, profile, loading: authLoading } = useAuth()
+  const adminRouteActive = Boolean(pathname?.startsWith("/viagem/") && pathname?.endsWith("/admin"))
   const [tripData, setTripData] = useState(() => normalizeTripViewData(initialTripData))
   const [isAdmin, setIsAdmin] = useState(false)
   const [canWrite, setCanWrite] = useState(false)
@@ -3110,11 +3111,13 @@ export default function TripPage() {
   const [tripOwnerUserId, setTripOwnerUserId] = useState<string | null>(null)
   const [sensitiveAccessGranted, setSensitiveAccessGranted] = useState(false)
   const [securityModalOpen, setSecurityModalOpen] = useState(false)
+  const [quickAccessGateRequired, setQuickAccessGateRequired] = useState(false)
   const pendingSensitiveActionRef = useRef<(() => void) | null>(null)
 
   useEffect(() => {
     setSensitiveAccessGranted(false)
     pendingSensitiveActionRef.current = null
+    setQuickAccessGateRequired(false)
   }, [tripOwnerUserId, user?.id, params?.id, params?.slug])
 
   useEffect(() => {
@@ -3153,6 +3156,8 @@ export default function TripPage() {
         if (repositoryTrip.data) {
           setTripOwnerUserId(repositoryTrip.data.ownerUserId ?? null)
           const isOwner = Boolean(user?.id && repositoryTrip.data.ownerUserId && user.id === repositoryTrip.data.ownerUserId)
+          const quickAccessMethods = getQuickAccessMethods(repositoryTrip.data.ownerUserId ?? null, null)
+          const requiresQuickAccessGate = Boolean(isAdminRoute && !user && quickAccessMethods.configured)
 
           if (isAdminRoute && user && !isOwner) {
             console.error("[TRIP] erro ao carregar link", "Usuario sem permissao para editar a viagem.")
@@ -3161,7 +3166,19 @@ export default function TripPage() {
             return
           }
 
-          const canEditTrip = isAdminRoute
+          if (isAdminRoute && !user) {
+            if (!quickAccessMethods.configured) {
+              const redirectTarget = pathname || `/viagem/${repositoryTrip.data.slug}/admin`
+              router.replace(`/login?redirect=${encodeURIComponent(redirectTarget)}`)
+              setIsLoadingTrip(false)
+              return
+            }
+            setQuickAccessGateRequired(requiresQuickAccessGate)
+          } else {
+            setQuickAccessGateRequired(false)
+          }
+
+          const canEditTrip = isAdminRoute && (Boolean(user) ? isOwner : !requiresQuickAccessGate)
           const canWriteTrip = isAdminRoute && isOwner
           setIsAdmin(canEditTrip)
           setCanWrite(canWriteTrip)
@@ -3494,6 +3511,40 @@ export default function TripPage() {
               ? "Entre com a conta proprietaria da viagem para acessar o modo administrador."
               : "Confira se o link esta correto ou peca um novo compartilhamento."}
           </p>
+        </div>
+      </main>
+    )
+  }
+
+  if (adminRouteActive && !user && quickAccessGateRequired && !sensitiveAccessGranted) {
+    return (
+      <main className="min-h-screen bg-black text-white flex items-center justify-center px-4">
+        <div className="max-w-md rounded-3xl border border-white/[0.06] bg-white/[0.02] p-8 text-center">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-white/[0.04]">
+            <Lock className="h-6 w-6 text-[#5de0e6]" />
+          </div>
+          <h1 className="text-xl font-semibold text-white">Desbloqueie para editar esta viagem</h1>
+          <p className="mt-3 text-sm text-white/50">
+            Use PIN ou biometria configurados neste dispositivo para abrir o modo administrador sem login tradicional.
+          </p>
+          <SensitiveAccessModal
+            open
+            onClose={() => setSecurityModalOpen(false)}
+            ownerUserId={tripOwnerUserId}
+            profileSettings={null}
+            onSuccess={() => {
+              setSensitiveAccessGranted(true)
+              setQuickAccessGateRequired(false)
+              setIsAdmin(true)
+              setCanWrite(false)
+              const pendingAction = pendingSensitiveActionRef.current
+              pendingSensitiveActionRef.current = null
+              setToast({ message: "Acesso rapido liberado para esta viagem.", type: "success" })
+              pendingAction?.()
+            }}
+            onLogin={handleRequireAuthenticatedAdmin}
+            onConfigureQuickAccess={handleConfigureQuickAccess}
+          />
         </div>
       </main>
     )
