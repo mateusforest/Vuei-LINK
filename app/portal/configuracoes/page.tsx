@@ -33,7 +33,7 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
 import { shouldUseSupabase } from "@/lib/data-source"
 import { updateProfile as updateProfileRepository } from "@/lib/repositories/profiles-repository"
@@ -41,6 +41,7 @@ import { createSupabaseBrowserClient } from "@/lib/supabase/client"
 import {
   disableQuickAccessBiometric,
   disableQuickAccessPin,
+  getQuickAccessMethods,
   isBiometricQuickAccessSupported,
   registerQuickAccessBiometric,
   saveQuickAccessPin,
@@ -95,6 +96,7 @@ function SettingsToast({ message }: { message: string }) {
 
 export default function ConfiguracoesPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { signOut, profile: authProfile, refreshProfile } = useAuth()
   const [profile, setProfile] = useState(defaultProfile)
   const [settings, setSettings] = useState(defaultSettings)
@@ -113,6 +115,9 @@ export default function ConfiguracoesPage() {
   const [photoFile, setPhotoFile] = useState<File | null>(null)
   const [pinForm, setPinForm] = useState({ pin: "", confirmPin: "" })
   const biometricSupported = isBiometricQuickAccessSupported()
+  const [deviceQuickAccess, setDeviceQuickAccess] = useState({ configured: false, pinEnabled: false, biometricEnabled: false })
+  const setupQuickAccess = searchParams.get("quickAccess") === "1"
+  const returnTo = searchParams.get("returnTo")
 
   useEffect(() => {
     if (typeof window === "undefined") return
@@ -139,6 +144,12 @@ export default function ConfiguracoesPage() {
       setProfile(nextProfile)
       setProfileForm(nextProfile)
       setPhotoPreview(authProfile.avatarUrl || "")
+      const localQuickAccess = getQuickAccessMethods(authProfile.id)
+      setDeviceQuickAccess({
+        configured: localQuickAccess.configured,
+        pinEnabled: localQuickAccess.pinEnabled,
+        biometricEnabled: localQuickAccess.biometricEnabled,
+      })
       setSettings((prev) => ({
         ...prev,
         faceId: authProfile.settings?.biometricEnabled ?? prev.faceId,
@@ -321,6 +332,7 @@ export default function ConfiguracoesPage() {
       }
 
       setSettings((prev) => ({ ...prev, pinEnabled: true }))
+      setDeviceQuickAccess((prev) => ({ ...prev, configured: true, pinEnabled: true }))
       setPinForm({ pin: "", confirmPin: "" })
       setShowPinModal(false)
       showToast("PIN salvo com sucesso.")
@@ -377,6 +389,11 @@ export default function ConfiguracoesPage() {
       }
 
       setShowBiometricModal(false)
+      setDeviceQuickAccess((prev) => ({
+        configured: settings.faceId || prev.pinEnabled,
+        pinEnabled: prev.pinEnabled,
+        biometricEnabled: settings.faceId,
+      }))
       showToast(settings.faceId ? "Biometria ativada." : "Biometria desativada.")
     } catch (error) {
       const message = error instanceof Error ? error.message : "Nao foi possivel salvar a configuracao."
@@ -425,6 +442,11 @@ export default function ConfiguracoesPage() {
       }
 
       setSettings((prev) => ({ ...prev, pinEnabled: false }))
+      setDeviceQuickAccess((prev) => ({
+        configured: prev.biometricEnabled,
+        pinEnabled: false,
+        biometricEnabled: prev.biometricEnabled,
+      }))
       setPinForm({ pin: "", confirmPin: "" })
       showToast("PIN desativado neste dispositivo.")
     } catch (error) {
@@ -539,6 +561,40 @@ export default function ConfiguracoesPage() {
               <Crown size={12} className="mr-1" />
               {profile.plan}
             </Badge>
+          </div>
+        </Card>
+      </motion.div>
+
+      <motion.div variants={fadeInUp}>
+        <Card className="border-primary/20 bg-gradient-to-br from-primary/10 to-secondary/10 p-5">
+          <div className="flex items-start gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/20">
+              <Shield size={18} className="text-primary" />
+            </div>
+            <div className="space-y-2">
+              <h2 className="text-base font-semibold">Acesso rapido neste dispositivo</h2>
+              <p className="text-sm text-muted-foreground">
+                O PIN e salvo apenas neste dispositivo. Para usar o acesso rapido neste celular, configure o PIN aqui.
+              </p>
+              <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+                <Badge variant="secondary" className="border-border/50 bg-background/50">
+                  {deviceQuickAccess.pinEnabled ? "PIN ativo neste dispositivo" : "PIN nao configurado neste dispositivo"}
+                </Badge>
+                <Badge variant="secondary" className="border-border/50 bg-background/50">
+                  {deviceQuickAccess.biometricEnabled ? "Biometria ativa neste dispositivo" : biometricSupported ? "Biometria disponivel" : "Biometria indisponivel"}
+                </Badge>
+              </div>
+              {setupQuickAccess && (
+                <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 p-3 text-sm text-amber-300">
+                  Este dispositivo ainda nao tinha acesso rapido configurado. Defina seu PIN ou biometria aqui e depois reabra o link admin da viagem.
+                </div>
+              )}
+              {returnTo && (
+                <Button variant="outline" className="border-border/50" onClick={() => router.push(returnTo)}>
+                  Voltar para a viagem
+                </Button>
+              )}
+            </div>
           </div>
         </Card>
       </motion.div>

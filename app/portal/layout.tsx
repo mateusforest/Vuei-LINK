@@ -224,13 +224,17 @@ function PortalLayoutInner({ children }: { children: React.ReactNode }) {
                 <Coins size={14} className="text-primary" />
                 <span className="text-xs font-medium">{credits.balance}</span>
               </div>
-              <div className="relative w-8 h-8 overflow-hidden rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center">
+              <Link
+                href="/portal/configuracoes"
+                aria-label="Abrir configuracoes"
+                className="relative flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-primary to-secondary ring-1 ring-border/50 transition-transform duration-200 active:scale-95"
+              >
                 {profile?.avatarUrl ? (
                   <Image src={profile.avatarUrl} alt={profile.name} fill className="object-cover rounded-full" />
                 ) : (
                   <span className="text-[10px] font-semibold text-primary-foreground">{initials}</span>
                 )}
-              </div>
+              </Link>
             </div>
           </div>
         </header>

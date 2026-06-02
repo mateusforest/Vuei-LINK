@@ -2805,6 +2805,7 @@ function QuickAccessGate({
   biometricEnabled,
   onUnlock,
   onLogin,
+  onConfigureQuickAccess,
 }: {
   tripName: string
   ownerUserId: string
@@ -2812,6 +2813,7 @@ function QuickAccessGate({
   biometricEnabled: boolean
   onUnlock: () => void
   onLogin: () => void
+  onConfigureQuickAccess: () => void
 }) {
   const [pin, setPin] = useState("")
   const [error, setError] = useState("")
@@ -2923,6 +2925,13 @@ function QuickAccessGate({
         >
           Entrar com login
         </Button>
+        <Button
+          variant="ghost"
+          onClick={onConfigureQuickAccess}
+          className="mt-3 w-full text-[#5de0e6] hover:bg-white/[0.04] hover:text-[#5de0e6]"
+        >
+          Configurar acesso rapido neste dispositivo
+        </Button>
       </div>
     </main>
   )
@@ -2995,7 +3004,7 @@ export default function TripPage() {
             quickAccessUnlocked
 
           if (isAdminRoute && !user) {
-            if (repositoryTrip.data.ownerUserId && resolvedQuickAccess.configured) {
+            if (repositoryTrip.data.ownerUserId) {
               setQuickAccessOwnerId(repositoryTrip.data.ownerUserId)
               setQuickAccessMethods({
                 pinEnabled: resolvedQuickAccess.pinEnabled,
@@ -3027,10 +3036,6 @@ export default function TripPage() {
                 setIsLoadingTrip(false)
                 return
               }
-            } else {
-              const redirectTarget = pathname || `/viagem/${routeSlug}/admin`
-              router.replace(`/login?redirect=${encodeURIComponent(redirectTarget)}`)
-              return
             }
           }
 
@@ -3144,6 +3149,13 @@ export default function TripPage() {
     const routeSlug = typeof params?.id === "string" ? params.id : tripData.id
     const target = pathname || `/viagem/${routeSlug}/admin`
     router.replace(`/login?redirect=${encodeURIComponent(target)}`)
+  }
+
+  const handleConfigureQuickAccess = () => {
+    const routeSlug = typeof params?.id === "string" ? params.id : tripData.id
+    const target = pathname || `/viagem/${routeSlug}/admin`
+    const quickAccessTarget = `/portal/configuracoes?quickAccess=1&returnTo=${encodeURIComponent(target)}`
+    router.replace(`/login?redirect=${encodeURIComponent(quickAccessTarget)}`)
   }
 
   const handleNavigate = (section: string) => {
@@ -3343,6 +3355,7 @@ export default function TripPage() {
           setToast({ message: "Acesso rapido liberado neste dispositivo.", type: "success" })
         }}
         onLogin={handleRequireAuthenticatedAdmin}
+        onConfigureQuickAccess={handleConfigureQuickAccess}
       />
     )
   }
