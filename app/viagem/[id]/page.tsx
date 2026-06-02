@@ -402,6 +402,23 @@ function buildTripDataFromStoredTrip(storedTrip: any) {
   })
 }
 
+function resolveProtectedWriteError(error?: string | null) {
+  const normalized = (error ?? "").toLowerCase()
+
+  if (
+    normalized.includes("row-level security") ||
+    normalized.includes("permission denied") ||
+    normalized.includes("jwt") ||
+    normalized.includes("not authenticated") ||
+    normalized.includes("auth") ||
+    normalized.includes("unauthorized")
+  ) {
+    return "Desbloqueio concluido, mas esta acao ainda exige login da conta proprietaria para salvar no banco."
+  }
+
+  return error || "Nao foi possivel concluir esta acao."
+}
+
 const iconMap: Record<string, any> = {
   Plane, Hotel, MapPin, Navigation, Star, Heart
 }
@@ -1061,7 +1078,7 @@ function AddFlightModal({ open, onClose, onSave, tripId, ownerUserId, agencyId, 
   const handleFileUpload = async (file?: File | null) => {
     if (!file) return
     if (!ownerUserId) {
-      setError("Entre com a conta proprietaria para anexar passagens nesta viagem.")
+      setError("Desbloqueie com PIN ou Face ID para anexar esta passagem.")
       return
     }
     if (!ensureSensitiveAccess()) {
@@ -1083,7 +1100,7 @@ function AddFlightModal({ open, onClose, onSave, tripId, ownerUserId, agencyId, 
     const uploadResult = await uploadDocumentFile(file, path)
     if (uploadResult.error || !uploadResult.data) {
       console.error("[TICKET] upload error", uploadResult.error)
-      setError(uploadResult.error || "Nao foi possivel anexar a passagem.")
+      setError(resolveProtectedWriteError(uploadResult.error || "Nao foi possivel anexar a passagem."))
       setUploading(false)
       return
     }
@@ -1106,7 +1123,7 @@ function AddFlightModal({ open, onClose, onSave, tripId, ownerUserId, agencyId, 
 
     if (metadataResult.error || !metadataResult.data) {
       console.error("[TICKET] upload error", metadataResult.error)
-      setError(metadataResult.error || "Nao foi possivel registrar a passagem.")
+      setError(resolveProtectedWriteError(metadataResult.error || "Nao foi possivel registrar a passagem."))
       setUploading(false)
       return
     }
@@ -2055,7 +2072,7 @@ function AddDocumentModal({ open, onClose, onSave, tripId, ownerUserId, agencyId
   const handleUpload = async (file?: File | null) => {
     if (!file) return
     if (!ownerUserId) {
-      setError("Entre com a conta proprietaria para anexar documentos nesta viagem.")
+      setError("Desbloqueie com PIN ou Face ID para anexar este documento.")
       return
     }
     if (!ensureSensitiveAccess()) {
@@ -2075,7 +2092,7 @@ function AddDocumentModal({ open, onClose, onSave, tripId, ownerUserId, agencyId
     const uploadResult = await uploadDocumentFile(file, path)
     if (uploadResult.error || !uploadResult.data) {
       console.error("[DOCUMENT] upload error", uploadResult.error)
-      setError(uploadResult.error || "Nao foi possivel anexar o documento.")
+      setError(resolveProtectedWriteError(uploadResult.error || "Nao foi possivel anexar o documento."))
       setUploading(false)
       return
     }
@@ -2098,7 +2115,7 @@ function AddDocumentModal({ open, onClose, onSave, tripId, ownerUserId, agencyId
 
     if (metadataResult.error || !metadataResult.data) {
       console.error("[DOCUMENT] upload error", metadataResult.error)
-      setError(metadataResult.error || "Nao foi possivel registrar o documento.")
+      setError(resolveProtectedWriteError(metadataResult.error || "Nao foi possivel registrar o documento."))
       setUploading(false)
       return
     }
@@ -2947,7 +2964,7 @@ function SensitiveAccessModal({
 
   const handlePinUnlock = async () => {
     if (!ownerUserId) {
-      setError("Entre para salvar alteracoes nesta viagem.")
+      setError("Configure o PIN desta conta ou use a biometria deste dispositivo para continuar.")
       return
     }
 
@@ -2973,7 +2990,7 @@ function SensitiveAccessModal({
 
   const handleBiometricUnlock = async () => {
     if (!ownerUserId) {
-      setError("Entre para salvar alteracoes nesta viagem.")
+      setError("Configure o PIN desta conta ou use a biometria deste dispositivo para continuar.")
       return
     }
 
@@ -3003,7 +3020,7 @@ function SensitiveAccessModal({
           <Lock className="h-8 w-8 text-[#5de0e6]" />
         </div>
         <p className="mt-3 text-center text-sm text-white/55">
-          Use PIN ou biometria para liberar acoes sensiveis desta viagem. Para salvar no Supabase, a conta proprietaria ainda precisa estar autenticada.
+          Use PIN ou biometria para liberar acoes sensiveis desta viagem. Se o banco exigir autenticacao para salvar, voce podera entrar apenas nesse momento.
         </p>
 
         <div className="mt-6 space-y-3">
@@ -3260,12 +3277,6 @@ export default function TripPage() {
       return
     }
 
-    if (!user || user.id !== tripOwnerUserId) {
-      showToast("Entre para salvar alteracoes nesta viagem.", "info")
-      handleRequireAuthenticatedAdmin()
-      return
-    }
-
     if (sensitiveAccessGranted) {
       onGranted()
       return
@@ -3276,9 +3287,8 @@ export default function TripPage() {
   }
 
   const ensureSensitiveAccess = () => {
-    if (!tripOwnerUserId || !user || user.id !== tripOwnerUserId) {
-      showToast("Entre para salvar alteracoes nesta viagem.", "info")
-      handleRequireAuthenticatedAdmin()
+    if (!tripOwnerUserId) {
+      showToast("Nao foi possivel validar a seguranca desta viagem.", "error")
       return false
     }
 
@@ -3349,12 +3359,6 @@ export default function TripPage() {
       return
     }
 
-    if (!canWrite) {
-      showToast("Entre para salvar alteracoes nesta viagem.", "info")
-      handleRequireAuthenticatedAdmin()
-      return
-    }
-
     if (!sensitiveAccessGranted) {
       requireSensitiveAccess(() => { void handleSaveHotel(data) })
       return
@@ -3381,7 +3385,7 @@ export default function TripPage() {
 
     if (result.error || !result.data) {
       console.error("[HOTEL] error", result.error)
-      showToast(result.error || "Nao foi possivel salvar a hospedagem.", "error")
+      showToast(resolveProtectedWriteError(result.error || "Nao foi possivel salvar a hospedagem."), "error")
       return
     }
 
@@ -3415,12 +3419,6 @@ export default function TripPage() {
   const handleDeleteHotel = async (hotelId: string) => {
     console.log("[HOTEL] delete started")
 
-    if (!canWrite) {
-      showToast("Entre para salvar alteracoes nesta viagem.", "info")
-      handleRequireAuthenticatedAdmin()
-      return
-    }
-
     if (!sensitiveAccessGranted) {
       requireSensitiveAccess(() => { void handleDeleteHotel(hotelId) })
       return
@@ -3430,7 +3428,7 @@ export default function TripPage() {
 
     if (!result.success) {
       console.error("[HOTEL] error", result.error)
-      showToast(result.error || "Nao foi possivel excluir a hospedagem.", "error")
+      showToast(resolveProtectedWriteError(result.error || "Nao foi possivel excluir a hospedagem."), "error")
       return
     }
 
@@ -3451,12 +3449,6 @@ export default function TripPage() {
   }
 
   const handleAddDocument = (data: any) => {
-    if (!canWrite) {
-      showToast("Entre para salvar alteracoes nesta viagem.", "info")
-      handleRequireAuthenticatedAdmin()
-      return
-    }
-
     requireSensitiveAccess(() => {
       setTripData(prev => ({
         ...prev,
@@ -3518,10 +3510,10 @@ export default function TripPage() {
           <TripHeader tripData={tripData} onOpenShare={() => setShareOpen(true)} onOpenMenu={() => setMenuOpen(true)} />
           <TripHero tripData={tripData} onEditTrip={() => setEditTripOpen(true)} />
           <QuickAccessCards tripData={tripData} onNavigate={handleNavigate} />
-  <FlightsSection tripData={tripData} onUpdateFlight={handleUpdateFlight} onAddFlight={handleAddFlight} tripId={tripData.id} ownerUserId={user?.id ?? profile?.id ?? null} agencyId={profile?.agencyId ?? null} ensureSensitiveAccess={ensureSensitiveAccess} />
+  <FlightsSection tripData={tripData} onUpdateFlight={handleUpdateFlight} onAddFlight={handleAddFlight} tripId={tripData.id} ownerUserId={tripOwnerUserId} agencyId={profile?.agencyId ?? null} ensureSensitiveAccess={ensureSensitiveAccess} />
   <HotelSection tripData={tripData} onSaveHotel={handleSaveHotel} onDeleteHotel={handleDeleteHotel} />
   <ItinerarySection tripData={tripData} onUpdateItinerary={handleUpdateItinerary} />
-  <DocumentsSection tripData={tripData} onAddDocument={handleAddDocument} tripId={tripData.id} ownerUserId={user?.id ?? profile?.id ?? null} agencyId={profile?.agencyId ?? null} tripOwnerUserId={tripOwnerUserId} profileSettings={profile?.settings ?? null} ensureSensitiveAccess={ensureSensitiveAccess} />
+  <DocumentsSection tripData={tripData} onAddDocument={handleAddDocument} tripId={tripData.id} ownerUserId={tripOwnerUserId} agencyId={profile?.agencyId ?? null} tripOwnerUserId={tripOwnerUserId} profileSettings={profile?.settings ?? null} ensureSensitiveAccess={ensureSensitiveAccess} />
   <ConciergeSection tripData={tripData} onOpenCredits={() => setCreditsOpen(true)} />
           <OfflineSection />
           <QuickInfoSection tripData={tripData} />
