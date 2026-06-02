@@ -101,8 +101,8 @@ export default function DocumentosPage() {
   const currentTrip = activeTrip ?? trips[0] ?? null
   const quickAccessOwnerId = profile?.id ?? null
   const quickAccessMethods = useMemo(
-    () => getQuickAccessMethods(quickAccessOwnerId),
-    [quickAccessOwnerId],
+    () => getQuickAccessMethods(quickAccessOwnerId, profile?.settings),
+    [quickAccessOwnerId, profile?.settings],
   )
 
   useEffect(() => {
@@ -155,12 +155,12 @@ export default function DocumentosPage() {
 
   const verifyPin = async () => {
     if (!quickAccessOwnerId) {
-      setPinErrorMessage("Faca login novamente para liberar documentos privados neste dispositivo.")
+      setPinErrorMessage("Faca login novamente para liberar documentos privados desta conta.")
       return
     }
 
     if (!quickAccessMethods.pinEnabled) {
-      setPinErrorMessage("Acesso rapido por PIN nao configurado neste dispositivo. Configure em Configuracoes.")
+      setPinErrorMessage("PIN da conta nao configurado. Configure em Configuracoes.")
       return
     }
 
@@ -168,7 +168,7 @@ export default function DocumentosPage() {
     setPinErrorMessage("")
 
     try {
-      const isValid = await verifyQuickAccessPin(quickAccessOwnerId, pin)
+      const isValid = await verifyQuickAccessPin(quickAccessOwnerId, pin, { profileSettings: profile?.settings })
       if (!isValid) {
         setPinErrorMessage("PIN invalido.")
         return
@@ -177,9 +177,9 @@ export default function DocumentosPage() {
       setPinVerified(true)
       setShowPinModal(false)
       setPin("")
-      setToastMessage("Documentos privados liberados neste dispositivo.")
+      setToastMessage("Documentos privados liberados.")
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Nao foi possivel validar o PIN neste dispositivo."
+      const message = error instanceof Error ? error.message : "Nao foi possivel validar o PIN desta conta."
       setPinErrorMessage(message)
     } finally {
       setIsUnlocking(false)
@@ -188,7 +188,7 @@ export default function DocumentosPage() {
 
   const handleBiometricUnlock = async () => {
     if (!quickAccessOwnerId) {
-      setPinErrorMessage("Faca login novamente para liberar documentos privados neste dispositivo.")
+      setPinErrorMessage("Faca login novamente para liberar documentos privados desta conta.")
       return
     }
 
@@ -209,7 +209,7 @@ export default function DocumentosPage() {
 
       setPinVerified(true)
       setShowPinModal(false)
-      setToastMessage("Documentos privados liberados neste dispositivo.")
+      setToastMessage("Documentos privados liberados.")
     } catch (error) {
       const message = error instanceof Error ? error.message : "Nao foi possivel validar a biometria."
       setPinErrorMessage(message)
@@ -499,7 +499,7 @@ export default function DocumentosPage() {
               Verificacao de seguranca
             </DialogTitle>
             <DialogDescription>
-              Desbloqueie os documentos privados com o acesso rapido configurado neste dispositivo.
+              Desbloqueie os documentos privados com o PIN da conta ou com a biometria configurada neste dispositivo.
             </DialogDescription>
           </DialogHeader>
 
@@ -520,7 +520,7 @@ export default function DocumentosPage() {
               </>
             ) : (
               <Card className="border-border/50 bg-muted/20 p-4 text-sm text-muted-foreground">
-                Acesso rapido por PIN nao configurado neste dispositivo. Configure em Configuracoes para liberar documentos privados aqui.
+                PIN da conta nao configurado. Configure em Configuracoes para liberar documentos privados aqui.
               </Card>
             )}
 

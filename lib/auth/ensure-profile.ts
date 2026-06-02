@@ -72,6 +72,9 @@ export async function ensureProfile(user: User, client?: SupabaseClient<Database
       notificationsEnabled: true,
       biometricEnabled: false,
       pinEnabled: false,
+      quickAccess: {
+        enabled: false,
+      },
     },
   }
 

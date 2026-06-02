@@ -41,6 +41,7 @@ import { createSupabaseBrowserClient } from "@/lib/supabase/client"
 import {
   disableQuickAccessBiometric,
   disableQuickAccessPin,
+  getLegacyQuickAccessPin,
   getQuickAccessMethods,
   isBiometricQuickAccessSupported,
   registerQuickAccessBiometric,
@@ -144,7 +145,7 @@ export default function ConfiguracoesPage() {
       setProfile(nextProfile)
       setProfileForm(nextProfile)
       setPhotoPreview(authProfile.avatarUrl || "")
-      const localQuickAccess = getQuickAccessMethods(authProfile.id)
+      const localQuickAccess = getQuickAccessMethods(authProfile.id, authProfile.settings)
       setDeviceQuickAccess({
         configured: localQuickAccess.configured,
         pinEnabled: localQuickAccess.pinEnabled,
@@ -153,7 +154,7 @@ export default function ConfiguracoesPage() {
       setSettings((prev) => ({
         ...prev,
         faceId: authProfile.settings?.biometricEnabled ?? prev.faceId,
-        pinEnabled: authProfile.settings?.pinEnabled ?? prev.pinEnabled,
+        pinEnabled: authProfile.settings?.quickAccess?.enabled ?? authProfile.settings?.pinEnabled ?? prev.pinEnabled,
         notifications: authProfile.settings?.notificationsEnabled ?? prev.notifications,
         darkMode: authProfile.settings?.darkMode ?? prev.darkMode,
         language: authProfile.settings?.language ?? prev.language,
@@ -178,6 +179,26 @@ export default function ConfiguracoesPage() {
       // fallback silencioso
     }
   }, [authProfile])
+
+  useEffect(() => {
+    if (!shouldUseSupabase() || !authProfile?.id) return
+    if (authProfile.settings?.quickAccess?.enabled) return
+
+    const legacyPin = getLegacyQuickAccessPin(authProfile.id)
+    if (!legacyPin) return
+
+    void updateProfileRepository(authProfile.id, {
+      settings: {
+        ...authProfile.settings,
+        pinEnabled: true,
+        quickAccess: legacyPin,
+      },
+    }).then(async (result) => {
+      if (result.data) {
+        await refreshProfile()
+      }
+    })
+  }, [authProfile, refreshProfile])
 
   useEffect(() => {
     if (typeof window === "undefined") return
@@ -302,7 +323,7 @@ export default function ConfiguracoesPage() {
     if (pinForm.pin.length !== 4 || pinForm.pin !== pinForm.confirmPin) return
 
     if (!authProfile?.id) {
-      setActionError("Faca login novamente para configurar o PIN neste dispositivo.")
+      setActionError("Faca login novamente para configurar o PIN desta conta.")
       return
     }
 
@@ -311,16 +332,18 @@ export default function ConfiguracoesPage() {
     setActionError("")
 
     try {
-      await saveQuickAccessPin(authProfile.id, pinForm.pin)
+      const quickAccess = await saveQuickAccessPin(authProfile.id, pinForm.pin)
 
       if (shouldUseSupabase() && authProfile) {
         const result = await updateProfileRepository(authProfile.id, {
           settings: {
+            ...authProfile.settings,
             language: authProfile.settings?.language ?? settings.language,
             darkMode: authProfile.settings?.darkMode ?? settings.darkMode,
             notificationsEnabled: settings.notifications,
             biometricEnabled: settings.faceId,
             pinEnabled: true,
+            quickAccess,
           },
         })
 
@@ -373,6 +396,7 @@ export default function ConfiguracoesPage() {
       if (shouldUseSupabase() && authProfile) {
         const result = await updateProfileRepository(authProfile.id, {
           settings: {
+            ...authProfile.settings,
             language: authProfile.settings?.language ?? "pt-BR",
             darkMode: authProfile.settings?.darkMode ?? true,
             notificationsEnabled: settings.notifications,
@@ -412,7 +436,7 @@ export default function ConfiguracoesPage() {
     }
 
     if (!settings.pinEnabled) {
-      showToast("Defina um novo PIN para ativar o acesso rapido neste dispositivo.")
+      showToast("Defina um novo PIN para ativar o acesso rapido desta conta.")
       return
     }
 
@@ -426,11 +450,15 @@ export default function ConfiguracoesPage() {
       if (shouldUseSupabase()) {
         const result = await updateProfileRepository(authProfile.id, {
           settings: {
+            ...authProfile.settings,
             language: authProfile.settings?.language ?? settings.language,
             darkMode: authProfile.settings?.darkMode ?? settings.darkMode,
             notificationsEnabled: settings.notifications,
             biometricEnabled: settings.faceId,
             pinEnabled: false,
+            quickAccess: {
+              enabled: false,
+            },
           },
         })
 
@@ -448,7 +476,7 @@ export default function ConfiguracoesPage() {
         biometricEnabled: prev.biometricEnabled,
       }))
       setPinForm({ pin: "", confirmPin: "" })
-      showToast("PIN desativado neste dispositivo.")
+      showToast("PIN desativado nesta conta.")
     } catch (error) {
       const message = error instanceof Error ? error.message : "Nao foi possivel atualizar a protecao por PIN."
       console.error("[PROFILE] save error", message)
@@ -495,7 +523,7 @@ export default function ConfiguracoesPage() {
         {
           icon: Lock,
           label: "PIN de seguranca",
-          description: settings.pinEnabled ? "PIN configurado" : "Defina um PIN de 4 digitos",
+          description: settings.pinEnabled ? "PIN da conta configurado" : "Defina um PIN de 4 digitos",
           action: () => setShowPinModal(true),
         },
         {
@@ -572,13 +600,13 @@ export default function ConfiguracoesPage() {
               <Shield size={18} className="text-primary" />
             </div>
             <div className="space-y-2">
-              <h2 className="text-base font-semibold">Acesso rapido neste dispositivo</h2>
+              <h2 className="text-base font-semibold">Acesso rapido</h2>
               <p className="text-sm text-muted-foreground">
-                O PIN e salvo apenas neste dispositivo. Para usar o acesso rapido neste celular, configure o PIN aqui.
+                O PIN fica salvo com seguranca na sua conta e funciona em outros dispositivos depois do login. A biometria continua sendo configurada separadamente em cada dispositivo.
               </p>
               <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
                 <Badge variant="secondary" className="border-border/50 bg-background/50">
-                  {deviceQuickAccess.pinEnabled ? "PIN ativo neste dispositivo" : "PIN nao configurado neste dispositivo"}
+                  {deviceQuickAccess.pinEnabled ? "PIN da conta ativo" : "PIN da conta nao configurado"}
                 </Badge>
                 <Badge variant="secondary" className="border-border/50 bg-background/50">
                   {deviceQuickAccess.biometricEnabled ? "Biometria ativa neste dispositivo" : biometricSupported ? "Biometria disponivel" : "Biometria indisponivel"}
@@ -586,7 +614,7 @@ export default function ConfiguracoesPage() {
               </div>
               {setupQuickAccess && (
                 <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 p-3 text-sm text-amber-300">
-                  Este dispositivo ainda nao tinha acesso rapido configurado. Defina seu PIN ou biometria aqui e depois reabra o link admin da viagem.
+                  Este dispositivo ainda nao tinha acesso rapido configurado. O PIN da conta pode ser usado aqui depois do login, e a biometria pode ser ativada localmente neste aparelho.
                 </div>
               )}
               {returnTo && (
@@ -753,7 +781,7 @@ export default function ConfiguracoesPage() {
             </div>
             {!biometricSupported && (
               <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 p-4 text-sm text-amber-300">
-                Este navegador ou dispositivo ainda nao oferece suporte confiavel a WebAuthn/passkey para o Vuei. Voce pode usar PIN neste dispositivo ou entrar com login.
+                Este navegador ou dispositivo ainda nao oferece suporte confiavel a WebAuthn/passkey para o Vuei. Voce pode usar o PIN da conta ou entrar com login.
               </div>
             )}
             <div className="flex items-center justify-between rounded-xl border border-border/50 p-4">

@@ -4,6 +4,9 @@ import type { Database } from "@/lib/supabase/types"
 
 export function mapProfileRowToProfile(row: Database["public"]["Tables"]["profiles"]["Row"]): Profile {
   const settings = row.settings as Record<string, unknown>
+  const quickAccessSettings = typeof settings.quickAccess === "object" && settings.quickAccess !== null
+    ? (settings.quickAccess as Record<string, unknown>)
+    : null
 
   return {
     id: row.id,
@@ -20,6 +23,14 @@ export function mapProfileRowToProfile(row: Database["public"]["Tables"]["profil
       notificationsEnabled: typeof settings.notificationsEnabled === "boolean" ? settings.notificationsEnabled : true,
       biometricEnabled: typeof settings.biometricEnabled === "boolean" ? settings.biometricEnabled : false,
       pinEnabled: typeof settings.pinEnabled === "boolean" ? settings.pinEnabled : false,
+      quickAccess: quickAccessSettings
+        ? {
+            enabled: typeof quickAccessSettings.enabled === "boolean" ? quickAccessSettings.enabled : false,
+            pinHash: typeof quickAccessSettings.pinHash === "string" ? quickAccessSettings.pinHash : null,
+            pinSalt: typeof quickAccessSettings.pinSalt === "string" ? quickAccessSettings.pinSalt : null,
+            pinIterations: typeof quickAccessSettings.pinIterations === "number" ? quickAccessSettings.pinIterations : null,
+          }
+        : null,
     },
     createdAt: row.created_at,
     updatedAt: row.updated_at,

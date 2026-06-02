@@ -55,6 +55,7 @@ function buildLocalProfile(): Profile {
       notificationsEnabled: state.settings?.notifications ?? true,
       biometricEnabled: state.settings?.faceId ?? false,
       pinEnabled: state.settings?.pinEnabled ?? false,
+      quickAccess: null,
     },
     createdAt: now,
     updatedAt: now,
@@ -119,6 +120,7 @@ export async function createProfile(payload: Omit<Profile, "createdAt" | "update
           notificationsEnabled: profile.settings?.notificationsEnabled ?? true,
           biometricEnabled: profile.settings?.biometricEnabled ?? false,
           pinEnabled: profile.settings?.pinEnabled ?? false,
+          quickAccess: profile.settings?.quickAccess ?? { enabled: false },
         },
       }
 
@@ -192,6 +194,7 @@ export async function updateProfile(id: string, payload: Partial<Profile>) {
           notificationsEnabled: nextProfile.settings?.notificationsEnabled ?? true,
           biometricEnabled: nextProfile.settings?.biometricEnabled ?? false,
           pinEnabled: nextProfile.settings?.pinEnabled ?? false,
+          quickAccess: nextProfile.settings?.quickAccess ?? { enabled: false },
         },
       }
 

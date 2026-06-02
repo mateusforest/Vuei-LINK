@@ -1,12 +1,20 @@
 export type UserRole = "traveler" | "agency_owner" | "agency_member" | "master"
 export type ProfileRole = UserRole
 
+export interface ProfileQuickAccessSettings {
+  enabled: boolean
+  pinHash?: string | null
+  pinSalt?: string | null
+  pinIterations?: number | null
+}
+
 export interface ProfileSettings {
   language: string | null
   darkMode: boolean
   notificationsEnabled: boolean
   biometricEnabled: boolean
   pinEnabled: boolean
+  quickAccess?: ProfileQuickAccessSettings | null
 }
 
 export interface Profile {

@@ -979,13 +979,13 @@ function FlightsSection({ tripData, onUpdateFlight, onAddFlight, tripId, ownerUs
 
       <EditFlightModal open={!!editingFlight} onClose={() => setEditingFlight(null)} flight={editingFlight} onSave={handleSaveFlight} />
       <QRCodeModal open={!!viewingQR} onClose={() => setViewingQR(null)} flight={viewingQR} />
-      <AddFlightModal open={addingFlight} onClose={() => setAddingFlight(false)} tripId={tripId} ownerUserId={ownerUserId} agencyId={agencyId} onSave={(data) => { onAddFlight(data); showToast("Arquivo anexado. A leitura automatica estara disponivel em breve.", "info"); setAddingFlight(false) }} />
+      <AddFlightModal open={addingFlight} onClose={() => setAddingFlight(false)} tripId={tripId} ownerUserId={ownerUserId} agencyId={agencyId} ensureSensitiveAccess={ensureSensitiveAccess} onSave={(data) => { onAddFlight(data); showToast("Arquivo anexado. A leitura automatica estara disponivel em breve.", "info"); setAddingFlight(false) }} />
     </section>
   )
 }
 
 // Add Flight Modal
-function AddFlightModal({ open, onClose, onSave, tripId, ownerUserId, agencyId }: { open: boolean; onClose: () => void; onSave: (data: any) => void; tripId: string; ownerUserId: string | null; agencyId: string | null }) {
+function AddFlightModal({ open, onClose, onSave, tripId, ownerUserId, agencyId, ensureSensitiveAccess }: { open: boolean; onClose: () => void; onSave: (data: any) => void; tripId: string; ownerUserId: string | null; agencyId: string | null; ensureSensitiveAccess: () => boolean }) {
   const [uploading, setUploading] = useState(false)
   const [fileName, setFileName] = useState("")
   const [error, setError] = useState("")
@@ -994,6 +994,10 @@ function AddFlightModal({ open, onClose, onSave, tripId, ownerUserId, agencyId }
     if (!file) return
     if (!ownerUserId) {
       setError("Entre com a conta proprietaria para anexar passagens nesta viagem.")
+      return
+    }
+    if (!ensureSensitiveAccess()) {
+      setError("Desbloqueie com PIN ou biometria antes de anexar passagens.")
       return
     }
 
@@ -1799,6 +1803,7 @@ function DocumentsSection({
         open={pinModal}
         onClose={() => setPinModal(false)}
         ownerUserId={tripOwnerUserId}
+        profileSettings={profile?.settings ?? null}
         onSuccess={() => {
           setUnlocked(true)
           setPinModal(false)
@@ -1806,7 +1811,7 @@ function DocumentsSection({
         }}
       />
       <ViewDocumentModal open={!!viewingDoc} onClose={() => setViewingDoc(null)} document={viewingDoc} />
-      <AddDocumentModal open={addingDoc} onClose={() => setAddingDoc(false)} tripId={tripId} ownerUserId={ownerUserId} agencyId={agencyId} onSave={(data) => { onAddDocument(data); showToast("Documento adicionado!", "success"); setAddingDoc(false) }} />
+      <AddDocumentModal open={addingDoc} onClose={() => setAddingDoc(false)} tripId={tripId} ownerUserId={ownerUserId} agencyId={agencyId} ensureSensitiveAccess={ensureSensitiveAccess} onSave={(data) => { onAddDocument(data); showToast("Documento adicionado!", "success"); setAddingDoc(false) }} />
     </section>
   )
 }
@@ -1817,15 +1822,18 @@ function PinModal({
   onClose,
   onSuccess,
   ownerUserId,
+  profileSettings,
 }: {
   open: boolean
   onClose: () => void
   onSuccess: () => void
   ownerUserId: string | null
+  profileSettings: any
 }) {
   const [pin, setPin] = useState("")
   const [error, setError] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const quickAccessMethods = getQuickAccessMethods(ownerUserId, profileSettings)
 
   const handleSubmit = async () => {
     if (pin.length !== 4 || !ownerUserId) return
@@ -1834,7 +1842,7 @@ function PinModal({
     setError("")
 
     try {
-      const isValid = await verifyQuickAccessPin(ownerUserId, pin)
+      const isValid = await verifyQuickAccessPin(ownerUserId, pin, { profileSettings })
       if (!isValid) {
         setError("PIN invalido")
         return
@@ -1844,6 +1852,28 @@ function PinModal({
       setPin("")
     } catch (pinError) {
       const message = pinError instanceof Error ? pinError.message : "Acesso rapido nao configurado neste dispositivo"
+      setError(message)
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const handleBiometricUnlock = async () => {
+    if (!ownerUserId) return
+
+    setIsSubmitting(true)
+    setError("")
+
+    try {
+      const isValid = await authenticateQuickAccessBiometric(ownerUserId)
+      if (!isValid) {
+        setError("Nao foi possivel validar a biometria neste dispositivo.")
+        return
+      }
+
+      onSuccess()
+    } catch (pinError) {
+      const message = pinError instanceof Error ? pinError.message : "Biometria indisponivel neste dispositivo."
       setError(message)
     } finally {
       setIsSubmitting(false)
@@ -1879,7 +1909,18 @@ function PinModal({
         <Button onClick={() => void handleSubmit()} disabled={isSubmitting || pin.length !== 4 || !ownerUserId} className="w-full mt-4 bg-gradient-to-r from-[#5de0e6] to-[#004aad] hover:opacity-90 text-white border-0 disabled:opacity-50">
           Desbloquear
         </Button>
-        <p className="text-xs text-white/30 mt-4">O PIN desta area usa a configuracao de acesso rapido salva neste dispositivo.</p>
+        {quickAccessMethods.biometricEnabled && (
+          <Button
+            variant="outline"
+            onClick={() => void handleBiometricUnlock()}
+            disabled={isSubmitting || !ownerUserId}
+            className="w-full mt-3 border-white/[0.08] bg-transparent text-white/80 hover:bg-white/[0.06]"
+          >
+            <Fingerprint className="mr-2 h-4 w-4" />
+            Usar Face ID / biometria
+          </Button>
+        )}
+        <p className="text-xs text-white/30 mt-4">O PIN desta area usa a configuracao de acesso rapido vinculada a sua conta. A biometria continua sendo por dispositivo.</p>
       </div>
     </Modal>
   )
@@ -1934,7 +1975,7 @@ function ViewDocumentModal({ open, onClose, document }: { open: boolean; onClose
 }
 
 // Add Document Modal
-function AddDocumentModal({ open, onClose, onSave, tripId, ownerUserId, agencyId }: { open: boolean; onClose: () => void; onSave: (data: any) => void; tripId: string; ownerUserId: string | null; agencyId: string | null }) {
+function AddDocumentModal({ open, onClose, onSave, tripId, ownerUserId, agencyId, ensureSensitiveAccess }: { open: boolean; onClose: () => void; onSave: (data: any) => void; tripId: string; ownerUserId: string | null; agencyId: string | null; ensureSensitiveAccess: () => boolean }) {
   const [formData, setFormData] = useState({ name: "", type: "voucher", private: false })
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState("")
@@ -1943,6 +1984,10 @@ function AddDocumentModal({ open, onClose, onSave, tripId, ownerUserId, agencyId
     if (!file) return
     if (!ownerUserId) {
       setError("Entre com a conta proprietaria para anexar documentos nesta viagem.")
+      return
+    }
+    if (!ensureSensitiveAccess()) {
+      setError("Desbloqueie com PIN ou biometria antes de anexar documentos.")
       return
     }
     console.log("[DOCUMENT] file selected", file.name)
@@ -2806,39 +2851,45 @@ function TripFooter() {
   )
 }
 
-function QuickAccessGate({
-  tripName,
+function SensitiveAccessModal({
+  open,
   ownerUserId,
-  pinEnabled,
-  biometricEnabled,
-  onUnlock,
+  profileSettings,
+  onClose,
+  onSuccess,
   onLogin,
   onConfigureQuickAccess,
 }: {
-  tripName: string
-  ownerUserId: string
-  pinEnabled: boolean
-  biometricEnabled: boolean
-  onUnlock: () => void
+  open: boolean
+  ownerUserId: string | null
+  profileSettings: any
+  onClose: () => void
+  onSuccess: () => void
   onLogin: () => void
   onConfigureQuickAccess: () => void
 }) {
   const [pin, setPin] = useState("")
   const [error, setError] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const quickAccessMethods = getQuickAccessMethods(ownerUserId, profileSettings)
 
   const handlePinUnlock = async () => {
+    if (!ownerUserId) {
+      setError("Entre para salvar alteracoes nesta viagem.")
+      return
+    }
+
     setIsSubmitting(true)
     setError("")
 
     try {
-      const isValid = await verifyQuickAccessPin(ownerUserId, pin)
+      const isValid = await verifyQuickAccessPin(ownerUserId, pin, { profileSettings })
       if (!isValid) {
         setError("PIN invalido")
         return
       }
 
-      onUnlock()
+      onSuccess()
     } catch (unlockError) {
       const message = unlockError instanceof Error ? unlockError.message : "Acesso rapido nao configurado neste dispositivo"
       setError(message)
@@ -2849,6 +2900,11 @@ function QuickAccessGate({
   }
 
   const handleBiometricUnlock = async () => {
+    if (!ownerUserId) {
+      setError("Entre para salvar alteracoes nesta viagem.")
+      return
+    }
+
     setIsSubmitting(true)
     setError("")
 
@@ -2859,7 +2915,7 @@ function QuickAccessGate({
         return
       }
 
-      onUnlock()
+      onSuccess()
     } catch (unlockError) {
       const message = unlockError instanceof Error ? unlockError.message : "Biometria indisponivel neste dispositivo."
       setError(message)
@@ -2869,18 +2925,17 @@ function QuickAccessGate({
   }
 
   return (
-    <main className="min-h-screen bg-black text-white flex items-center justify-center px-4">
-      <div className="w-full max-w-md rounded-3xl border border-white/[0.06] bg-white/[0.02] p-8 shadow-2xl">
+    <Modal open={open} onClose={onClose} title="Desbloqueie para editar esta viagem">
+      <div className="w-full">
         <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-[#5de0e6]/20 to-[#004aad]/20">
           <Lock className="h-8 w-8 text-[#5de0e6]" />
         </div>
-        <h1 className="text-center text-xl font-semibold text-white">Desbloqueie para editar esta viagem</h1>
         <p className="mt-3 text-center text-sm text-white/55">
-          {tripName || "Viagem"} detectada. Use o acesso rapido configurado neste dispositivo ou entre com login.
+          Use PIN ou biometria para liberar acoes sensiveis desta viagem. Para salvar no Supabase, a conta proprietaria ainda precisa estar autenticada.
         </p>
 
         <div className="mt-6 space-y-3">
-          {biometricEnabled && (
+          {quickAccessMethods.biometricEnabled && (
             <Button
               onClick={() => void handleBiometricUnlock()}
               disabled={isSubmitting}
@@ -2891,7 +2946,7 @@ function QuickAccessGate({
             </Button>
           )}
 
-          {pinEnabled && (
+          {quickAccessMethods.pinEnabled && (
             <div className="space-y-3 rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4">
               <Label className="text-white/70">Usar PIN</Label>
               <Input
@@ -2913,9 +2968,9 @@ function QuickAccessGate({
             </div>
           )}
 
-          {!pinEnabled && !biometricEnabled && (
+          {!quickAccessMethods.pinEnabled && !quickAccessMethods.biometricEnabled && (
             <div className="rounded-2xl border border-amber-500/20 bg-amber-500/10 p-4 text-sm text-amber-300">
-              Acesso rapido nao configurado neste dispositivo.
+              Acesso rapido nao configurado neste dispositivo ou nesta conta.
             </div>
           )}
 
@@ -2941,7 +2996,7 @@ function QuickAccessGate({
           Configurar acesso rapido neste dispositivo
         </Button>
       </div>
-    </main>
+    </Modal>
   )
 }
 
@@ -2964,9 +3019,14 @@ export default function TripPage() {
   const [tripSettingsOpen, setTripSettingsOpen] = useState(false)
   const [creditsOpen, setCreditsOpen] = useState(false)
   const [tripOwnerUserId, setTripOwnerUserId] = useState<string | null>(null)
-  const [quickAccessOwnerId, setQuickAccessOwnerId] = useState<string | null>(null)
-  const [quickAccessMethods, setQuickAccessMethods] = useState({ pinEnabled: false, biometricEnabled: false })
-  const [quickAccessUnlocked, setQuickAccessUnlocked] = useState(false)
+  const [sensitiveAccessGranted, setSensitiveAccessGranted] = useState(false)
+  const [securityModalOpen, setSecurityModalOpen] = useState(false)
+  const pendingSensitiveActionRef = useRef<(() => void) | null>(null)
+
+  useEffect(() => {
+    setSensitiveAccessGranted(false)
+    pendingSensitiveActionRef.current = null
+  }, [tripOwnerUserId, user?.id, params?.id])
 
   useEffect(() => {
     if (typeof window === "undefined") return
@@ -2977,11 +3037,6 @@ export default function TripPage() {
     const publicToken = searchParams.get("token") || searchParams.get("publicToken")
     const isPublicRoute = pathname?.startsWith("/v/") ?? false
     const isAdminRoute = isAdminLinkMode(searchParams, pathname)
-
-    if (isAdminRoute && authLoading) {
-      setIsLoadingTrip(true)
-      return
-    }
 
     setIsAdmin(false)
     setCanWrite(false)
@@ -3004,57 +3059,15 @@ export default function TripPage() {
         if (repositoryTrip.data) {
           setTripOwnerUserId(repositoryTrip.data.ownerUserId ?? null)
           const isOwner = Boolean(user?.id && repositoryTrip.data.ownerUserId && user.id === repositoryTrip.data.ownerUserId)
-          const resolvedQuickAccess = getQuickAccessMethods(repositoryTrip.data.ownerUserId)
-          const hasQuickAccess =
-            Boolean(repositoryTrip.data.ownerUserId) &&
-            resolvedQuickAccess.configured &&
-            quickAccessOwnerId === repositoryTrip.data.ownerUserId &&
-            quickAccessUnlocked
 
-          if (isAdminRoute && !user) {
-            if (repositoryTrip.data.ownerUserId) {
-              setQuickAccessOwnerId(repositoryTrip.data.ownerUserId)
-              setQuickAccessMethods({
-                pinEnabled: resolvedQuickAccess.pinEnabled,
-                biometricEnabled: resolvedQuickAccess.biometricEnabled,
-              })
-
-              if (!quickAccessUnlocked) {
-                setTripData(
-                  buildTripDataFromStoredTrip({
-                    id: repositoryTrip.data.id,
-                    slug: repositoryTrip.data.slug,
-                    name: repositoryTrip.data.title,
-                    destination: repositoryTrip.data.destination,
-                    country: repositoryTrip.data.country ?? undefined,
-                    startDate: repositoryTrip.data.startDate ?? undefined,
-                    endDate: repositoryTrip.data.endDate ?? undefined,
-                    passengersCount: repositoryTrip.data.travelersCount,
-                    status: repositoryTrip.data.status,
-                    coverImage: repositoryTrip.data.coverImage ?? undefined,
-                    adminLink: repositoryTrip.data.adminLink,
-                    shareLink: repositoryTrip.data.publicLink,
-                    flights: repositoryTrip.data.flights,
-                    hotels: [],
-                    itinerary: repositoryTrip.data.itinerary,
-                    documents: [],
-                    travelersCount: repositoryTrip.data.travelersCount,
-                  }),
-                )
-                setIsLoadingTrip(false)
-                return
-              }
-            }
-          }
-
-          if (isAdminRoute && !isOwner && !hasQuickAccess) {
+          if (isAdminRoute && user && !isOwner) {
             console.error("[TRIP] erro ao carregar link", "Usuario sem permissao para editar a viagem.")
             setLoadError("Voce nao tem permissao para editar esta viagem.")
             setIsLoadingTrip(false)
             return
           }
 
-          const canEditTrip = isAdminRoute && (isOwner || hasQuickAccess)
+          const canEditTrip = isAdminRoute
           const canWriteTrip = isAdminRoute && isOwner
           setIsAdmin(canEditTrip)
           setCanWrite(canWriteTrip)
@@ -3147,7 +3160,7 @@ export default function TripPage() {
     }
 
     void loadTrip()
-  }, [params, pathname, router, user?.id, authLoading, quickAccessOwnerId, quickAccessUnlocked])
+  }, [params, pathname, router, user?.id, authLoading])
 
   const showToast = (message: string, type: "success" | "error" | "info" = "success") => {
     setToast({ message, type })
@@ -3157,6 +3170,42 @@ export default function TripPage() {
     const routeSlug = typeof params?.id === "string" ? params.id : tripData.id
     const target = pathname || `/viagem/${routeSlug}/admin`
     router.replace(`/login?redirect=${encodeURIComponent(target)}`)
+  }
+
+  const requireSensitiveAccess = (onGranted: () => void) => {
+    if (!tripOwnerUserId) {
+      showToast("Nao foi possivel validar a seguranca desta viagem.", "error")
+      return
+    }
+
+    if (!user || user.id !== tripOwnerUserId) {
+      showToast("Entre para salvar alteracoes nesta viagem.", "info")
+      handleRequireAuthenticatedAdmin()
+      return
+    }
+
+    if (sensitiveAccessGranted) {
+      onGranted()
+      return
+    }
+
+    pendingSensitiveActionRef.current = onGranted
+    setSecurityModalOpen(true)
+  }
+
+  const ensureSensitiveAccess = () => {
+    if (!tripOwnerUserId || !user || user.id !== tripOwnerUserId) {
+      showToast("Entre para salvar alteracoes nesta viagem.", "info")
+      handleRequireAuthenticatedAdmin()
+      return false
+    }
+
+    if (!sensitiveAccessGranted) {
+      setSecurityModalOpen(true)
+      return false
+    }
+
+    return true
   }
 
   const handleConfigureQuickAccess = () => {
@@ -3177,17 +3226,20 @@ export default function TripPage() {
   }
 
   const handleUpdateTrip = (data: any) => {
-    setTripData(prev => ({
-      ...prev,
-      destination: data.destination,
-      country: data.country,
-      dates: { start: data.startDate, end: data.endDate },
-      status: data.status
-    }))
-    showToast("Viagem atualizada!", "success")
+    requireSensitiveAccess(() => {
+      setTripData(prev => ({
+        ...prev,
+        destination: data.destination,
+        country: data.country,
+        dates: { start: data.startDate, end: data.endDate },
+        status: data.status
+      }))
+      showToast("Viagem atualizada!", "success")
+    })
   }
 
   const handleUpdateFlight = (id: number, data: any) => {
+  if (!ensureSensitiveAccess()) return
   setTripData(prev => ({
   ...prev,
   flights: prev.flights.map(f => f.id === id ? data : f)
@@ -3195,6 +3247,7 @@ export default function TripPage() {
   }
 
   const handleAddFlight = (data: any) => {
+    if (!ensureSensitiveAccess()) return
     setTripData(prev => ({
       ...prev,
       documents: [...prev.documents, { ...data, private: data.private ?? false }]
@@ -3210,8 +3263,13 @@ export default function TripPage() {
     }
 
     if (!canWrite) {
-      showToast("Entre com login para salvar alteracoes desta viagem.", "info")
+      showToast("Entre para salvar alteracoes nesta viagem.", "info")
       handleRequireAuthenticatedAdmin()
+      return
+    }
+
+    if (!sensitiveAccessGranted) {
+      requireSensitiveAccess(() => { void handleSaveHotel(data) })
       return
     }
 
@@ -3271,8 +3329,13 @@ export default function TripPage() {
     console.log("[HOTEL] delete started")
 
     if (!canWrite) {
-      showToast("Entre com login para excluir hospedagens desta viagem.", "info")
+      showToast("Entre para salvar alteracoes nesta viagem.", "info")
       handleRequireAuthenticatedAdmin()
+      return
+    }
+
+    if (!sensitiveAccessGranted) {
+      requireSensitiveAccess(() => { void handleDeleteHotel(hotelId) })
       return
     }
 
@@ -3302,25 +3365,31 @@ export default function TripPage() {
 
   const handleAddDocument = (data: any) => {
     if (!canWrite) {
-      showToast("Entre com login para anexar documentos nesta viagem.", "info")
+      showToast("Entre para salvar alteracoes nesta viagem.", "info")
       handleRequireAuthenticatedAdmin()
       return
     }
 
-    setTripData(prev => ({
-      ...prev,
-      documents: [...prev.documents, { ...data, private: data.private ?? data.isPrivate ?? false }]
-    }))
+    requireSensitiveAccess(() => {
+      setTripData(prev => ({
+        ...prev,
+        documents: [...prev.documents, { ...data, private: data.private ?? data.isPrivate ?? false }]
+      }))
+    })
   }
 
   const handleUpdateTravelers = (travelers: { name: string; avatar?: string; role: string }[]) => {
-    setTripData(prev => ({ ...prev, travelers }))
+    requireSensitiveAccess(() => {
+      setTripData(prev => ({ ...prev, travelers }))
+    })
   }
 
   const handleSaveTripSettings = (data: { privacy: string; permissions: string; status: string; preferences: string }) => {
-    setTripData(prev => ({ ...prev, status: data.status, tripPreferences: data }))
-    setTripSettingsOpen(false)
-    showToast("Configuracoes da viagem atualizadas.", "success")
+    requireSensitiveAccess(() => {
+      setTripData(prev => ({ ...prev, status: data.status, tripPreferences: data }))
+      setTripSettingsOpen(false)
+      showToast("Configuracoes da viagem atualizadas.", "success")
+    })
   }
 
   if (isLoadingTrip) {
@@ -3351,23 +3420,6 @@ export default function TripPage() {
     )
   }
 
-  if ((pathname?.endsWith("/admin") ?? false) && !user && quickAccessOwnerId && !quickAccessUnlocked) {
-    return (
-      <QuickAccessGate
-        tripName={tripData.destination}
-        ownerUserId={quickAccessOwnerId}
-        pinEnabled={quickAccessMethods.pinEnabled}
-        biometricEnabled={quickAccessMethods.biometricEnabled}
-        onUnlock={() => {
-          setQuickAccessUnlocked(true)
-          setToast({ message: "Acesso rapido liberado neste dispositivo.", type: "success" })
-        }}
-        onLogin={handleRequireAuthenticatedAdmin}
-        onConfigureQuickAccess={handleConfigureQuickAccess}
-      />
-    )
-  }
-
   return (
     <PermissionContext.Provider value={{ isAdmin, canWrite, setIsAdmin }}>
       <ToastContext.Provider value={{ showToast }}>
@@ -3389,6 +3441,22 @@ export default function TripPage() {
           <TripFooter />
 
           <ShareModal open={shareOpen} onClose={() => setShareOpen(false)} tripData={tripData} />
+          <SensitiveAccessModal
+            open={securityModalOpen}
+            onClose={() => setSecurityModalOpen(false)}
+            ownerUserId={tripOwnerUserId}
+            profileSettings={profile?.settings ?? null}
+            onSuccess={() => {
+              setSensitiveAccessGranted(true)
+              setSecurityModalOpen(false)
+              const pendingAction = pendingSensitiveActionRef.current
+              pendingSensitiveActionRef.current = null
+              setToast({ message: "Acesso rapido liberado para acoes sensiveis.", type: "success" })
+              pendingAction?.()
+            }}
+            onLogin={handleRequireAuthenticatedAdmin}
+            onConfigureQuickAccess={handleConfigureQuickAccess}
+          />
           <MenuModal
             open={menuOpen}
             onClose={() => setMenuOpen(false)}

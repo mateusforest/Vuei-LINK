@@ -1,3 +1,6 @@
+import { shouldUseSupabase } from "@/lib/data-source"
+import type { ProfileQuickAccessSettings, ProfileSettings } from "@/types"
+
 const QUICK_ACCESS_STORAGE_KEY = "vuei_quick_access_v1"
 const PIN_HASH_ITERATIONS = 120_000
 
@@ -22,6 +25,10 @@ export interface QuickAccessMethods {
   pinEnabled: boolean
   biometricEnabled: boolean
   biometricSupported: boolean
+}
+
+interface QuickAccessPinVerificationOptions {
+  profileSettings?: ProfileSettings | null
 }
 
 function getWindowCrypto() {
@@ -96,26 +103,43 @@ async function hashPin(pin: string, salt: string, iterations = PIN_HASH_ITERATIO
     throw new Error("Hash de PIN indisponivel neste navegador.")
   }
 
-  const keyMaterial = await resolvedCrypto.subtle.importKey(
-    "raw",
-    new TextEncoder().encode(pin),
-    { name: "PBKDF2" },
-    false,
-    ["deriveBits"],
-  )
+  let current = new TextEncoder().encode(`${pin}:${salt}`)
 
-  const derivedBits = await resolvedCrypto.subtle.deriveBits(
-    {
-      name: "PBKDF2",
-      salt: base64ToBytes(salt),
-      iterations,
-      hash: "SHA-256",
-    },
-    keyMaterial,
-    256,
-  )
+  for (let iteration = 0; iteration < iterations; iteration += 1) {
+    const digest = await resolvedCrypto.subtle.digest("SHA-256", current)
+    current = new Uint8Array(digest)
+  }
 
-  return bytesToBase64(new Uint8Array(derivedBits))
+  return bytesToBase64(current)
+}
+
+function getProfilePinSettings(settings?: ProfileSettings | null): ProfileQuickAccessSettings | null {
+  const quickAccess = settings?.quickAccess
+  if (!quickAccess?.enabled || !quickAccess.pinHash || !quickAccess.pinSalt) {
+    return null
+  }
+
+  return {
+    enabled: true,
+    pinHash: quickAccess.pinHash,
+    pinSalt: quickAccess.pinSalt,
+    pinIterations: quickAccess.pinIterations ?? PIN_HASH_ITERATIONS,
+  }
+}
+
+export function getLegacyQuickAccessPin(ownerUserId: string | null | undefined): ProfileQuickAccessSettings | null {
+  if (!ownerUserId) return null
+  const record = getRecord(ownerUserId)
+  if (!record?.pinEnabled || !record.pinHash || !record.pinSalt) {
+    return null
+  }
+
+  return {
+    enabled: true,
+    pinHash: record.pinHash,
+    pinSalt: record.pinSalt,
+    pinIterations: record.pinIterations ?? PIN_HASH_ITERATIONS,
+  }
 }
 
 export function isBiometricQuickAccessSupported() {
@@ -130,22 +154,32 @@ export function isBiometricQuickAccessSupported() {
   )
 }
 
-export function getQuickAccessMethods(ownerUserId: string | null | undefined): QuickAccessMethods {
-  if (!ownerUserId) {
-    return {
-      configured: false,
-      pinEnabled: false,
-      biometricEnabled: false,
-      biometricSupported: isBiometricQuickAccessSupported(),
-    }
-  }
+export function getQuickAccessMethods(ownerUserId: string | null | undefined, profileSettings?: ProfileSettings | null): QuickAccessMethods {
+  const profilePin = getProfilePinSettings(profileSettings)
+  const legacyPin = getLegacyQuickAccessPin(ownerUserId)
+  const record = ownerUserId ? getRecord(ownerUserId) : null
 
-  const record = getRecord(ownerUserId)
   return {
-    configured: Boolean(record?.pinEnabled || record?.biometricEnabled),
-    pinEnabled: Boolean(record?.pinEnabled && record.pinHash && record.pinSalt),
+    configured: Boolean(profilePin || legacyPin || (record?.biometricEnabled && record.webAuthnCredentialId)),
+    pinEnabled: Boolean(profilePin || legacyPin),
     biometricEnabled: Boolean(record?.biometricEnabled && record.webAuthnCredentialId),
     biometricSupported: isBiometricQuickAccessSupported(),
+  }
+}
+
+export async function buildQuickAccessPinSettings(pin: string): Promise<ProfileQuickAccessSettings> {
+  if (!/^\d{4}$/.test(pin)) {
+    throw new Error("O PIN precisa ter 4 digitos.")
+  }
+
+  const pinSalt = createRandomBase64(16)
+  const pinHash = await hashPin(pin, pinSalt)
+
+  return {
+    enabled: true,
+    pinHash,
+    pinSalt,
+    pinIterations: PIN_HASH_ITERATIONS,
   }
 }
 
@@ -154,25 +188,22 @@ export async function saveQuickAccessPin(ownerUserId: string, pin: string) {
     throw new Error("Conta invalida para configurar o PIN.")
   }
 
-  if (!/^\d{4}$/.test(pin)) {
-    throw new Error("O PIN precisa ter 4 digitos.")
-  }
-
+  const quickAccess = await buildQuickAccessPinSettings(pin)
   const current = getRecord(ownerUserId)
-  const pinSalt = createRandomBase64(16)
-  const pinHash = await hashPin(pin, pinSalt)
 
   upsertRecord({
-    version: 1,
+    version: 2,
     ownerUserId,
     pinEnabled: true,
-    pinHash,
-    pinSalt,
-    pinIterations: PIN_HASH_ITERATIONS,
+    pinHash: quickAccess.pinHash ?? undefined,
+    pinSalt: quickAccess.pinSalt ?? undefined,
+    pinIterations: quickAccess.pinIterations ?? PIN_HASH_ITERATIONS,
     biometricEnabled: current?.biometricEnabled ?? false,
     webAuthnCredentialId: current?.webAuthnCredentialId,
     updatedAt: new Date().toISOString(),
   })
+
+  return quickAccess
 }
 
 export function disableQuickAccessPin(ownerUserId: string) {
@@ -194,14 +225,21 @@ export function disableQuickAccessPin(ownerUserId: string) {
   })
 }
 
-export async function verifyQuickAccessPin(ownerUserId: string, pin: string) {
-  const record = getRecord(ownerUserId)
-  if (!record?.pinEnabled || !record.pinSalt || !record.pinHash) {
-    throw new Error("PIN nao configurado neste dispositivo.")
+export async function verifyQuickAccessPin(ownerUserId: string, pin: string, options?: QuickAccessPinVerificationOptions) {
+  const profilePin = getProfilePinSettings(options?.profileSettings)
+
+  if (profilePin?.pinHash && profilePin.pinSalt) {
+    const hashedPin = await hashPin(pin, profilePin.pinSalt, profilePin.pinIterations ?? PIN_HASH_ITERATIONS)
+    return hashedPin === profilePin.pinHash
   }
 
-  const hashedPin = await hashPin(pin, record.pinSalt, record.pinIterations ?? PIN_HASH_ITERATIONS)
-  return hashedPin === record.pinHash
+  const legacyPin = getLegacyQuickAccessPin(ownerUserId)
+  if (legacyPin?.pinHash && legacyPin.pinSalt) {
+    const hashedPin = await hashPin(pin, legacyPin.pinSalt, legacyPin.pinIterations ?? PIN_HASH_ITERATIONS)
+    return hashedPin === legacyPin.pinHash
+  }
+
+  throw new Error("PIN nao configurado para esta conta neste dispositivo ou perfil.")
 }
 
 export async function registerQuickAccessBiometric(ownerUserId: string, displayName: string) {
@@ -243,7 +281,7 @@ export async function registerQuickAccessBiometric(ownerUserId: string, displayN
   const current = getRecord(ownerUserId)
 
   upsertRecord({
-    version: 1,
+    version: current?.version ?? 2,
     ownerUserId,
     pinEnabled: current?.pinEnabled ?? false,
     pinHash: current?.pinHash,
@@ -297,4 +335,10 @@ export async function authenticateQuickAccessBiometric(ownerUserId: string) {
   })) as PublicKeyCredential | null
 
   return Boolean(credential)
+}
+
+export function getQuickAccessSqlRecommendation() {
+  return shouldUseSupabase()
+    ? null
+    : "profiles.settings.quickAccess pode ser usado sem SQL extra apenas quando a coluna settings ja existe."
 }
