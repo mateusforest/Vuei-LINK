@@ -2203,7 +2203,7 @@ function ConciergeSection({ tripData, onOpenCredits }: { tripData: any; onOpenCr
   ])
   const [typing, setTyping] = useState(false)
   const [conversationId, setConversationId] = useState<string | null>(null)
-  const { isAdmin, canWrite } = useContext(PermissionContext)
+  const { isAdmin } = useContext(PermissionContext)
   const { user, profile } = useAuth()
   const { showToast } = useToast()
   const hasFlights = Array.isArray(tripData.flights) && tripData.flights.length > 0
@@ -2219,12 +2219,13 @@ function ConciergeSection({ tripData, onOpenCredits }: { tripData: any; onOpenCr
 
   useEffect(() => {
     if (!shouldUseSupabase() || !tripData?.id) return
+    if (!isAdmin && !user?.id) return
 
     let active = true
 
     const loadConversation = async () => {
       const conversationsResult = await listConversationsByTrip(tripData.id)
-      if (!active || !conversationsResult.data.length) return
+      if (!active || !(conversationsResult.data ?? []).length) return
 
       const conciergeConversation =
         conversationsResult.data.find((conversation) => conversation.channel === "concierge") ??
@@ -2237,10 +2238,10 @@ function ConciergeSection({ tripData, onOpenCredits }: { tripData: any; onOpenCr
 
       setConversationId(conciergeConversation.id)
 
-      if (messagesResult.data.length === 0) return
+      if ((messagesResult.data ?? []).length === 0) return
 
       setMessages(
-        messagesResult.data.map((entry) => ({
+        (messagesResult.data ?? []).map((entry) => ({
           role: entry.role === "user" ? "user" : "assistant",
           content: entry.content,
         }))
@@ -2252,7 +2253,7 @@ function ConciergeSection({ tripData, onOpenCredits }: { tripData: any; onOpenCr
     return () => {
       active = false
     }
-  }, [tripData?.id])
+  }, [isAdmin, tripData?.id, user?.id])
 
   const suggestions = [
     "Mostrar hospedagem",
@@ -2299,54 +2300,65 @@ function ConciergeSection({ tripData, onOpenCredits }: { tripData: any; onOpenCr
     window.setTimeout(async () => {
       let nextConversationId = conversationId
 
-      if (shouldUseSupabase() && canWrite && user?.id && tripData?.id) {
+      if (shouldUseSupabase() && tripData?.id) {
         if (!nextConversationId) {
           const conversationResult = await createConversation({
             tripId: tripData.id,
-            userId: user.id,
+            userId: user?.id ?? null,
             agencyId: profile?.agencyId ?? tripData.agencyId ?? null,
             clientId: tripData.clientId ?? null,
             channel: "concierge",
             metadata: {
-              origin: "trip-link",
+              origin: isAdmin ? "trip-admin-link" : "trip-public-link",
             },
           })
 
           if (conversationResult.data) {
             nextConversationId = conversationResult.data.id
             setConversationId(conversationResult.data.id)
+          } else if (conversationResult.error) {
+            console.error("[CONCIERGE] create conversation error", conversationResult.error)
           }
         }
 
         if (nextConversationId) {
-          await addAiMessage({
+          const userMessageResult = await addAiMessage({
             conversationId: nextConversationId,
             tripId: tripData.id,
-            userId: user.id,
+            userId: user?.id ?? null,
             agencyId: profile?.agencyId ?? tripData.agencyId ?? null,
             clientId: tripData.clientId ?? null,
             role: "user",
             content: userMessage,
             metadata: {
-              origin: "trip-link",
+              origin: isAdmin ? "trip-admin-link" : "trip-public-link",
             },
           })
 
-          await addAiMessage({
+          const assistantMessageResult = await addAiMessage({
             conversationId: nextConversationId,
             tripId: tripData.id,
-            userId: user.id,
+            userId: user?.id ?? null,
             agencyId: profile?.agencyId ?? tripData.agencyId ?? null,
             clientId: tripData.clientId ?? null,
             role: "assistant",
             content: response,
             metadata: {
-              origin: "trip-link",
+              origin: isAdmin ? "trip-admin-link" : "trip-public-link",
             },
           })
+
+          if (!userMessageResult.data || !assistantMessageResult.data) {
+            const repositoryError = userMessageResult.error || assistantMessageResult.error
+            console.error("[CONCIERGE] sync error", repositoryError)
+            showToast(
+              repositoryError || "Nao foi possivel sincronizar esta mensagem com o concierge real desta viagem.",
+              "info"
+            )
+          }
+        } else {
+          showToast("Nao foi possivel sincronizar esta conversa com o concierge real desta viagem.", "info")
         }
-      } else if (shouldUseSupabase()) {
-        showToast("O historico do concierge so sincroniza com a agencia quando a conta proprietaria esta autenticada.", "info")
       }
 
       setMessages((prev) => [...prev, { role: "assistant", content: response }])

@@ -1,19 +1,16 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { motion } from "framer-motion"
 import Link from "next/link"
 import {
   MessageSquare,
   Search,
-  ThumbsUp,
-  ThumbsDown,
   AlertTriangle,
   Clock,
   Bot,
   ArrowUpRight,
   Building2,
-  Plane,
   CheckCircle2,
   RefreshCw
 } from "lucide-react"
@@ -53,11 +50,25 @@ const priorityConfig = {
 }
 
 export default function MasterConciergePage() {
-  const { conciergeRequests, updateConciergeStatus, trips } = useMaster()
+  const { conciergeRequests, updateConciergeStatus } = useMaster()
   
   const [searchQuery, setSearchQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
   const [selectedRequest, setSelectedRequest] = useState(conciergeRequests[0] || null)
+
+  useEffect(() => {
+    if (!selectedRequest && conciergeRequests.length > 0) {
+      setSelectedRequest(conciergeRequests[0])
+      return
+    }
+
+    if (selectedRequest) {
+      const refreshed = conciergeRequests.find((request) => request.id === selectedRequest.id)
+      if (refreshed) {
+        setSelectedRequest(refreshed)
+      }
+    }
+  }, [conciergeRequests, selectedRequest])
 
   const filteredRequests = conciergeRequests.filter(req => {
     const matchesSearch = req.message.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -70,8 +81,8 @@ export default function MasterConciergePage() {
   const pageStats = [
     { label: "Pendentes", value: conciergeRequests.filter(r => r.status === "pending").length.toString(), change: "aguardando", icon: AlertTriangle },
     { label: "Em andamento", value: conciergeRequests.filter(r => r.status === "in_progress").length.toString(), change: "ativos", icon: MessageSquare },
-    { label: "Resolvidos", value: conciergeRequests.filter(r => r.status === "resolved").length.toString(), change: "este mes", icon: CheckCircle2 },
-    { label: "Tempo Medio", value: "1.2s", change: "resposta IA", icon: Clock },
+    { label: "Resolvidos", value: conciergeRequests.filter(r => r.status === "resolved").length.toString(), change: "historico real", icon: CheckCircle2 },
+    { label: "Mensagens", value: conciergeRequests.reduce((total, request) => total + request.messages.length, 0).toString(), change: "persistidas", icon: Clock },
   ]
 
   const formatTimeAgo = (dateStr: string) => {
@@ -261,29 +272,32 @@ export default function MasterConciergePage() {
 
                 {/* Message */}
                 <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                  <div className="flex justify-end">
-                    <div className="max-w-[80%] bg-primary/20 border border-primary/20 rounded-2xl rounded-tr-sm px-4 py-3">
-                      <p className="text-sm text-foreground">{selectedRequest.message}</p>
-                      <span className="text-[10px] text-muted-foreground mt-1 block text-right">
-                        {new Date(selectedRequest.createdAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* AI Response */}
-                  <div className="flex justify-start">
-                    <div className="flex gap-3 max-w-[80%]">
-                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center flex-shrink-0">
-                        <Bot className="h-4 w-4 text-white" />
+                  {selectedRequest.messages.map((message) =>
+                    message.role === "user" ? (
+                      <div key={message.id} className="flex justify-end">
+                        <div className="max-w-[80%] bg-primary/20 border border-primary/20 rounded-2xl rounded-tr-sm px-4 py-3">
+                          <p className="text-sm text-foreground">{message.content}</p>
+                          <span className="text-[10px] text-muted-foreground mt-1 block text-right">
+                            {new Date(message.createdAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                          </span>
+                        </div>
                       </div>
-                      <div className="bg-white/5 border border-white/10 rounded-2xl rounded-tl-sm px-4 py-3">
-                        <p className="text-sm text-foreground">
-                          Ola! Estou analisando sua solicitacao e ja vou te ajudar com isso. Por favor, aguarde um momento enquanto processo as informacoes.
-                        </p>
-                        <span className="text-[10px] text-muted-foreground mt-2 block">Resposta automatica</span>
+                    ) : (
+                      <div key={message.id} className="flex justify-start">
+                        <div className="flex gap-3 max-w-[80%]">
+                          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center flex-shrink-0">
+                            <Bot className="h-4 w-4 text-white" />
+                          </div>
+                          <div className="bg-white/5 border border-white/10 rounded-2xl rounded-tl-sm px-4 py-3">
+                            <p className="text-sm text-foreground">{message.content}</p>
+                            <span className="text-[10px] text-muted-foreground mt-2 block">
+                              {new Date(message.createdAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                            </span>
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  </div>
+                    )
+                  )}
                 </div>
 
                 {/* Actions */}

@@ -30,8 +30,9 @@ import { createTrip as createTripRecord, deleteTrip as deleteTripRecord, listTri
 import { updateProfile as updateProfileRecord } from "@/lib/repositories/profiles-repository"
 import {
   addMessage as addAiMessage,
-  listConversationsByTrip,
-  listMessages,
+  listConversations,
+  listMessagesByConversationIds,
+  updateConversationStatus,
 } from "@/lib/repositories/ai-repository"
 import type { Agency } from "@/types"
 
@@ -101,11 +102,19 @@ export interface ConciergeRequest {
   tripId: string
   clientId: string
   clientName: string
+  tripName?: string
   destination: string
   question: string
   response?: string
   status: "pending" | "answered" | "resolved"
   createdAt: string
+  lastInteractionAt?: string
+  messages?: Array<{
+    id: string
+    role: "user" | "assistant" | "agent" | "system"
+    content: string
+    createdAt: string
+  }>
 }
 
 export interface TeamMember {
@@ -153,8 +162,8 @@ interface AgencyContextType {
   getDocumentsByClient: (clientId: string) => AgencyDocument[]
   conciergeRequests: ConciergeRequest[]
   addConciergeRequest: (data: Omit<ConciergeRequest, "id" | "createdAt">) => void
-  respondToRequest: (id: string, response: string) => void
-  resolveRequest: (id: string) => void
+  respondToRequest: (id: string, response: string) => Promise<boolean>
+  resolveRequest: (id: string) => Promise<boolean>
   teamMembers: TeamMember[]
   addTeamMember: (data: Omit<TeamMember, "id" | "createdAt">) => void
   updateTeamMember: (id: string, data: Partial<TeamMember>) => void
@@ -597,78 +606,84 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
       mapCanonicalTripToAgencyTrip(trip, trip.clientId ? tripClientNameMap.get(trip.clientId) ?? "" : "")
     )
 
-    const conversationsByTrip = await Promise.all(
-      canonicalTrips.map(async (trip) => {
-        const conversationsResult = await listConversationsByTrip(trip.id)
-        const conversations = conversationsResult.data ?? []
-
-        const messagesByConversation = await Promise.all(
-          conversations.map(async (conversation) => {
-            const messagesResult = await listMessages(conversation.id)
-            return {
-              conversation,
-              messages: messagesResult.data ?? [],
-              error: messagesResult.error ?? null,
-            }
-          })
-        )
-
-        return {
-          trip,
-          conversationGroups: messagesByConversation,
-          error: conversationsResult.error ?? null,
-        }
-      })
-    )
+    const conversationsResult = await listConversations({
+      agencyId: resolvedAgency.id,
+      channel: "concierge",
+    })
+    const conversations = conversationsResult.data ?? []
+    const conversationIds = conversations.map((conversation) => conversation.id)
+    const messagesResult = await listMessagesByConversationIds(conversationIds)
+    const conversationMessages = messagesResult.data ?? []
+    const messagesByConversationId = conversationMessages.reduce<Map<string, typeof conversationMessages>>((accumulator, message) => {
+      const current = accumulator.get(message.conversationId) ?? []
+      current.push(message)
+      accumulator.set(message.conversationId, current)
+      return accumulator
+    }, new Map())
+    const tripById = new Map(canonicalTrips.map((trip) => [trip.id, trip]))
 
     const mappedDocuments: AgencyDocument[] = (documentsResult.data ?? []).map(mapDocumentRecordToAgencyDocument)
 
-    const mappedConciergeRequests: ConciergeRequest[] = conversationsByTrip.flatMap(({ trip, conversationGroups }) =>
-      conversationGroups
-        .map(({ conversation, messages }) => {
-          const userMessage = messages.find((message) => message.role === "user")
-          if (!userMessage) return null
+    const mappedConciergeRequests: ConciergeRequest[] = conversations
+      .map((conversation) => {
+        if (!conversation.tripId) return null
 
-          const responseMessage = [...messages]
-            .reverse()
-            .find((message) => message.role === "assistant" || message.role === "agent")
+        const trip = tripById.get(conversation.tripId)
+        if (!trip) return null
 
-          const clientId = conversation.clientId ?? trip.clientId ?? ""
-          return {
-            id: conversation.id,
-            conversationId: conversation.id,
-            tripId: trip.id,
-            clientId,
-            clientName: clientId ? tripClientNameMap.get(clientId) ?? "Cliente sem nome" : "Cliente sem nome",
-            destination: trip.destination,
-            question: userMessage.content,
-            response: responseMessage?.content,
-            status:
-              conversation.status === "closed" || conversation.status === "archived"
-                ? "resolved"
-                : responseMessage
-                  ? "answered"
-                  : "pending",
-            createdAt: conversation.createdAt,
-          } satisfies ConciergeRequest
+        const messages = (messagesByConversationId.get(conversation.id) ?? []).slice().sort((left, right) => {
+          return new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime()
         })
-        .filter((request): request is ConciergeRequest => Boolean(request))
-    )
+        const userMessage = messages.find((message) => message.role === "user")
+        if (!userMessage) return null
+
+        const responseMessage = [...messages]
+          .reverse()
+          .find((message) => message.role === "assistant" || message.role === "agent")
+        const lastMessage = messages[messages.length - 1]
+        const clientId = conversation.clientId ?? trip.clientId ?? ""
+
+        return {
+          id: conversation.id,
+          conversationId: conversation.id,
+          tripId: trip.id,
+          clientId,
+          clientName: clientId ? tripClientNameMap.get(clientId) ?? "Cliente sem nome" : "Cliente sem nome",
+          tripName: trip.title,
+          destination: trip.destination,
+          question: userMessage.content,
+          response: responseMessage?.content,
+          status:
+            conversation.status === "closed" || conversation.status === "archived"
+              ? "resolved"
+              : responseMessage
+                ? "answered"
+                : "pending",
+          createdAt: conversation.createdAt,
+          lastInteractionAt: lastMessage?.createdAt ?? conversation.updatedAt,
+          messages: messages.map((message) => ({
+            id: message.id,
+            role: message.role,
+            content: message.content,
+            createdAt: message.createdAt,
+          })),
+        } satisfies ConciergeRequest
+      })
+      .filter((request): request is ConciergeRequest => Boolean(request))
+      .sort((left, right) => {
+        return new Date(right.lastInteractionAt ?? right.createdAt).getTime() - new Date(left.lastInteractionAt ?? left.createdAt).getTime()
+      })
 
     const history =
       resolvedAgency.creditsBalance > 0
         ? [{ action: "Saldo da agencia", amount: resolvedAgency.creditsBalance, date: new Date().toISOString(), source: "Supabase" }]
         : []
 
-    const conversationError = conversationsByTrip.find((entry) => entry.error)?.error ?? null
-    const messageError =
-      conversationsByTrip.flatMap((entry) => entry.conversationGroups).find((group) => group.error)?.error ?? null
-
     setAgency(resolvedAgency)
     setAgencyId(resolvedAgency.id)
     setSetupIncomplete(false)
     setWorkspaceError(
-      agencyResult.error || clientsResult.error || tripsResult.error || documentsResult.error || conversationError || messageError || null
+      agencyResult.error || clientsResult.error || tripsResult.error || documentsResult.error || conversationsResult.error || messagesResult.error || null
     )
     setClients(mappedClients)
     setTrips(mappedTrips)
@@ -1044,45 +1059,75 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
     addActivity("Solicitacao recebida", `${data.clientName}: ${data.question.slice(0, 50)}...`, "concierge")
   }, [addActivity])
 
-  const respondToRequest = useCallback((id: string, response: string) => {
-    void (async () => {
-      const request = conciergeRequests.find((item) => item.id === id)
+  const respondToRequest = useCallback(async (id: string, response: string) => {
+    const request = conciergeRequests.find((item) => item.id === id)
 
-      if (isUsingRealData && request) {
-        const result = await addAiMessage({
-          conversationId: request.conversationId ?? request.id,
-          tripId: request.tripId,
-          userId: user?.id ?? null,
-          agencyId: agencyId,
-          clientId: request.clientId || null,
-          role: "agent",
-          content: response,
-          metadata: {
-            origin: "agency-portal",
-          },
-        })
+    if (isUsingRealData && request) {
+      const result = await addAiMessage({
+        conversationId: request.conversationId ?? request.id,
+        tripId: request.tripId,
+        userId: user?.id ?? null,
+        agencyId: agencyId,
+        clientId: request.clientId || null,
+        role: "agent",
+        content: response,
+        metadata: {
+          origin: "agency-portal",
+        },
+      })
 
-        if (!result.data) {
-          setWorkspaceError(result.error ?? "Nao foi possivel salvar a resposta do concierge.")
-          return
-        }
-
-        await refreshAgencyWorkspace()
-        return
+      if (!result.data) {
+        setWorkspaceError(result.error ?? "Nao foi possivel salvar a resposta do concierge.")
+        return false
       }
 
-      setConciergeRequests((prev) =>
-        prev.map((requestItem) => (requestItem.id === id ? { ...requestItem, response, status: "answered" as const } : requestItem))
+      setWorkspaceError(null)
+      await refreshAgencyWorkspace()
+      return true
+    }
+
+    setConciergeRequests((prev) =>
+      prev.map((requestItem) =>
+        requestItem.id === id
+          ? {
+              ...requestItem,
+              response,
+              status: "answered" as const,
+              lastInteractionAt: new Date().toISOString(),
+              messages: [
+                ...(requestItem.messages ?? []),
+                {
+                  id: `local-agent-${Date.now()}`,
+                  role: "agent",
+                  content: response,
+                  createdAt: new Date().toISOString(),
+                },
+              ],
+            }
+          : requestItem
       )
-      addActivity("Solicitacao respondida", `${response.slice(0, 50)}...`, "concierge")
-    })()
+    )
+    addActivity("Solicitacao respondida", `${response.slice(0, 50)}...`, "concierge")
+    return true
   }, [addActivity, agencyId, conciergeRequests, isUsingRealData, refreshAgencyWorkspace, user?.id])
 
-  const resolveRequest = useCallback((id: string) => {
+  const resolveRequest = useCallback(async (id: string) => {
+    if (isUsingRealData) {
+      const result = await updateConversationStatus(id, "closed")
+      if (!result.data) {
+        setWorkspaceError(result.error ?? "Nao foi possivel concluir a solicitacao do concierge.")
+        return false
+      }
+      setWorkspaceError(null)
+      await refreshAgencyWorkspace()
+      return true
+    }
+
     setConciergeRequests((prev) =>
       prev.map((request) => (request.id === id ? { ...request, status: "resolved" as const } : request))
     )
-  }, [])
+    return true
+  }, [isUsingRealData, refreshAgencyWorkspace])
 
   const addTeamMember = useCallback((data: Omit<TeamMember, "id" | "createdAt">) => {
     const newMember: TeamMember = {

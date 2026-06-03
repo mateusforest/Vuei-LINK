@@ -7,6 +7,7 @@ import { listAgencies, listAllAgencyMembers, type AgencyMember } from "@/lib/rep
 import { listAllClients } from "@/lib/repositories/clients-repository"
 import { listTrips } from "@/lib/repositories/trips-repository"
 import { listDocuments } from "@/lib/repositories/documents-repository"
+import { listConversations, listMessagesByConversationIds, updateConversationStatus } from "@/lib/repositories/ai-repository"
 import { shouldUseSupabase } from "@/lib/data-source"
 import { useAuth } from "@/contexts/auth-context"
 
@@ -66,7 +67,7 @@ interface ConciergeRequest {
   id: string
   tripId: string
   tripName: string
-  userId: string
+  userId?: string
   userName: string
   agencyId?: string
   agencyName?: string
@@ -75,6 +76,13 @@ interface ConciergeRequest {
   priority: "low" | "medium" | "high"
   createdAt: string
   resolvedAt?: string
+  lastInteractionAt?: string
+  messages: Array<{
+    id: string
+    role: "user" | "assistant" | "agent" | "system"
+    content: string
+    createdAt: string
+  }>
 }
 
 interface AIPrompt {
@@ -172,6 +180,8 @@ interface MasterContextType {
     clients: string | null
     trips: string | null
     documents: string | null
+    conciergeConversations: string | null
+    conciergeMessages: string | null
   }
   conciergeRequests: ConciergeRequest[]
   aiPrompts: AIPrompt[]
@@ -211,6 +221,7 @@ type MasterState = {
   agencies: Agency[]
   users: User[]
   trips: MasterTrip[]
+  conciergeRequests: ConciergeRequest[]
   activities: Activity[]
   stats: MasterStats
 }
@@ -246,6 +257,7 @@ const INITIAL_STATE: MasterState = {
   agencies: [],
   users: [],
   trips: [],
+  conciergeRequests: [],
   activities: [],
   stats: EMPTY_STATS,
 }
@@ -257,6 +269,8 @@ const EMPTY_DATA_ERRORS = {
   clients: null,
   trips: null,
   documents: null,
+  conciergeConversations: null,
+  conciergeMessages: null,
 }
 
 function noopWithLog(action: string) {
@@ -275,6 +289,15 @@ function normalizeTripStatus(status: TripStatus): Extract<TripStatus, "upcoming"
   return "upcoming"
 }
 
+function resolveConciergePriority(createdAt: string, hasResponse: boolean): ConciergeRequest["priority"] {
+  if (hasResponse) return "low"
+
+  const ageInHours = (Date.now() - new Date(createdAt).getTime()) / (1000 * 60 * 60)
+  if (ageInHours >= 24) return "high"
+  if (ageInHours >= 2) return "medium"
+  return "low"
+}
+
 function buildMasterState(data: {
   profiles: Awaited<ReturnType<typeof listProfiles>>["data"]
   agencies: Awaited<ReturnType<typeof listAgencies>>["data"]
@@ -282,6 +305,8 @@ function buildMasterState(data: {
   clients: Awaited<ReturnType<typeof listAllClients>>["data"]
   trips: Awaited<ReturnType<typeof listTrips>>["data"]
   documents: Awaited<ReturnType<typeof listDocuments>>["data"]
+  conversations: Awaited<ReturnType<typeof listConversations>>["data"]
+  messages: Awaited<ReturnType<typeof listMessagesByConversationIds>>["data"]
 }): MasterState {
   const profiles = data.profiles ?? []
   const agenciesData = data.agencies ?? []
@@ -289,6 +314,8 @@ function buildMasterState(data: {
   const clients = data.clients ?? []
   const tripsData = data.trips ?? []
   const documents = data.documents ?? []
+  const conversations = data.conversations ?? []
+  const messages = data.messages ?? []
 
   const profileMap = new Map(profiles.map((profile) => [profile.id, profile]))
   const agencyMap = new Map(agenciesData.map((agency) => [agency.id, agency]))
@@ -316,6 +343,13 @@ function buildMasterState(data: {
   const documentsByTrip = documents.reduce<Map<string, number>>((accumulator, document) => {
     if (!document.tripId) return accumulator
     accumulator.set(document.tripId, (accumulator.get(document.tripId) ?? 0) + 1)
+    return accumulator
+  }, new Map())
+
+  const messagesByConversation = messages.reduce<Map<string, typeof messages>>((accumulator, message) => {
+    const current = accumulator.get(message.conversationId) ?? []
+    current.push(message)
+    accumulator.set(message.conversationId, current)
     return accumulator
   }, new Map())
 
@@ -396,6 +430,54 @@ function buildMasterState(data: {
     })
     .sort((left, right) => new Date(right.startDate).getTime() - new Date(left.startDate).getTime())
 
+  const conciergeRequests: ConciergeRequest[] = conversations
+    .filter((conversation) => conversation.channel === "concierge" && conversation.tripId)
+    .map((conversation) => {
+      const trip = tripsData.find((entry) => entry.id === conversation.tripId)
+      if (!trip) return null
+
+      const agency = trip.agencyId ? agencyMap.get(trip.agencyId) : null
+      const client = trip.clientId ? clientMap.get(trip.clientId) : null
+      const travelerProfile = conversation.userId ? profileMap.get(conversation.userId) : null
+      const conversationMessages = (messagesByConversation.get(conversation.id) ?? []).slice().sort((left, right) => {
+        return new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime()
+      })
+      const firstUserMessage = conversationMessages.find((message) => message.role === "user")
+      if (!firstUserMessage) return null
+
+      const latestMessage = conversationMessages[conversationMessages.length - 1]
+      const hasResponse = conversationMessages.some((message) => message.role === "assistant" || message.role === "agent")
+
+      return {
+        id: conversation.id,
+        tripId: trip.id,
+        tripName: trip.title,
+        userId: conversation.userId ?? undefined,
+        userName: client?.name || travelerProfile?.name || travelerProfile?.email || "Viajante",
+        agencyId: agency?.id,
+        agencyName: agency?.name,
+        message: firstUserMessage.content,
+        status:
+          conversation.status === "closed" || conversation.status === "archived"
+            ? "resolved"
+            : hasResponse
+              ? "in_progress"
+              : "pending",
+        priority: resolveConciergePriority(conversation.createdAt, hasResponse),
+        createdAt: conversation.createdAt,
+        resolvedAt: conversation.status === "closed" || conversation.status === "archived" ? conversation.updatedAt : undefined,
+        lastInteractionAt: latestMessage?.createdAt ?? conversation.updatedAt,
+        messages: conversationMessages.map((message) => ({
+          id: message.id,
+          role: message.role,
+          content: message.content,
+          createdAt: message.createdAt,
+        })),
+      } satisfies ConciergeRequest
+    })
+    .filter((request): request is ConciergeRequest => Boolean(request))
+    .sort((left, right) => new Date(right.lastInteractionAt ?? right.createdAt).getTime() - new Date(left.lastInteractionAt ?? left.createdAt).getTime())
+
   const activities: Activity[] = [
     ...agencies.map((agency) => ({
       id: `agency-${agency.id}`,
@@ -421,6 +503,14 @@ function buildMasterState(data: {
       entityName: trip.name,
       createdAt: trip.createdAt,
     })),
+    ...conciergeRequests.map((request) => ({
+      id: `concierge-${request.id}`,
+      type: "concierge_request" as const,
+      description: "Nova interacao no concierge",
+      entityId: request.id,
+      entityName: request.tripName,
+      createdAt: request.lastInteractionAt ?? request.createdAt,
+    })),
   ]
     .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())
     .slice(0, 12)
@@ -429,6 +519,7 @@ function buildMasterState(data: {
     agencies,
     users,
     trips,
+    conciergeRequests,
     activities,
     stats: {
       totalAgencies: agencies.length,
@@ -483,14 +574,19 @@ export function MasterProvider({ children }: { children: ReactNode }) {
         return
       }
 
-      const [profilesResult, agenciesResult, membersResult, clientsResult, tripsResult, documentsResult] = await Promise.all([
+      const [profilesResult, agenciesResult, membersResult, clientsResult, tripsResult, documentsResult, conversationsResult] = await Promise.all([
         listProfiles(),
         listAgencies(),
         listAllAgencyMembers(),
         listAllClients(),
         listTrips(),
         listDocuments(),
+        listConversations({ channel: "concierge" }),
       ])
+
+      const messagesResult = await listMessagesByConversationIds(
+        (conversationsResult.data ?? []).map((conversation) => conversation.id)
+      )
 
       if (!active) return
 
@@ -501,6 +597,8 @@ export function MasterProvider({ children }: { children: ReactNode }) {
         clients: clientsResult.error,
         trips: tripsResult.error,
         documents: documentsResult.error,
+        conciergeConversations: conversationsResult.error,
+        conciergeMessages: messagesResult.error,
       }
 
       if (nextErrors.profiles) {
@@ -518,6 +616,8 @@ export function MasterProvider({ children }: { children: ReactNode }) {
         clients: clientsResult.data ?? [],
         trips: tripsResult.data ?? [],
         documents: documentsResult.data ?? [],
+        conversations: conversationsResult.data ?? [],
+        messages: messagesResult.data ?? [],
       })
 
       const nextNotifications: Notification[] = [
@@ -581,6 +681,26 @@ export function MasterProvider({ children }: { children: ReactNode }) {
               createdAt: new Date().toISOString(),
             }
           : null,
+        conversationsResult.error
+          ? {
+              id: "concierge-conversations-error",
+              title: "Falha ao ler conversas do concierge",
+              message: conversationsResult.error,
+              type: "error",
+              read: false,
+              createdAt: new Date().toISOString(),
+            }
+          : null,
+        messagesResult.error
+          ? {
+              id: "concierge-messages-error",
+              title: "Falha ao ler mensagens do concierge",
+              message: messagesResult.error,
+              type: "error",
+              read: false,
+              createdAt: new Date().toISOString(),
+            }
+          : null,
       ].filter((notification): notification is Notification => Boolean(notification))
 
       setState(nextState)
@@ -629,6 +749,31 @@ export function MasterProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  const handleUpdateConciergeStatus = (id: string, status: ConciergeRequest["status"]) => {
+    setState((current) => ({
+      ...current,
+      conciergeRequests: current.conciergeRequests.map((request) =>
+        request.id === id
+          ? {
+              ...request,
+              status,
+              resolvedAt: status === "resolved" ? new Date().toISOString() : undefined,
+            }
+          : request
+      ),
+    }))
+
+    if (shouldUseSupabase() && user && profile?.role === "master") {
+      void (async () => {
+        const nextStatus = status === "resolved" ? "closed" : "open"
+        const result = await updateConversationStatus(id, nextStatus)
+        if (!result.data && result.error) {
+          console.error("[MASTER] concierge update error", result.error)
+        }
+      })()
+    }
+  }
+
   return (
     <MasterContext.Provider
       value={{
@@ -636,7 +781,7 @@ export function MasterProvider({ children }: { children: ReactNode }) {
         users: state.users,
         trips: state.trips,
         dataErrors,
-        conciergeRequests: [],
+        conciergeRequests: state.conciergeRequests,
         aiPrompts: [],
         templates: [],
         transactions: [],
@@ -654,7 +799,7 @@ export function MasterProvider({ children }: { children: ReactNode }) {
         suspendUser: () => noopWithLog("Suspensao de usuario no master"),
         activateUser: () => noopWithLog("Reativacao de usuario no master"),
         adjustUserCredits: () => noopWithLog("Ajuste de creditos no master"),
-        updateConciergeStatus: () => noopWithLog("Atualizacao de concierge no master"),
+        updateConciergeStatus: handleUpdateConciergeStatus,
         addPrompt: () => noopWithLog("Criacao de prompt no master"),
         updatePrompt: () => noopWithLog("Edicao de prompt no master"),
         togglePrompt: () => noopWithLog("Ativacao de prompt no master"),

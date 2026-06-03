@@ -39,13 +39,12 @@ const quickReplies = [
 ]
 
 export default function ConciergePage() {
-  const { conciergeRequests, respondToRequest, resolveRequest, trips, isUsingRealData } = useAgency()
+  const { conciergeRequests, respondToRequest, resolveRequest } = useAgency()
   const [selectedRequest, setSelectedRequest] = useState<ConciergeRequest | null>(
     conciergeRequests.length > 0 ? conciergeRequests[0] : null
   )
   const [searchQuery, setSearchQuery] = useState("")
   const [messageInput, setMessageInput] = useState("")
-  const [localMessages, setLocalMessages] = useState<Record<string, Message[]>>({})
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   const scrollToBottom = () => {
@@ -54,7 +53,7 @@ export default function ConciergePage() {
 
   useEffect(() => {
     scrollToBottom()
-  }, [localMessages, selectedRequest])
+  }, [selectedRequest])
 
   useEffect(() => {
     if (!selectedRequest && conciergeRequests.length > 0) {
@@ -81,6 +80,15 @@ export default function ConciergePage() {
     const request = conciergeRequests.find(r => r.id === requestId)
     if (!request) return []
 
+    if (Array.isArray(request.messages) && request.messages.length > 0) {
+      return request.messages.map((message) => ({
+        id: message.id,
+        type: message.role === "user" ? "client" : "agent",
+        text: message.content,
+        time: new Date(message.createdAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
+      }))
+    }
+
     const baseMessages: Message[] = [
       {
         id: `${requestId}-1`,
@@ -95,44 +103,24 @@ export default function ConciergePage() {
         id: `${requestId}-2`,
         type: "agent",
         text: request.response,
-        time: new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
+        time: new Date(request.lastInteractionAt ?? request.createdAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
       })
     }
 
-    const additionalMessages = localMessages[requestId] || []
-    return [...baseMessages, ...additionalMessages]
+    return baseMessages
   }
 
-  const handleSendMessage = () => {
+  const handleSendMessage = async () => {
     if (!messageInput.trim() || !selectedRequest) return
 
-    // If first response, update the request status
-    if (selectedRequest.status === "pending") {
-      respondToRequest(selectedRequest.id, messageInput)
-      if (isUsingRealData) {
-        setMessageInput("")
-        return
-      }
-    }
-
-    const newMessage: Message = {
-      id: `msg-${Date.now()}`,
-      type: "agent",
-      text: messageInput,
-      time: new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
-    }
-
-    setLocalMessages(prev => ({
-      ...prev,
-      [selectedRequest.id]: [...(prev[selectedRequest.id] || []), newMessage]
-    }))
-    
+    const saved = await respondToRequest(selectedRequest.id, messageInput)
+    if (!saved) return
     setMessageInput("")
   }
 
-  const handleResolve = () => {
+  const handleResolve = async () => {
     if (selectedRequest) {
-      resolveRequest(selectedRequest.id)
+      await resolveRequest(selectedRequest.id)
     }
   }
 

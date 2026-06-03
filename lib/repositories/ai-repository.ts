@@ -40,6 +40,15 @@ interface CreateConversationPayload {
   metadata?: Record<string, unknown> | null
 }
 
+interface ListConversationsParams {
+  tripId?: string
+  userId?: string
+  agencyId?: string
+  clientId?: string
+  channel?: Extract<AiModule, "concierge" | "itinerary" | "documents" | "ticket_reader">
+  status?: AiConversation["status"]
+}
+
 interface AddMessagePayload {
   conversationId: string
   tripId: string | null
@@ -174,15 +183,20 @@ function writeAiState(state: AiRepositoryState) {
   window.localStorage.setItem(AI_STORAGE_KEY, JSON.stringify(state))
 }
 
-export async function listConversationsByTrip(tripId: string) {
+export async function listConversations(params?: ListConversationsParams) {
   if (shouldUseSupabase()) {
     const client = createSupabaseBrowserClient()
     if (client) {
-      const { data, error } = await client
-        .from("ai_conversations")
-        .select("*")
-        .eq("trip_id", tripId)
-        .order("created_at", { ascending: false })
+      let query = client.from("ai_conversations").select("*").order("updated_at", { ascending: false })
+
+      if (params?.tripId) query = query.eq("trip_id", params.tripId)
+      if (params?.userId) query = query.eq("user_id", params.userId)
+      if (params?.agencyId) query = query.eq("agency_id", params.agencyId)
+      if (params?.clientId) query = query.eq("client_id", params.clientId)
+      if (params?.channel) query = query.eq("channel", params.channel)
+      if (params?.status) query = query.eq("status", params.status)
+
+      const { data, error } = await query
 
       if (error) {
         return { source: "supabase" as const, data: [] as AiConversation[], error: error.message }
@@ -200,7 +214,21 @@ export async function listConversationsByTrip(tripId: string) {
   }
 
   const state = readAiState()
-  return { source: "local" as const, data: state.conversations.filter((conversation) => conversation.tripId === tripId), error: null }
+  const filtered = state.conversations.filter((conversation) => {
+    if (params?.tripId && conversation.tripId !== params.tripId) return false
+    if (params?.userId && conversation.userId !== params.userId) return false
+    if (params?.agencyId && conversation.agencyId !== params.agencyId) return false
+    if (params?.clientId && conversation.clientId !== params.clientId) return false
+    if (params?.channel && conversation.channel !== params.channel) return false
+    if (params?.status && conversation.status !== params.status) return false
+    return true
+  })
+
+  return { source: "local" as const, data: filtered, error: null }
+}
+
+export async function listConversationsByTrip(tripId: string) {
+  return listConversations({ tripId })
 }
 
 export async function getConversation(conversationId: string) {
@@ -303,6 +331,43 @@ export async function listMessages(conversationId: string) {
   return { source: "local" as const, data: state.messages.filter((message) => message.conversationId === conversationId), error: null }
 }
 
+export async function listMessagesByConversationIds(conversationIds: string[]) {
+  if (conversationIds.length === 0) {
+    return { source: shouldUseSupabase() ? ("supabase" as const) : ("local" as const), data: [] as AiMessage[], error: null }
+  }
+
+  if (shouldUseSupabase()) {
+    const client = createSupabaseBrowserClient()
+    if (client) {
+      const { data, error } = await client
+        .from("ai_messages")
+        .select("*")
+        .in("conversation_id", conversationIds)
+        .order("created_at", { ascending: true })
+
+      if (error) {
+        return { source: "supabase" as const, data: [] as AiMessage[], error: error.message }
+      }
+
+      return { source: "supabase" as const, data: (data ?? []).map(mapMessageRow), error: null }
+    }
+
+    return {
+      source: "supabase-placeholder" as const,
+      config: createSupabaseBrowserClientPlaceholder(),
+      data: [] as AiMessage[],
+      error: "Supabase browser client indisponivel.",
+    }
+  }
+
+  const state = readAiState()
+  return {
+    source: "local" as const,
+    data: state.messages.filter((message) => conversationIds.includes(message.conversationId)),
+    error: null,
+  }
+}
+
 export async function addMessage(payload: AddMessagePayload) {
   if (shouldUseSupabase()) {
     const client = createSupabaseBrowserClient()
@@ -352,6 +417,51 @@ export async function addMessage(payload: AddMessagePayload) {
   const state = readAiState()
   writeAiState({ ...state, messages: [...state.messages, message] })
   return { source: "local" as const, data: message, error: null }
+}
+
+export async function updateConversationStatus(conversationId: string, status: AiConversation["status"]) {
+  if (shouldUseSupabase()) {
+    const client = createSupabaseBrowserClient()
+    if (client) {
+      const { data, error } = await client
+        .from("ai_conversations")
+        .update({ status })
+        .eq("id", conversationId)
+        .select("*")
+        .maybeSingle()
+
+      if (error) {
+        return { source: "supabase" as const, data: null as AiConversation | null, error: error.message }
+      }
+
+      return { source: "supabase" as const, data: data ? mapConversationRow(data) : null, error: null }
+    }
+
+    return {
+      source: "supabase-placeholder" as const,
+      config: createSupabaseBrowserClientPlaceholder(),
+      data: null as AiConversation | null,
+      error: "Supabase browser client indisponivel.",
+    }
+  }
+
+  const state = readAiState()
+  let updatedConversation: AiConversation | null = null
+
+  const conversations = state.conversations.map((conversation) => {
+    if (conversation.id !== conversationId) return conversation
+
+    updatedConversation = {
+      ...conversation,
+      status,
+      updatedAt: new Date().toISOString(),
+    }
+
+    return updatedConversation
+  })
+
+  writeAiState({ ...state, conversations })
+  return { source: "local" as const, data: updatedConversation, error: null }
 }
 
 export async function logAiUsage(payload: LogAiUsagePayload) {
