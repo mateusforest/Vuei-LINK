@@ -94,11 +94,14 @@ export interface Database {
         Row: {
           id: string
           trip_id: string | null
-          user_id: string | null
-          agency_id: string | null
           client_id: string | null
-          channel: "concierge" | "itinerary" | "documents" | "ticket_reader"
+          agency_id: string | null
+          owner_user_id: string | null
+          source: "concierge" | "itinerary" | "documents" | "ticket_reader"
           status: "open" | "closed" | "archived"
+          title: string | null
+          last_message: string | null
+          last_message_at: string | null
           metadata: Json
           created_at: string
           updated_at: string
@@ -106,22 +109,28 @@ export interface Database {
         Insert: {
           id?: string
           trip_id?: string | null
-          user_id?: string | null
-          agency_id?: string | null
           client_id?: string | null
-          channel: "concierge" | "itinerary" | "documents" | "ticket_reader"
+          agency_id?: string | null
+          owner_user_id?: string | null
+          source: "concierge" | "itinerary" | "documents" | "ticket_reader"
           status?: "open" | "closed" | "archived"
+          title?: string | null
+          last_message?: string | null
+          last_message_at?: string | null
           metadata?: Json
           created_at?: string
           updated_at?: string
         }
         Update: {
           trip_id?: string | null
-          user_id?: string | null
-          agency_id?: string | null
           client_id?: string | null
-          channel?: "concierge" | "itinerary" | "documents" | "ticket_reader"
+          agency_id?: string | null
+          owner_user_id?: string | null
+          source?: "concierge" | "itinerary" | "documents" | "ticket_reader"
           status?: "open" | "closed" | "archived"
+          title?: string | null
+          last_message?: string | null
+          last_message_at?: string | null
           metadata?: Json
           updated_at?: string
         }
@@ -130,37 +139,22 @@ export interface Database {
         Row: {
           id: string
           conversation_id: string
-          trip_id: string | null
-          user_id: string | null
-          agency_id: string | null
-          client_id: string | null
           role: "user" | "assistant" | "agent" | "system"
           content: string
-          credits_used: number
           metadata: Json
           created_at: string
         }
         Insert: {
           id?: string
           conversation_id: string
-          trip_id?: string | null
-          user_id?: string | null
-          agency_id?: string | null
-          client_id?: string | null
           role: "user" | "assistant" | "agent" | "system"
           content: string
-          credits_used?: number
           metadata?: Json
           created_at?: string
         }
         Update: {
-          trip_id?: string | null
-          user_id?: string | null
-          agency_id?: string | null
-          client_id?: string | null
           role?: "user" | "assistant" | "agent" | "system"
           content?: string
-          credits_used?: number
           metadata?: Json
         }
       }

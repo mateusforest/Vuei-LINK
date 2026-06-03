@@ -37,6 +37,7 @@ interface CreateConversationPayload {
   agencyId: string | null
   clientId: string | null
   channel: Extract<AiModule, "concierge" | "itinerary" | "documents" | "ticket_reader">
+  title?: string | null
   metadata?: Record<string, unknown> | null
 }
 
@@ -92,10 +93,10 @@ function mapConversationRow(row: Database["public"]["Tables"]["ai_conversations"
   return {
     id: row.id,
     tripId: row.trip_id,
-    userId: row.user_id,
+    userId: row.owner_user_id,
     agencyId: row.agency_id,
     clientId: row.client_id,
-    channel: row.channel,
+    channel: row.source,
     status: row.status,
     metadata: (row.metadata ?? {}) as Record<string, unknown>,
     createdAt: row.created_at,
@@ -107,13 +108,13 @@ function mapMessageRow(row: Database["public"]["Tables"]["ai_messages"]["Row"]):
   return {
     id: row.id,
     conversationId: row.conversation_id,
-    tripId: row.trip_id,
-    userId: row.user_id,
-    agencyId: row.agency_id,
-    clientId: row.client_id,
+    tripId: null,
+    userId: null,
+    agencyId: null,
+    clientId: null,
     role: row.role,
     content: row.content,
-    creditsUsed: row.credits_used,
+    creditsUsed: 0,
     metadata: (row.metadata ?? {}) as Record<string, unknown>,
     createdAt: row.created_at,
   }
@@ -183,6 +184,19 @@ function writeAiState(state: AiRepositoryState) {
   window.localStorage.setItem(AI_STORAGE_KEY, JSON.stringify(state))
 }
 
+function mapAiSchemaError(error?: string | null) {
+  const normalized = (error ?? "").toLowerCase()
+  if (
+    normalized.includes("ai_conversations") && normalized.includes("does not exist") ||
+    normalized.includes("ai_messages") && normalized.includes("does not exist") ||
+    normalized.includes("relation") && normalized.includes("does not exist")
+  ) {
+    return "As tabelas do Concierge ainda nao existem no Supabase. Rode o arquivo supabase/ai_conversations_setup.sql antes de testar este modulo."
+  }
+
+  return error ?? null
+}
+
 export async function listConversations(params?: ListConversationsParams) {
   if (shouldUseSupabase()) {
     const client = createSupabaseBrowserClient()
@@ -190,16 +204,16 @@ export async function listConversations(params?: ListConversationsParams) {
       let query = client.from("ai_conversations").select("*").order("updated_at", { ascending: false })
 
       if (params?.tripId) query = query.eq("trip_id", params.tripId)
-      if (params?.userId) query = query.eq("user_id", params.userId)
+      if (params?.userId) query = query.eq("owner_user_id", params.userId)
       if (params?.agencyId) query = query.eq("agency_id", params.agencyId)
       if (params?.clientId) query = query.eq("client_id", params.clientId)
-      if (params?.channel) query = query.eq("channel", params.channel)
+      if (params?.channel) query = query.eq("source", params.channel)
       if (params?.status) query = query.eq("status", params.status)
 
       const { data, error } = await query
 
       if (error) {
-        return { source: "supabase" as const, data: [] as AiConversation[], error: error.message }
+        return { source: "supabase" as const, data: [] as AiConversation[], error: mapAiSchemaError(error.message) }
       }
 
       return { source: "supabase" as const, data: (data ?? []).map(mapConversationRow), error: null }
@@ -237,7 +251,7 @@ export async function getConversation(conversationId: string) {
     if (client) {
       const { data, error } = await client.from("ai_conversations").select("*").eq("id", conversationId).maybeSingle()
       if (error) {
-        return { source: "supabase" as const, data: null as AiConversation | null, error: error.message }
+        return { source: "supabase" as const, data: null as AiConversation | null, error: mapAiSchemaError(error.message) }
       }
 
       return { source: "supabase" as const, data: data ? mapConversationRow(data) : null, error: null }
@@ -261,16 +275,19 @@ export async function createConversation(payload: CreateConversationPayload) {
     if (client) {
       const insertPayload: Database["public"]["Tables"]["ai_conversations"]["Insert"] = {
         trip_id: payload.tripId,
-        user_id: payload.userId,
+        owner_user_id: payload.userId,
         agency_id: payload.agencyId,
         client_id: payload.clientId,
-        channel: payload.channel,
+        source: payload.channel,
+        title: payload.title ?? "Concierge",
+        last_message: null,
+        last_message_at: null,
         metadata: payload.metadata ?? {},
       }
 
       const { data, error } = await client.from("ai_conversations").insert(insertPayload).select("*").single()
       if (error) {
-        return { source: "supabase" as const, data: null as AiConversation | null, error: error.message }
+        return { source: "supabase" as const, data: null as AiConversation | null, error: mapAiSchemaError(error.message) }
       }
 
       return { source: "supabase" as const, data: mapConversationRow(data), error: null }
@@ -313,7 +330,7 @@ export async function listMessages(conversationId: string) {
         .order("created_at", { ascending: true })
 
       if (error) {
-        return { source: "supabase" as const, data: [] as AiMessage[], error: error.message }
+        return { source: "supabase" as const, data: [] as AiMessage[], error: mapAiSchemaError(error.message) }
       }
 
       return { source: "supabase" as const, data: (data ?? []).map(mapMessageRow), error: null }
@@ -346,7 +363,7 @@ export async function listMessagesByConversationIds(conversationIds: string[]) {
         .order("created_at", { ascending: true })
 
       if (error) {
-        return { source: "supabase" as const, data: [] as AiMessage[], error: error.message }
+        return { source: "supabase" as const, data: [] as AiMessage[], error: mapAiSchemaError(error.message) }
       }
 
       return { source: "supabase" as const, data: (data ?? []).map(mapMessageRow), error: null }
@@ -374,19 +391,26 @@ export async function addMessage(payload: AddMessagePayload) {
     if (client) {
       const insertPayload: Database["public"]["Tables"]["ai_messages"]["Insert"] = {
         conversation_id: payload.conversationId,
-        trip_id: payload.tripId,
-        user_id: payload.userId,
-        agency_id: payload.agencyId,
-        client_id: payload.clientId,
         role: payload.role,
         content: payload.content,
-        credits_used: payload.creditsUsed ?? 0,
         metadata: payload.metadata ?? {},
       }
 
       const { data, error } = await client.from("ai_messages").insert(insertPayload).select("*").single()
       if (error) {
-        return { source: "supabase" as const, data: null as AiMessage | null, error: error.message }
+        return { source: "supabase" as const, data: null as AiMessage | null, error: mapAiSchemaError(error.message) }
+      }
+
+      const { error: conversationError } = await client
+        .from("ai_conversations")
+        .update({
+          last_message: payload.content,
+          last_message_at: new Date().toISOString(),
+        })
+        .eq("id", payload.conversationId)
+
+      if (conversationError) {
+        console.error("[CONCIERGE] conversation last message update error", mapAiSchemaError(conversationError.message))
       }
 
       return { source: "supabase" as const, data: mapMessageRow(data), error: null }
@@ -431,7 +455,7 @@ export async function updateConversationStatus(conversationId: string, status: A
         .maybeSingle()
 
       if (error) {
-        return { source: "supabase" as const, data: null as AiConversation | null, error: error.message }
+        return { source: "supabase" as const, data: null as AiConversation | null, error: mapAiSchemaError(error.message) }
       }
 
       return { source: "supabase" as const, data: data ? mapConversationRow(data) : null, error: null }
