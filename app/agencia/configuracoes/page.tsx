@@ -35,8 +35,9 @@ import {
 import { useAgency } from "@/contexts/agency-context"
 import { useAuth } from "@/contexts/auth-context"
 import { useRouter } from "next/navigation"
-import { getAgencyByOwner, updateAgency as updateAgencyRepository } from "@/lib/repositories/agencies-repository"
+import { updateAgency as updateAgencyRepository } from "@/lib/repositories/agencies-repository"
 import { shouldUseSupabase } from "@/lib/data-source"
+import { createSupabaseBrowserClient } from "@/lib/supabase/client"
 
 const settingsSections = [
   { id: "agency", label: "Dados da Agencia", icon: Building2 },
@@ -72,7 +73,7 @@ const STORAGE_KEY = "vuei_agencia_configuracoes_frontend"
 export default function SettingsPage() {
   const router = useRouter()
   const { signOut, user, profile } = useAuth()
-  const { credits, agency, setupIncomplete, workspaceError } = useAgency()
+  const { credits, agency, setupIncomplete, workspaceError, refreshAgencyWorkspace } = useAgency()
   const [activeSection, setActiveSection] = useState("agency")
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -80,6 +81,7 @@ export default function SettingsPage() {
   const [showPhotoModal, setShowPhotoModal] = useState(false)
   const [showPasswordModal, setShowPasswordModal] = useState(false)
   const [showPlanModal, setShowPlanModal] = useState(false)
+  const [photoFile, setPhotoFile] = useState<File | null>(null)
 
   const [agencyData, setAgencyData] = useState({
     name: "Agencia Viaje+",
@@ -107,38 +109,29 @@ export default function SettingsPage() {
   useEffect(() => {
     if (typeof window === "undefined") return
 
-    if (shouldUseSupabase() && user?.id) {
-      let active = true
-
-      const loadAgency = async () => {
-        const result = await getAgencyByOwner(user.id)
-        if (!active || !result.data) return
-
+    if (shouldUseSupabase()) {
+      if (agency) {
         setAgencyData((prev) => ({
           ...prev,
-          name: result.data?.name || prev.name,
-          email: result.data?.settings?.email || profile?.email || prev.email,
-          phone: result.data?.settings?.phone || profile?.phone || prev.phone,
-          address: result.data?.settings?.address || prev.address,
-          logo: result.data?.logo || result.data?.branding?.logoUrl || prev.logo,
-          plan: result.data?.plan ? result.data.plan[0].toUpperCase() + result.data.plan.slice(1) : prev.plan,
+          name: agency.name || prev.name,
+          email: agency.settings?.email || profile?.email || prev.email,
+          phone: agency.settings?.phone || profile?.phone || prev.phone,
+          address: agency.settings?.address || prev.address,
+          logo: agency.logo || agency.branding?.logoUrl || prev.logo,
+          plan: agency.plan ? agency.plan[0].toUpperCase() + agency.plan.slice(1) : prev.plan,
         }))
-
-        if (result.data?.settings?.notifications) {
-          setNotifications({
-            concierge: result.data.settings.notifications.concierge,
-            trips: result.data.settings.notifications.trips,
-            credits: result.data.settings.notifications.credits,
-            newClients: result.data.settings.notifications.newClients,
-          })
-        }
       }
 
-      void loadAgency()
-
-      return () => {
-        active = false
+      if (agency?.settings?.notifications) {
+        setNotifications({
+          concierge: agency.settings.notifications.concierge,
+          trips: agency.settings.notifications.trips,
+          credits: agency.settings.notifications.credits,
+          newClients: agency.settings.notifications.newClients,
+        })
       }
+
+      return
     }
 
     const savedState = window.localStorage.getItem(STORAGE_KEY)
@@ -151,7 +144,7 @@ export default function SettingsPage() {
     } catch {
       // fallback silencioso
     }
-  }, [profile?.email, profile?.phone, user?.id])
+  }, [agency, profile?.email, profile?.phone])
 
   useEffect(() => {
     if (typeof window === "undefined") return
@@ -168,42 +161,76 @@ export default function SettingsPage() {
     setSaving(true)
 
     if (shouldUseSupabase() && user?.id) {
-      const currentAgency = await getAgencyByOwner(user.id)
-      if (currentAgency.data) {
-        const updateResult = await updateAgencyRepository(currentAgency.data.id, {
-          name: agencyData.name,
-          logo: agencyData.logo,
-          plan: agencyData.plan.toLowerCase() as "starter" | "pro" | "enterprise",
-          settings: {
-            ...(currentAgency.data.settings ?? {
-              email: null,
-              phone: null,
-              cnpj: null,
-              address: null,
-              notifications: notifications,
-              twoFactorEnabled: false,
-            }),
-            email: agencyData.email,
-            phone: agencyData.phone,
-            cnpj: agencyData.cnpj,
-            address: agencyData.address,
-            notifications,
-          },
-          branding: {
-            logoUrl: agencyData.logo || null,
-          },
-        })
-
-        if (!updateResult.data) {
-          setSaving(false)
-          showToast(updateResult.error || "Nao foi possivel salvar a agencia no Supabase.")
-          return
-        }
-      } else {
+      if (!agency) {
         setSaving(false)
-        showToast(currentAgency.error || "Agencia nao encontrada no Supabase.")
+        showToast("Agencia nao encontrada no Supabase.")
         return
       }
+
+      let nextLogo = agencyData.logo
+
+      if (photoFile) {
+        const client = createSupabaseBrowserClient()
+        if (!client) {
+          setSaving(false)
+          showToast("Cliente Supabase indisponivel para upload da logo.")
+          return
+        }
+
+        const extension = photoFile.name.split(".").pop()?.toLowerCase() || "png"
+        const filePath = `${user.id}/agency/${agency.id}/logo-${Date.now()}.${extension}`
+        const uploadResult = await client.storage.from("vuei-avatars").upload(filePath, photoFile, {
+          cacheControl: "3600",
+          upsert: true,
+        })
+
+        if (uploadResult.error) {
+          setSaving(false)
+          showToast(
+            uploadResult.error.message.includes("Bucket not found")
+              ? "Bucket 'vuei-avatars' nao existe. Rode o SQL de configuracao antes de salvar a logo."
+              : uploadResult.error.message
+          )
+          return
+        }
+
+        nextLogo = client.storage.from("vuei-avatars").getPublicUrl(filePath).data.publicUrl
+      }
+
+      const updateResult = await updateAgencyRepository(agency.id, {
+        name: agencyData.name,
+        logo: nextLogo || null,
+        plan: agencyData.plan.toLowerCase() as "starter" | "pro" | "enterprise",
+        settings: {
+          ...(agency.settings ?? {
+            email: null,
+            phone: null,
+            cnpj: null,
+            address: null,
+            notifications,
+            twoFactorEnabled: false,
+          }),
+          email: agencyData.email,
+          phone: agencyData.phone,
+          cnpj: agencyData.cnpj,
+          address: agencyData.address,
+          notifications,
+        },
+        branding: {
+          ...(agency.branding ?? { logoUrl: null }),
+          logoUrl: nextLogo || null,
+        },
+      })
+
+      if (!updateResult.data) {
+        setSaving(false)
+        showToast(updateResult.error || "Nao foi possivel salvar a agencia no Supabase.")
+        return
+      }
+
+      setAgencyData((prev) => ({ ...prev, logo: nextLogo }))
+      setPhotoFile(null)
+      await refreshAgencyWorkspace()
     } else {
       await new Promise((resolve) => setTimeout(resolve, 700))
     }
@@ -216,6 +243,7 @@ export default function SettingsPage() {
 
   const handleLogoSelected = (file?: File) => {
     if (!file) return
+    setPhotoFile(file)
 
     const reader = new FileReader()
     reader.onload = () => {

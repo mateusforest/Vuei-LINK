@@ -20,9 +20,19 @@ import { useAuth } from "@/contexts/auth-context"
 import { shouldUseSupabase } from "@/lib/data-source"
 import { createClient as createClientRecord, deleteClient as deleteClientRecord, listClients, updateClient as updateClientRecord } from "@/lib/repositories/clients-repository"
 import { getAgencyById, getAgencyByOwner } from "@/lib/repositories/agencies-repository"
-import { deleteDocument as deleteDocumentRecord, listDocumentsByTrip } from "@/lib/repositories/documents-repository"
+import {
+  createDocumentMetadata,
+  deleteDocument as deleteDocumentRecord,
+  listDocuments,
+  uploadDocumentFile,
+} from "@/lib/repositories/documents-repository"
 import { createTrip as createTripRecord, deleteTrip as deleteTripRecord, listTripsByAgency, updateTrip as updateTripRecord } from "@/lib/repositories/trips-repository"
 import { updateProfile as updateProfileRecord } from "@/lib/repositories/profiles-repository"
+import {
+  addMessage as addAiMessage,
+  listConversationsByTrip,
+  listMessages,
+} from "@/lib/repositories/ai-repository"
 import type { Agency } from "@/types"
 
 export interface Client extends Pick<CanonicalClient, "id" | "name"> {
@@ -63,10 +73,16 @@ export interface AgencyDocument {
   id: string
   tripId?: string
   clientId?: string
+  agencyId?: string
+  ownerUserId?: string
   name: string
   type: "voucher" | "ticket" | "passport" | "visa" | "insurance" | "itinerary" | "other"
   isPrivate: boolean
   fileUrl?: string
+  filePath?: string
+  mimeType?: string
+  size?: number | null
+  visibility?: "private" | "public_trip" | "agency_only"
   createdAt: string
 }
 
@@ -81,6 +97,7 @@ export interface ItineraryItem {
 
 export interface ConciergeRequest {
   id: string
+  conversationId?: string
   tripId: string
   clientId: string
   clientName: string
@@ -130,7 +147,7 @@ interface AgencyContextType {
   getTripById: (id: string) => AgencyTrip | undefined
   getTripsByClient: (clientId: string) => AgencyTrip[]
   documents: AgencyDocument[]
-  addDocument: (data: Omit<AgencyDocument, "id" | "createdAt">) => Promise<AgencyDocument | null>
+  addDocument: (data: Omit<AgencyDocument, "id" | "createdAt"> & { file?: File | null }) => Promise<AgencyDocument | null>
   deleteDocument: (id: string) => Promise<boolean>
   getDocumentsByTrip: (tripId: string) => AgencyDocument[]
   getDocumentsByClient: (clientId: string) => AgencyDocument[]
@@ -152,6 +169,7 @@ interface AgencyContextType {
   isUsingRealData: boolean
   setupIncomplete: boolean
   workspaceError: string | null
+  refreshAgencyWorkspace: () => Promise<void>
 }
 
 const AgencyContext = createContext<AgencyContextType | undefined>(undefined)
@@ -224,6 +242,58 @@ function parseDestination(destination: string): { city: string; country: string 
     return { city: parts[0], country: parts[parts.length - 1] }
   }
   return { city: destination, country: "" }
+}
+
+function sanitizeFileName(name: string) {
+  return name
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9.\-_]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "")
+    .toLowerCase()
+}
+
+function mapDocumentRecordToAgencyDocument(document: {
+  id: string
+  tripId: string | null
+  clientId: string | null
+  agencyId: string | null
+  ownerUserId: string | null
+  name: string
+  type: string
+  isPrivate: boolean
+  fileUrl: string | null
+  filePath: string | null
+  mimeType: string | null
+  size: number | null
+  visibility: "private" | "public_trip" | "agency_only"
+  createdAt: string
+}): AgencyDocument {
+  return {
+    id: document.id,
+    tripId: document.tripId ?? undefined,
+    clientId: document.clientId ?? undefined,
+    agencyId: document.agencyId ?? undefined,
+    ownerUserId: document.ownerUserId ?? undefined,
+    name: document.name,
+    type:
+      document.type === "voucher" ||
+      document.type === "ticket" ||
+      document.type === "passport" ||
+      document.type === "visa" ||
+      document.type === "insurance" ||
+      document.type === "itinerary"
+        ? document.type
+        : "other",
+    isPrivate: document.isPrivate,
+    fileUrl: document.fileUrl ?? undefined,
+    filePath: document.filePath ?? undefined,
+    mimeType: document.mimeType ?? undefined,
+    size: document.size ?? null,
+    visibility: document.visibility,
+    createdAt: document.createdAt,
+  }
 }
 
 function mapCanonicalTripToAgencyTrip(trip: CanonicalTrip, clientName = ""): AgencyTrip {
@@ -441,7 +511,7 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
     window.localStorage.setItem(AGENCY_STORAGE_KEY, JSON.stringify(payload))
   }, [clients, trips, documents, conciergeRequests, teamMembers, activities, credits, isLoaded, isUsingRealData])
 
-  useEffect(() => {
+  const refreshAgencyWorkspace = useCallback(async () => {
     if (!isUsingRealData) return
     if (!user?.id) {
       setAgency(null)
@@ -464,135 +534,161 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
       return
     }
 
-    let active = true
+    const agencyResult = profile?.agencyId ? await getAgencyById(profile.agencyId) : await getAgencyByOwner(user.id)
+    const resolvedAgency = agencyResult.data
 
-    const loadAgencyWorkspace = async () => {
-      const agencyResult = profile?.agencyId ? await getAgencyById(profile.agencyId) : await getAgencyByOwner(user.id)
-      const resolvedAgency = agencyResult.data
-
-      if (!active) return
-
-      if (!resolvedAgency) {
-        setAgency(null)
-        setAgencyId(null)
-        setSetupIncomplete(profile?.role === "agency_owner")
-        setWorkspaceError(
-          profile?.role === "agency_owner"
-            ? "Sua conta de agencia foi criada, mas a agencia ainda nao foi persistida corretamente no Supabase."
-            : agencyResult.error ?? null
-        )
-        setClients([])
-        setTrips([])
-        setDocuments([])
-        setConciergeRequests([])
-        setTeamMembers([])
-        setActivities([])
-        setCredits({
-          balance: 0,
-          plan: "starter",
-          history: [],
-          ...buildCanonicalCredits(0, []),
-        })
-        setIsLoaded(true)
-        return
-      }
-
-      if (profile?.agencyId !== resolvedAgency.id && profile?.id) {
-        const profileUpdate = await updateProfileRecord(profile.id, {
-          agencyId: resolvedAgency.id,
-          role: profile.role === "agency_member" ? "agency_member" : "agency_owner",
-        })
-
-        if (!profileUpdate.data && profileUpdate.error) {
-          console.error("[AUTH ERROR]", profileUpdate.error)
-        }
-      }
-
-      const [clientsResult, tripsResult] = await Promise.all([
-        listClients(resolvedAgency.id),
-        listTripsByAgency(resolvedAgency.id),
-      ])
-
-      if (!active) return
-
-      const mappedClients: Client[] = (clientsResult.data ?? []).map((client) => ({
-        id: client.id,
-        name: client.name,
-        email: client.email ?? "",
-        phone: client.phone ?? "",
-        document: client.document ?? undefined,
-        notes: client.notes ?? undefined,
-        status: client.status === "inactive" ? "inactive" : "active",
-        createdAt: client.createdAt,
-        updatedAt: client.updatedAt,
-      }))
-
-      const tripClientNameMap = new Map(mappedClients.map((client) => [client.id, client.name]))
-      const canonicalTrips = tripsResult.data ?? []
-      const mappedTrips = canonicalTrips.map((trip) =>
-        mapCanonicalTripToAgencyTrip(trip, trip.clientId ? tripClientNameMap.get(trip.clientId) ?? "" : "")
-      )
-
-      const documentsByTrip = await Promise.all(
-        canonicalTrips.map(async (trip) => {
-          const result = await listDocumentsByTrip(trip.id)
-          return result.data ?? []
-        })
-      )
-
-      if (!active) return
-
-      const mappedDocuments: AgencyDocument[] = documentsByTrip.flat().map((document) => ({
-        id: document.id,
-        tripId: document.tripId ?? undefined,
-        clientId: document.clientId ?? undefined,
-        name: document.name,
-        type:
-          document.type === "voucher" ||
-          document.type === "ticket" ||
-          document.type === "passport" ||
-          document.type === "visa" ||
-          document.type === "insurance" ||
-          document.type === "itinerary"
-            ? document.type
-            : "other",
-        isPrivate: document.isPrivate,
-        fileUrl: document.fileUrl ?? undefined,
-        createdAt: document.createdAt,
-      }))
-
-      const history =
-        resolvedAgency.creditsBalance > 0
-          ? [{ action: "Saldo da agencia", amount: resolvedAgency.creditsBalance, date: new Date().toISOString(), source: "Supabase" }]
-          : []
-
-      setAgency(resolvedAgency)
-      setAgencyId(resolvedAgency.id)
-      setSetupIncomplete(false)
+    if (!resolvedAgency) {
+      setAgency(null)
+      setAgencyId(null)
+      setSetupIncomplete(profile?.role === "agency_owner")
       setWorkspaceError(
-        clientsResult.error || tripsResult.error || agencyResult.error || null
+        profile?.role === "agency_owner"
+          ? "Sua conta de agencia foi criada, mas a agencia ainda nao foi persistida corretamente no Supabase."
+          : agencyResult.error ?? null
       )
-      setClients(mappedClients)
-      setTrips(mappedTrips)
-      setDocuments(mappedDocuments)
+      setClients([])
+      setTrips([])
+      setDocuments([])
       setConciergeRequests([])
       setTeamMembers([])
       setActivities([])
       setCredits({
-        balance: resolvedAgency.creditsBalance,
-        plan: resolvedAgency.plan === "pro" ? "professional" : resolvedAgency.plan,
-        history,
-        ...buildCanonicalCredits(resolvedAgency.creditsBalance, history),
+        balance: 0,
+        plan: "starter",
+        history: [],
+        ...buildCanonicalCredits(0, []),
       })
       setIsLoaded(true)
+      return
     }
 
-    void loadAgencyWorkspace()
+    if (profile?.agencyId !== resolvedAgency.id && profile?.id) {
+      const profileUpdate = await updateProfileRecord(profile.id, {
+        agencyId: resolvedAgency.id,
+        role: profile.role === "agency_member" ? "agency_member" : "agency_owner",
+      })
 
-    return () => {
-      active = false
+      if (!profileUpdate.data && profileUpdate.error) {
+        console.error("[AUTH ERROR]", profileUpdate.error)
+      }
     }
+
+    const [clientsResult, tripsResult, documentsResult] = await Promise.all([
+      listClients(resolvedAgency.id),
+      listTripsByAgency(resolvedAgency.id),
+      listDocuments({ agencyId: resolvedAgency.id }),
+    ])
+
+    const mappedClients: Client[] = (clientsResult.data ?? []).map((client) => ({
+      id: client.id,
+      name: client.name,
+      email: client.email ?? "",
+      phone: client.phone ?? "",
+      document: client.document ?? undefined,
+      notes: client.notes ?? undefined,
+      status: client.status === "inactive" ? "inactive" : "active",
+      createdAt: client.createdAt,
+      updatedAt: client.updatedAt,
+    }))
+
+    const tripClientNameMap = new Map(mappedClients.map((client) => [client.id, client.name]))
+    const canonicalTrips = tripsResult.data ?? []
+    const mappedTrips = canonicalTrips.map((trip) =>
+      mapCanonicalTripToAgencyTrip(trip, trip.clientId ? tripClientNameMap.get(trip.clientId) ?? "" : "")
+    )
+
+    const conversationsByTrip = await Promise.all(
+      canonicalTrips.map(async (trip) => {
+        const conversationsResult = await listConversationsByTrip(trip.id)
+        const conversations = conversationsResult.data ?? []
+
+        const messagesByConversation = await Promise.all(
+          conversations.map(async (conversation) => {
+            const messagesResult = await listMessages(conversation.id)
+            return {
+              conversation,
+              messages: messagesResult.data ?? [],
+              error: messagesResult.error ?? null,
+            }
+          })
+        )
+
+        return {
+          trip,
+          conversationGroups: messagesByConversation,
+          error: conversationsResult.error ?? null,
+        }
+      })
+    )
+
+    const mappedDocuments: AgencyDocument[] = (documentsResult.data ?? []).map(mapDocumentRecordToAgencyDocument)
+
+    const mappedConciergeRequests: ConciergeRequest[] = conversationsByTrip.flatMap(({ trip, conversationGroups }) =>
+      conversationGroups
+        .map(({ conversation, messages }) => {
+          const userMessage = messages.find((message) => message.role === "user")
+          if (!userMessage) return null
+
+          const responseMessage = [...messages]
+            .reverse()
+            .find((message) => message.role === "assistant" || message.role === "agent")
+
+          const clientId = conversation.clientId ?? trip.clientId ?? ""
+          return {
+            id: conversation.id,
+            conversationId: conversation.id,
+            tripId: trip.id,
+            clientId,
+            clientName: clientId ? tripClientNameMap.get(clientId) ?? "Cliente sem nome" : "Cliente sem nome",
+            destination: trip.destination,
+            question: userMessage.content,
+            response: responseMessage?.content,
+            status:
+              conversation.status === "closed" || conversation.status === "archived"
+                ? "resolved"
+                : responseMessage
+                  ? "answered"
+                  : "pending",
+            createdAt: conversation.createdAt,
+          } satisfies ConciergeRequest
+        })
+        .filter((request): request is ConciergeRequest => Boolean(request))
+    )
+
+    const history =
+      resolvedAgency.creditsBalance > 0
+        ? [{ action: "Saldo da agencia", amount: resolvedAgency.creditsBalance, date: new Date().toISOString(), source: "Supabase" }]
+        : []
+
+    const conversationError = conversationsByTrip.find((entry) => entry.error)?.error ?? null
+    const messageError =
+      conversationsByTrip.flatMap((entry) => entry.conversationGroups).find((group) => group.error)?.error ?? null
+
+    setAgency(resolvedAgency)
+    setAgencyId(resolvedAgency.id)
+    setSetupIncomplete(false)
+    setWorkspaceError(
+      agencyResult.error || clientsResult.error || tripsResult.error || documentsResult.error || conversationError || messageError || null
+    )
+    setClients(mappedClients)
+    setTrips(mappedTrips)
+    setDocuments(mappedDocuments)
+    setConciergeRequests(mappedConciergeRequests)
+    setTeamMembers([])
+    setActivities([])
+    setCredits({
+      balance: resolvedAgency.creditsBalance,
+      plan: resolvedAgency.plan === "pro" ? "professional" : resolvedAgency.plan,
+      history,
+      ...buildCanonicalCredits(resolvedAgency.creditsBalance, history),
+    })
+    setIsLoaded(true)
   }, [isUsingRealData, profile?.agencyId, profile?.id, profile?.role, user?.id])
+
+  useEffect(() => {
+    if (!isUsingRealData) return
+    void refreshAgencyWorkspace()
+  }, [isUsingRealData, refreshAgencyWorkspace])
 
   const addActivity = useCallback((action: string, description: string, type: Activity["type"]) => {
     const newActivity: Activity = {
@@ -848,10 +944,65 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
   const getTripById = useCallback((id: string) => trips.find((trip) => trip.id === id), [trips])
   const getTripsByClient = useCallback((clientId: string) => trips.filter((trip) => trip.clientId === clientId), [trips])
 
-  const addDocument = useCallback(async (data: Omit<AgencyDocument, "id" | "createdAt">) => {
+  const addDocument = useCallback(async (data: Omit<AgencyDocument, "id" | "createdAt"> & { file?: File | null }) => {
     if (isUsingRealData) {
-      setWorkspaceError("O upload operacional da agencia ainda depende do fluxo real de arquivo nesta etapa.")
-      return null
+      if (!agencyId) {
+        const message = "Agencia nao configurada no Supabase. Finalize o cadastro antes de enviar documentos."
+        setWorkspaceError(message)
+        return null
+      }
+
+      if (!user?.id) {
+        const message = "Usuario autenticado nao encontrado para enviar o documento."
+        setWorkspaceError(message)
+        return null
+      }
+
+      if (!data.file) {
+        const message = "Selecione um arquivo real antes de enviar o documento."
+        setWorkspaceError(message)
+        return null
+      }
+
+      if (!data.tripId) {
+        const message = "Selecione uma viagem real para vincular este documento."
+        setWorkspaceError(message)
+        return null
+      }
+
+      const safeName = sanitizeFileName(data.file.name)
+      const path = `${user.id}/${agencyId}/${data.tripId}/${data.type}/${Date.now()}-${safeName}`
+      const uploadResult = await uploadDocumentFile({ file: data.file, path })
+
+      if (!uploadResult.data) {
+        setWorkspaceError(uploadResult.error ?? "Nao foi possivel enviar o arquivo para o Storage.")
+        return null
+      }
+
+      const metadataResult = await createDocumentMetadata({
+        tripId: data.tripId ?? null,
+        clientId: data.clientId ?? null,
+        agencyId,
+        ownerUserId: user.id,
+        name: data.name || data.file.name,
+        type: data.type,
+        filePath: uploadResult.data.path,
+        fileUrl: uploadResult.data.fileUrl ?? null,
+        mimeType: data.file.type || null,
+        size: data.file.size ?? null,
+        isPrivate: data.isPrivate,
+        visibility: data.visibility ?? (data.isPrivate ? "private" : "agency_only"),
+      })
+
+      if (!metadataResult.data) {
+        setWorkspaceError(metadataResult.error ?? "Nao foi possivel salvar o documento no Supabase.")
+        return null
+      }
+
+      const newDocument = mapDocumentRecordToAgencyDocument(metadataResult.data)
+      setWorkspaceError(null)
+      setDocuments((prev) => [newDocument, ...prev])
+      return newDocument
     }
 
     const newDocument: AgencyDocument = {
@@ -894,11 +1045,38 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
   }, [addActivity])
 
   const respondToRequest = useCallback((id: string, response: string) => {
-    setConciergeRequests((prev) =>
-      prev.map((request) => (request.id === id ? { ...request, response, status: "answered" as const } : request))
-    )
-    addActivity("Solicitacao respondida", `${response.slice(0, 50)}...`, "concierge")
-  }, [addActivity])
+    void (async () => {
+      const request = conciergeRequests.find((item) => item.id === id)
+
+      if (isUsingRealData && request) {
+        const result = await addAiMessage({
+          conversationId: request.conversationId ?? request.id,
+          tripId: request.tripId,
+          userId: user?.id ?? null,
+          agencyId: agencyId,
+          clientId: request.clientId || null,
+          role: "agent",
+          content: response,
+          metadata: {
+            origin: "agency-portal",
+          },
+        })
+
+        if (!result.data) {
+          setWorkspaceError(result.error ?? "Nao foi possivel salvar a resposta do concierge.")
+          return
+        }
+
+        await refreshAgencyWorkspace()
+        return
+      }
+
+      setConciergeRequests((prev) =>
+        prev.map((requestItem) => (requestItem.id === id ? { ...requestItem, response, status: "answered" as const } : requestItem))
+      )
+      addActivity("Solicitacao respondida", `${response.slice(0, 50)}...`, "concierge")
+    })()
+  }, [addActivity, agencyId, conciergeRequests, isUsingRealData, refreshAgencyWorkspace, user?.id])
 
   const resolveRequest = useCallback((id: string) => {
     setConciergeRequests((prev) =>
@@ -996,6 +1174,7 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
         isUsingRealData,
         setupIncomplete,
         workspaceError,
+        refreshAgencyWorkspace,
       }}
     >
       {children}

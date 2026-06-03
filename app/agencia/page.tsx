@@ -18,7 +18,6 @@ import {
   ChevronRight,
   TrendingUp,
   X,
-  Upload,
   Check,
   Copy,
 } from "lucide-react"
@@ -143,129 +142,6 @@ function NewClientModal({ open, onClose, onSave }: { open: boolean; onClose: () 
           className="w-full bg-gradient-to-r from-[#5de0e6] to-[#004aad] hover:opacity-90 text-white border-0 disabled:opacity-50"
         >
           Cadastrar Cliente
-        </Button>
-      </div>
-    </Modal>
-  )
-}
-
-// Upload Document Modal
-function UploadDocModal({ open, onClose, clients, trips, onSave }: { 
-  open: boolean
-  onClose: () => void
-  clients: Client[]
-  trips: AgencyTrip[]
-  onSave: (data: { name: string; type: string; clientId?: string; tripId?: string; isPrivate: boolean }) => Promise<boolean>
-}) {
-  const [uploading, setUploading] = useState(false)
-  const [formData, setFormData] = useState({
-    name: "",
-    type: "voucher",
-    clientId: "",
-    tripId: "",
-    isPrivate: false
-  })
-
-  const handleUpload = async () => {
-    setUploading(true)
-    const saved = await onSave(formData)
-    setUploading(false)
-    if (!saved) return
-    setFormData({ name: "", type: "voucher", clientId: "", tripId: "", isPrivate: false })
-    onClose()
-  }
-
-  return (
-    <Modal open={open} onClose={onClose} title="Enviar Documento">
-      <div className="space-y-4">
-        <div 
-          className="p-6 rounded-xl border-2 border-dashed border-white/10 hover:border-[#5de0e6]/30 transition-colors text-center cursor-pointer"
-          onClick={() => setFormData({ ...formData, name: "documento-upload.pdf" })}
-        >
-          {uploading ? (
-            <div className="flex flex-col items-center gap-3">
-              <div className="w-8 h-8 border-2 border-white/30 border-t-[#5de0e6] rounded-full animate-spin" />
-              <p className="text-sm text-white/60">Enviando...</p>
-            </div>
-          ) : (
-            <>
-              <Upload className="w-8 h-8 mx-auto text-white/40 mb-2" />
-              <p className="text-sm text-white/60">Clique para selecionar</p>
-              <p className="text-xs text-white/30 mt-1">PDF, PNG, JPG ate 10MB</p>
-            </>
-          )}
-        </div>
-
-        {formData.name && (
-          <div className="p-3 rounded-xl bg-[#5de0e6]/10 border border-[#5de0e6]/30 flex items-center gap-2">
-            <FileText className="w-4 h-4 text-[#5de0e6]" />
-            <span className="text-sm text-white">{formData.name}</span>
-          </div>
-        )}
-
-        <div>
-          <label className="text-xs text-white/50 uppercase tracking-wider">Tipo</label>
-          <select
-            value={formData.type}
-            onChange={(e) => setFormData({ ...formData, type: e.target.value })}
-            className="w-full mt-1 px-4 py-3 rounded-xl bg-[#0a0a0a] border border-white/[0.08] text-white focus:outline-none focus:border-[#5de0e6]/50 appearance-none"
-            style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='rgba(255,255,255,0.4)'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center', backgroundSize: '16px' }}
-          >
-            <option value="voucher" className="bg-[#0a0a0a]">Voucher</option>
-            <option value="ticket" className="bg-[#0a0a0a]">Ingresso</option>
-            <option value="passport" className="bg-[#0a0a0a]">Passaporte</option>
-            <option value="visa" className="bg-[#0a0a0a]">Visto</option>
-            <option value="insurance" className="bg-[#0a0a0a]">Seguro</option>
-            <option value="other" className="bg-[#0a0a0a]">Outro</option>
-          </select>
-        </div>
-
-        <div>
-          <label className="text-xs text-white/50 uppercase tracking-wider">Cliente</label>
-          <select
-            value={formData.clientId}
-            onChange={(e) => setFormData({ ...formData, clientId: e.target.value })}
-            className="w-full mt-1 px-4 py-3 rounded-xl bg-[#0a0a0a] border border-white/[0.08] text-white focus:outline-none focus:border-[#5de0e6]/50 appearance-none"
-            style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='rgba(255,255,255,0.4)'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center', backgroundSize: '16px' }}
-          >
-            <option value="" className="bg-[#0a0a0a]">Selecionar cliente</option>
-            {clients.map(c => (
-              <option key={c.id} value={c.id} className="bg-[#0a0a0a]">{c.name}</option>
-            ))}
-          </select>
-        </div>
-
-        <div>
-          <label className="text-xs text-white/50 uppercase tracking-wider">Viagem</label>
-          <select
-            value={formData.tripId}
-            onChange={(e) => setFormData({ ...formData, tripId: e.target.value })}
-            className="w-full mt-1 px-4 py-3 rounded-xl bg-[#0a0a0a] border border-white/[0.08] text-white focus:outline-none focus:border-[#5de0e6]/50 appearance-none"
-            style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='rgba(255,255,255,0.4)'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center', backgroundSize: '16px' }}
-          >
-            <option value="" className="bg-[#0a0a0a]">Selecionar viagem</option>
-            {trips.map(t => (
-              <option key={t.id} value={t.id} className="bg-[#0a0a0a]">{t.name} - {t.clientName}</option>
-            ))}
-          </select>
-        </div>
-
-        <label className="flex items-center gap-3 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={formData.isPrivate}
-            onChange={(e) => setFormData({ ...formData, isPrivate: e.target.checked })}
-            className="w-4 h-4 rounded border-white/20 bg-white/5 text-[#5de0e6] focus:ring-[#5de0e6]/50"
-          />
-          <span className="text-sm text-white/70">Documento privado (nao aparece no link compartilhavel)</span>
-        </label>
-
-        <Button 
-          onClick={handleUpload} 
-          disabled={!formData.name}
-          className="w-full bg-gradient-to-r from-[#5de0e6] to-[#004aad] hover:opacity-90 text-white border-0 disabled:opacity-50"
-        >
-          Enviar Documento
         </Button>
       </div>
     </Modal>
@@ -433,9 +309,8 @@ function GenerateItineraryModal({ open, onClose, clients, trips, onGenerate }: {
 export default function AgencyDashboard() {
   const router = useRouter()
   const { user, profile } = useAuth()
-  const { clients, trips, credits, activities, conciergeRequests, addClient, addDocument, useCredits, isUsingRealData, setupIncomplete, workspaceError } = useAgency()
+  const { clients, trips, credits, activities, conciergeRequests, addClient, useCredits, setupIncomplete, workspaceError } = useAgency()
   const [newClientOpen, setNewClientOpen] = useState(false)
-  const [uploadDocOpen, setUploadDocOpen] = useState(false)
   const [generateItineraryOpen, setGenerateItineraryOpen] = useState(false)
   const [agencyName, setAgencyName] = useState(profile?.name || "Agencia")
 
@@ -477,23 +352,6 @@ export default function AgencyDashboard() {
       return false
     }
     return true
-  }
-
-  const handleUploadDoc = async (data: { name: string; type: string; clientId?: string; tripId?: string; isPrivate: boolean }) => {
-    const created = await addDocument({
-      name: data.name,
-      type: data.type as any,
-      clientId: data.clientId,
-      tripId: data.tripId,
-      isPrivate: data.isPrivate
-    })
-
-    if (!created && isUsingRealData) {
-      window.alert("Nenhum dado real ainda foi salvo nesta acao. Verifique o upload de arquivo da area de documentos da agencia.")
-      return false
-    }
-
-    return Boolean(created)
   }
 
   const handleGenerateItinerary = () => {
@@ -726,7 +584,7 @@ export default function AgencyDashboard() {
           {[
             { icon: Plane, label: "Nova Viagem", action: () => router.push("/agencia/viagens/criar"), gradient: "from-primary to-accent" },
             { icon: Users, label: "Novo Cliente", action: () => setNewClientOpen(true), gradient: "from-accent to-primary" },
-            { icon: FileText, label: "Upload Doc", action: () => setUploadDocOpen(true), gradient: "from-primary/80 to-accent/80" },
+            { icon: FileText, label: "Upload Doc", action: () => router.push("/agencia/documentos"), gradient: "from-primary/80 to-accent/80" },
             { icon: Sparkles, label: "Gerar Roteiro", action: () => setGenerateItineraryOpen(true), gradient: "from-accent/80 to-primary/80" },
             { icon: MessageSquare, label: "Concierge", action: () => router.push("/agencia/concierge"), gradient: "from-primary to-accent" },
           ].map((action, index) => (
@@ -805,13 +663,6 @@ export default function AgencyDashboard() {
         open={newClientOpen} 
         onClose={() => setNewClientOpen(false)} 
         onSave={handleNewClient} 
-      />
-      <UploadDocModal 
-        open={uploadDocOpen} 
-        onClose={() => setUploadDocOpen(false)} 
-        clients={clients}
-        trips={trips}
-        onSave={handleUploadDoc} 
       />
       <GenerateItineraryModal 
         open={generateItineraryOpen} 

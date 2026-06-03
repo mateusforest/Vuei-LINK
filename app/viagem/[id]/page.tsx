@@ -10,6 +10,7 @@ import { shouldUseSupabase } from "@/lib/data-source"
 import { getTripByAdminToken, getTripByPublicToken, getTripBySlug } from "@/lib/repositories/trips-repository"
 import { createDocumentMetadata, getSignedDocumentUrl, listDocumentsByTrip, listPublicTripDocuments, uploadDocumentFile } from "@/lib/repositories/documents-repository"
 import { createTripHotel, deleteTripHotel, listTripHotels, updateTripHotel } from "@/lib/repositories/trip-hotels-repository"
+import { addMessage as addAiMessage, createConversation, listConversationsByTrip, listMessages } from "@/lib/repositories/ai-repository"
 import { validateDocumentFile } from "@/lib/files/file-validation"
 import { getDestinationCoverImage, getDestinationMetadata } from "@/lib/trip-destination"
 import { useAuth } from "@/contexts/auth-context"
@@ -2201,7 +2202,10 @@ function ConciergeSection({ tripData, onOpenCredits }: { tripData: any; onOpenCr
     { role: "assistant", content: `Ola! Sou o concierge da sua viagem para ${tripData.destination}. Posso ajudar com informacoes reais que ja estejam adicionadas.` }
   ])
   const [typing, setTyping] = useState(false)
-  const { isAdmin } = useContext(PermissionContext)
+  const [conversationId, setConversationId] = useState<string | null>(null)
+  const { isAdmin, canWrite } = useContext(PermissionContext)
+  const { user, profile } = useAuth()
+  const { showToast } = useToast()
   const hasFlights = Array.isArray(tripData.flights) && tripData.flights.length > 0
   const hasHotel = Boolean(tripData.hotel)
   const hasItinerary = Array.isArray(tripData.itinerary) && tripData.itinerary.length > 0
@@ -2210,7 +2214,45 @@ function ConciergeSection({ tripData, onOpenCredits }: { tripData: any; onOpenCr
     setMessages([
       { role: "assistant", content: `Ola! Sou o concierge da sua viagem para ${tripData.destination}. Posso ajudar com informacoes reais que ja estejam adicionadas.` }
     ])
+    setConversationId(null)
   }, [tripData.destination])
+
+  useEffect(() => {
+    if (!shouldUseSupabase() || !tripData?.id) return
+
+    let active = true
+
+    const loadConversation = async () => {
+      const conversationsResult = await listConversationsByTrip(tripData.id)
+      if (!active || !conversationsResult.data.length) return
+
+      const conciergeConversation =
+        conversationsResult.data.find((conversation) => conversation.channel === "concierge") ??
+        conversationsResult.data[0]
+
+      if (!conciergeConversation) return
+
+      const messagesResult = await listMessages(conciergeConversation.id)
+      if (!active) return
+
+      setConversationId(conciergeConversation.id)
+
+      if (messagesResult.data.length === 0) return
+
+      setMessages(
+        messagesResult.data.map((entry) => ({
+          role: entry.role === "user" ? "user" : "assistant",
+          content: entry.content,
+        }))
+      )
+    }
+
+    void loadConversation()
+
+    return () => {
+      active = false
+    }
+  }, [tripData?.id])
 
   const suggestions = [
     "Mostrar hospedagem",
@@ -2219,35 +2261,95 @@ function ConciergeSection({ tripData, onOpenCredits }: { tripData: any; onOpenCr
     "Mostrar documentos"
   ]
 
-  const handleSend = () => {
+  const buildResponse = (userMessage: string) => {
+    let response = "Ainda nao encontrei dados reais suficientes nessa viagem para responder com precisao."
+
+    if (userMessage.includes("hosped")) {
+      response = hasHotel
+        ? `Sua hospedagem atual e ${tripData.hotel.name}. Check-in: ${tripData.hotel.checkIn}. Check-out: ${tripData.hotel.checkOut}.`
+        : "Ainda nao ha hospedagem real adicionada."
+    } else if (userMessage.includes("roteiro")) {
+      response = hasItinerary
+        ? `Seu roteiro possui ${tripData.itinerary.length} dias planejados. Abra a secao de roteiro para ver os detalhes reais.`
+        : "Ainda nao ha roteiro real criado."
+    } else if (userMessage.includes("passag")) {
+      response = hasFlights
+        ? `Sua viagem possui ${tripData.flights.length} passagem(ns) adicionada(s).`
+        : "Ainda nao ha passagens reais adicionadas."
+    } else if (userMessage.includes("document")) {
+      response = Array.isArray(tripData.documents) && tripData.documents.length > 0
+        ? `Sua viagem possui ${tripData.documents.length} documento(s) real(is) cadastrado(s).`
+        : "Ainda nao ha documentos reais adicionados."
+    }
+
+    return response
+  }
+
+  const handleSend = async () => {
     if (!message.trim()) return
-    
-    setMessages(prev => [...prev, { role: "user", content: message }])
-    const userMessage = message.toLowerCase()
+
+    const userMessage = message
+    const normalizedUserMessage = userMessage.toLowerCase()
+    setMessages((prev) => [...prev, { role: "user", content: userMessage }])
     setMessage("")
     setTyping(true)
-    
-    setTimeout(() => {
-      let response = "Ainda nao encontrei dados reais suficientes nessa viagem para responder com precisao."
 
-      if (userMessage.includes("hosped")) {
-        response = hasHotel
-          ? `Sua hospedagem atual e ${tripData.hotel.name}. Check-in: ${tripData.hotel.checkIn}. Check-out: ${tripData.hotel.checkOut}.`
-          : "Ainda nao ha hospedagem real adicionada."
-      } else if (userMessage.includes("roteiro")) {
-        response = hasItinerary
-          ? `Seu roteiro possui ${tripData.itinerary.length} dias planejados. Abra a secao de roteiro para ver os detalhes reais.`
-          : "Ainda nao ha roteiro real criado."
-      } else if (userMessage.includes("passag")) {
-        response = hasFlights
-          ? `Sua viagem possui ${tripData.flights.length} passagem(ns) adicionada(s).`
-          : "Ainda nao ha passagens reais adicionadas."
-      } else if (userMessage.includes("document")) {
-        response = Array.isArray(tripData.documents) && tripData.documents.length > 0
-          ? `Sua viagem possui ${tripData.documents.length} documento(s) real(is) cadastrado(s).`
-          : "Ainda nao ha documentos reais adicionados."
+    const response = buildResponse(normalizedUserMessage)
+
+    window.setTimeout(async () => {
+      let nextConversationId = conversationId
+
+      if (shouldUseSupabase() && canWrite && user?.id && tripData?.id) {
+        if (!nextConversationId) {
+          const conversationResult = await createConversation({
+            tripId: tripData.id,
+            userId: user.id,
+            agencyId: profile?.agencyId ?? tripData.agencyId ?? null,
+            clientId: tripData.clientId ?? null,
+            channel: "concierge",
+            metadata: {
+              origin: "trip-link",
+            },
+          })
+
+          if (conversationResult.data) {
+            nextConversationId = conversationResult.data.id
+            setConversationId(conversationResult.data.id)
+          }
+        }
+
+        if (nextConversationId) {
+          await addAiMessage({
+            conversationId: nextConversationId,
+            tripId: tripData.id,
+            userId: user.id,
+            agencyId: profile?.agencyId ?? tripData.agencyId ?? null,
+            clientId: tripData.clientId ?? null,
+            role: "user",
+            content: userMessage,
+            metadata: {
+              origin: "trip-link",
+            },
+          })
+
+          await addAiMessage({
+            conversationId: nextConversationId,
+            tripId: tripData.id,
+            userId: user.id,
+            agencyId: profile?.agencyId ?? tripData.agencyId ?? null,
+            clientId: tripData.clientId ?? null,
+            role: "assistant",
+            content: response,
+            metadata: {
+              origin: "trip-link",
+            },
+          })
+        }
+      } else if (shouldUseSupabase()) {
+        showToast("O historico do concierge so sincroniza com a agencia quando a conta proprietaria esta autenticada.", "info")
       }
-      setMessages(prev => [...prev, { role: "assistant", content: response }])
+
+      setMessages((prev) => [...prev, { role: "assistant", content: response }])
       setTyping(false)
     }, 1500)
   }
@@ -3195,6 +3297,8 @@ export default function TripPage() {
               slug: repositoryTrip.data.slug,
               name: repositoryTrip.data.title,
               destination: repositoryTrip.data.destination,
+              agencyId: repositoryTrip.data.agencyId ?? null,
+              clientId: repositoryTrip.data.clientId ?? null,
               country: repositoryTrip.data.country ?? undefined,
               city: repositoryTrip.data.city ?? undefined,
               startDate: repositoryTrip.data.startDate ?? undefined,

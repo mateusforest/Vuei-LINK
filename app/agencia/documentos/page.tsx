@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useRef, useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import {
   Search,
@@ -16,7 +16,6 @@ import {
   Eye,
   Shield,
   X,
-  Check,
   FolderOpen,
 } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
@@ -38,6 +37,8 @@ import {
 } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { useAgency, type AgencyDocument } from "@/contexts/agency-context"
+import { getSignedDocumentUrl, updateDocumentMetadata } from "@/lib/repositories/documents-repository"
+import { validateDocumentFile } from "@/lib/files/file-validation"
 
 const documentTypes = [
   { value: "all", label: "Todos" },
@@ -63,13 +64,16 @@ const getFileIcon = (type: string) => {
 }
 
 export default function DocumentsPage() {
-  const { documents, clients, trips, addDocument, deleteDocument, getClientById, getTripById, isUsingRealData } = useAgency()
+  const { documents, clients, trips, addDocument, deleteDocument, getClientById, getTripById, isUsingRealData, workspaceError } = useAgency()
   const [searchQuery, setSearchQuery] = useState("")
   const [filter, setFilter] = useState("all")
   const [privacyFilter, setPrivacyFilter] = useState<"all" | "private" | "shared">("all")
   const [uploadModalOpen, setUploadModalOpen] = useState(false)
   const [dragOver, setDragOver] = useState(false)
   const [uploading, setUploading] = useState(false)
+  const [actionError, setActionError] = useState("")
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
   const [uploadData, setUploadData] = useState({
     name: "",
     type: "voucher" as AgencyDocument["type"],
@@ -94,31 +98,83 @@ export default function DocumentsPage() {
   })
 
   const handleUpload = async () => {
-    if (!uploadData.name) return
+    if (!uploadData.name || !selectedFile) return
     setUploading(true)
+    setActionError("")
     const created = await addDocument({
       name: uploadData.name,
       type: uploadData.type,
       clientId: uploadData.clientId || undefined,
       tripId: uploadData.tripId || undefined,
-      isPrivate: uploadData.isPrivate
+      isPrivate: uploadData.isPrivate,
+      visibility: uploadData.isPrivate ? "private" : "agency_only",
+      file: selectedFile,
     })
     setUploading(false)
     if (created) {
       setUploadModalOpen(false)
+      setSelectedFile(null)
       setUploadData({ name: "", type: "voucher", clientId: "", tripId: "", isPrivate: false })
       return
     }
 
-    if (isUsingRealData) {
-      window.alert("Nenhum dado real ainda foi salvo nesta area. O upload real da agencia depende do envio de arquivo nesta etapa.")
-    }
+    setActionError(workspaceError || "Nao foi possivel enviar o documento.")
   }
 
   const handleDelete = async (id: string) => {
     if (confirm("Tem certeza que deseja excluir este documento?")) {
       await deleteDocument(id)
     }
+  }
+
+  const handleSelectFile = (file?: File | null) => {
+    if (!file) return
+    const validation = validateDocumentFile(file)
+    if (!validation.valid) {
+      setActionError(validation.error || "Arquivo invalido.")
+      return
+    }
+
+    setActionError("")
+    setSelectedFile(file)
+    setUploadData((prev) => ({ ...prev, name: prev.name || file.name }))
+  }
+
+  const handleOpenDocument = async (doc: AgencyDocument) => {
+    if (doc.filePath && isUsingRealData) {
+      const result = await getSignedDocumentUrl(doc.filePath)
+      if (!result.data) {
+        setActionError(result.error || "Nao foi possivel abrir o documento.")
+        return
+      }
+
+      window.open(result.data, "_blank", "noopener,noreferrer")
+      return
+    }
+
+    if (doc.fileUrl) {
+      window.open(doc.fileUrl, "_blank", "noopener,noreferrer")
+      return
+    }
+
+    setActionError("Documento sem arquivo disponivel para visualizacao.")
+  }
+
+  const handleTogglePrivacy = async (doc: AgencyDocument) => {
+    if (!isUsingRealData) return
+
+    const nextPrivate = !doc.isPrivate
+    const result = await updateDocumentMetadata(doc.id, {
+      isPrivate: nextPrivate,
+      visibility: nextPrivate ? "private" : "agency_only",
+    })
+
+    if (!result.data) {
+      setActionError(result.error || "Nao foi possivel atualizar a privacidade do documento.")
+      return
+    }
+
+    window.location.reload()
   }
 
   const formatDate = (dateStr: string) => {
@@ -159,6 +215,12 @@ export default function DocumentsPage() {
       </Card>
 
       {/* Search and Filters */}
+      {actionError ? (
+        <Card className="border-red-500/20 bg-red-500/5">
+          <CardContent className="p-4 text-sm text-red-300">{actionError}</CardContent>
+        </Card>
+      ) : null}
+
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -280,10 +342,10 @@ export default function DocumentsPage() {
                     </div>
 
                     <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground">
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground" onClick={() => void handleOpenDocument(doc)}>
                         <Eye className="h-4 w-4" />
                       </Button>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground">
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground" onClick={() => void handleOpenDocument(doc)}>
                         <Download className="h-4 w-4" />
                       </Button>
                       <DropdownMenu>
@@ -293,7 +355,7 @@ export default function DocumentsPage() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="border-white/10 bg-card">
-                          <DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => void handleTogglePrivacy(doc)}>
                             {doc.isPrivate ? (
                               <>
                                 <Unlock className="mr-2 h-4 w-4" />
@@ -344,20 +406,19 @@ export default function DocumentsPage() {
               onDrop={(e) => {
                 e.preventDefault()
                 setDragOver(false)
-                if (isUsingRealData) {
-                  window.alert("Upload real desta area ainda depende da selecao de arquivo nesta etapa.")
-                  return
-                }
-                setUploadData({ ...uploadData, name: "documento-upload.pdf" })
+                handleSelectFile(e.dataTransfer.files?.[0])
               }}
               onClick={() => {
-                if (isUsingRealData) {
-                  window.alert("Upload real desta area ainda depende da selecao de arquivo nesta etapa.")
-                  return
-                }
-                setUploadData({ ...uploadData, name: "documento-upload.pdf" })
+                fileInputRef.current?.click()
               }}
             >
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".pdf,.png,.jpg,.jpeg"
+                className="hidden"
+                onChange={(e) => handleSelectFile(e.target.files?.[0])}
+              />
               {uploading ? (
                 <div className="flex flex-col items-center gap-3">
                   <div className="w-8 h-8 border-2 border-white/30 border-t-primary rounded-full animate-spin" />
@@ -370,9 +431,9 @@ export default function DocumentsPage() {
                   </div>
                   <p className="text-sm font-medium text-foreground">{uploadData.name}</p>
                   <Button 
-                    variant="ghost" 
+                    variant="ghost"
                     size="sm" 
-                    onClick={(e) => { e.stopPropagation(); setUploadData({ ...uploadData, name: "" }) }}
+                    onClick={(e) => { e.stopPropagation(); setUploadData({ ...uploadData, name: "" }); setSelectedFile(null) }}
                     className="text-xs text-muted-foreground"
                   >
                     <X className="w-3 h-3 mr-1" />
@@ -458,7 +519,7 @@ export default function DocumentsPage() {
               </Button>
               <Button 
                 onClick={handleUpload}
-                disabled={!uploadData.name || uploading}
+                disabled={!uploadData.name || !selectedFile || uploading}
                 className="flex-1 bg-gradient-to-r from-primary to-accent text-white disabled:opacity-50"
               >
                 <Upload className="mr-2 h-4 w-4" />

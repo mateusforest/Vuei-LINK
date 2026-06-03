@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { usePathname } from "next/navigation"
@@ -41,9 +41,6 @@ import {
 import { AgencyProvider, useAgency } from "@/contexts/agency-context"
 import { RouteGuard } from "@/components/auth/route-guard"
 import { useAuth } from "@/contexts/auth-context"
-import { getAgencyByOwner } from "@/lib/repositories/agencies-repository"
-import { withTimeout } from "@/lib/async/with-timeout"
-import type { Agency } from "@/types"
 
 const navItems = [
   { href: "/agencia", icon: LayoutDashboard, label: "Dashboard" },
@@ -74,9 +71,8 @@ function AgencyLayoutInner({ children }: { children: React.ReactNode }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [notificationsOpen, setNotificationsOpen] = useState(false)
-  const { user, profile } = useAuth()
-  const { credits, conciergeRequests } = useAgency()
-  const [agencyProfile, setAgencyProfile] = useState<Agency | null>(null)
+  const { profile } = useAuth()
+  const { credits, conciergeRequests, agency } = useAgency()
   const [agencyNotifications, setAgencyNotifications] = useState([
     {
       id: "agency-notification-1",
@@ -106,43 +102,14 @@ function AgencyLayoutInner({ children }: { children: React.ReactNode }) {
   
   const pendingRequests = conciergeRequests.filter(r => r.status === "pending").length
   const unreadNotifications = agencyNotifications.filter((notification) => !notification.read).length
-  const displayName = agencyProfile?.name || profile?.name || "Agencia"
-  const displayPlan = agencyProfile?.plan ? agencyProfile.plan[0].toUpperCase() + agencyProfile.plan.slice(1) : "Agency"
+  const displayName = agency?.name || profile?.name || "Agencia"
+  const displayPlan = agency?.plan ? agency.plan[0].toUpperCase() + agency.plan.slice(1) : "Agency"
   const initials = displayName
     .split(" ")
     .filter(Boolean)
     .slice(0, 2)
     .map((part) => part[0]?.toUpperCase() ?? "")
     .join("") || "AG"
-
-  useEffect(() => {
-    if (!user?.id) return
-
-    let active = true
-
-    const loadAgency = async () => {
-      try {
-        const result = await withTimeout(getAgencyByOwner(user.id), 10_000, "Agency bootstrap timeout.")
-        if (active) {
-          setAgencyProfile(result.data)
-          console.log("[BOOT] agency loaded", result.data?.id ?? null)
-        }
-      } catch (error) {
-        const message = error instanceof Error ? error.message : "Falha ao carregar agencia."
-        console.error("[AUTH ERROR]", message)
-        if (active) {
-          setAgencyProfile(null)
-          console.log("[BOOT] agency loaded", null)
-        }
-      }
-    }
-
-    void loadAgency()
-
-    return () => {
-      active = false
-    }
-  }, [user?.id])
 
   const markAgencyNotificationRead = (id: string) => {
     setAgencyNotifications((prev) => prev.map((notification) => notification.id === id ? { ...notification, read: true } : notification))
@@ -351,8 +318,8 @@ function AgencyLayoutInner({ children }: { children: React.ReactNode }) {
                 </div>
               </DropdownMenuContent>
             </DropdownMenu>
-            <Avatar className="h-8 w-8 border border-white/10">
-              <AvatarImage src={profile?.avatarUrl ?? "/placeholder.svg"} />
+              <Avatar className="h-8 w-8 border border-white/10">
+              <AvatarImage src={agency?.logo || agency?.branding?.logoUrl || profile?.avatarUrl || "/placeholder.svg"} />
               <AvatarFallback className="bg-primary/20 text-xs text-primary">{initials}</AvatarFallback>
             </Avatar>
           </div>
@@ -515,7 +482,7 @@ function AgencyLayoutInner({ children }: { children: React.ReactNode }) {
                 <div className="text-xs text-muted-foreground">{displayPlan}</div>
               </div>
               <Avatar className="h-10 w-10 border-2 border-primary/30">
-                <AvatarImage src={profile?.avatarUrl ?? "/placeholder.svg"} />
+                <AvatarImage src={agency?.logo || agency?.branding?.logoUrl || profile?.avatarUrl || "/placeholder.svg"} />
                 <AvatarFallback className="bg-primary/20 text-primary">{initials}</AvatarFallback>
               </Avatar>
             </div>

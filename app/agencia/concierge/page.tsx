@@ -39,7 +39,7 @@ const quickReplies = [
 ]
 
 export default function ConciergePage() {
-  const { conciergeRequests, respondToRequest, resolveRequest, trips } = useAgency()
+  const { conciergeRequests, respondToRequest, resolveRequest, trips, isUsingRealData } = useAgency()
   const [selectedRequest, setSelectedRequest] = useState<ConciergeRequest | null>(
     conciergeRequests.length > 0 ? conciergeRequests[0] : null
   )
@@ -55,6 +55,20 @@ export default function ConciergePage() {
   useEffect(() => {
     scrollToBottom()
   }, [localMessages, selectedRequest])
+
+  useEffect(() => {
+    if (!selectedRequest && conciergeRequests.length > 0) {
+      setSelectedRequest(conciergeRequests[0])
+      return
+    }
+
+    if (selectedRequest) {
+      const refreshedRequest = conciergeRequests.find((request) => request.id === selectedRequest.id)
+      if (refreshedRequest) {
+        setSelectedRequest(refreshedRequest)
+      }
+    }
+  }, [conciergeRequests, selectedRequest])
 
   const filteredRequests = conciergeRequests.filter(
     (req) =>
@@ -91,23 +105,27 @@ export default function ConciergePage() {
 
   const handleSendMessage = () => {
     if (!messageInput.trim() || !selectedRequest) return
-    
+
+    // If first response, update the request status
+    if (selectedRequest.status === "pending") {
+      respondToRequest(selectedRequest.id, messageInput)
+      if (isUsingRealData) {
+        setMessageInput("")
+        return
+      }
+    }
+
     const newMessage: Message = {
       id: `msg-${Date.now()}`,
       type: "agent",
       text: messageInput,
       time: new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
     }
-    
+
     setLocalMessages(prev => ({
       ...prev,
       [selectedRequest.id]: [...(prev[selectedRequest.id] || []), newMessage]
     }))
-
-    // If first response, update the request status
-    if (selectedRequest.status === "pending") {
-      respondToRequest(selectedRequest.id, messageInput)
-    }
     
     setMessageInput("")
   }

@@ -22,6 +22,11 @@ export interface DocumentMetadataPayload {
   aiExtractedData?: Record<string, unknown> | null
 }
 
+interface UploadDocumentFilePayload {
+  file: File
+  path: string
+}
+
 interface DocumentsRepositoryPayload {
   schemaVersion: number
   documents: Document[]
@@ -293,6 +298,13 @@ export async function updateDocumentMetadata(id: string, payload: Partial<Docume
 
       return { source: "supabase" as const, data: data ? mapDocumentRowToDocument(data) : null, error: null }
     }
+
+    return {
+      source: "supabase-placeholder" as const,
+      config: createSupabaseBrowserClientPlaceholder(),
+      data: null as Document | null,
+      error: "Supabase browser client indisponivel.",
+    }
   }
 
   const documents = readLocalDocuments()
@@ -328,6 +340,13 @@ export async function deleteDocument(id: string) {
 
       return { source: "supabase" as const, success: true, error: null }
     }
+
+    return {
+      source: "supabase-placeholder" as const,
+      config: createSupabaseBrowserClientPlaceholder(),
+      success: false,
+      error: "Supabase browser client indisponivel.",
+    }
   }
 
   const documents = readLocalDocuments().filter((document) => document.id !== id)
@@ -336,8 +355,10 @@ export async function deleteDocument(id: string) {
   return { source: "local" as const, success: true, error: null }
 }
 
-export async function uploadDocumentFile(file: File, path: string) {
+export async function uploadDocumentFile(fileOrPayload: File | UploadDocumentFilePayload, legacyPath?: string) {
   console.log("[UPLOAD] started")
+  const file = fileOrPayload instanceof File ? fileOrPayload : fileOrPayload.file
+  const path = fileOrPayload instanceof File ? legacyPath ?? "" : fileOrPayload.path
 
   if (shouldUseSupabase()) {
     const client = createSupabaseBrowserClient()
