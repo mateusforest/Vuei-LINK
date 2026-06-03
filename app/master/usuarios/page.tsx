@@ -34,7 +34,7 @@ function getRoleLabel(type: "traveler" | "agency" | "admin") {
 function MasterUsuariosPageContent() {
   const searchParams = useSearchParams()
   const highlightId = searchParams.get("id")
-  const { users, stats } = useMaster()
+  const { users, stats, dataErrors } = useMaster()
   const [searchQuery, setSearchQuery] = useState("")
   const [typeFilter, setTypeFilter] = useState("all")
   const [showDetailsModal, setShowDetailsModal] = useState<string | null>(highlightId)
@@ -136,6 +136,15 @@ function MasterUsuariosPageContent() {
         <h1 className="text-2xl lg:text-3xl font-bold text-foreground tracking-tight">Usuarios</h1>
         <p className="text-sm text-muted-foreground">Leitura real de profiles e roles do Supabase</p>
       </motion.div>
+
+      {dataErrors.profiles ? (
+        <motion.div variants={fadeInUp}>
+          <Card className="border-red-500/20 bg-red-500/5 p-4">
+            <p className="text-sm font-medium text-foreground">Falha ao carregar usuarios reais</p>
+            <p className="mt-1 text-xs text-muted-foreground">{dataErrors.profiles}</p>
+          </Card>
+        </motion.div>
+      ) : null}
 
       <motion.div variants={fadeInUp} className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {pageStats.map((stat) => (

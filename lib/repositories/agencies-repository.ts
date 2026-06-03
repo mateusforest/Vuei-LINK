@@ -473,6 +473,13 @@ export async function listAllAgencyMembers() {
         error: null,
       }
     }
+
+    return {
+      source: "supabase-placeholder" as const,
+      data: [] as AgencyMember[],
+      error: "Supabase browser client indisponivel.",
+      config: createSupabaseBrowserClientPlaceholder(),
+    }
   }
 
   const agency = buildAgency()

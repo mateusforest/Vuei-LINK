@@ -33,7 +33,7 @@ function formatDate(dateStr: string) {
 }
 
 export default function MasterOverviewPage() {
-  const { stats, agencies, users, trips, activities } = useMaster()
+  const { stats, agencies, users, trips, activities, dataErrors } = useMaster()
 
   const overviewCards = [
     { label: "Usuarios", value: stats.totalUsers, icon: Users, href: "/master/usuarios" },
@@ -53,6 +53,16 @@ export default function MasterOverviewPage() {
         <h1 className="text-2xl lg:text-3xl font-bold text-foreground tracking-tight">Overview</h1>
         <p className="text-sm text-muted-foreground">Leitura operacional real do Vuei no Supabase</p>
       </motion.div>
+
+      {dataErrors.profiles || dataErrors.agencies ? (
+        <motion.div variants={fadeInUp}>
+          <Card className="border-red-500/20 bg-red-500/5 p-4">
+            <p className="text-sm font-medium text-foreground">Falha ao carregar dados do Master</p>
+            {dataErrors.profiles ? <p className="mt-1 text-xs text-muted-foreground">Usuarios: {dataErrors.profiles}</p> : null}
+            {dataErrors.agencies ? <p className="mt-1 text-xs text-muted-foreground">Agencias: {dataErrors.agencies}</p> : null}
+          </Card>
+        </motion.div>
+      ) : null}
 
       <motion.div variants={fadeInUp} className="grid grid-cols-2 lg:grid-cols-5 gap-4">
         {overviewCards.map((card) => (

@@ -28,7 +28,7 @@ function formatDate(dateStr: string) {
 function MasterAgenciasPageContent() {
   const searchParams = useSearchParams()
   const highlightId = searchParams.get("id")
-  const { agencies, stats } = useMaster()
+  const { agencies, stats, dataErrors } = useMaster()
   const [searchQuery, setSearchQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
   const [showDetailsModal, setShowDetailsModal] = useState<string | null>(highlightId)
@@ -136,6 +136,15 @@ function MasterAgenciasPageContent() {
         <h1 className="text-2xl lg:text-3xl font-bold text-foreground tracking-tight">Agencias</h1>
         <p className="text-sm text-muted-foreground">Leitura real de agências e memberships do Supabase</p>
       </motion.div>
+
+      {dataErrors.agencies ? (
+        <motion.div variants={fadeInUp}>
+          <Card className="border-red-500/20 bg-red-500/5 p-4">
+            <p className="text-sm font-medium text-foreground">Falha ao carregar agencias reais</p>
+            <p className="mt-1 text-xs text-muted-foreground">{dataErrors.agencies}</p>
+          </Card>
+        </motion.div>
+      ) : null}
 
       <motion.div variants={fadeInUp} className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {pageStats.map((stat) => (

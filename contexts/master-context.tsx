@@ -165,6 +165,14 @@ interface MasterContextType {
   agencies: Agency[]
   users: User[]
   trips: MasterTrip[]
+  dataErrors: {
+    profiles: string | null
+    agencies: string | null
+    agencyMembers: string | null
+    clients: string | null
+    trips: string | null
+    documents: string | null
+  }
   conciergeRequests: ConciergeRequest[]
   aiPrompts: AIPrompt[]
   templates: Template[]
@@ -240,6 +248,15 @@ const INITIAL_STATE: MasterState = {
   trips: [],
   activities: [],
   stats: EMPTY_STATS,
+}
+
+const EMPTY_DATA_ERRORS = {
+  profiles: null,
+  agencies: null,
+  agencyMembers: null,
+  clients: null,
+  trips: null,
+  documents: null,
 }
 
 function noopWithLog(action: string) {
@@ -433,6 +450,7 @@ export function MasterProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<MasterState>(INITIAL_STATE)
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [settings, setSettings] = useState<MasterSettings>(INITIAL_SETTINGS)
+  const [dataErrors, setDataErrors] = useState(EMPTY_DATA_ERRORS)
 
   useEffect(() => {
     let active = true
@@ -443,6 +461,7 @@ export function MasterProvider({ children }: { children: ReactNode }) {
       if (!shouldUseSupabase()) {
         if (!active) return
         setState(INITIAL_STATE)
+        setDataErrors(EMPTY_DATA_ERRORS)
         setNotifications([
           {
             id: "master-no-supabase",
@@ -459,6 +478,7 @@ export function MasterProvider({ children }: { children: ReactNode }) {
       if (!user || profile?.role !== "master") {
         if (!active) return
         setState(INITIAL_STATE)
+        setDataErrors(EMPTY_DATA_ERRORS)
         setNotifications([])
         return
       }
@@ -473,6 +493,23 @@ export function MasterProvider({ children }: { children: ReactNode }) {
       ])
 
       if (!active) return
+
+      const nextErrors = {
+        profiles: profilesResult.error,
+        agencies: agenciesResult.error,
+        agencyMembers: membersResult.error,
+        clients: clientsResult.error,
+        trips: tripsResult.error,
+        documents: documentsResult.error,
+      }
+
+      if (nextErrors.profiles) {
+        console.error("[MASTER] profiles read error", nextErrors.profiles)
+      }
+
+      if (nextErrors.agencies) {
+        console.error("[MASTER] agencies read error", nextErrors.agencies)
+      }
 
       const nextState = buildMasterState({
         profiles: profilesResult.data ?? [],
@@ -547,6 +584,7 @@ export function MasterProvider({ children }: { children: ReactNode }) {
       ].filter((notification): notification is Notification => Boolean(notification))
 
       setState(nextState)
+      setDataErrors(nextErrors)
       setNotifications(nextNotifications)
     }
 
@@ -597,6 +635,7 @@ export function MasterProvider({ children }: { children: ReactNode }) {
         agencies: state.agencies,
         users: state.users,
         trips: state.trips,
+        dataErrors,
         conciergeRequests: [],
         aiPrompts: [],
         templates: [],
