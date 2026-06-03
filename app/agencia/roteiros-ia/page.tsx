@@ -45,6 +45,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { useAgency } from "@/contexts/agency-context"
+import { shouldUseSupabase } from "@/lib/data-source"
 
 const ITINERARIES_STORAGE_KEY = "vuei_agencia_roteiros_ia"
 
@@ -61,6 +62,7 @@ const travelStyles = [
 
 export default function RoteirosIAPage() {
   const { credits, useCredits } = useAgency()
+  const isRealMode = shouldUseSupabase()
   const [isGenerating, setIsGenerating] = useState(false)
   const [generatedItinerary, setGeneratedItinerary] = useState<any>(null)
   const [selectedStyles, setSelectedStyles] = useState<string[]>([])
@@ -77,6 +79,7 @@ export default function RoteirosIAPage() {
 
   useEffect(() => {
     if (typeof window === "undefined") return
+    if (isRealMode) return
 
     const stored = window.localStorage.getItem(ITINERARIES_STORAGE_KEY)
     if (!stored) return
@@ -87,12 +90,13 @@ export default function RoteirosIAPage() {
     } catch {
       setSavedItineraries([])
     }
-  }, [])
+  }, [isRealMode])
 
   useEffect(() => {
     if (typeof window === "undefined") return
+    if (isRealMode) return
     window.localStorage.setItem(ITINERARIES_STORAGE_KEY, JSON.stringify(safeItineraries))
-  }, [safeItineraries])
+  }, [isRealMode, safeItineraries])
 
   const toggleStyle = (styleId: string) => {
     setSelectedStyles(prev => 
@@ -103,6 +107,11 @@ export default function RoteirosIAPage() {
   }
 
   const handleGenerate = async () => {
+    if (isRealMode) {
+      alert("Roteiros IA ainda nao persistem em dados reais nesta fase.")
+      return
+    }
+
     if (credits.balance < 5) {
       alert("Creditos insuficientes. Compre mais creditos para continuar.")
       return
@@ -159,6 +168,11 @@ export default function RoteirosIAPage() {
   }
 
   const handleSaveItinerary = () => {
+    if (isRealMode) {
+      alert("Salvar roteiros IA em modo real ainda nao esta integrado.")
+      return
+    }
+
     if (generatedItinerary) {
       setSavedItineraries((prev) => [
         {
@@ -199,6 +213,14 @@ export default function RoteirosIAPage() {
           {credits.balance} creditos disponiveis
         </Badge>
       </div>
+
+      {isRealMode ? (
+        <Card className="bg-card border-border">
+          <CardContent className="p-4 text-sm text-muted-foreground">
+            Roteiros IA ainda nao persistem em dados reais nesta fase. Esta area permanece apenas como rascunho visual.
+          </CardContent>
+        </Card>
+      ) : null}
 
       <Tabs defaultValue="generate" className="space-y-6">
         <TabsList className="bg-card border border-border">

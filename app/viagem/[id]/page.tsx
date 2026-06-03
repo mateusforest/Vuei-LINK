@@ -2976,7 +2976,7 @@ function CreditsModal({ open, onClose, credits }: { open: boolean; onClose: () =
             {plans.map((plan) => (
               <button
                 key={plan.name}
-                onClick={() => showToast(`${plan.mode} mock iniciado para ${plan.name}.`, "success")}
+                onClick={() => showToast(`Compra de creditos para ${plan.name} ainda nao esta integrada.`, "info")}
                 className={cn(
                   "w-full p-4 rounded-xl border transition-all flex items-center justify-between",
                   plan.popular

@@ -24,6 +24,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { useAgency } from "@/contexts/agency-context"
+import { shouldUseSupabase } from "@/lib/data-source"
 
 const packages = [
   {
@@ -77,10 +78,12 @@ const plans = [
 
 export default function CreditsPage() {
   const { credits, addCredits } = useAgency()
+  const isRealMode = shouldUseSupabase()
   const [purchasing, setPurchasing] = useState<number | null>(null)
   const [upgradeOpen, setUpgradeOpen] = useState(false)
 
   const handlePurchase = async (pkg: typeof packages[0]) => {
+    if (isRealMode) return
     setPurchasing(pkg.id)
     await new Promise(resolve => setTimeout(resolve, 1500))
     addCredits(pkg.credits)
@@ -263,14 +266,16 @@ export default function CreditsPage() {
                         : "border-white/10 bg-white/5 text-foreground hover:bg-white/10"
                     }`}
                     variant={pkg.popular ? "default" : "outline"}
-                    onClick={() => handlePurchase(pkg)}
-                    disabled={purchasing !== null}
+                  onClick={() => handlePurchase(pkg)}
+                    disabled={purchasing !== null || isRealMode}
                   >
                     {purchasing === pkg.id ? (
                       <>
                         <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
                         Processando...
                       </>
+                    ) : isRealMode ? (
+                      "Em breve"
                     ) : (
                       "Comprar"
                     )}
@@ -280,6 +285,11 @@ export default function CreditsPage() {
             </motion.div>
           ))}
         </div>
+        {isRealMode ? (
+          <p className="text-xs text-muted-foreground">
+            Compra de creditos da agencia ainda nao esta integrada ao backend real nesta fase.
+          </p>
+        ) : null}
       </div>
 
       {/* Plans */}

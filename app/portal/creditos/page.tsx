@@ -18,6 +18,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { useTrips } from "@/contexts/trips-context"
+import { shouldUseSupabase } from "@/lib/data-source"
 
 const fadeInUp = {
   initial: { opacity: 0, y: 20 },
@@ -49,6 +50,7 @@ const iconMap: Record<string, typeof MessageCircle> = {
 
 export default function CreditosPage() {
   const { credits, addCredits } = useTrips()
+  const isRealMode = shouldUseSupabase()
   const usedCredits = 200 - credits.balance
   const usagePercentage = (usedCredits / 200) * 100
 
@@ -131,9 +133,9 @@ export default function CreditosPage() {
       <motion.div variants={fadeInUp}>
         <div className="grid grid-cols-3 gap-3">
           {[
-            { label: "Concierge", value: "45", icon: MessageCircle, desc: "perguntas" },
-            { label: "Documentos", value: "3", icon: FileText, desc: "salvos" },
-            { label: "Offline", value: "1", icon: WifiOff, desc: "viagem" },
+            { label: "Concierge", value: isRealMode ? "0" : "45", icon: MessageCircle, desc: isRealMode ? "aguardando integracao" : "perguntas" },
+            { label: "Documentos", value: isRealMode ? "0" : "3", icon: FileText, desc: isRealMode ? "aguardando integracao" : "salvos" },
+            { label: "Offline", value: isRealMode ? "0" : "1", icon: WifiOff, desc: isRealMode ? "aguardando integracao" : "viagem" },
           ].map((stat, index) => (
             <Card key={index} className="p-4 bg-card/50 border-border/50 vuei-glass text-center">
               <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary/10 to-secondary/10 flex items-center justify-center mx-auto mb-2">
@@ -183,14 +185,23 @@ export default function CreditosPage() {
                       ? 'bg-gradient-to-r from-primary to-secondary text-primary-foreground vuei-button-glow' 
                       : 'bg-muted/50 hover:bg-muted'
                   }`}
-                  onClick={() => addCredits(pkg.credits)}
+                  onClick={() => {
+                    if (isRealMode) return
+                    addCredits(pkg.credits)
+                  }}
+                  disabled={isRealMode}
                 >
-                  Comprar
+                  {isRealMode ? "Em breve" : "Comprar"}
                 </Button>
               </div>
             </Card>
           ))}
         </div>
+        {isRealMode ? (
+          <p className="mt-3 text-xs text-muted-foreground">
+            Compra de creditos ainda nao esta integrada ao backend real nesta fase.
+          </p>
+        ) : null}
       </motion.div>
 
       {/* Upgrade to Premium */}
