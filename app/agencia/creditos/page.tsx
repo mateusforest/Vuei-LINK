@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { motion } from "framer-motion"
 import {
   Sparkles,
@@ -25,6 +25,8 @@ import {
 } from "@/components/ui/dialog"
 import { useAgency } from "@/contexts/agency-context"
 import { shouldUseSupabase } from "@/lib/data-source"
+import { getCreditBalance, listCreditTransactions } from "@/lib/repositories/credits-repository"
+import type { CreditTransaction } from "@/types"
 
 const packages = [
   {
@@ -77,10 +79,38 @@ const plans = [
 ]
 
 export default function CreditsPage() {
-  const { credits, addCredits } = useAgency()
+  const { credits, addCredits, agencyId } = useAgency()
   const isRealMode = shouldUseSupabase()
   const [purchasing, setPurchasing] = useState<number | null>(null)
   const [upgradeOpen, setUpgradeOpen] = useState(false)
+  const [realBalance, setRealBalance] = useState<number | null>(null)
+  const [realHistory, setRealHistory] = useState<CreditTransaction[]>([])
+  const [loadError, setLoadError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!isRealMode || !agencyId) return
+
+    let mounted = true
+
+    const loadCredits = async () => {
+      const [balanceResult, historyResult] = await Promise.all([
+        getCreditBalance("agency", agencyId),
+        listCreditTransactions("agency", agencyId),
+      ])
+
+      if (!mounted) return
+
+      setLoadError(balanceResult.error ?? historyResult.error ?? null)
+      setRealBalance(balanceResult.data?.balance ?? 0)
+      setRealHistory(historyResult.data ?? [])
+    }
+
+    void loadCredits()
+
+    return () => {
+      mounted = false
+    }
+  }, [agencyId, isRealMode])
 
   const handlePurchase = async (pkg: typeof packages[0]) => {
     if (isRealMode) return
@@ -90,15 +120,33 @@ export default function CreditsPage() {
     setPurchasing(null)
   }
 
+  const effectiveBalance = isRealMode ? (realBalance ?? 0) : credits.balance
+  const effectiveHistory = useMemo(
+    () =>
+      isRealMode
+        ? realHistory.map((transaction) => ({
+            action: transaction.reason || transaction.type,
+            amount: transaction.amount,
+            date: transaction.createdAt,
+            source: transaction.source || "Supabase",
+            description:
+              typeof transaction.metadata?.description === "string"
+                ? transaction.metadata.description
+                : undefined,
+          }))
+        : credits.history,
+    [credits.history, isRealMode, realHistory],
+  )
+
   // Calculate usage stats
-  const todayUsage = credits.history
+  const todayUsage = effectiveHistory
     .filter(h => {
       const today = new Date().toDateString()
       return new Date(h.date).toDateString() === today && h.amount < 0
     })
     .reduce((sum, h) => sum + Math.abs(h.amount), 0)
 
-  const weekUsage = credits.history
+  const weekUsage = effectiveHistory
     .filter(h => {
       const weekAgo = new Date()
       weekAgo.setDate(weekAgo.getDate() - 7)
@@ -128,19 +176,19 @@ export default function CreditsPage() {
                   Saldo disponivel
                 </div>
                 <div className="mt-2 flex items-baseline gap-2">
-                  <span className="text-4xl font-bold text-foreground">{credits.balance.toLocaleString()}</span>
+                  <span className="text-4xl font-bold text-foreground">{effectiveBalance.toLocaleString()}</span>
                   <span className="text-muted-foreground">creditos</span>
                 </div>
                 <div className="mt-4 h-2 w-64 overflow-hidden rounded-full bg-white/10">
                   <motion.div
                     className="h-full rounded-full bg-gradient-to-r from-primary to-accent"
                     initial={{ width: 0 }}
-                    animate={{ width: `${Math.min((credits.balance / 5000) * 100, 100)}%` }}
+                    animate={{ width: `${Math.min((effectiveBalance / 5000) * 100, 100)}%` }}
                     transition={{ duration: 1, delay: 0.3 }}
                   />
                 </div>
                 <p className="mt-2 text-xs text-muted-foreground">
-                  {Math.round((credits.balance / 5000) * 100)}% do limite maximo
+                  {Math.round((effectiveBalance / 5000) * 100)}% do limite maximo
                 </p>
               </div>
 
@@ -166,6 +214,12 @@ export default function CreditsPage() {
         </Card>
       </motion.div>
 
+      {loadError ? (
+        <Card className="border-red-500/20 bg-red-500/10 p-4 text-sm text-red-300">
+          {loadError}
+        </Card>
+      ) : null}
+
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Usage History */}
         <Card className="border-white/5 bg-card/50 lg:col-span-2">
@@ -176,12 +230,12 @@ export default function CreditsPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
-            {credits.history.length === 0 ? (
+            {effectiveHistory.length === 0 ? (
               <div className="py-8 text-center text-muted-foreground">
                 Nenhum historico ainda
               </div>
             ) : (
-              credits.history.slice(0, 6).map((item, index) => (
+              effectiveHistory.slice(0, 6).map((item, index) => (
                 <motion.div
                   key={index}
                   initial={{ opacity: 0, x: -10 }}
@@ -360,7 +414,7 @@ export default function CreditsPage() {
             <div className="rounded-xl border border-primary/20 bg-primary/5 p-4">
               <p className="text-sm text-muted-foreground">Plano atual</p>
               <p className="text-lg font-semibold text-foreground">Pro</p>
-              <p className="text-sm text-muted-foreground">{credits.balance} creditos disponiveis agora</p>
+              <p className="text-sm text-muted-foreground">{effectiveBalance} creditos disponiveis agora</p>
             </div>
             <div className="grid gap-3 md:grid-cols-2">
               {plans.filter((plan) => !plan.current).map((plan) => (

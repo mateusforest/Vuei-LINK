@@ -345,6 +345,48 @@ export interface Database {
           updated_at?: string
         }
       }
+      credit_transactions: {
+        Row: {
+          id: string
+          owner_type: "traveler" | "agency"
+          owner_user_id: string | null
+          agency_id: string | null
+          type: "grant" | "consume" | "refund" | "adjustment" | "purchase"
+          amount: number
+          balance_after: number | null
+          reason: string | null
+          source: string | null
+          metadata: Json
+          created_at: string
+          created_by: string | null
+        }
+        Insert: {
+          id?: string
+          owner_type: "traveler" | "agency"
+          owner_user_id?: string | null
+          agency_id?: string | null
+          type: "grant" | "consume" | "refund" | "adjustment" | "purchase"
+          amount: number
+          balance_after?: number | null
+          reason?: string | null
+          source?: string | null
+          metadata?: Json
+          created_at?: string
+          created_by?: string | null
+        }
+        Update: {
+          owner_type?: "traveler" | "agency"
+          owner_user_id?: string | null
+          agency_id?: string | null
+          type?: "grant" | "consume" | "refund" | "adjustment" | "purchase"
+          amount?: number
+          balance_after?: number | null
+          reason?: string | null
+          source?: string | null
+          metadata?: Json
+          created_by?: string | null
+        }
+      }
       trip_hotels: {
         Row: {
           id: string

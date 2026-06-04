@@ -1,5 +1,6 @@
 "use client"
 
+import { useEffect, useMemo, useState } from "react"
 import { motion } from "framer-motion"
 import { 
   Coins, 
@@ -19,6 +20,9 @@ import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { useTrips } from "@/contexts/trips-context"
 import { shouldUseSupabase } from "@/lib/data-source"
+import { useAuth } from "@/contexts/auth-context"
+import { getCreditBalance, listCreditTransactions } from "@/lib/repositories/credits-repository"
+import type { CreditTransaction } from "@/types"
 
 const fadeInUp = {
   initial: { opacity: 0, y: 20 },
@@ -50,9 +54,58 @@ const iconMap: Record<string, typeof MessageCircle> = {
 
 export default function CreditosPage() {
   const { credits, addCredits } = useTrips()
+  const { user } = useAuth()
   const isRealMode = shouldUseSupabase()
-  const usedCredits = 200 - credits.balance
-  const usagePercentage = (usedCredits / 200) * 100
+  const [realBalance, setRealBalance] = useState<number | null>(null)
+  const [realHistory, setRealHistory] = useState<CreditTransaction[]>([])
+  const [loadError, setLoadError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!isRealMode || !user?.id) return
+
+    let mounted = true
+
+    const loadCredits = async () => {
+      const [balanceResult, historyResult] = await Promise.all([
+        getCreditBalance("profile", user.id),
+        listCreditTransactions("profile", user.id),
+      ])
+
+      if (!mounted) return
+
+      setLoadError(balanceResult.error ?? historyResult.error ?? null)
+      setRealBalance(balanceResult.data?.balance ?? 0)
+      setRealHistory(historyResult.data ?? [])
+    }
+
+    void loadCredits()
+
+    return () => {
+      mounted = false
+    }
+  }, [isRealMode, user?.id])
+
+  const effectiveBalance = isRealMode ? (realBalance ?? 0) : credits.balance
+  const effectiveHistory = useMemo(
+    () =>
+      isRealMode
+        ? realHistory.map((transaction) => ({
+            action: transaction.reason || transaction.type,
+            amount: transaction.amount,
+            date: transaction.createdAt,
+            source: transaction.source || "Supabase",
+          }))
+        : credits.history,
+    [credits.history, isRealMode, realHistory],
+  )
+
+  const grantedCredits = effectiveHistory.reduce((sum, item) => (item.amount > 0 ? sum + item.amount : sum), 0)
+  const usedCredits = effectiveHistory.reduce((sum, item) => (item.amount < 0 ? sum + Math.abs(item.amount) : sum), 0)
+  const usageBase = Math.max(grantedCredits, effectiveBalance + usedCredits, 1)
+  const usagePercentage = (usedCredits / usageBase) * 100
+  const conciergeUsage = effectiveHistory.filter((item) => (item.source || "").toLowerCase().includes("concierge")).length
+  const documentsUsage = effectiveHistory.filter((item) => (item.source || "").toLowerCase().includes("document")).length
+  const offlineUsage = effectiveHistory.filter((item) => (item.source || "").toLowerCase().includes("offline")).length
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr)
@@ -101,7 +154,7 @@ export default function CreditosPage() {
                 </div>
                 <div className="flex items-baseline gap-3">
                   <span className="text-5xl md:text-6xl font-bold vuei-gradient-text">
-                    {credits.balance}
+                    {effectiveBalance}
                   </span>
                   <span className="text-muted-foreground">creditos</span>
                 </div>
@@ -114,14 +167,14 @@ export default function CreditosPage() {
               {/* Usage Stats */}
               <div className="space-y-3 md:text-right">
                 <div className="flex items-center gap-2 md:justify-end">
-                  <TrendingUp size={14} className="text-muted-foreground" />
-                  <span className="text-sm text-muted-foreground">
-                    {usedCredits} de 200 utilizados
+                    <TrendingUp size={14} className="text-muted-foreground" />
+                    <span className="text-sm text-muted-foreground">
+                    {usedCredits} de {usageBase} utilizados
                   </span>
                 </div>
                 <Progress value={usagePercentage} className="h-2 w-full md:w-48" />
                 <p className="text-xs text-muted-foreground">
-                  Renovacao em 15 Jul 2024
+                  {isRealMode ? "Saldo sincronizado com o Supabase" : "Renovacao em 15 Jul 2024"}
                 </p>
               </div>
             </div>
@@ -133,9 +186,9 @@ export default function CreditosPage() {
       <motion.div variants={fadeInUp}>
         <div className="grid grid-cols-3 gap-3">
           {[
-            { label: "Concierge", value: isRealMode ? "0" : "45", icon: MessageCircle, desc: isRealMode ? "aguardando integracao" : "perguntas" },
-            { label: "Documentos", value: isRealMode ? "0" : "3", icon: FileText, desc: isRealMode ? "aguardando integracao" : "salvos" },
-            { label: "Offline", value: isRealMode ? "0" : "1", icon: WifiOff, desc: isRealMode ? "aguardando integracao" : "viagem" },
+            { label: "Concierge", value: isRealMode ? conciergeUsage.toString() : "45", icon: MessageCircle, desc: isRealMode ? "transacoes" : "perguntas" },
+            { label: "Documentos", value: isRealMode ? documentsUsage.toString() : "3", icon: FileText, desc: isRealMode ? "transacoes" : "salvos" },
+            { label: "Offline", value: isRealMode ? offlineUsage.toString() : "1", icon: WifiOff, desc: isRealMode ? "transacoes" : "viagem" },
           ].map((stat, index) => (
             <Card key={index} className="p-4 bg-card/50 border-border/50 vuei-glass text-center">
               <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary/10 to-secondary/10 flex items-center justify-center mx-auto mb-2">
@@ -147,6 +200,14 @@ export default function CreditosPage() {
           ))}
         </div>
       </motion.div>
+
+      {loadError ? (
+        <motion.div variants={fadeInUp}>
+          <Card className="p-4 bg-red-500/10 border-red-500/20 text-sm text-red-300">
+            {loadError}
+          </Card>
+        </motion.div>
+      ) : null}
 
       {/* Buy Credits */}
       <motion.div variants={fadeInUp}>
@@ -238,7 +299,7 @@ export default function CreditosPage() {
           </Button>
         </div>
         <Card className="bg-card/50 border-border/50 vuei-glass divide-y divide-border/50">
-          {credits.history.slice(0, 5).map((item, index) => {
+          {effectiveHistory.slice(0, 5).map((item, index) => {
             const Icon = iconMap[item.source] || Gift
             return (
               <div key={index} className="flex items-center gap-4 p-4">

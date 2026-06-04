@@ -3,6 +3,7 @@ export type CreditOwnerType = "profile" | "agency"
 export type CreditTransactionType =
   | "grant"
   | "purchase"
+  | "consume"
   | "usage_ai"
   | "usage_concierge"
   | "usage_document"
@@ -29,6 +30,9 @@ export interface CreditTransaction {
   relatedDocumentId: string | null
   source: string | null
   createdAt: string
+  balanceAfter?: number | null
+  metadata?: Record<string, unknown>
+  createdBy?: string | null
 }
 
 export interface CreditPackage {
