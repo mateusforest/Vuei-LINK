@@ -43,7 +43,7 @@ const roles = [
 ]
 
 export default function TeamPage() {
-  const { teamMembers, addTeamMember, updateTeamMember, removeTeamMember } = useAgency()
+  const { teamMembers, addTeamMember, updateTeamMember, removeTeamMember, workspaceError } = useAgency()
   const [searchQuery, setSearchQuery] = useState("")
   const [inviteModalOpen, setInviteModalOpen] = useState(false)
   const [inviteEmail, setInviteEmail] = useState("")
@@ -59,8 +59,10 @@ export default function TeamPage() {
 
   const getRoleIcon = (role: string) => {
     switch (role) {
-      case "admin":
+      case "owner":
         return Crown
+      case "admin":
+        return Shield
       case "viewer":
         return Shield
       default:
@@ -70,6 +72,8 @@ export default function TeamPage() {
 
   const getRoleLabel = (role: string) => {
     switch (role) {
+      case "owner":
+        return "Owner"
       case "admin":
         return "Admin"
       case "viewer":
@@ -79,28 +83,39 @@ export default function TeamPage() {
     }
   }
 
-  const handleInvite = () => {
+  const handleInvite = async () => {
     if (!inviteEmail || !inviteName) return
-    
-    addTeamMember({
+
+    const result = await addTeamMember({
       name: inviteName,
       email: inviteEmail,
       role: inviteRole as "admin" | "agent" | "viewer",
-      status: "pending"
+      status: "active"
     })
-    
+
+    if (!result.success) {
+      window.alert(result.error || "Nao foi possivel vincular o membro a agencia.")
+      return
+    }
+
     setInviteEmail("")
     setInviteName("")
     setInviteRole("agent")
     setInviteModalOpen(false)
   }
 
-  const handleResendInvite = (id: string) => {
-    updateTeamMember(id, { createdAt: new Date().toISOString() })
+  const handleResendInvite = async (id: string) => {
+    const result = await updateTeamMember(id, { status: "active" })
+    if (!result.success) {
+      window.alert(result.error || "Nao foi possivel atualizar o membro.")
+    }
   }
 
-  const handleCancelInvite = (id: string) => {
-    removeTeamMember(id)
+  const handleCancelInvite = async (id: string) => {
+    const result = await removeTeamMember(id)
+    if (!result.success) {
+      window.alert(result.error || "Nao foi possivel desativar o membro.")
+    }
   }
 
   return (
@@ -119,6 +134,12 @@ export default function TeamPage() {
           Convidar
         </Button>
       </div>
+
+      {workspaceError ? (
+        <Card className="border-red-500/20 bg-red-500/5">
+          <CardContent className="p-4 text-sm text-red-300">{workspaceError}</CardContent>
+        </Card>
+      ) : null}
 
       {/* Search */}
       <div className="relative max-w-md">
@@ -149,7 +170,7 @@ export default function TeamPage() {
                     <div className="flex items-center gap-3">
                       <div className="relative">
                         <Avatar className="h-12 w-12 border-2 border-white/10">
-                          <AvatarImage src="/placeholder.svg" />
+                          <AvatarImage src={member.avatar || "/placeholder.svg"} />
                           <AvatarFallback className="bg-primary/20 text-primary">
                             {member.name.split(" ").map(n => n[0]).join("").slice(0, 2)}
                           </AvatarFallback>
@@ -171,19 +192,27 @@ export default function TeamPage() {
                           <MoreHorizontal className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="border-white/10 bg-card">
-                        <DropdownMenuItem>
+                        <DropdownMenuContent align="end" className="border-white/10 bg-card">
+                        <DropdownMenuItem disabled={member.role === "owner"} onClick={() => void updateTeamMember(member.id, { role: "admin" })}>
                           <Edit2 className="mr-2 h-4 w-4" />
-                          Editar
+                          Tornar admin
                         </DropdownMenuItem>
-                        <DropdownMenuItem>
+                        <DropdownMenuItem disabled={member.role === "owner"} onClick={() => void updateTeamMember(member.id, { role: "agent" })}>
                           <Shield className="mr-2 h-4 w-4" />
-                          Alterar funcao
+                          Tornar agente
+                        </DropdownMenuItem>
+                        <DropdownMenuItem disabled={member.role === "owner"} onClick={() => void updateTeamMember(member.id, { role: "viewer" })}>
+                          <Shield className="mr-2 h-4 w-4" />
+                          Tornar gerente
+                        </DropdownMenuItem>
+                        <DropdownMenuItem disabled={member.role === "owner"} onClick={() => void updateTeamMember(member.id, { status: member.status === "inactive" ? "active" : "inactive" })}>
+                          <Shield className="mr-2 h-4 w-4" />
+                          {member.status === "inactive" ? "Reativar membro" : "Desativar membro"}
                         </DropdownMenuItem>
                         <DropdownMenuSeparator className="bg-white/10" />
-                        <DropdownMenuItem className="text-red-400" onClick={() => removeTeamMember(member.id)}>
+                        <DropdownMenuItem className="text-red-400" disabled={member.role === "owner"} onClick={() => void removeTeamMember(member.id)}>
                           <Trash2 className="mr-2 h-4 w-4" />
-                          Remover
+                          Desativar
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
@@ -204,7 +233,7 @@ export default function TeamPage() {
                       {getRoleLabel(member.role)}
                     </Badge>
                     <span className="text-xs text-muted-foreground">
-                      {member.status === "pending" ? "Convite pendente" : "Ativo agora"}
+                      {member.status === "pending" ? "Convite pendente" : member.status === "inactive" ? "Inativo" : "Ativo agora"}
                     </span>
                   </div>
 
@@ -312,6 +341,9 @@ export default function TeamPage() {
                 })}
               </div>
             </div>
+            <p className="text-xs text-muted-foreground">
+              Convite de novo usuario ainda depende de fluxo de convite. Por enquanto, so e possivel vincular emails que ja existem em profiles.
+            </p>
             <div className="flex gap-3">
               <Button
                 variant="outline"

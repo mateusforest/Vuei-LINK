@@ -19,7 +19,7 @@ import { buildAdminTripUrl, buildPublicTripUrl } from "@/lib/security/link-token
 import { useAuth } from "@/contexts/auth-context"
 import { shouldUseSupabase } from "@/lib/data-source"
 import { createClient as createClientRecord, deleteClient as deleteClientRecord, listClients, updateClient as updateClientRecord } from "@/lib/repositories/clients-repository"
-import { getAgencyById, getAgencyByOwner } from "@/lib/repositories/agencies-repository"
+import { addAgencyMember as addAgencyMemberRecord, getAgencyById, getAgencyByOwner, listAgencyMembers, updateAgencyMember as updateAgencyMemberRecord } from "@/lib/repositories/agencies-repository"
 import {
   createDocumentMetadata,
   deleteDocument as deleteDocumentRecord,
@@ -27,6 +27,7 @@ import {
   uploadDocumentFile,
 } from "@/lib/repositories/documents-repository"
 import { createTrip as createTripRecord, deleteTrip as deleteTripRecord, listTripsByAgency, updateTrip as updateTripRecord } from "@/lib/repositories/trips-repository"
+import { getProfileByEmail } from "@/lib/repositories/profiles-repository"
 import { updateProfile as updateProfileRecord } from "@/lib/repositories/profiles-repository"
 import {
   addMessage as addAiMessage,
@@ -119,9 +120,10 @@ export interface ConciergeRequest {
 
 export interface TeamMember {
   id: string
+  profileId?: string
   name: string
   email: string
-  role: "admin" | "agent" | "viewer"
+  role: "owner" | "admin" | "agent" | "viewer"
   status: "active" | "pending" | "inactive"
   avatar?: string
   createdAt: string
@@ -165,9 +167,9 @@ interface AgencyContextType {
   respondToRequest: (id: string, response: string) => Promise<boolean>
   resolveRequest: (id: string) => Promise<boolean>
   teamMembers: TeamMember[]
-  addTeamMember: (data: Omit<TeamMember, "id" | "createdAt">) => void
-  updateTeamMember: (id: string, data: Partial<TeamMember>) => void
-  removeTeamMember: (id: string) => void
+  addTeamMember: (data: Omit<TeamMember, "id" | "createdAt">) => Promise<{ success: boolean; error: string | null }>
+  updateTeamMember: (id: string, data: Partial<TeamMember>) => Promise<{ success: boolean; error: string | null }>
+  removeTeamMember: (id: string) => Promise<{ success: boolean; error: string | null }>
   credits: AgencyCredits
   useCredits: (amount: number, source: string, action: string) => boolean
   addCredits: (amount: number) => void
@@ -411,7 +413,7 @@ const initialConciergeRequests: ConciergeRequest[] = [
 ]
 
 const initialTeamMembers: TeamMember[] = [
-  { id: "team-1", name: "Admin Principal", email: "admin@agencia.com", role: "admin", status: "active", createdAt: new Date().toISOString() },
+  { id: "team-1", name: "Admin Principal", email: "admin@agencia.com", role: "owner", status: "active", createdAt: new Date().toISOString() },
   { id: "team-2", name: "Agente 1", email: "agente1@agencia.com", role: "agent", status: "active", createdAt: new Date().toISOString() },
 ]
 
@@ -587,6 +589,7 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
       listTripsByAgency(resolvedAgency.id),
       listDocuments({ agencyId: resolvedAgency.id }),
     ])
+    const membersResult = await listAgencyMembers(resolvedAgency.id)
 
     const mappedClients: Client[] = (clientsResult.data ?? []).map((client) => ({
       id: client.id,
@@ -623,6 +626,22 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
     const tripById = new Map(canonicalTrips.map((trip) => [trip.id, trip]))
 
     const mappedDocuments: AgencyDocument[] = (documentsResult.data ?? []).map(mapDocumentRecordToAgencyDocument)
+    const mappedTeamMembers: TeamMember[] = (membersResult.data ?? []).map((member) => ({
+      id: member.id,
+      profileId: member.profileId,
+      name: member.name || member.email || "Membro sem nome",
+      email: member.email || "",
+      role:
+        member.role === "owner" || member.role === "admin" || member.role === "viewer"
+          ? member.role
+          : "agent",
+      status:
+        member.status === "inactive" || member.status === "pending"
+          ? member.status
+          : "active",
+      avatar: member.avatarUrl,
+      createdAt: member.createdAt,
+    }))
 
     const mappedConciergeRequests: ConciergeRequest[] = conversations
       .map((conversation) => {
@@ -683,13 +702,13 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
     setAgencyId(resolvedAgency.id)
     setSetupIncomplete(false)
     setWorkspaceError(
-      agencyResult.error || clientsResult.error || tripsResult.error || documentsResult.error || conversationsResult.error || messagesResult.error || null
+      agencyResult.error || clientsResult.error || tripsResult.error || documentsResult.error || membersResult.error || conversationsResult.error || messagesResult.error || null
     )
     setClients(mappedClients)
     setTrips(mappedTrips)
     setDocuments(mappedDocuments)
     setConciergeRequests(mappedConciergeRequests)
-    setTeamMembers([])
+    setTeamMembers(mappedTeamMembers)
     setActivities([])
     setCredits({
       balance: resolvedAgency.creditsBalance,
@@ -1129,7 +1148,83 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
     return true
   }, [isUsingRealData, refreshAgencyWorkspace])
 
-  const addTeamMember = useCallback((data: Omit<TeamMember, "id" | "createdAt">) => {
+  const addTeamMember = useCallback(async (data: Omit<TeamMember, "id" | "createdAt">) => {
+    if (isUsingRealData) {
+      if (!agencyId) {
+        const message = "Agencia nao configurada no Supabase. Finalize o cadastro antes de gerenciar a equipe."
+        setWorkspaceError(message)
+        return { success: false, error: message }
+      }
+
+      const existingProfile = await getProfileByEmail(data.email)
+      if (!existingProfile.data) {
+        const message = existingProfile.error ?? "Convite de novo usuario ainda depende de fluxo de convite."
+        setWorkspaceError(message)
+        return { success: false, error: message }
+      }
+
+      const duplicateMember = teamMembers.find((member) => member.profileId === existingProfile.data?.id)
+      if (duplicateMember) {
+        const message = "Este usuario ja faz parte da equipe da agencia."
+        setWorkspaceError(message)
+        return { success: false, error: message }
+      }
+
+      const result = await addAgencyMemberRecord({
+        agencyId,
+        profileId: existingProfile.data.id,
+        role: data.role === "agent" ? "member" : data.role,
+        status: data.status === "inactive" ? "inactive" : "active",
+        name: existingProfile.data.name || data.name,
+        email: existingProfile.data.email || data.email,
+        avatarUrl: existingProfile.data.avatarUrl ?? undefined,
+      })
+
+      if (!result.data) {
+        const message = result.error ?? "Nao foi possivel vincular o membro a agencia."
+        setWorkspaceError(message)
+        return { success: false, error: message }
+      }
+
+      const profileUpdateResult = await updateProfileRecord(existingProfile.data.id, {
+        agencyId,
+        role: "agency_member",
+      })
+
+      if (!profileUpdateResult.data) {
+        await updateAgencyMemberRecord(result.data.id, {
+          role: result.data.role,
+          status: "inactive",
+          name: result.data.name,
+          email: result.data.email,
+          avatarUrl: result.data.avatarUrl,
+        })
+
+        const message = profileUpdateResult.error ?? "Membro vinculado, mas falhou ao atualizar o profile da equipe."
+        setWorkspaceError(message)
+        return { success: false, error: message }
+      }
+
+      const newMember: TeamMember = {
+        id: result.data.id,
+        profileId: result.data.profileId,
+        name: result.data.name || existingProfile.data.name || data.name,
+        email: result.data.email || existingProfile.data.email || data.email,
+        role:
+          result.data.role === "owner" || result.data.role === "admin" || result.data.role === "viewer"
+            ? result.data.role
+            : "agent",
+        status: result.data.status === "inactive" || result.data.status === "pending" ? result.data.status : "active",
+        avatar: result.data.avatarUrl,
+        createdAt: result.data.createdAt,
+      }
+
+      setWorkspaceError(null)
+      setTeamMembers((prev) => [newMember, ...prev])
+      addActivity("Membro vinculado", newMember.name, "team")
+      return { success: true, error: null }
+    }
+
     const newMember: TeamMember = {
       ...data,
       id: `team-${Date.now()}`,
@@ -1137,17 +1232,108 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
     }
     setTeamMembers((prev) => [...prev, newMember])
     addActivity("Membro convidado", data.name, "team")
-  }, [addActivity])
+    return { success: true, error: null }
+  }, [addActivity, agencyId, isUsingRealData, teamMembers])
 
-  const updateTeamMember = useCallback((id: string, data: Partial<TeamMember>) => {
+  const updateTeamMember = useCallback(async (id: string, data: Partial<TeamMember>) => {
+    if (isUsingRealData) {
+      const currentMember = teamMembers.find((member) => member.id === id)
+      if (!currentMember) {
+        const message = "Membro nao encontrado."
+        setWorkspaceError(message)
+        return { success: false, error: message }
+      }
+
+      if (currentMember.role === "owner") {
+        const message = "O owner da agencia nao pode ser alterado por esta tela."
+        setWorkspaceError(message)
+        return { success: false, error: message }
+      }
+
+      const result = await updateAgencyMemberRecord(id, {
+        role: data.role === "agent" ? "member" : data.role,
+        status: data.status,
+        name: currentMember.name,
+        email: currentMember.email,
+        avatarUrl: currentMember.avatar,
+      })
+
+      if (!result.data) {
+        const message = result.error ?? "Nao foi possivel atualizar o membro da equipe."
+        setWorkspaceError(message)
+        return { success: false, error: message }
+      }
+
+      const updatedMember: TeamMember = {
+        ...currentMember,
+        role:
+          result.data.role === "owner" || result.data.role === "admin" || result.data.role === "viewer"
+            ? result.data.role
+            : "agent",
+        status: result.data.status === "inactive" || result.data.status === "pending" ? result.data.status : "active",
+      }
+
+      setWorkspaceError(null)
+      setTeamMembers((prev) => prev.map((member) => (member.id === id ? updatedMember : member)))
+      return { success: true, error: null }
+    }
+
     setTeamMembers((prev) => prev.map((member) => (member.id === id ? { ...member, ...data } : member)))
-  }, [])
+    return { success: true, error: null }
+  }, [isUsingRealData, teamMembers])
 
-  const removeTeamMember = useCallback((id: string) => {
+  const removeTeamMember = useCallback(async (id: string) => {
     const member = teamMembers.find((item) => item.id === id)
+    if (!member) {
+      const message = "Membro nao encontrado."
+      setWorkspaceError(message)
+      return { success: false, error: message }
+    }
+
+    if (isUsingRealData) {
+      if (member.role === "owner") {
+        const message = "O owner da agencia nao pode ser removido por esta tela."
+        setWorkspaceError(message)
+        return { success: false, error: message }
+      }
+
+      const result = await updateAgencyMemberRecord(id, {
+        status: "inactive",
+        role: member.role === "agent" ? "member" : member.role,
+        name: member.name,
+        email: member.email,
+        avatarUrl: member.avatar,
+      })
+
+      if (!result.data) {
+        const message = result.error ?? "Nao foi possivel desativar o membro da equipe."
+        setWorkspaceError(message)
+        return { success: false, error: message }
+      }
+
+      if (member.profileId) {
+        const profileUpdateResult = await updateProfileRecord(member.profileId, {
+          agencyId: null,
+          role: "traveler",
+        })
+
+        if (!profileUpdateResult.data) {
+          const message = profileUpdateResult.error ?? "Membro desativado, mas falhou ao atualizar o profile vinculado."
+          setWorkspaceError(message)
+          return { success: false, error: message }
+        }
+      }
+
+      setWorkspaceError(null)
+      setTeamMembers((prev) => prev.map((item) => (item.id === id ? { ...item, status: "inactive" } : item)))
+      addActivity("Membro desativado", member.name, "team")
+      return { success: true, error: null }
+    }
+
     setTeamMembers((prev) => prev.filter((item) => item.id !== id))
-    if (member) addActivity("Membro removido", member.name, "team")
-  }, [teamMembers, addActivity])
+    addActivity("Membro removido", member.name, "team")
+    return { success: true, error: null }
+  }, [addActivity, isUsingRealData, teamMembers])
 
   const useCredits = useCallback((amount: number, source: string, action: string) => {
     if (credits.balance < amount) return false

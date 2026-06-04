@@ -13,6 +13,7 @@ export interface AgencyMember {
   createdAt: string
   name?: string
   email?: string
+  avatarUrl?: string
 }
 
 interface CreateAgencyPayload {
@@ -425,6 +426,26 @@ export async function listAgencyMembers(agencyId: string) {
         return { source: "supabase" as const, data: [] as AgencyMember[], error: error.message }
       }
 
+      const profileIds = (data ?? []).map((member) => member.profile_id)
+      const { data: profilesData, error: profilesError } = profileIds.length > 0
+        ? await client.from("profiles").select("id, email, name, avatar_url").in("id", profileIds)
+        : { data: [], error: null }
+
+      if (profilesError) {
+        console.error("[AUTH ERROR]", profilesError.message)
+      }
+
+      const profileMap = new Map(
+        (profilesData ?? []).map((profile) => [
+          profile.id,
+          {
+            name: profile.name,
+            email: profile.email,
+            avatarUrl: profile.avatar_url,
+          },
+        ]),
+      )
+
       return {
         source: "supabase" as const,
         data: (data ?? []).map((member) => ({
@@ -434,8 +455,11 @@ export async function listAgencyMembers(agencyId: string) {
           role: member.role,
           status: member.status,
           createdAt: member.created_at,
+          name: profileMap.get(member.profile_id)?.name ?? undefined,
+          email: profileMap.get(member.profile_id)?.email ?? undefined,
+          avatarUrl: profileMap.get(member.profile_id)?.avatarUrl ?? undefined,
         })),
-        error: null,
+        error: profilesError?.message ?? null,
       }
     }
 
@@ -519,6 +543,7 @@ export async function addAgencyMember(payload: Omit<AgencyMember, "id" | "create
           createdAt: data.created_at,
           name: payload.name,
           email: payload.email,
+          avatarUrl: payload.avatarUrl,
         },
         error: null,
       }
@@ -580,6 +605,9 @@ export async function updateAgencyMember(id: string, payload: Partial<AgencyMemb
               role: data.role,
               status: data.status,
               createdAt: data.created_at,
+              name: payload.name,
+              email: payload.email,
+              avatarUrl: payload.avatarUrl,
             }
           : null,
         error: null,
