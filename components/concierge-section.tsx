@@ -16,7 +16,7 @@ export function ConciergeSection() {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: "-120px" }}
           transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
-          className="overflow-hidden rounded-[28px] border border-white/12 bg-[linear-gradient(180deg,#f1f1f4_0%,#c8c8cd_55%,#3f3f45_100%)] shadow-[0_24px_90px_rgba(255,255,255,0.06)]"
+          className="overflow-hidden rounded-[28px] bg-[#05080d] shadow-[0_24px_80px_rgba(0,0,0,0.3),0_12px_36px_rgba(47,125,246,0.08)]"
         >
           <div className="block md:hidden">
             <div className="bg-[linear-gradient(180deg,#1d1d20_0%,#111317_54%,#07090d_100%)] px-5 pb-6 pt-6 text-white">
