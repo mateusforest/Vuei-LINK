@@ -5,8 +5,11 @@ export type AiModule =
   | "ticket_reader"
   | "accommodation_reader"
   | "flight_reader"
+  | "support_assistant"
 
 export type AiRole = "user" | "assistant" | "agent" | "system"
+
+export type AiUsageStatus = "success" | "error" | "blocked" | "insufficient_credits"
 
 export interface AiStructuredResult<TData = Record<string, unknown>> {
   success: boolean
@@ -68,6 +71,9 @@ export interface AiConversation {
   clientId: string | null
   channel: Extract<AiModule, "concierge" | "itinerary" | "documents" | "ticket_reader">
   status: "open" | "closed" | "archived"
+  title?: string | null
+  lastMessage?: string | null
+  lastMessageAt?: string | null
   metadata?: Record<string, unknown> | null
   createdAt: string
   updatedAt: string
@@ -87,15 +93,38 @@ export interface AiMessage {
   createdAt: string
 }
 
+export interface AiPrompt {
+  id: string
+  code: string
+  name: string
+  module: AiModule
+  systemPrompt: string
+  userPromptTemplate: string | null
+  isActive: boolean
+  version: number
+  metadata: Record<string, unknown> | null
+  createdAt: string
+  updatedAt: string
+}
+
 export interface AiUsageLog {
   id: string
+  ownerType: "traveler" | "agency" | null
+  ownerUserId: string | null
   tripId: string | null
   userId: string | null
   agencyId: string | null
   clientId: string | null
   module: AiModule
   action: string
+  model: string | null
+  inputTokens: number
+  outputTokens: number
+  totalTokens: number
+  estimatedCost: number | null
+  creditsCharged: number
   creditsUsed: number
+  status: AiUsageStatus
   metadata: Record<string, unknown> | null
   createdAt: string
 }

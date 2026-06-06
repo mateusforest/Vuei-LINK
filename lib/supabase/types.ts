@@ -161,35 +161,62 @@ export interface Database {
       ai_usage_logs: {
         Row: {
           id: string
+          owner_type: "traveler" | "agency" | null
+          owner_user_id: string | null
           trip_id: string | null
           user_id: string | null
           agency_id: string | null
           client_id: string | null
-          module: "concierge" | "itinerary" | "documents" | "ticket_reader" | "accommodation_reader" | "flight_reader"
+          module: "concierge" | "itinerary" | "documents" | "ticket_reader" | "accommodation_reader" | "flight_reader" | "support_assistant"
           action: string
+          model: string | null
+          input_tokens: number | null
+          output_tokens: number | null
+          total_tokens: number | null
+          estimated_cost: number | null
+          credits_charged: number | null
+          status: "success" | "error" | "blocked" | "insufficient_credits" | null
           credits_used: number
           metadata: Json
           created_at: string
         }
         Insert: {
           id?: string
+          owner_type?: "traveler" | "agency" | null
+          owner_user_id?: string | null
           trip_id?: string | null
           user_id?: string | null
           agency_id?: string | null
           client_id?: string | null
-          module: "concierge" | "itinerary" | "documents" | "ticket_reader" | "accommodation_reader" | "flight_reader"
+          module: "concierge" | "itinerary" | "documents" | "ticket_reader" | "accommodation_reader" | "flight_reader" | "support_assistant"
           action: string
+          model?: string | null
+          input_tokens?: number | null
+          output_tokens?: number | null
+          total_tokens?: number | null
+          estimated_cost?: number | null
+          credits_charged?: number | null
+          status?: "success" | "error" | "blocked" | "insufficient_credits" | null
           credits_used?: number
           metadata?: Json
           created_at?: string
         }
         Update: {
+          owner_type?: "traveler" | "agency" | null
+          owner_user_id?: string | null
           trip_id?: string | null
           user_id?: string | null
           agency_id?: string | null
           client_id?: string | null
-          module?: "concierge" | "itinerary" | "documents" | "ticket_reader" | "accommodation_reader" | "flight_reader"
+          module?: "concierge" | "itinerary" | "documents" | "ticket_reader" | "accommodation_reader" | "flight_reader" | "support_assistant"
           action?: string
+          model?: string | null
+          input_tokens?: number | null
+          output_tokens?: number | null
+          total_tokens?: number | null
+          estimated_cost?: number | null
+          credits_charged?: number | null
+          status?: "success" | "error" | "blocked" | "insufficient_credits" | null
           credits_used?: number
           metadata?: Json
         }
@@ -199,7 +226,7 @@ export interface Database {
           id: string
           code: string
           name: string
-          module: "concierge" | "itinerary" | "documents" | "ticket_reader" | "accommodation_reader" | "flight_reader"
+          module: "concierge" | "itinerary" | "documents" | "ticket_reader" | "accommodation_reader" | "flight_reader" | "support_assistant"
           system_prompt: string
           user_prompt_template: string | null
           is_active: boolean
@@ -212,7 +239,7 @@ export interface Database {
           id?: string
           code: string
           name: string
-          module: "concierge" | "itinerary" | "documents" | "ticket_reader" | "accommodation_reader" | "flight_reader"
+          module: "concierge" | "itinerary" | "documents" | "ticket_reader" | "accommodation_reader" | "flight_reader" | "support_assistant"
           system_prompt: string
           user_prompt_template?: string | null
           is_active?: boolean
@@ -224,7 +251,7 @@ export interface Database {
         Update: {
           code?: string
           name?: string
-          module?: "concierge" | "itinerary" | "documents" | "ticket_reader" | "accommodation_reader" | "flight_reader"
+          module?: "concierge" | "itinerary" | "documents" | "ticket_reader" | "accommodation_reader" | "flight_reader" | "support_assistant"
           system_prompt?: string
           user_prompt_template?: string | null
           is_active?: boolean

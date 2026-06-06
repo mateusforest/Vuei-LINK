@@ -10,7 +10,7 @@ import { shouldUseSupabase } from "@/lib/data-source"
 import { getTripByAdminToken, getTripByPublicToken, getTripBySlug } from "@/lib/repositories/trips-repository"
 import { createDocumentMetadata, getSignedDocumentUrl, listDocumentsByTrip, listPublicTripDocuments, uploadDocumentFile } from "@/lib/repositories/documents-repository"
 import { createTripHotel, deleteTripHotel, listTripHotels, updateTripHotel } from "@/lib/repositories/trip-hotels-repository"
-import { addMessage as addAiMessage, createConversation, listConversationsByTrip, listMessages } from "@/lib/repositories/ai-repository"
+import { listConversationsByTrip, listMessages } from "@/lib/repositories/ai-repository"
 import { validateDocumentFile } from "@/lib/files/file-validation"
 import { getDestinationCoverImage, getDestinationMetadata } from "@/lib/trip-destination"
 import { useAuth } from "@/contexts/auth-context"
@@ -2286,6 +2286,37 @@ function ConciergeSection({ tripData, onOpenCredits }: { tripData: any; onOpenCr
     return response
   }
 
+  const requestRealConciergeReply = async (userMessage: string) => {
+    const response = await fetch("/api/ai/concierge", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        tripId: tripData?.id,
+        conversationId,
+        message: userMessage,
+        origin: isAdmin ? "trip-admin-link" : "trip-public-link",
+      }),
+    })
+
+    const data = await response.json().catch(() => null)
+
+    if (!response.ok) {
+      return {
+        ok: false as const,
+        error: data?.error || "Nao foi possivel obter uma resposta real do concierge desta viagem.",
+      }
+    }
+
+    return {
+      ok: true as const,
+      conversationId: data?.conversationId ?? null,
+      assistantMessage: data?.assistantMessage ?? "",
+      warning: data?.warning ?? null,
+    }
+  }
+
   const handleSend = async () => {
     if (!message.trim()) return
 
@@ -2295,72 +2326,31 @@ function ConciergeSection({ tripData, onOpenCredits }: { tripData: any; onOpenCr
     setMessage("")
     setTyping(true)
 
-    const response = buildResponse(normalizedUserMessage)
-
     window.setTimeout(async () => {
-      let nextConversationId = conversationId
-
       if (shouldUseSupabase() && tripData?.id) {
-        if (!nextConversationId) {
-          const conversationResult = await createConversation({
-            tripId: tripData.id,
-            userId: user?.id ?? null,
-            agencyId: profile?.agencyId ?? tripData.agencyId ?? null,
-            clientId: tripData.clientId ?? null,
-            channel: "concierge",
-            metadata: {
-              origin: isAdmin ? "trip-admin-link" : "trip-public-link",
-            },
-          })
+        const result = await requestRealConciergeReply(userMessage)
 
-          if (conversationResult.data) {
-            nextConversationId = conversationResult.data.id
-            setConversationId(conversationResult.data.id)
-          } else if (conversationResult.error) {
-            console.error("[CONCIERGE] create conversation error", conversationResult.error)
-          }
+        if (!result.ok) {
+          console.error("[CONCIERGE] real response error", result.error)
+          showToast(result.error, "info")
+          setTyping(false)
+          return
         }
 
-        if (nextConversationId) {
-          const userMessageResult = await addAiMessage({
-            conversationId: nextConversationId,
-            tripId: tripData.id,
-            userId: user?.id ?? null,
-            agencyId: profile?.agencyId ?? tripData.agencyId ?? null,
-            clientId: tripData.clientId ?? null,
-            role: "user",
-            content: userMessage,
-            metadata: {
-              origin: isAdmin ? "trip-admin-link" : "trip-public-link",
-            },
-          })
-
-          const assistantMessageResult = await addAiMessage({
-            conversationId: nextConversationId,
-            tripId: tripData.id,
-            userId: user?.id ?? null,
-            agencyId: profile?.agencyId ?? tripData.agencyId ?? null,
-            clientId: tripData.clientId ?? null,
-            role: "assistant",
-            content: response,
-            metadata: {
-              origin: isAdmin ? "trip-admin-link" : "trip-public-link",
-            },
-          })
-
-          if (!userMessageResult.data || !assistantMessageResult.data) {
-            const repositoryError = userMessageResult.error || assistantMessageResult.error
-            console.error("[CONCIERGE] sync error", repositoryError)
-            showToast(
-              repositoryError || "Nao foi possivel sincronizar esta mensagem com o concierge real desta viagem.",
-              "info"
-            )
-          }
-        } else {
-          showToast("Nao foi possivel sincronizar esta conversa com o concierge real desta viagem.", "info")
+        if (result.conversationId) {
+          setConversationId(result.conversationId)
         }
+
+        if (result.warning) {
+          showToast(result.warning, "info")
+        }
+
+        setMessages((prev) => [...prev, { role: "assistant", content: result.assistantMessage }])
+        setTyping(false)
+        return
       }
 
+      const response = buildResponse(normalizedUserMessage)
       setMessages((prev) => [...prev, { role: "assistant", content: response }])
       setTyping(false)
     }, 1500)

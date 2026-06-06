@@ -1,13 +1,20 @@
 "use client"
 
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react"
-import type { AgencyPlanCode, CreditPackage, TripStatus } from "@/types"
+import type { AgencyPlanCode, AiPrompt as CanonicalAiPrompt, AiUsageLog, CreditPackage, TripStatus } from "@/types"
 import { listProfiles } from "@/lib/repositories/profiles-repository"
 import { listAgencies, listAllAgencyMembers, type AgencyMember } from "@/lib/repositories/agencies-repository"
 import { listAllClients } from "@/lib/repositories/clients-repository"
 import { listTrips } from "@/lib/repositories/trips-repository"
 import { listDocuments } from "@/lib/repositories/documents-repository"
-import { listConversations, listMessagesByConversationIds, updateConversationStatus } from "@/lib/repositories/ai-repository"
+import {
+  listAiUsageLogs,
+  listConversations,
+  listMessagesByConversationIds,
+  listPrompts,
+  updateConversationStatus,
+  updatePrompt as updatePromptRecord,
+} from "@/lib/repositories/ai-repository"
 import { shouldUseSupabase } from "@/lib/data-source"
 import { useAuth } from "@/contexts/auth-context"
 
@@ -85,14 +92,15 @@ interface ConciergeRequest {
   }>
 }
 
-interface AIPrompt {
-  id: string
-  name: string
-  module: "concierge" | "itinerary" | "documents" | "notifications"
-  prompt: string
-  isActive: boolean
-  usageCount: number
-  lastUsed: string
+type AIPrompt = CanonicalAiPrompt
+
+interface MasterAiOverview {
+  totalConversations: number
+  totalMessages: number
+  totalTokens: number
+  totalEstimatedCost: number
+  totalCreditsCharged: number
+  recentErrors: number
 }
 
 interface Template {
@@ -173,6 +181,8 @@ interface MasterContextType {
   agencies: Agency[]
   users: User[]
   trips: MasterTrip[]
+  aiUsageLogs: AiUsageLog[]
+  aiOverview: MasterAiOverview
   dataErrors: {
     profiles: string | null
     agencies: string | null
@@ -182,6 +192,8 @@ interface MasterContextType {
     documents: string | null
     conciergeConversations: string | null
     conciergeMessages: string | null
+    aiUsageLogs: string | null
+    aiPrompts: string | null
   }
   conciergeRequests: ConciergeRequest[]
   aiPrompts: AIPrompt[]
@@ -222,6 +234,9 @@ type MasterState = {
   users: User[]
   trips: MasterTrip[]
   conciergeRequests: ConciergeRequest[]
+  aiUsageLogs: AiUsageLog[]
+  aiPrompts: AIPrompt[]
+  aiOverview: MasterAiOverview
   activities: Activity[]
   stats: MasterStats
 }
@@ -258,6 +273,16 @@ const INITIAL_STATE: MasterState = {
   users: [],
   trips: [],
   conciergeRequests: [],
+  aiUsageLogs: [],
+  aiPrompts: [],
+  aiOverview: {
+    totalConversations: 0,
+    totalMessages: 0,
+    totalTokens: 0,
+    totalEstimatedCost: 0,
+    totalCreditsCharged: 0,
+    recentErrors: 0,
+  },
   activities: [],
   stats: EMPTY_STATS,
 }
@@ -271,6 +296,8 @@ const EMPTY_DATA_ERRORS = {
   documents: null,
   conciergeConversations: null,
   conciergeMessages: null,
+  aiUsageLogs: null,
+  aiPrompts: null,
 }
 
 function noopWithLog(action: string) {
@@ -307,6 +334,8 @@ function buildMasterState(data: {
   documents: Awaited<ReturnType<typeof listDocuments>>["data"]
   conversations: Awaited<ReturnType<typeof listConversations>>["data"]
   messages: Awaited<ReturnType<typeof listMessagesByConversationIds>>["data"]
+  aiUsageLogs: AiUsageLog[]
+  aiPrompts: AIPrompt[]
 }): MasterState {
   const profiles = data.profiles ?? []
   const agenciesData = data.agencies ?? []
@@ -316,6 +345,8 @@ function buildMasterState(data: {
   const documents = data.documents ?? []
   const conversations = data.conversations ?? []
   const messages = data.messages ?? []
+  const aiUsageLogs = data.aiUsageLogs ?? []
+  const aiPrompts = data.aiPrompts ?? []
 
   const profileMap = new Map(profiles.map((profile) => [profile.id, profile]))
   const agencyMap = new Map(agenciesData.map((agency) => [agency.id, agency]))
@@ -520,6 +551,16 @@ function buildMasterState(data: {
     users,
     trips,
     conciergeRequests,
+    aiUsageLogs,
+    aiPrompts,
+    aiOverview: {
+      totalConversations: conversations.length,
+      totalMessages: messages.length,
+      totalTokens: aiUsageLogs.reduce((total, log) => total + (log.totalTokens ?? 0), 0),
+      totalEstimatedCost: aiUsageLogs.reduce((total, log) => total + (log.estimatedCost ?? 0), 0),
+      totalCreditsCharged: aiUsageLogs.reduce((total, log) => total + (log.creditsCharged ?? 0), 0),
+      recentErrors: aiUsageLogs.filter((log) => log.status === "error" || log.status === "blocked").length,
+    },
     activities,
     stats: {
       totalAgencies: agencies.length,
@@ -531,7 +572,7 @@ function buildMasterState(data: {
       totalClients: clients.length,
       totalDocuments: documents.length,
       monthlyRevenue: 0,
-      totalCreditsConsumed: 0,
+      totalCreditsConsumed: aiUsageLogs.reduce((total, log) => total + (log.creditsCharged ?? 0), 0),
     },
   }
 }
@@ -574,7 +615,7 @@ export function MasterProvider({ children }: { children: ReactNode }) {
         return
       }
 
-      const [profilesResult, agenciesResult, membersResult, clientsResult, tripsResult, documentsResult, conversationsResult] = await Promise.all([
+      const [profilesResult, agenciesResult, membersResult, clientsResult, tripsResult, documentsResult, conversationsResult, aiUsageLogsResult, aiPromptsResult] = await Promise.all([
         listProfiles(),
         listAgencies(),
         listAllAgencyMembers(),
@@ -582,6 +623,8 @@ export function MasterProvider({ children }: { children: ReactNode }) {
         listTrips(),
         listDocuments(),
         listConversations({ channel: "concierge" }),
+        listAiUsageLogs({ limit: 250 }),
+        listPrompts({ includeInactive: true }),
       ])
 
       const messagesResult = await listMessagesByConversationIds(
@@ -599,6 +642,8 @@ export function MasterProvider({ children }: { children: ReactNode }) {
         documents: documentsResult.error,
         conciergeConversations: conversationsResult.error,
         conciergeMessages: messagesResult.error,
+        aiUsageLogs: aiUsageLogsResult.error,
+        aiPrompts: aiPromptsResult.error,
       }
 
       if (nextErrors.profiles) {
@@ -618,6 +663,8 @@ export function MasterProvider({ children }: { children: ReactNode }) {
         documents: documentsResult.data ?? [],
         conversations: conversationsResult.data ?? [],
         messages: messagesResult.data ?? [],
+        aiUsageLogs: aiUsageLogsResult.data ?? [],
+        aiPrompts: aiPromptsResult.data ?? [],
       })
 
       const nextNotifications: Notification[] = [
@@ -701,6 +748,26 @@ export function MasterProvider({ children }: { children: ReactNode }) {
               createdAt: new Date().toISOString(),
             }
           : null,
+        aiUsageLogsResult.error
+          ? {
+              id: "ai-usage-logs-error",
+              title: "Falha ao ler logs de IA",
+              message: aiUsageLogsResult.error,
+              type: "error",
+              read: false,
+              createdAt: new Date().toISOString(),
+            }
+          : null,
+        aiPromptsResult.error
+          ? {
+              id: "ai-prompts-error",
+              title: "Falha ao ler prompts de IA",
+              message: aiPromptsResult.error,
+              type: "error",
+              read: false,
+              createdAt: new Date().toISOString(),
+            }
+          : null,
       ].filter((notification): notification is Notification => Boolean(notification))
 
       setState(nextState)
@@ -774,15 +841,55 @@ export function MasterProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  const handleUpdatePrompt = async (id: string, data: Partial<AIPrompt>) => {
+    const currentPrompt = state.aiPrompts.find((prompt) => prompt.id === id)
+    if (!currentPrompt) {
+      console.info("[MASTER] Prompt nao encontrado para atualizacao.")
+      return
+    }
+
+    const result = await updatePromptRecord(id, {
+      name: data.name ?? currentPrompt.name,
+      module: data.module ?? currentPrompt.module,
+      systemPrompt: data.systemPrompt ?? currentPrompt.systemPrompt,
+      userPromptTemplate: data.userPromptTemplate ?? currentPrompt.userPromptTemplate,
+      isActive: data.isActive ?? currentPrompt.isActive,
+      version: data.version ?? currentPrompt.version,
+      metadata: data.metadata ?? currentPrompt.metadata ?? {},
+    })
+
+    if (!result.data) {
+      console.error("[MASTER] ai prompt update error", result.error)
+      return
+    }
+
+    setState((current) => ({
+      ...current,
+      aiPrompts: current.aiPrompts.map((prompt) => (prompt.id === id ? result.data! : prompt)),
+    }))
+  }
+
+  const handleTogglePrompt = async (id: string) => {
+    const currentPrompt = state.aiPrompts.find((prompt) => prompt.id === id)
+    if (!currentPrompt) {
+      console.info("[MASTER] Prompt nao encontrado para alternancia.")
+      return
+    }
+
+    await handleUpdatePrompt(id, { isActive: !currentPrompt.isActive })
+  }
+
   return (
     <MasterContext.Provider
       value={{
         agencies: state.agencies,
         users: state.users,
         trips: state.trips,
+        aiUsageLogs: state.aiUsageLogs,
+        aiOverview: state.aiOverview,
         dataErrors,
         conciergeRequests: state.conciergeRequests,
-        aiPrompts: [],
+        aiPrompts: state.aiPrompts,
         templates: [],
         transactions: [],
         credits,
@@ -801,8 +908,8 @@ export function MasterProvider({ children }: { children: ReactNode }) {
         adjustUserCredits: () => noopWithLog("Ajuste de creditos no master"),
         updateConciergeStatus: handleUpdateConciergeStatus,
         addPrompt: () => noopWithLog("Criacao de prompt no master"),
-        updatePrompt: () => noopWithLog("Edicao de prompt no master"),
-        togglePrompt: () => noopWithLog("Ativacao de prompt no master"),
+        updatePrompt: handleUpdatePrompt,
+        togglePrompt: handleTogglePrompt,
         addTemplate: () => noopWithLog("Criacao de template no master"),
         updateTemplate: () => noopWithLog("Edicao de template no master"),
         toggleTemplate: () => noopWithLog("Ativacao de template no master"),

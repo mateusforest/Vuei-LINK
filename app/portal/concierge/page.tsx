@@ -20,7 +20,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { useTrips } from "@/contexts/trips-context"
 import { useAuth } from "@/contexts/auth-context"
-import { createConversation, addMessage, listConversationsByTrip, listMessages } from "@/lib/repositories/ai-repository"
+import { listConversationsByTrip, listMessages } from "@/lib/repositories/ai-repository"
 import { shouldUseSupabase } from "@/lib/data-source"
 
 type UiMessage = {
@@ -111,9 +111,44 @@ function buildTripAwareResponse(
   }
 }
 
+async function requestRealConciergeReply(payload: {
+  tripId: string
+  conversationId: string | null
+  message: string
+}) {
+  const response = await fetch("/api/ai/concierge", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      tripId: payload.tripId,
+      conversationId: payload.conversationId,
+      message: payload.message,
+      origin: "traveler-portal",
+    }),
+  })
+
+  const data = await response.json().catch(() => null)
+
+  if (!response.ok) {
+    return {
+      ok: false as const,
+      error: data?.error || "Nao foi possivel obter uma resposta real do concierge.",
+    }
+  }
+
+  return {
+    ok: true as const,
+    conversationId: data?.conversationId ?? null,
+    assistantMessage: data?.assistantMessage ?? "",
+    warning: data?.warning ?? null,
+  }
+}
+
 export default function ConciergePage() {
   const { trips, activeTrip } = useTrips()
-  const { user, profile } = useAuth()
+  const { user } = useAuth()
   const selectedTrip = activeTrip ?? trips[0] ?? null
   const [messages, setMessages] = useState<UiMessage[]>(() =>
     selectedTrip ? [buildInitialAssistantMessage(selectedTrip.destination)] : []
@@ -210,67 +245,42 @@ export default function ConciergePage() {
     setIsTyping(true)
     setError(null)
 
-    const response = buildTripAwareResponse(messageText, selectedTrip)
-
-    let nextConversationId = conversationId
-
     if (shouldUseSupabase()) {
-      if (!nextConversationId) {
-        const conversationResult = await createConversation({
-          tripId: selectedTrip.id,
-          userId: user.id,
-          agencyId: profile?.agencyId ?? null,
-          clientId: null,
-          channel: "concierge",
-          metadata: {
-            origin: "traveler-portal",
-          },
-        })
+      const result = await requestRealConciergeReply({
+        tripId: selectedTrip.id,
+        conversationId,
+        message: messageText,
+      })
 
-        if (!conversationResult.data) {
-          setError(conversationResult.error ?? "Nao foi possivel iniciar a conversa real do concierge.")
-          setIsTyping(false)
-          return
-        }
-
-        nextConversationId = conversationResult.data.id
-        setConversationId(conversationResult.data.id)
-      }
-
-      const [userMessageResult, assistantMessageResult] = await Promise.all([
-        addMessage({
-          conversationId: nextConversationId,
-          tripId: selectedTrip.id,
-          userId: user.id,
-          agencyId: profile?.agencyId ?? null,
-          clientId: null,
-          role: "user",
-          content: messageText,
-          metadata: {
-            origin: "traveler-portal",
-          },
-        }),
-        addMessage({
-          conversationId: nextConversationId,
-          tripId: selectedTrip.id,
-          userId: user.id,
-          agencyId: profile?.agencyId ?? null,
-          clientId: null,
-          role: "assistant",
-          content: response.content,
-          metadata: {
-            origin: "traveler-portal",
-          },
-        }),
-      ])
-
-      if (!userMessageResult.data || !assistantMessageResult.data) {
-        console.error("[CONCIERGE] sync error", userMessageResult.error || assistantMessageResult.error)
-        setError(userMessageResult.error || assistantMessageResult.error || "Nao foi possivel sincronizar o concierge real.")
+      if (!result.ok) {
+        console.error("[CONCIERGE] real response error", result.error)
+        setError(result.error)
         setIsTyping(false)
         return
       }
+
+      if (result.conversationId) {
+        setConversationId(result.conversationId)
+      }
+
+      window.setTimeout(() => {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `assistant-${Date.now()}`,
+            role: "assistant",
+            content: result.assistantMessage,
+            timestamp: new Date(),
+          },
+        ])
+        setIsTyping(false)
+        setError(result.warning)
+      }, 400)
+
+      return
     }
+
+    const response = buildTripAwareResponse(messageText, selectedTrip)
 
     window.setTimeout(() => {
       setMessages((prev) => [
