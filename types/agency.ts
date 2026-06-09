@@ -21,6 +21,7 @@ export interface AgencySettings {
 
 export interface AgencyBranding {
   logoUrl: string | null
+  linkLogoUrl?: string | null
 }
 
 export interface Agency {

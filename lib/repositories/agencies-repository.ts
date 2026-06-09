@@ -135,6 +135,7 @@ function mapAgencyRowToAgency(row: Database["public"]["Tables"]["agencies"]["Row
     },
     branding: {
       logoUrl: typeof branding.logoUrl === "string" ? branding.logoUrl : row.logo_url,
+      linkLogoUrl: typeof branding.linkLogoUrl === "string" ? branding.linkLogoUrl : null,
     },
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -371,6 +372,7 @@ export async function updateAgency(id: string, payload: Partial<Agency>) {
         branding: payload.branding
           ? {
               logoUrl: payload.branding.logoUrl,
+              linkLogoUrl: payload.branding.linkLogoUrl ?? undefined,
             }
           : undefined,
       }

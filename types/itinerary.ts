@@ -8,6 +8,7 @@ export interface TripItineraryActivity {
   title: string
   location: string | null
   description: string | null
+  period: "morning" | "afternoon" | "evening" | "flexible"
   type: "attraction" | "food" | "transport" | "hotel" | "experience" | "flight" | "other"
   highlight: boolean
 }

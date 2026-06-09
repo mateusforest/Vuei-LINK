@@ -6,6 +6,8 @@ import { requestItineraryGeneration } from "@/lib/ai/itinerary-generation"
 import { buildTripItineraryPdf } from "@/lib/ai/itinerary-pdf"
 import { getCompleteItineraryCreditCost, getSimpleItineraryCreditCost, estimateCostUsd } from "@/lib/ai/credit-consumption"
 import { createAiUsageLog } from "@/lib/ai/usage-logs"
+import type { Document } from "@/types/document"
+import type { TripItineraryRecord, TripItineraryContent } from "@/types/itinerary"
 
 type JsonObject = Record<string, unknown>
 type TripRow = Database["public"]["Tables"]["trips"]["Row"]
@@ -15,6 +17,53 @@ type DocumentRow = Database["public"]["Tables"]["documents"]["Row"]
 type HotelRow = Database["public"]["Tables"]["trip_hotels"]["Row"]
 type FlightRow = Database["public"]["Tables"]["trip_flights"]["Row"]
 type TripItineraryRow = Database["public"]["Tables"]["trip_itineraries"]["Row"]
+
+function calculateTripDays(startDate?: string | null, endDate?: string | null) {
+  if (!startDate || !endDate) return null
+
+  const start = new Date(`${startDate}T12:00:00`)
+  const end = new Date(`${endDate}T12:00:00`)
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end < start) return null
+
+  return Math.floor((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1
+}
+
+function mapDocumentRowToDocument(row: DocumentRow): Document {
+  return {
+    id: row.id,
+    tripId: row.trip_id,
+    clientId: row.client_id,
+    agencyId: row.agency_id,
+    ownerUserId: row.owner_user_id,
+    name: row.name,
+    type: row.type,
+    fileUrl: row.file_url,
+    filePath: row.file_path,
+    mimeType: row.mime_type,
+    size: row.size_bytes,
+    isPrivate: row.is_private,
+    visibility: row.visibility,
+    aiExtractedData: (row.ai_extracted_data ?? {}) as Record<string, unknown>,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  }
+}
+
+function mapItineraryRowToRecord(row: TripItineraryRow): TripItineraryRecord {
+  return {
+    id: row.id,
+    tripId: row.trip_id,
+    documentId: row.document_id,
+    title: row.title,
+    mode: row.mode,
+    status: row.status,
+    content: (row.content ?? null) as TripItineraryContent | null,
+    pdfUrl: row.pdf_url,
+    createdBy: row.created_by,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  }
+}
 
 interface GenerateItineraryRequestBody {
   tripId?: string
@@ -269,11 +318,15 @@ export async function POST(request: Request) {
     hotels: (hotelsResult.data ?? []) as HotelRow[],
     flights: (flightsResult.data ?? []) as FlightRow[],
   })
+  const expectedDays = calculateTripDays(accessResult.trip.start_date, accessResult.trip.end_date)
 
   const aiResult = await requestItineraryGeneration({
     mode,
     tripTitle: accessResult.trip.title,
     destination: accessResult.trip.destination,
+    startDate: accessResult.trip.start_date,
+    endDate: accessResult.trip.end_date,
+    expectedDays,
     travelContext: context,
   })
 
@@ -366,6 +419,7 @@ export async function POST(request: Request) {
       branding: {
         agencyName: agencyResult.data?.name ?? null,
         agencyLogoUrl:
+          (typeof branding.linkLogoUrl === "string" && branding.linkLogoUrl) ||
           (typeof branding.logoUrl === "string" && branding.logoUrl) ||
           agencyResult.data?.logo_url ||
           null,
@@ -573,7 +627,7 @@ export async function POST(request: Request) {
   }
 
   return NextResponse.json({
-    itinerary: itineraryUpdate.data,
-    document,
+    itinerary: mapItineraryRowToRecord(itineraryUpdate.data),
+    document: document ? mapDocumentRowToDocument(document) : null,
   })
 }

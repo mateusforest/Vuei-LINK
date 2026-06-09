@@ -187,6 +187,8 @@ const DEFAULT_HERO_IMAGE = getDestinationCoverImage()
 const initialTripData = {
   id: "trip-default",
   destination: "Minha Viagem",
+  startDate: null,
+  endDate: null,
   country: "A definir",
   countryFlag: "🇫🇷",
   dates: { start: "A definir", end: "A definir" },
@@ -457,6 +459,7 @@ function mapItineraryContentToLegacyDays(content?: TripItineraryContent | null) 
       highlight: activity.highlight,
       description: activity.description,
       location: activity.location,
+      period: activity.period ?? "flexible",
       icon:
         activity.type === "food"
           ? "UtensilsCrossed"
@@ -495,6 +498,13 @@ function mapLegacyDaysToItineraryContent(days: any[], previousContent?: TripItin
         title: typeof item?.title === "string" ? item.title : "Atividade",
         location: typeof item?.location === "string" ? item.location : null,
         description: typeof item?.description === "string" ? item.description : null,
+        period:
+          item?.period === "morning" ||
+          item?.period === "afternoon" ||
+          item?.period === "evening" ||
+          item?.period === "flexible"
+            ? item.period
+            : "flexible",
         type:
           item?.type === "attraction" ||
           item?.type === "food" ||
@@ -515,6 +525,23 @@ function resolveSimpleTripItinerary(itineraries: TripItineraryRecord[]) {
   return itineraries.find((record) => record.mode === "simple" && (record.status === "completed" || record.status === "draft" || record.status === "generating")) ?? null
 }
 
+function calculateTripDayCount(startDate?: string | null, endDate?: string | null) {
+  if (!startDate || !endDate) return null
+
+  const start = new Date(`${startDate}T12:00:00`)
+  const end = new Date(`${endDate}T12:00:00`)
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end < start) return null
+
+  return Math.floor((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1
+}
+
+function getItineraryPeriodLabel(period?: string | null) {
+  if (period === "morning") return "Manha"
+  if (period === "afternoon") return "Tarde"
+  if (period === "evening") return "Noite"
+  return "Flexivel"
+}
+
 function normalizeTripViewData(tripData: any) {
   const travelers = normalizeTravelers(tripData?.travelers, tripData?.travelersCount)
   const flights = Array.isArray(tripData?.flights) ? tripData.flights : []
@@ -531,6 +558,8 @@ function normalizeTripViewData(tripData: any) {
     destination: tripData?.destination || "Minha Viagem",
     country: tripData?.country || "Nao informado",
     countryFlag: tripData?.countryFlag || "🌍",
+    startDate: tripData?.startDate || null,
+    endDate: tripData?.endDate || null,
     dates: {
       start: tripData?.dates?.start || "A definir",
       end: tripData?.dates?.end || "A definir",
@@ -605,6 +634,8 @@ function buildTripDataFromStoredTrip(storedTrip: any) {
     ...initialTripData,
     id: storedTrip.id || storedTrip.slug || initialTripData.id,
     destination: city || storedTrip.title || "Minha Viagem",
+    startDate: storedTrip.startDate || null,
+    endDate: storedTrip.endDate || null,
     country: storedTrip.country || country || initialTripData.country,
     countryFlag: getCountryFlag(storedTrip.country || country),
     dates: {
@@ -727,7 +758,7 @@ function TripHeader({
   onOpenMenu,
 }: {
   tripData: any
-  agencyBranding: { name: string | null; logoUrl: string | null }
+  agencyBranding: { name: string | null; logoUrl: string | null; isAgency: boolean }
   onOpenShare: () => void
   onOpenMenu: () => void
 }) {
@@ -748,18 +779,20 @@ function TripHeader({
         scrolled ? "bg-black/80 backdrop-blur-xl border-b border-white/5" : "bg-transparent"
       )}
     >
-      <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <div className="rounded-2xl border border-white/10 bg-white/95 px-4 py-3 shadow-[0_18px_60px_rgba(0,0,0,0.22)] backdrop-blur">
-            <div className="flex flex-col gap-1">
+      <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="rounded-2xl border border-white/10 bg-white/92 px-3 py-2 shadow-[0_16px_48px_rgba(0,0,0,0.2)] backdrop-blur">
+            <div className="flex flex-col gap-0.5">
               <Image
                 src={agencyBranding.logoUrl || "/vuei-logo.png"}
                 alt={agencyBranding.name || "Vuei"}
                 width={144}
                 height={48}
-                className="h-9 w-auto max-w-[140px] object-contain sm:h-10 sm:max-w-[160px]"
+                className="h-7 w-auto max-w-[120px] object-contain sm:h-8 sm:max-w-[150px]"
               />
-              <span className="text-[10px] uppercase tracking-[0.2em] text-black/45">Powered by Vuei</span>
+              <span className="text-[9px] uppercase tracking-[0.16em] text-black/40">
+                {agencyBranding.isAgency ? "Powered by Vuei" : "Vuei"}
+              </span>
             </div>
           </div>
           <div className={cn("hidden sm:flex items-center gap-2 transition-opacity duration-300", scrolled ? "opacity-100" : "opacity-0")}>
@@ -2072,7 +2105,7 @@ function ItinerarySection({
   ownerUserId: string | null
   agencyId: string | null
   ensureSensitiveAccess: () => boolean
-  onUpdateItinerary: (data: any) => void
+  onUpdateItinerary: (data: any) => Promise<void> | void
   onGenerateSimple: () => Promise<void>
   onGenerateComplete: () => Promise<void>
   onSaveUploadedItinerary: (payload: { itinerary: TripItineraryRecord; document: any }) => void
@@ -2090,6 +2123,20 @@ function ItinerarySection({
   const simpleRecord = itineraryRecords.find((record) => record.mode === "simple" && (record.status === "completed" || record.status === "draft" || record.status === "generating")) ?? null
   const documentRecords = itineraryRecords.filter((record) => record.mode !== "simple")
   const hasGenerating = itineraryRecords.some((record) => record.status === "generating")
+  const realPlannedDays = calculateTripDayCount(tripData?.startDate, tripData?.endDate)
+  const plannedDaysLabel = simpleRecord
+    ? `${realPlannedDays ?? itinerary.length} dia(s) planejado(s)`
+    : documentRecords.length > 0
+      ? `${documentRecords.length} roteiro(s) salvo(s)`
+      : "Nenhum roteiro criado"
+  const groupedActiveItems = activeItinerary
+    ? [
+        { key: "morning", label: "Manha", items: activeItinerary.items.filter((item: any) => item.period === "morning") },
+        { key: "afternoon", label: "Tarde", items: activeItinerary.items.filter((item: any) => item.period === "afternoon") },
+        { key: "evening", label: "Noite", items: activeItinerary.items.filter((item: any) => item.period === "evening") },
+        { key: "flexible", label: "Flexivel", items: activeItinerary.items.filter((item: any) => !item.period || item.period === "flexible") },
+      ].filter((group) => group.items.length > 0)
+    : []
 
   useEffect(() => {
     if (!activeItinerary && itinerary[0]?.day) {
@@ -2140,16 +2187,18 @@ function ItinerarySection({
 
   const handleOpenItineraryDocument = async (record: TripItineraryRecord) => {
     const document = Array.isArray(tripData.documents) ? tripData.documents.find((entry: any) => entry.id === record.documentId) : null
-    if (!document) {
+    if (!document && !record.pdfUrl) {
       showToast("Documento do roteiro nao encontrado.", "error")
       return
     }
 
-    const resolvedUrl = document.fileUrl
+    const resolvedUrl = document?.fileUrl
       ? { data: document.fileUrl, error: null }
-      : document.filePath
+      : document?.filePath
         ? await getSignedDocumentUrl(document.filePath)
-        : { data: null, error: "Arquivo indisponivel para visualizacao." }
+        : record.pdfUrl
+          ? await getSignedDocumentUrl(record.pdfUrl)
+          : { data: null, error: "Arquivo indisponivel para visualizacao." }
 
     if (resolvedUrl.error || !resolvedUrl.data) {
       showToast(resolvedUrl.error || "Nao foi possivel abrir o roteiro.", "error")
@@ -2170,7 +2219,7 @@ function ItinerarySection({
             <div>
               <h2 className="text-xl font-semibold text-white">Roteiro</h2>
               <p className="text-sm text-white/40">
-                {simpleRecord ? `${itinerary.length} dias planejados` : documentRecords.length > 0 ? `${documentRecords.length} roteiro(s) salvo(s)` : "Nenhum roteiro criado"}
+                {plannedDaysLabel}
               </p>
             </div>
           </div>
@@ -2215,6 +2264,7 @@ function ItinerarySection({
           <>
             <div className="mb-4 rounded-2xl border border-[#5de0e6]/20 bg-[#5de0e6]/10 p-4 text-sm text-white/80">
               Roteiro simples criado com IA e salvo para edicao no modo admin.
+              {realPlannedDays ? ` Periodo real: ${realPlannedDays} dia(s).` : ""}
             </div>
             <div className="flex gap-2 mb-6 overflow-x-auto pb-2 scrollbar-hide">
               {itinerary.map((day: any) => (
@@ -2246,13 +2296,45 @@ function ItinerarySection({
                   transition={{ duration: 0.3 }}
                   className="relative"
                 >
-                  <h3 className="text-lg font-medium text-white mb-6">{activeItinerary.title}</h3>
+                  <div className="mb-6 space-y-3">
+                    <div className="flex flex-wrap items-center gap-3">
+                      <h3 className="text-lg font-medium text-white">{activeItinerary.title}</h3>
+                      <span className="rounded-full border border-white/10 px-3 py-1 text-[10px] uppercase tracking-[0.18em] text-white/45">
+                        {activeItinerary.items.length} atividade(s)
+                      </span>
+                    </div>
+                    {activeItinerary.summary ? <p className="text-sm text-white/65">{activeItinerary.summary}</p> : null}
+                    {(activeItinerary.tips || activeItinerary.important) ? (
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        {activeItinerary.tips ? (
+                          <div className="rounded-2xl border border-white/8 bg-white/[0.03] p-4">
+                            <p className="text-[10px] uppercase tracking-[0.18em] text-[#5de0e6]/80">Observacao util</p>
+                            <p className="mt-2 text-sm text-white/70">{activeItinerary.tips}</p>
+                          </div>
+                        ) : null}
+                        {activeItinerary.important ? (
+                          <div className="rounded-2xl border border-white/8 bg-white/[0.03] p-4">
+                            <p className="text-[10px] uppercase tracking-[0.18em] text-[#5de0e6]/80">Importante</p>
+                            <p className="mt-2 text-sm text-white/70">{activeItinerary.important}</p>
+                          </div>
+                        ) : null}
+                      </div>
+                    ) : null}
+                  </div>
 
                   <div className="relative pl-8">
                     <div className="absolute left-[11px] top-2 bottom-2 w-px bg-gradient-to-b from-[#5de0e6]/50 via-[#004aad]/30 to-transparent" />
 
-                    <div className="space-y-6">
-                      {activeItinerary.items.map((item: any, i: number) => {
+                    <div className="space-y-8">
+                      {groupedActiveItems.map((group) => (
+                        <div key={group.key} className="space-y-4">
+                          <div className="flex items-center gap-2">
+                            <div className="h-px flex-1 bg-white/10" />
+                            <p className="text-[11px] uppercase tracking-[0.22em] text-white/40">{group.label}</p>
+                            <div className="h-px flex-1 bg-white/10" />
+                          </div>
+                          <div className="space-y-6">
+                            {group.items.map((item: any, i: number) => {
                         const IconComponent = iconMap[item.icon] || MapPin
                         return (
                           <motion.div
@@ -2278,13 +2360,18 @@ function ItinerarySection({
                                 <div>
                                   <p className="text-xs text-[#5de0e6] font-medium">{item.time}</p>
                                   <p className="text-white font-medium mt-1">{item.title}</p>
+                                  {item.location ? <p className="mt-2 text-sm text-white/50">{item.location}</p> : null}
+                                  {item.description ? <p className="mt-2 text-sm text-white/60">{item.description}</p> : null}
                                 </div>
                                 {isAdmin ? <Edit3 className="w-4 h-4 text-white/30 opacity-0 group-hover:opacity-100 transition-opacity" /> : <ChevronRight className="w-4 h-4 text-white/30" />}
                               </div>
                             </div>
                           </motion.div>
                         )
-                      })}
+                            })}
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 </motion.div>
@@ -2305,14 +2392,30 @@ function ItinerarySection({
                     </p>
                   </div>
                   <span className="rounded-full border border-white/10 px-2 py-1 text-[10px] uppercase tracking-wider text-white/50">
-                    {record.status === "completed" ? "Concluido" : record.status === "uploaded" ? "Anexado" : record.status}
+                    {record.status === "completed"
+                      ? "Concluido"
+                      : record.status === "uploaded"
+                        ? "Anexado"
+                        : record.status === "failed"
+                          ? "Falhou"
+                          : record.status === "generating"
+                            ? "Gerando"
+                            : record.status}
                   </span>
                 </div>
+                {record.status === "failed" ? (
+                  <p className="mt-3 text-sm text-red-300">Falha honesta na geracao. Este roteiro nao possui arquivo valido para abrir.</p>
+                ) : null}
+                {record.status === "generating" ? (
+                  <p className="mt-3 text-sm text-white/55">Gerando roteiro e vinculando arquivo real no backend...</p>
+                ) : null}
                 <div className="mt-4 flex flex-wrap gap-2">
-                  <Button size="sm" variant="outline" className="border-white/10 text-white/80" onClick={() => void handleOpenItineraryDocument(record)}>
-                    <ExternalLink className="mr-2 h-4 w-4" />
-                    Abrir
-                  </Button>
+                  {record.documentId ? (
+                    <Button size="sm" variant="outline" className="border-white/10 text-white/80" onClick={() => void handleOpenItineraryDocument(record)}>
+                      <ExternalLink className="mr-2 h-4 w-4" />
+                      Abrir
+                    </Button>
+                  ) : null}
                   {isAdmin ? (
                     <Button size="sm" variant="ghost" className="text-red-300 hover:bg-red-500/10" onClick={() => void onDeleteItinerary(record)}>
                       <Trash2 className="mr-2 h-4 w-4" />
@@ -2418,6 +2521,20 @@ function EditItineraryItemModal({ open, onClose, item, onSave, onDelete }: { ope
   <option value="flight" className="bg-[#0a0a0a] text-white">Voo</option>
           </select>
         </div>
+        <div>
+          <label className="text-xs text-white/50 uppercase tracking-wider">Periodo</label>
+          <select
+            value={formData.period || "flexible"}
+            onChange={(e) => setFormData({ ...formData, period: e.target.value })}
+            className="w-full mt-1 px-4 py-3 rounded-xl bg-[#0a0a0a] border border-white/[0.08] text-white focus:outline-none focus:border-[#5de0e6]/50 appearance-none"
+            style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='rgba(255,255,255,0.4)'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center', backgroundSize: '16px' }}
+          >
+            <option value="morning" className="bg-[#0a0a0a] text-white">Manha</option>
+            <option value="afternoon" className="bg-[#0a0a0a] text-white">Tarde</option>
+            <option value="evening" className="bg-[#0a0a0a] text-white">Noite</option>
+            <option value="flexible" className="bg-[#0a0a0a] text-white">Flexivel</option>
+          </select>
+        </div>
         <div className="flex items-center gap-3">
           <input
             type="checkbox"
@@ -2443,7 +2560,7 @@ function EditItineraryItemModal({ open, onClose, item, onSave, onDelete }: { ope
 
 // Add Itinerary Item Modal
 function AddItineraryItemModal({ open, onClose, day, onSave }: { open: boolean; onClose: () => void; day: number; onSave: (data: any) => void }) {
-  const [formData, setFormData] = useState({ title: "", time: "", type: "attraction", highlight: false })
+  const [formData, setFormData] = useState({ title: "", time: "", type: "attraction", period: "flexible", highlight: false })
 
   return (
     <Modal open={open} onClose={onClose} title="Adicionar ao Roteiro">
@@ -2492,6 +2609,21 @@ function AddItineraryItemModal({ open, onClose, day, onSave }: { open: boolean; 
             <option value="transport" className="bg-[#0a0a0a] text-white">Transporte</option>
             <option value="hotel" className="bg-[#0a0a0a] text-white">Hospedagem</option>
             <option value="experience" className="bg-[#0a0a0a] text-white">Experiencia</option>
+          </select>
+        </div>
+
+        <div>
+          <label className="text-xs text-white/50 uppercase tracking-wider">Periodo</label>
+          <select
+            value={formData.period}
+            onChange={(e) => setFormData({ ...formData, period: e.target.value })}
+            className="w-full mt-1 px-4 py-3 rounded-xl bg-[#0a0a0a] border border-white/[0.08] text-white focus:outline-none focus:border-[#5de0e6]/50 appearance-none"
+            style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='rgba(255,255,255,0.4)'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center', backgroundSize: '16px' }}
+          >
+            <option value="morning" className="bg-[#0a0a0a] text-white">Manha</option>
+            <option value="afternoon" className="bg-[#0a0a0a] text-white">Tarde</option>
+            <option value="evening" className="bg-[#0a0a0a] text-white">Noite</option>
+            <option value="flexible" className="bg-[#0a0a0a] text-white">Flexivel</option>
           </select>
         </div>
 
@@ -4093,21 +4225,23 @@ function CreditsModal({ open, onClose, credits }: { open: boolean; onClose: () =
 }
 
 // Footer
-function TripFooter({ agencyBranding }: { agencyBranding: { name: string | null; logoUrl: string | null } }) {
+function TripFooter({ agencyBranding }: { agencyBranding: { name: string | null; logoUrl: string | null; isAgency: boolean } }) {
   return (
-    <footer className="py-12 px-4 border-t border-white/[0.06]">
+    <footer className="py-10 px-4 border-t border-white/[0.06]">
       <div className="max-w-6xl mx-auto">
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <div className="flex flex-col gap-1">
+          <div className="flex items-center gap-3">
+            <div className="flex flex-col gap-0.5">
               <Image
                 src={agencyBranding.logoUrl || "/vuei-logo.png"}
                 alt={agencyBranding.name || "Vuei"}
                 width={80}
                 height={32}
-                className="h-6 w-auto object-contain opacity-70"
+                className="h-5 w-auto object-contain opacity-75"
               />
-              <span className="text-[10px] uppercase tracking-[0.2em] text-white/35">Powered by Vuei</span>
+              <span className="text-[9px] uppercase tracking-[0.14em] text-white/30">
+                {agencyBranding.isAgency ? "Powered by Vuei" : "Vuei"}
+              </span>
             </div>
             <span className="text-sm text-white/30">{agencyBranding.name ? `${agencyBranding.name} no seu link inteligente` : "Sua viagem inteligente"}</span>
           </div>
@@ -4344,7 +4478,7 @@ export default function TripPage() {
   const [sensitiveAccessGranted, setSensitiveAccessGranted] = useState(false)
   const [securityModalOpen, setSecurityModalOpen] = useState(false)
   const [quickAccessGateRequired, setQuickAccessGateRequired] = useState(false)
-  const [agencyBranding, setAgencyBranding] = useState<{ name: string | null; logoUrl: string | null }>({ name: null, logoUrl: null })
+  const [agencyBranding, setAgencyBranding] = useState<{ name: string | null; logoUrl: string | null; isAgency: boolean }>({ name: null, logoUrl: null, isAgency: false })
   const pendingSensitiveActionRef = useRef<(() => void) | null>(null)
   const loadRequestRef = useRef(0)
 
@@ -4435,7 +4569,8 @@ export default function TripPage() {
 
           setAgencyBranding({
             name: agencyResult?.data?.name ?? null,
-            logoUrl: agencyResult?.data?.branding?.logoUrl || agencyResult?.data?.logo || null,
+            logoUrl: agencyResult?.data?.branding?.linkLogoUrl || agencyResult?.data?.branding?.logoUrl || agencyResult?.data?.logo || null,
+            isAgency: Boolean(repositoryTrip.data.agencyId),
           })
 
           console.log("[LINK] trip loaded", repositoryTrip.data.id)
@@ -4508,7 +4643,7 @@ export default function TripPage() {
         const matchedTrip = allTrips.find((trip) => trip.slug === routeSlug || trip.id === routeSlug)
 
         if (matchedTrip) {
-          setAgencyBranding({ name: null, logoUrl: null })
+          setAgencyBranding({ name: null, logoUrl: null, isAgency: false })
           setTripData(buildTripDataFromStoredTrip(matchedTrip))
           setIsLoadingTrip(false)
           return
@@ -4815,6 +4950,12 @@ export default function TripPage() {
     }
 
     const nextItinerary = result.data.itinerary as TripItineraryRecord
+    if (mode === "complete_pdf" && nextItinerary.status === "completed" && !nextItinerary.documentId && !result.data.document) {
+      console.error("[ITINERARY] complete pdf missing document", nextItinerary)
+      showToast("O roteiro foi marcado como concluido, mas nenhum documento valido foi retornado pelo backend.", "error")
+      return
+    }
+
     syncTripItineraryRecord(nextItinerary)
 
     if (nextItinerary.mode === "simple") {

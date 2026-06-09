@@ -4,6 +4,9 @@ export interface ItineraryGenerationRequest {
   mode: "simple" | "complete_pdf"
   tripTitle: string
   destination: string
+  startDate?: string | null
+  endDate?: string | null
+  expectedDays?: number | null
   travelContext: string
 }
 
@@ -13,6 +16,7 @@ export interface GeneratedItineraryActivity {
   title: string
   location: string | null
   description: string | null
+  period: "morning" | "afternoon" | "evening" | "flexible"
   type: "attraction" | "food" | "transport" | "hotel" | "experience" | "flight" | "other"
   highlight: boolean
 }
@@ -110,6 +114,13 @@ function normalizeActivities(value: unknown): GeneratedItineraryActivity[] {
         title: normalizeString(activity.title) ?? "Atividade sem titulo",
         location: normalizeString(activity.location),
         description: normalizeString(activity.description),
+        period:
+          activity.period === "morning" ||
+          activity.period === "afternoon" ||
+          activity.period === "evening" ||
+          activity.period === "flexible"
+            ? activity.period
+            : "flexible",
         type:
           activity.type === "attraction" ||
           activity.type === "food" ||
@@ -162,7 +173,7 @@ function parseStructuredContent(payload: unknown): GeneratedItineraryContent | n
 
 function getSystemPrompt(mode: "simple" | "complete_pdf") {
   if (mode === "simple") {
-    return "Voce gera roteiros enxutos para o Vuei. Use apenas o contexto real fornecido. Nao invente reservas, documentos, horarios obrigatorios ou contatos criticos. Quando algo nao existir, deixe null ou omita detalhes. Responda apenas com JSON valido."
+    return "Voce gera roteiros simples, mas comercialmente fortes, para o Vuei. Use apenas o contexto real fornecido. Nao invente reservas, documentos, horarios obrigatorios ou contatos criticos. Para cada dia, entregue titulo, resumo, observacoes uteis e atividades suficientes para manha, tarde e noite. Cada dia deve ter de 2 a 4 atividades, com horarios sugeridos quando possivel, locais/regioes e descricoes curtas. Quando algo nao existir, deixe null ou trate como sugestao geral. Responda apenas com JSON valido."
   }
 
   return "Voce gera roteiros completos para PDF no Vuei. Use apenas o contexto real fornecido. Nao invente reservas, horarios obrigatorios, documentos criticos ou contatos oficiais. Pode sugerir atividades e dicas gerais quando forem apresentadas como sugestoes. Responda apenas com JSON valido."
@@ -172,8 +183,15 @@ export async function requestItineraryGeneration({
   mode,
   tripTitle,
   destination,
+  startDate,
+  endDate,
+  expectedDays,
   travelContext,
 }: ItineraryGenerationRequest): Promise<GeneratedItineraryResult> {
+  const completionBudget = mode === "simple"
+    ? Math.min(12_000, Math.max(2_200, 600 + (expectedDays ?? 3) * 260))
+    : Math.min(18_000, Math.max(3_600, 1_000 + (expectedDays ?? 3) * 420))
+
   const apiKey = process.env.OPENAI_API_KEY
   if (!apiKey) {
     return {
@@ -196,7 +214,7 @@ export async function requestItineraryGeneration({
     body: JSON.stringify({
       model: OPENAI_ITINERARY_MODEL,
       temperature: mode === "simple" ? 0.3 : 0.4,
-      max_completion_tokens: mode === "simple" ? 1400 : 2600,
+      max_completion_tokens: completionBudget,
       response_format: {
         type: "json_schema",
         json_schema: {
@@ -247,13 +265,17 @@ export async function requestItineraryGeneration({
                           title: { type: "string" },
                           location: { type: ["string", "null"] },
                           description: { type: ["string", "null"] },
+                          period: {
+                            type: "string",
+                            enum: ["morning", "afternoon", "evening", "flexible"],
+                          },
                           type: {
                             type: "string",
                             enum: ["attraction", "food", "transport", "hotel", "experience", "flight", "other"],
                           },
                           highlight: { type: "boolean" },
                         },
-                        required: ["id", "time", "title", "location", "description", "type", "highlight"],
+                        required: ["id", "time", "title", "location", "description", "period", "type", "highlight"],
                       },
                     },
                   },
@@ -274,6 +296,11 @@ export async function requestItineraryGeneration({
           role: "user",
           content:
             `Crie um roteiro em modo ${mode} para a viagem "${tripTitle}" em ${destination}. ` +
+            `Periodo real: ${startDate ?? "nao informado"} ate ${endDate ?? "nao informado"}. ` +
+            `${expectedDays ? `Gere exatamente ${expectedDays} dia(s), um para cada dia real do periodo. ` : ""}` +
+            (mode === "simple"
+              ? "No modo simples, cada dia precisa refletir manha, tarde e noite por meio do campo period das atividades, com 2 a 4 atividades no total por dia. "
+              : "No modo completo, mantenha profundidade maior, mas ainda respeitando exatamente o periodo real. ") +
             "Use o contexto real abaixo. Quando nao houver dado critico confirmado, mantenha a informacao ausente ou identifique como sugestao geral sem inventar reservas.\n\n" +
             travelContext,
         },
@@ -325,6 +352,22 @@ export async function requestItineraryGeneration({
       calledModel: true,
       model: OPENAI_ITINERARY_MODEL,
       error: "A IA nao retornou um roteiro utilizavel para esta viagem.",
+      rawText,
+      data: parsed,
+      usage: {
+        inputTokens: payload?.usage?.prompt_tokens ?? 0,
+        outputTokens: payload?.usage?.completion_tokens ?? 0,
+        totalTokens: payload?.usage?.total_tokens ?? 0,
+      },
+    }
+  }
+
+  if (expectedDays && parsed.days.length !== expectedDays) {
+    return {
+      ok: false,
+      calledModel: true,
+      model: OPENAI_ITINERARY_MODEL,
+      error: `A IA retornou ${parsed.days.length} dia(s), mas a viagem exige ${expectedDays} dia(s) no periodo informado.`,
       rawText,
       data: parsed,
       usage: {

@@ -23,6 +23,7 @@ type ProfileRow = Database["public"]["Tables"]["profiles"]["Row"]
 type AgencyMemberRow = Database["public"]["Tables"]["agency_members"]["Row"]
 type DocumentRow = Database["public"]["Tables"]["documents"]["Row"]
 type HotelRow = Database["public"]["Tables"]["trip_hotels"]["Row"]
+type FlightRow = Database["public"]["Tables"]["trip_flights"]["Row"]
 type PromptRow = Database["public"]["Tables"]["ai_prompts"]["Row"]
 
 function mapPromptRow(row: PromptRow): AiPrompt {
@@ -298,6 +299,11 @@ export async function POST(request: Request) {
     .select("*")
     .eq("trip_id", accessResult.trip.id)
     .order("created_at", { ascending: true })
+  const flightsResult = await supabase
+    .from("trip_flights")
+    .select("*")
+    .eq("trip_id", accessResult.trip.id)
+    .order("departure_at", { ascending: true, nullsFirst: false })
   const documentsResult = await supabase
     .from("documents")
     .select("*")
@@ -325,6 +331,7 @@ export async function POST(request: Request) {
   const contextSummary = buildTripContextSummary({
     trip: accessResult.trip,
     hotels: (hotelsResult.data ?? []) as HotelRow[],
+    flights: (flightsResult.data ?? []) as FlightRow[],
     documents: (documentsResult.data ?? []) as DocumentRow[],
     audience: ownerType,
     recentMessages: history,

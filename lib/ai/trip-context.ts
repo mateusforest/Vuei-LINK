@@ -3,11 +3,13 @@ import type { Database } from "@/lib/supabase/types"
 type TripRow = Database["public"]["Tables"]["trips"]["Row"]
 type DocumentRow = Database["public"]["Tables"]["documents"]["Row"]
 type HotelRow = Database["public"]["Tables"]["trip_hotels"]["Row"]
+type FlightRow = Database["public"]["Tables"]["trip_flights"]["Row"]
 
 export interface TripContextSummaryInput {
   trip: TripRow
   documents: DocumentRow[]
   hotels: HotelRow[]
+  flights: FlightRow[]
   audience: "traveler" | "agency"
   recentMessages?: Array<{ role: string; content: string }>
 }
@@ -34,18 +36,44 @@ function summarizeDocuments(documents: DocumentRow[]) {
     .join("; ")
 }
 
-function summarizeFlights(documents: DocumentRow[]) {
+function summarizeFlights(flights: FlightRow[], documents: DocumentRow[]) {
+  const prioritizedFlights = flights
+    .filter((flight) => flight.extraction_status === "completed" || flight.extraction_status === "manual")
+    .sort((left, right) => {
+      const leftTime = left.departure_at ? new Date(left.departure_at).getTime() : Number.MAX_SAFE_INTEGER
+      const rightTime = right.departure_at ? new Date(right.departure_at).getTime() : Number.MAX_SAFE_INTEGER
+      return leftTime - rightTime
+    })
+
+  if (prioritizedFlights.length > 0) {
+    return prioritizedFlights
+      .map((flight) => {
+        const route = [flight.origin_airport, flight.destination_airport].filter(Boolean).join(" -> ")
+        return [
+          `companhia=${flight.airline ?? "nao informada"}`,
+          `voo=${flight.flight_number ?? "nao informado"}`,
+          `localizador=${flight.booking_reference ?? "nao informado"}`,
+          route ? `rota=${route}` : null,
+          flight.departure_at ? `saida=${flight.departure_at}` : null,
+          flight.arrival_at ? `chegada=${flight.arrival_at}` : null,
+          flight.passenger_name ? `passageiro=${flight.passenger_name}` : null,
+          flight.terminal ? `terminal=${flight.terminal}` : null,
+          flight.gate ? `portao=${flight.gate}` : null,
+          flight.seat ? `assento=${flight.seat}` : null,
+          flight.baggage_info ? `bagagem=${flight.baggage_info}` : null,
+          `status_extracao=${flight.extraction_status}`,
+        ]
+          .filter(Boolean)
+          .join(", ")
+      })
+      .join("; ")
+  }
+
   const ticketDocuments = documents.filter((document) => document.type === "ticket")
   if (!ticketDocuments.length) return "Nenhuma passagem processada."
 
   return ticketDocuments
-    .map((document) => {
-      const extracted = (document.ai_extracted_data ?? {}) as Record<string, unknown>
-      const airline = typeof extracted.airline === "string" ? extracted.airline : "Companhia nao identificada"
-      const flightNumber = typeof extracted.flightNumber === "string" ? extracted.flightNumber : "voo nao identificado"
-      const route = [extracted.originCode, extracted.destinationCode].filter((value) => typeof value === "string").join(" -> ")
-      return `${airline} ${flightNumber}${route ? ` (${route})` : ""}`
-    })
+    .map((document) => `${document.name} [ticket] sem voo estruturado confirmado`)
     .join("; ")
 }
 
@@ -59,7 +87,7 @@ function summarizeRecentMessages(messages: Array<{ role: string; content: string
 }
 
 export function buildTripContextSummary(input: TripContextSummaryInput) {
-  const { trip, documents, hotels, audience, recentMessages } = input
+  const { trip, documents, hotels, flights, audience, recentMessages } = input
   const travelWindow = [trip.start_date, trip.end_date].filter(Boolean).join(" ate ")
 
   return [
@@ -70,7 +98,7 @@ export function buildTripContextSummary(input: TripContextSummaryInput) {
     `Estilo: ${trip.style || "Nao informado"}`,
     `Viajantes: ${trip.travelers_count}`,
     `Hospedagens: ${summarizeHotels(hotels)}`,
-    `Passagens: ${summarizeFlights(documents)}`,
+    `Passagens estruturadas: ${summarizeFlights(flights, documents)}`,
     `Documentos visiveis para este contexto (${audience}): ${summarizeDocuments(documents)}`,
     `Historico recente:\n${summarizeRecentMessages(recentMessages)}`,
   ].join("\n")

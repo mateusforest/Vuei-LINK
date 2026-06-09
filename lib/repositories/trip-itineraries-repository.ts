@@ -1,4 +1,5 @@
 import type { TripItineraryRecord, TripItineraryContent, TripItineraryMode, TripItineraryStatus } from "@/types"
+import type { Document } from "@/types/document"
 import { createSupabaseBrowserClient, createSupabaseBrowserClientPlaceholder } from "@/lib/supabase/client"
 import { shouldUseSupabase } from "@/lib/data-source"
 import type { Database } from "@/lib/supabase/types"
@@ -55,6 +56,80 @@ function mapRow(row: TripItineraryRow): TripItineraryRecord {
     createdBy: row.created_by,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+  }
+}
+
+function mapApiItineraryRecord(value: unknown): TripItineraryRecord | null {
+  if (!value || typeof value !== "object") return null
+
+  const row = value as Record<string, unknown>
+  const id = typeof row.id === "string" ? row.id : null
+  const tripId = typeof row.tripId === "string" ? row.tripId : typeof row.trip_id === "string" ? row.trip_id : null
+  if (!id || !tripId) return null
+
+  return {
+    id,
+    tripId,
+    documentId:
+      typeof row.documentId === "string"
+        ? row.documentId
+        : typeof row.document_id === "string"
+          ? row.document_id
+          : null,
+    title: typeof row.title === "string" ? row.title : "Roteiro da viagem",
+    mode: (row.mode as TripItineraryMode) ?? "simple",
+    status: (row.status as TripItineraryStatus) ?? "draft",
+    content: (row.content ?? null) as TripItineraryContent | null,
+    pdfUrl:
+      typeof row.pdfUrl === "string"
+        ? row.pdfUrl
+        : typeof row.pdf_url === "string"
+          ? row.pdf_url
+          : null,
+    createdBy:
+      typeof row.createdBy === "string"
+        ? row.createdBy
+        : typeof row.created_by === "string"
+          ? row.created_by
+          : null,
+    createdAt:
+      typeof row.createdAt === "string"
+        ? row.createdAt
+        : typeof row.created_at === "string"
+          ? row.created_at
+          : new Date().toISOString(),
+    updatedAt:
+      typeof row.updatedAt === "string"
+        ? row.updatedAt
+        : typeof row.updated_at === "string"
+          ? row.updated_at
+          : new Date().toISOString(),
+  }
+}
+
+function mapApiDocument(value: unknown): Document | null {
+  if (!value || typeof value !== "object") return null
+  const row = value as Record<string, unknown>
+  const id = typeof row.id === "string" ? row.id : null
+  if (!id) return null
+
+  return {
+    id,
+    tripId: typeof row.tripId === "string" ? row.tripId : typeof row.trip_id === "string" ? row.trip_id : null,
+    clientId: typeof row.clientId === "string" ? row.clientId : typeof row.client_id === "string" ? row.client_id : null,
+    agencyId: typeof row.agencyId === "string" ? row.agencyId : typeof row.agency_id === "string" ? row.agency_id : null,
+    ownerUserId: typeof row.ownerUserId === "string" ? row.ownerUserId : typeof row.owner_user_id === "string" ? row.owner_user_id : null,
+    name: typeof row.name === "string" ? row.name : "Documento",
+    type: typeof row.type === "string" ? row.type : "itinerary",
+    fileUrl: typeof row.fileUrl === "string" ? row.fileUrl : typeof row.file_url === "string" ? row.file_url : null,
+    filePath: typeof row.filePath === "string" ? row.filePath : typeof row.file_path === "string" ? row.file_path : null,
+    mimeType: typeof row.mimeType === "string" ? row.mimeType : typeof row.mime_type === "string" ? row.mime_type : null,
+    size: typeof row.size === "number" ? row.size : typeof row.size_bytes === "number" ? row.size_bytes : null,
+    isPrivate: row.isPrivate === true || row.is_private === true,
+    visibility: (row.visibility as Document["visibility"]) ?? "private",
+    aiExtractedData: (row.aiExtractedData ?? row.ai_extracted_data ?? {}) as Record<string, unknown>,
+    createdAt: typeof row.createdAt === "string" ? row.createdAt : typeof row.created_at === "string" ? row.created_at : new Date().toISOString(),
+    updatedAt: typeof row.updatedAt === "string" ? row.updatedAt : typeof row.updated_at === "string" ? row.updated_at : new Date().toISOString(),
   }
 }
 
@@ -212,7 +287,13 @@ export async function requestAiItineraryGeneration(payload: { tripId: string; mo
 
   return {
     source: "api" as const,
-    data,
+    data: data
+      ? {
+          ...data,
+          itinerary: mapApiItineraryRecord(data.itinerary) ?? null,
+          document: mapApiDocument(data.document) ?? null,
+        }
+      : null,
     error: response.ok ? null : data?.error || "Nao foi possivel gerar o roteiro.",
   }
 }
