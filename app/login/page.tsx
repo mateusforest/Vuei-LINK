@@ -16,7 +16,7 @@ type AppRole = "traveler" | "agency_owner" | "agency_member" | "master"
 
 export default function LoginPage() {
   const router = useRouter()
-  const { signIn, user, profile, loading } = useAuth()
+  const { signIn, user, profile, loading, initialized } = useAuth()
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [email, setEmail] = useState("")
@@ -30,12 +30,12 @@ export default function LoginPage() {
   }, [])
 
   useEffect(() => {
-    if (safeRedirect === undefined) return
+    if (safeRedirect === undefined || !initialized) return
     const resolvedRole = (profile?.role ?? user?.user_metadata?.role) as AppRole | undefined
     if (!loading && user && resolvedRole) {
       router.replace(safeRedirect || getRedirectByRole(resolvedRole))
     }
-  }, [loading, profile?.role, router, safeRedirect, user])
+  }, [initialized, loading, profile?.role, router, safeRedirect, user])
 
   const validateForm = () => {
     const newErrors: { email?: string; password?: string } = {}

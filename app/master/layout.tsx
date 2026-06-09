@@ -80,7 +80,7 @@ function MasterLayoutInner({ children }: { children: React.ReactNode }) {
   const [searchQuery, setSearchQuery] = useState("")
   const [notificationsOpen, setNotificationsOpen] = useState(false)
   
-  const { credits, notifications, markNotificationRead, markAllNotificationsRead, searchGlobal } = useMaster()
+  const { credits, notifications, markNotificationRead, markAllNotificationsRead, searchGlobal, loadingState } = useMaster()
   const unreadCount = notifications.filter(n => !n.read).length
   const searchResults = searchQuery.length > 1 ? searchGlobal(searchQuery) : { agencies: [], users: [], trips: [] }
   const hasResults = searchResults.agencies.length > 0 || searchResults.users.length > 0 || searchResults.trips.length > 0
@@ -541,7 +541,15 @@ function MasterLayoutInner({ children }: { children: React.ReactNode }) {
           </div>
         </header>
 
-        <main className="p-4 lg:p-8">{children}</main>
+        <main className="p-4 lg:p-8">
+          {loadingState ? (
+            <div className="rounded-2xl border border-white/5 bg-card/40 p-6 text-sm text-muted-foreground">
+              Carregando dados do portal master...
+            </div>
+          ) : (
+            children
+          )}
+        </main>
       </div>
     </div>
   )

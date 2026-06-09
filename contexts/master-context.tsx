@@ -182,6 +182,7 @@ interface MasterContextType {
   users: User[]
   trips: MasterTrip[]
   aiUsageLogs: AiUsageLog[]
+  loadingState: boolean
   aiOverview: MasterAiOverview
   dataErrors: {
     profiles: string | null
@@ -580,6 +581,7 @@ function buildMasterState(data: {
 export function MasterProvider({ children }: { children: ReactNode }) {
   const { user, profile, loading } = useAuth()
   const [state, setState] = useState<MasterState>(INITIAL_STATE)
+  const [loadingState, setLoadingState] = useState(true)
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [settings, setSettings] = useState<MasterSettings>(INITIAL_SETTINGS)
   const [dataErrors, setDataErrors] = useState(EMPTY_DATA_ERRORS)
@@ -589,6 +591,7 @@ export function MasterProvider({ children }: { children: ReactNode }) {
 
     async function loadMasterData() {
       if (loading) return
+      setLoadingState(true)
 
       if (!shouldUseSupabase()) {
         if (!active) return
@@ -604,6 +607,7 @@ export function MasterProvider({ children }: { children: ReactNode }) {
             createdAt: new Date().toISOString(),
           },
         ])
+        setLoadingState(false)
         return
       }
 
@@ -612,6 +616,7 @@ export function MasterProvider({ children }: { children: ReactNode }) {
         setState(INITIAL_STATE)
         setDataErrors(EMPTY_DATA_ERRORS)
         setNotifications([])
+        setLoadingState(false)
         return
       }
 
@@ -773,6 +778,7 @@ export function MasterProvider({ children }: { children: ReactNode }) {
       setState(nextState)
       setDataErrors(nextErrors)
       setNotifications(nextNotifications)
+      setLoadingState(false)
     }
 
     void loadMasterData()
@@ -886,6 +892,7 @@ export function MasterProvider({ children }: { children: ReactNode }) {
         users: state.users,
         trips: state.trips,
         aiUsageLogs: state.aiUsageLogs,
+        loadingState,
         aiOverview: state.aiOverview,
         dataErrors,
         conciergeRequests: state.conciergeRequests,

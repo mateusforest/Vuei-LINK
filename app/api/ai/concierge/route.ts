@@ -3,9 +3,10 @@ import { createSupabaseServerClient } from "@/lib/supabase/server"
 import { shouldUseSupabase } from "@/lib/data-source"
 import type { AiPrompt } from "@/types"
 import type { Database } from "@/lib/supabase/types"
-
-const OPENAI_MODEL = process.env.OPENAI_CONCIERGE_MODEL ?? "gpt-4.1-mini"
-const MIN_CREDITS_PER_CALL = 1
+import { requestConciergeReply } from "@/lib/ai/concierge-engine"
+import { getConciergeCreditCost, estimateCostUsd } from "@/lib/ai/credit-consumption"
+import { buildFallbackConciergePrompt, buildPromptInput } from "@/lib/ai/prompts"
+import { buildTripContextSummary } from "@/lib/ai/trip-context"
 
 type JsonObject = Record<string, unknown>
 
@@ -23,40 +24,6 @@ type DocumentRow = Database["public"]["Tables"]["documents"]["Row"]
 type HotelRow = Database["public"]["Tables"]["trip_hotels"]["Row"]
 type PromptRow = Database["public"]["Tables"]["ai_prompts"]["Row"]
 
-function buildFallbackPrompt(code: string): AiPrompt {
-  if (code === "concierge_agency") {
-    return {
-      id: "prompt-concierge-agency-default",
-      code,
-      name: "Concierge Agency",
-      module: "concierge",
-      systemPrompt:
-        "Voce e o Concierge Vuei em contexto de agencia. Responda com base apenas no contexto real da viagem e deixe claro quando algum dado ainda nao estiver disponivel.",
-      userPromptTemplate: "{message}",
-      isActive: true,
-      version: 1,
-      metadata: { fallback: true },
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    }
-  }
-
-  return {
-    id: "prompt-concierge-traveler-default",
-    code: "concierge_traveler",
-    name: "Concierge Traveler",
-    module: "concierge",
-    systemPrompt:
-      "Voce e o Concierge Vuei para viajantes. Responda usando somente o contexto real disponivel da viagem, sem inventar documentos, roteiros, reservas ou informacoes ausentes.",
-    userPromptTemplate: "{message}",
-    isActive: true,
-    version: 1,
-    metadata: { fallback: true },
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  }
-}
-
 function mapPromptRow(row: PromptRow): AiPrompt {
   return {
     id: row.id,
@@ -71,53 +38,6 @@ function mapPromptRow(row: PromptRow): AiPrompt {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }
-}
-
-function estimateCostUsd(inputTokens: number, outputTokens: number) {
-  const inputRate = Number(process.env.OPENAI_PRICE_INPUT_PER_1M_USD ?? "")
-  const outputRate = Number(process.env.OPENAI_PRICE_OUTPUT_PER_1M_USD ?? "")
-
-  if (!Number.isFinite(inputRate) || !Number.isFinite(outputRate) || inputRate < 0 || outputRate < 0) {
-    return null
-  }
-
-  return Number((((inputTokens / 1_000_000) * inputRate) + ((outputTokens / 1_000_000) * outputRate)).toFixed(6))
-}
-
-function buildContextSummary(trip: TripRow, hotels: HotelRow[], documents: DocumentRow[], audience: "traveler" | "agency") {
-  const travelWindow = [trip.start_date, trip.end_date].filter(Boolean).join(" ate ")
-  const hotelsSummary = hotels.length
-    ? hotels
-        .map((hotel) => {
-          const hotelName = hotel.name ?? hotel.hotel_name ?? "Hospedagem sem nome"
-          return `${hotelName} (${hotel.check_in ?? "check-in nao informado"} -> ${hotel.check_out ?? "check-out nao informado"})`
-        })
-        .join("; ")
-    : "Nenhuma hospedagem real adicionada."
-
-  const documentsSummary = documents.length
-    ? documents
-        .map((document) => `${document.name} [${document.type}]${document.is_private ? " (privado)" : ""}`)
-        .join("; ")
-    : "Nenhum documento real anexado."
-
-  return [
-    `Viagem: ${trip.title}`,
-    `Destino: ${trip.destination}${trip.city ? `, ${trip.city}` : ""}${trip.country ? `, ${trip.country}` : ""}`,
-    `Periodo: ${travelWindow || "Nao informado"}`,
-    `Status: ${trip.status}`,
-    `Estilo: ${trip.style || "Nao informado"}`,
-    `Viajantes: ${trip.travelers_count}`,
-    `Hospedagens: ${hotelsSummary}`,
-    `Documentos visiveis para este contexto (${audience}): ${documentsSummary}`,
-  ].join("\n")
-}
-
-function buildUserPrompt(template: string | null, message: string, contextSummary: string) {
-  const baseTemplate = template?.trim() || "{message}\n\nContexto real:\n{context}"
-  return baseTemplate
-    .replaceAll("{message}", message)
-    .replaceAll("{context}", contextSummary)
 }
 
 async function getProfile(client: NonNullable<Awaited<ReturnType<typeof createSupabaseServerClient>>>, userId: string) {
@@ -212,7 +132,7 @@ async function resolvePrompt(
     .maybeSingle()
 
   if (exact.data) return { prompt: mapPromptRow(exact.data), error: null }
-  if (exact.error) return { prompt: buildFallbackPrompt(code), error: exact.error.message }
+  if (exact.error) return { prompt: buildFallbackConciergePrompt(code), error: exact.error.message }
 
   const fallback = await client
     .from("ai_prompts")
@@ -224,7 +144,7 @@ async function resolvePrompt(
     .maybeSingle()
 
   if (fallback.data) return { prompt: mapPromptRow(fallback.data), error: null }
-  return { prompt: buildFallbackPrompt(code), error: fallback.error?.message ?? null }
+  return { prompt: buildFallbackConciergePrompt(code), error: fallback.error?.message ?? null }
 }
 
 async function createOrReuseConversation(
@@ -302,66 +222,6 @@ async function fetchConversationHistory(
   }))
 }
 
-async function requestOpenAIReply(systemPrompt: string, history: Array<{ role: string; content: string }>, userPrompt: string) {
-  const apiKey = process.env.OPENAI_API_KEY
-  if (!apiKey) {
-    return {
-      ok: false as const,
-      error: "A IA operacional ainda nao esta configurada no servidor. Defina OPENAI_API_KEY para habilitar respostas reais.",
-    }
-  }
-
-  const response = await fetch("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model: OPENAI_MODEL,
-      temperature: 0.3,
-      max_completion_tokens: 600,
-      messages: [
-        { role: "system", content: systemPrompt },
-        ...history.map((message) => ({
-          role: message.role === "assistant" ? "assistant" : "user",
-          content: message.content,
-        })),
-        { role: "user", content: userPrompt },
-      ],
-    }),
-  })
-
-  const data = await response.json().catch(() => null)
-
-  if (!response.ok) {
-    return {
-      ok: false as const,
-      error:
-        data?.error?.message ||
-        "A chamada real de IA falhou no servidor.",
-    }
-  }
-
-  const content = data?.choices?.[0]?.message?.content?.trim?.()
-  if (!content) {
-    return {
-      ok: false as const,
-      error: "A IA nao retornou uma resposta valida para esta pergunta.",
-    }
-  }
-
-  return {
-    ok: true as const,
-    content,
-    usage: {
-      inputTokens: data?.usage?.prompt_tokens ?? 0,
-      outputTokens: data?.usage?.completion_tokens ?? 0,
-      totalTokens: data?.usage?.total_tokens ?? 0,
-    },
-  }
-}
-
 export async function POST(request: Request) {
   if (!shouldUseSupabase()) {
     return NextResponse.json(
@@ -422,7 +282,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: balanceResult.error }, { status: 500 })
   }
 
-  if ((balanceResult.balance ?? 0) < MIN_CREDITS_PER_CALL) {
+  const creditsPerCall = getConciergeCreditCost()
+
+  if ((balanceResult.balance ?? 0) < creditsPerCall) {
     return NextResponse.json(
       { error: "Saldo insuficiente. Adicione creditos antes de usar o concierge real." },
       { status: 402 }
@@ -459,15 +321,16 @@ export async function POST(request: Request) {
   }
 
   const history = await fetchConversationHistory(supabase, conversationResult.conversationId)
-  const contextSummary = buildContextSummary(
-    accessResult.trip,
-    (hotelsResult.data ?? []) as HotelRow[],
-    (documentsResult.data ?? []) as DocumentRow[],
-    ownerType,
-  )
+  const contextSummary = buildTripContextSummary({
+    trip: accessResult.trip,
+    hotels: (hotelsResult.data ?? []) as HotelRow[],
+    documents: (documentsResult.data ?? []) as DocumentRow[],
+    audience: ownerType,
+    recentMessages: history,
+  })
 
-  const userPrompt = buildUserPrompt(promptResult.prompt.userPromptTemplate, message, contextSummary)
-  const aiResult = await requestOpenAIReply(promptResult.prompt.systemPrompt, history, userPrompt)
+  const userPrompt = buildPromptInput(promptResult.prompt.userPromptTemplate, message, contextSummary)
+  const aiResult = await requestConciergeReply(promptResult.prompt.systemPrompt, history, userPrompt)
 
   if (!aiResult.ok) {
     return NextResponse.json({ error: aiResult.error }, { status: 503 })
@@ -475,7 +338,7 @@ export async function POST(request: Request) {
 
   const assistantMessage = aiResult.content
   const estimatedCost = estimateCostUsd(aiResult.usage.inputTokens, aiResult.usage.outputTokens)
-  const creditsToCharge = MIN_CREDITS_PER_CALL
+  const creditsToCharge = creditsPerCall
 
   const userInsert = await supabase.from("ai_messages").insert({
     conversation_id: conversationResult.conversationId,
@@ -490,7 +353,7 @@ export async function POST(request: Request) {
     content: assistantMessage,
     metadata: {
       origin,
-      model: OPENAI_MODEL,
+      model: aiResult.model,
       promptCode: promptResult.prompt.code,
     },
   })
@@ -526,7 +389,7 @@ export async function POST(request: Request) {
     client_id: accessResult.trip.client_id,
     module: "concierge",
     action: "chat_completion",
-    model: OPENAI_MODEL,
+      model: aiResult.model,
     input_tokens: aiResult.usage.inputTokens,
     output_tokens: aiResult.usage.outputTokens,
     total_tokens: aiResult.usage.totalTokens,

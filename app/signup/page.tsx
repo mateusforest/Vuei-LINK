@@ -15,7 +15,7 @@ import { getSafeRedirectFromWindow } from "@/lib/auth/safe-redirect"
 
 export default function SignupPage() {
   const router = useRouter()
-  const { signUp, user, profile, loading } = useAuth()
+  const { signUp, user, profile, loading, initialized } = useAuth()
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
@@ -42,12 +42,12 @@ export default function SignupPage() {
   }, [])
 
   useEffect(() => {
-    if (safeRedirect === undefined) return
+    if (safeRedirect === undefined || !initialized) return
     const resolvedRole = profile?.role ?? (user?.user_metadata?.role as any)
     if (!loading && user && resolvedRole) {
       router.replace(safeRedirect || getRedirectByRole(resolvedRole))
     }
-  }, [loading, profile?.role, router, safeRedirect, user])
+  }, [initialized, loading, profile?.role, router, safeRedirect, user])
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {}

@@ -178,6 +178,7 @@ interface AgencyContextType {
   agencyId: string | null
   agency: Agency | null
   isUsingRealData: boolean
+  workspaceLoading: boolean
   setupIncomplete: boolean
   workspaceError: string | null
   refreshAgencyWorkspace: () => Promise<void>
@@ -428,6 +429,7 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
   const isUsingRealData = shouldUseSupabase()
   const [agency, setAgency] = useState<Agency | null>(null)
   const [agencyId, setAgencyId] = useState<string | null>(null)
+  const [workspaceLoading, setWorkspaceLoading] = useState(isUsingRealData)
   const [setupIncomplete, setSetupIncomplete] = useState(false)
   const [workspaceError, setWorkspaceError] = useState<string | null>(null)
   const [clients, setClients] = useState<Client[]>(isUsingRealData ? [] : initialClients)
@@ -524,6 +526,7 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
 
   const refreshAgencyWorkspace = useCallback(async () => {
     if (!isUsingRealData) return
+    setWorkspaceLoading(true)
     if (!user?.id) {
       setAgency(null)
       setAgencyId(null)
@@ -542,6 +545,7 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
         ...buildCanonicalCredits(0, []),
       })
       setIsLoaded(true)
+      setWorkspaceLoading(false)
       return
     }
 
@@ -570,6 +574,7 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
         ...buildCanonicalCredits(0, []),
       })
       setIsLoaded(true)
+      setWorkspaceLoading(false)
       return
     }
 
@@ -717,6 +722,7 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
       ...buildCanonicalCredits(resolvedAgency.creditsBalance, history),
     })
     setIsLoaded(true)
+    setWorkspaceLoading(false)
   }, [isUsingRealData, profile?.agencyId, profile?.id, profile?.role, user?.id])
 
   useEffect(() => {
@@ -1403,6 +1409,7 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
         agencyId,
         agency,
         isUsingRealData,
+        workspaceLoading,
         setupIncomplete,
         workspaceError,
         refreshAgencyWorkspace,

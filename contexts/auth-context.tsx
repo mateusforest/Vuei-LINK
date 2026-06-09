@@ -27,6 +27,7 @@ interface AuthContextType {
   user: User | null
   profile: Profile | null
   loading: boolean
+  initialized: boolean
   signIn: (payload: SignInPayload) => Promise<{ error: string | null; user: User | null; profile: Profile | null; session: Session | null }>
   signUp: (payload: SignUpPayload) => Promise<{ error: string | null; user: User | null; profile: Profile | null; session: Session | null }>
   signOut: () => Promise<void>
@@ -42,13 +43,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(supabaseEnabled)
+  const [initialized, setInitialized] = useState(!supabaseEnabled)
   const supabase = useMemo(() => createSupabaseBrowserClient(), [])
   const bootstrapRunRef = useRef(0)
   const profileRef = useRef<Profile | null>(null)
   const sessionSignatureRef = useRef<string | null>(null)
+  const profileRequestRef = useRef(0)
 
   const loadProfile = useCallback(
     async (nextUser: User | null) => {
+      const requestId = profileRequestRef.current + 1
+      profileRequestRef.current = requestId
+
       if (!nextUser || !supabase) {
         setProfile(null)
         profileRef.current = null
@@ -62,6 +68,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           BOOTSTRAP_TIMEOUT_MS,
           "Profile bootstrap timeout.",
         )
+
+        if (profileRequestRef.current !== requestId) {
+          return profileRef.current
+        }
 
         setProfile(ensuredProfile)
         profileRef.current = ensuredProfile
@@ -128,6 +138,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     if (!supabaseEnabled || !supabase) {
       setLoading(false)
+      setInitialized(true)
       return
     }
 
@@ -157,6 +168,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } finally {
         if (mounted && bootstrapRunRef.current === currentRun) {
           setLoading(false)
+          setInitialized(true)
           console.log("[BOOT] finished")
         }
       }
@@ -272,7 +284,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ session, user, profile, loading, signIn, signUp, signOut, refreshProfile }}>
+    <AuthContext.Provider value={{ session, user, profile, loading, initialized, signIn, signUp, signOut, refreshProfile }}>
       {children}
     </AuthContext.Provider>
   )

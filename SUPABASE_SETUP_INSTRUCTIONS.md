@@ -1,4 +1,4 @@
-# Supabase Setup Instructions
+real# Supabase Setup Instructions
 
 ## Ordem para rodar no SQL Editor
 

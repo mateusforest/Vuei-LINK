@@ -72,7 +72,7 @@ function AgencyLayoutInner({ children }: { children: React.ReactNode }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [notificationsOpen, setNotificationsOpen] = useState(false)
   const { profile } = useAuth()
-  const { credits, conciergeRequests, agency } = useAgency()
+  const { credits, conciergeRequests, agency, workspaceLoading } = useAgency()
   const [agencyNotifications, setAgencyNotifications] = useState([
     {
       id: "agency-notification-1",
@@ -497,7 +497,15 @@ function AgencyLayoutInner({ children }: { children: React.ReactNode }) {
           sidebarCollapsed ? "lg:pl-20" : "lg:pl-[260px]"
         )}
       >
-        <div className="p-4 lg:p-6">{children}</div>
+        <div className="p-4 lg:p-6">
+          {workspaceLoading ? (
+            <div className="rounded-2xl border border-white/5 bg-card/40 p-6 text-sm text-muted-foreground">
+              Carregando workspace da agencia...
+            </div>
+          ) : (
+            children
+          )}
+        </div>
       </main>
 
       {/* Mobile Bottom Navigation */}

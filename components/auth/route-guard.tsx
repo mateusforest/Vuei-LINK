@@ -17,12 +17,12 @@ export function RouteGuard({
 }) {
   const router = useRouter()
   const pathname = usePathname()
-  const { user, profile, loading } = useAuth()
+  const { user, profile, loading, initialized } = useAuth()
   const resolvedRole = profile?.role ?? (typeof user?.user_metadata?.role === "string" ? (user.user_metadata.role as UserRole) : null)
   const resolvedProfile = resolvedRole ? { role: resolvedRole } : null
 
   useEffect(() => {
-    if (!shouldUseSupabase() || loading) return
+    if (!shouldUseSupabase() || loading || !initialized) return
 
     if (!user) {
       const target = buildLoginRedirectTarget(pathname)
@@ -36,11 +36,11 @@ export function RouteGuard({
       console.log("[BOOT] redirecting", target)
       router.replace(target)
     }
-  }, [allowedRoles, loading, pathname, resolvedProfile, resolvedRole, router, user])
+  }, [allowedRoles, initialized, loading, pathname, resolvedProfile, resolvedRole, router, user])
 
   if (!shouldUseSupabase()) return <>{children}</>
 
-  if (loading) {
+  if (loading || !initialized || (user && !resolvedRole)) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background text-foreground">
         <div className="text-sm text-muted-foreground">Carregando sessao...</div>

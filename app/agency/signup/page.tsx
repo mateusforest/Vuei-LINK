@@ -17,7 +17,7 @@ import { createAgency } from "@/lib/repositories/agencies-repository"
 
 export default function AgencySignupPage() {
   const router = useRouter()
-  const { signUp, user, profile, loading, refreshProfile } = useAuth()
+  const { signUp, user, profile, loading, initialized, refreshProfile } = useAuth()
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
@@ -49,13 +49,13 @@ export default function AgencySignupPage() {
   }, [])
 
   useEffect(() => {
-    if (safeRedirect === undefined) return
+    if (safeRedirect === undefined || !initialized) return
     const detectedRole = (profile?.role ?? user?.user_metadata?.role) as "traveler" | "agency_owner" | "agency_member" | "master" | undefined
     const hasRealAgency = Boolean(profile?.agencyId)
     if (!loading && user && detectedRole && (detectedRole !== "agency_owner" || hasRealAgency)) {
       router.replace(safeRedirect || getRedirectByRole(detectedRole))
     }
-  }, [loading, profile?.agencyId, profile?.role, router, safeRedirect, user])
+  }, [initialized, loading, profile?.agencyId, profile?.role, router, safeRedirect, user])
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {}

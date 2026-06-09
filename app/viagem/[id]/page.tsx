@@ -7,12 +7,14 @@ import { motion, AnimatePresence, useScroll, useTransform } from "framer-motion"
 import { extractAgencyStorageState } from "@/lib/mappers/agency-mappers"
 import { extractTripsStoragePayload } from "@/lib/mappers/trip-mappers"
 import { shouldUseSupabase } from "@/lib/data-source"
+import { getAgencyById } from "@/lib/repositories/agencies-repository"
 import { getTripByAdminToken, getTripByPublicToken, getTripBySlug } from "@/lib/repositories/trips-repository"
 import { createDocumentMetadata, getSignedDocumentUrl, listDocumentsByTrip, listPublicTripDocuments, uploadDocumentFile } from "@/lib/repositories/documents-repository"
 import { createTripHotel, deleteTripHotel, listTripHotels, updateTripHotel } from "@/lib/repositories/trip-hotels-repository"
 import { listConversationsByTrip, listMessages } from "@/lib/repositories/ai-repository"
 import { validateDocumentFile } from "@/lib/files/file-validation"
 import { getDestinationCoverImage, getDestinationMetadata } from "@/lib/trip-destination"
+import { getOfflineWarningMessage, saveTripOfflinePackage } from "@/lib/offline/trip-offline"
 import { useAuth } from "@/contexts/auth-context"
 import { buildAdminTripUrl, buildPublicTripUrl, isAdminLinkMode } from "@/lib/security/link-tokens"
 import {
@@ -480,7 +482,17 @@ function StatusBadge({ status, daysUntil }: { status: string; daysUntil: number 
 }
 
 // Header
-function TripHeader({ tripData, onOpenShare, onOpenMenu }: { tripData: any; onOpenShare: () => void; onOpenMenu: () => void }) {
+function TripHeader({
+  tripData,
+  agencyBranding,
+  onOpenShare,
+  onOpenMenu,
+}: {
+  tripData: any
+  agencyBranding: { name: string | null; logoUrl: string | null }
+  onOpenShare: () => void
+  onOpenMenu: () => void
+}) {
   const [scrolled, setScrolled] = useState(false)
   const { isAdmin } = useContext(PermissionContext)
   const travelers = Array.isArray(tripData?.travelers) ? tripData.travelers : []
@@ -500,7 +512,16 @@ function TripHeader({ tripData, onOpenShare, onOpenMenu }: { tripData: any; onOp
     >
       <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Image src="/vuei-logo.png" alt="Vuei" width={80} height={32} className="h-7 w-auto" />
+          <div className="flex flex-col gap-1">
+            <Image
+              src={agencyBranding.logoUrl || "/vuei-logo.png"}
+              alt={agencyBranding.name || "Vuei"}
+              width={100}
+              height={36}
+              className="h-7 w-auto object-contain"
+            />
+            <span className="text-[10px] uppercase tracking-[0.2em] text-white/40">Powered by Vuei</span>
+          </div>
           <div className={cn("hidden sm:flex items-center gap-2 transition-opacity duration-300", scrolled ? "opacity-100" : "opacity-0")}>
             <span className="text-white/40">|</span>
             <span className="text-white/80 font-medium">{tripData.destination}</span>
@@ -2804,18 +2825,19 @@ function TripSettingsModal({
 }
 
 // Offline Section
-function OfflineSection() {
+function OfflineSection({ tripData }: { tripData: any }) {
   const [downloading, setDownloading] = useState(false)
   const [downloaded, setDownloaded] = useState(false)
   const { showToast } = useToast()
 
   const handleDownload = () => {
     setDownloading(true)
+    const offlinePackage = saveTripOfflinePackage(tripData)
     setTimeout(() => {
       setDownloading(false)
       setDownloaded(true)
-      showToast("Viagem salva offline!", "success")
-    }, 2000)
+      showToast(offlinePackage.warning, "info")
+    }, 600)
   }
 
   return (
@@ -2835,7 +2857,7 @@ function OfflineSection() {
           <div className="flex flex-col sm:flex-row items-center gap-6">
             <div className="flex-1 text-center sm:text-left">
               <h3 className="text-lg font-medium text-white mb-2">{downloaded ? "Viagem salva offline!" : "Salvar viagem offline"}</h3>
-              <p className="text-sm text-white/40 mb-4">{downloaded ? "Todos os seus documentos, vouchers e roteiros estao disponiveis mesmo sem internet." : "Baixe roteiros, documentos e vouchers para acessar durante a viagem, mesmo sem conexao."}</p>
+              <p className="text-sm text-white/40 mb-4">{downloaded ? getOfflineWarningMessage() : "Salve o ultimo resumo, passagens extraidas, hospedagem, documentos ja abertos, roteiro e informacoes rapidas para consultar sem internet."}</p>
               
               <div className="flex flex-wrap gap-2 justify-center sm:justify-start">
                 {["Roteiro", "Vouchers", "Documentos", "Contatos"].map((item) => (
@@ -3024,14 +3046,23 @@ function CreditsModal({ open, onClose, credits }: { open: boolean; onClose: () =
 }
 
 // Footer
-function TripFooter() {
+function TripFooter({ agencyBranding }: { agencyBranding: { name: string | null; logoUrl: string | null } }) {
   return (
     <footer className="py-12 px-4 border-t border-white/[0.06]">
       <div className="max-w-6xl mx-auto">
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-4">
-            <Image src="/vuei-logo.png" alt="Vuei" width={80} height={32} className="h-6 w-auto opacity-60" />
-            <span className="text-sm text-white/30">Sua viagem inteligente</span>
+            <div className="flex flex-col gap-1">
+              <Image
+                src={agencyBranding.logoUrl || "/vuei-logo.png"}
+                alt={agencyBranding.name || "Vuei"}
+                width={80}
+                height={32}
+                className="h-6 w-auto object-contain opacity-70"
+              />
+              <span className="text-[10px] uppercase tracking-[0.2em] text-white/35">Powered by Vuei</span>
+            </div>
+            <span className="text-sm text-white/30">{agencyBranding.name ? `${agencyBranding.name} no seu link inteligente` : "Sua viagem inteligente"}</span>
           </div>
           <div className="flex items-center gap-6">
             <a href="/suporte" className="text-xs text-white/40 hover:text-white/60 transition-colors">Suporte</a>
@@ -3216,7 +3247,9 @@ export default function TripPage() {
   const [sensitiveAccessGranted, setSensitiveAccessGranted] = useState(false)
   const [securityModalOpen, setSecurityModalOpen] = useState(false)
   const [quickAccessGateRequired, setQuickAccessGateRequired] = useState(false)
+  const [agencyBranding, setAgencyBranding] = useState<{ name: string | null; logoUrl: string | null }>({ name: null, logoUrl: null })
   const pendingSensitiveActionRef = useRef<(() => void) | null>(null)
+  const loadRequestRef = useRef(0)
 
   useEffect(() => {
     setSensitiveAccessGranted(false)
@@ -3241,6 +3274,8 @@ export default function TripPage() {
 
     setIsAdmin(false)
     setCanWrite(false)
+    const requestId = loadRequestRef.current + 1
+    loadRequestRef.current = requestId
 
     const loadTrip = async () => {
       setIsLoadingTrip(true)
@@ -3258,10 +3293,15 @@ export default function TripPage() {
             : await getTripBySlug(routeSlug)
 
         if (repositoryTrip.data) {
+          if (loadRequestRef.current !== requestId) return
           setTripOwnerUserId(repositoryTrip.data.ownerUserId ?? null)
           const isOwner = Boolean(user?.id && repositoryTrip.data.ownerUserId && user.id === repositoryTrip.data.ownerUserId)
           const quickAccessMethods = getQuickAccessMethods(repositoryTrip.data.ownerUserId ?? null, null)
           const requiresQuickAccessGate = Boolean(isAdminRoute && !user && quickAccessMethods.configured)
+
+          if (isAdminRoute && authLoading) {
+            return
+          }
 
           if (isAdminRoute && user && !isOwner) {
             console.error("[TRIP] erro ao carregar link", "Usuario sem permissao para editar a viagem.")
@@ -3291,6 +3331,14 @@ export default function TripPage() {
             ? await listDocumentsByTrip(repositoryTrip.data.id)
             : await listPublicTripDocuments(repositoryTrip.data.id)
           const hotelsResult = await listTripHotels(repositoryTrip.data.id)
+          const agencyResult = repositoryTrip.data.agencyId ? await getAgencyById(repositoryTrip.data.agencyId) : null
+
+          if (loadRequestRef.current !== requestId) return
+
+          setAgencyBranding({
+            name: agencyResult?.data?.name ?? null,
+            logoUrl: agencyResult?.data?.branding?.logoUrl || agencyResult?.data?.logo || null,
+          })
 
           console.log("[LINK] trip loaded", repositoryTrip.data.id)
           setTripData(
@@ -3362,6 +3410,7 @@ export default function TripPage() {
         const matchedTrip = allTrips.find((trip) => trip.slug === routeSlug || trip.id === routeSlug)
 
         if (matchedTrip) {
+          setAgencyBranding({ name: null, logoUrl: null })
           setTripData(buildTripDataFromStoredTrip(matchedTrip))
           setIsLoadingTrip(false)
           return
@@ -3664,7 +3713,7 @@ export default function TripPage() {
           <div className="fixed inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxwYXRoIGQ9Ik0wIDBoNjB2NjBIMHoiLz48cGF0aCBkPSJNMzAgMzBoMXYxaC0xeiIgZmlsbD0icmdiYSgyNTUsMjU1LDI1NSwwLjAzKSIvPjwvZz48L3N2Zz4=')] pointer-events-none opacity-50" />
           <FloatingParticles />
 
-          <TripHeader tripData={tripData} onOpenShare={() => setShareOpen(true)} onOpenMenu={() => setMenuOpen(true)} />
+          <TripHeader tripData={tripData} agencyBranding={agencyBranding} onOpenShare={() => setShareOpen(true)} onOpenMenu={() => setMenuOpen(true)} />
           <TripHero tripData={tripData} onEditTrip={() => setEditTripOpen(true)} />
           <QuickAccessCards tripData={tripData} onNavigate={handleNavigate} />
   <FlightsSection tripData={tripData} onUpdateFlight={handleUpdateFlight} onAddFlight={handleAddFlight} tripId={tripData.id} ownerUserId={tripOwnerUserId} agencyId={profile?.agencyId ?? null} ensureSensitiveAccess={ensureSensitiveAccess} />
@@ -3672,9 +3721,9 @@ export default function TripPage() {
   <ItinerarySection tripData={tripData} onUpdateItinerary={handleUpdateItinerary} />
   <DocumentsSection tripData={tripData} onAddDocument={handleAddDocument} tripId={tripData.id} ownerUserId={tripOwnerUserId} agencyId={profile?.agencyId ?? null} tripOwnerUserId={tripOwnerUserId} profileSettings={profile?.settings ?? null} ensureSensitiveAccess={ensureSensitiveAccess} />
   <ConciergeSection tripData={tripData} onOpenCredits={() => setCreditsOpen(true)} />
-          <OfflineSection />
+          <OfflineSection tripData={tripData} />
           <QuickInfoSection tripData={tripData} />
-          <TripFooter />
+          <TripFooter agencyBranding={agencyBranding} />
 
           <ShareModal open={shareOpen} onClose={() => setShareOpen(false)} tripData={tripData} />
           <SensitiveAccessModal
