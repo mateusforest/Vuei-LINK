@@ -427,6 +427,33 @@ export async function getSignedDocumentUrl(path: string) {
   }
 }
 
+export async function deleteDocumentFile(path?: string | null) {
+  if (!path) {
+    return { source: "local" as const, success: true, error: null }
+  }
+
+  if (shouldUseSupabase()) {
+    const client = createSupabaseBrowserClient()
+    if (client) {
+      const { error } = await client.storage.from(DOCUMENTS_BUCKET).remove([path])
+      if (error) {
+        return { source: "supabase" as const, success: false, error: error.message }
+      }
+
+      return { source: "supabase" as const, success: true, error: null }
+    }
+
+    return {
+      source: "supabase-placeholder" as const,
+      config: createSupabaseBrowserClientPlaceholder(),
+      success: false,
+      error: "Supabase browser client indisponivel.",
+    }
+  }
+
+  return { source: "local" as const, success: true, error: null }
+}
+
 export async function listPublicTripDocuments(tripId: string) {
   if (shouldUseSupabase()) {
     const client = createSupabaseBrowserClient()

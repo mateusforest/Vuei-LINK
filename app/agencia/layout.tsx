@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { usePathname } from "next/navigation"
@@ -31,13 +31,6 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
 import { AgencyProvider, useAgency } from "@/contexts/agency-context"
 import { RouteGuard } from "@/components/auth/route-guard"
 import { useAuth } from "@/contexts/auth-context"
@@ -118,6 +111,96 @@ function AgencyLayoutInner({ children }: { children: React.ReactNode }) {
   const clearAgencyNotifications = () => {
     setAgencyNotifications([])
   }
+
+  useEffect(() => {
+    if (!notificationsOpen) return
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setNotificationsOpen(false)
+      }
+    }
+
+    window.addEventListener("keydown", handleEscape)
+    return () => window.removeEventListener("keydown", handleEscape)
+  }, [notificationsOpen])
+
+  const renderNotificationsMenu = () => (
+    <div className="absolute right-0 top-full z-50 mt-3 w-80 overflow-hidden rounded-2xl border border-white/10 bg-card/95 shadow-2xl backdrop-blur-xl">
+      <div className="flex items-center justify-between border-b border-white/5 px-4 py-3">
+        <span className="text-sm font-semibold text-foreground">Notificacoes</span>
+        <div className="flex items-center gap-2">
+          {agencyNotifications.length > 0 ? (
+            <button
+              onClick={() => {
+                setAgencyNotifications((prev) => prev.map((notification) => ({ ...notification, read: true })))
+                setNotificationsOpen(false)
+              }}
+              className="text-xs text-muted-foreground hover:text-foreground"
+            >
+              Marcar lidas
+            </button>
+          ) : null}
+          <button onClick={() => setNotificationsOpen(false)} className="rounded-lg p-1 text-muted-foreground hover:bg-white/5 hover:text-foreground">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+      <div className="max-h-64 overflow-y-auto">
+        {agencyNotifications.length === 0 ? (
+          <p className="py-8 text-center text-sm text-muted-foreground">Sem notificacoes</p>
+        ) : (
+          agencyNotifications.map((notification) => (
+            <div
+              key={notification.id}
+              className={cn(
+                "border-b border-white/5 px-4 py-3 transition-colors hover:bg-white/5",
+                !notification.read && "bg-primary/5",
+              )}
+            >
+              <div className="flex items-start gap-3">
+                <div
+                  className={cn(
+                    "mt-1.5 h-2 w-2 rounded-full",
+                    notification.type === "success" && "bg-emerald-400",
+                    notification.type === "warning" && "bg-amber-400",
+                    notification.type === "info" && "bg-primary",
+                  )}
+                />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-foreground">{notification.title}</p>
+                  <p className="text-xs text-muted-foreground">{notification.message}</p>
+                  <Link
+                    href={notification.href}
+                    className="mt-2 inline-block text-xs text-primary hover:underline"
+                    onClick={() => {
+                      markAgencyNotificationRead(notification.id)
+                      setNotificationsOpen(false)
+                    }}
+                  >
+                    Abrir item relacionado
+                  </Link>
+                </div>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+      {agencyNotifications.length > 0 ? (
+        <div className="border-t border-white/5 px-4 py-3">
+          <button
+            onClick={() => {
+              clearAgencyNotifications()
+              setNotificationsOpen(false)
+            }}
+            className="text-xs text-primary hover:underline"
+          >
+            Limpar notificacoes
+          </button>
+        </div>
+      ) : null}
+    </div>
+  )
 
   return (
     <div className="min-h-screen bg-background">
@@ -267,59 +350,15 @@ function AgencyLayoutInner({ children }: { children: React.ReactNode }) {
             </Link>
           </div>
           <div className="flex items-center gap-2">
-            <DropdownMenu open={notificationsOpen} onOpenChange={setNotificationsOpen}>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="relative h-9 w-9">
-                  <Bell className="h-5 w-5" />
-                  {unreadNotifications > 0 && <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-primary" />}
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-80 border-white/10 bg-card/95 backdrop-blur-xl">
-                <div className="flex items-center justify-between border-b border-white/5 px-4 py-2">
-                  <span className="text-sm font-semibold">Notificacoes</span>
-                  {agencyNotifications.length > 0 && (
-                    <button onClick={clearAgencyNotifications} className="text-xs text-primary hover:underline">
-                      Limpar
-                    </button>
-                  )}
-                </div>
-                <div className="max-h-64 overflow-y-auto">
-                  {agencyNotifications.length === 0 ? (
-                    <p className="py-8 text-center text-sm text-muted-foreground">Sem notificacoes</p>
-                  ) : (
-                    agencyNotifications.map((notification) => (
-                      <DropdownMenuItem
-                        key={notification.id}
-                        className={`cursor-pointer items-start gap-3 border-b border-white/5 px-4 py-3 ${!notification.read ? "bg-primary/5" : ""}`}
-                        onClick={() => {
-                          markAgencyNotificationRead(notification.id)
-                          setNotificationsOpen(false)
-                        }}
-                      >
-                        <div
-                          className={`mt-1 h-2 w-2 rounded-full ${
-                            notification.type === "success"
-                              ? "bg-emerald-400"
-                              : notification.type === "warning"
-                                ? "bg-amber-400"
-                                : "bg-primary"
-                          }`}
-                        />
-                        <div className="min-w-0">
-                          <p className="text-sm font-medium text-foreground">{notification.title}</p>
-                          <p className="text-xs text-muted-foreground">{notification.message}</p>
-                          <Link href={notification.href} className="mt-2 inline-block text-xs text-primary hover:underline">
-                            Abrir item relacionado
-                          </Link>
-                        </div>
-                      </DropdownMenuItem>
-                    ))
-                  )}
-                </div>
-              </DropdownMenuContent>
-            </DropdownMenu>
-              <Avatar className="h-8 w-8 border border-white/10">
-              <AvatarImage src={agency?.logo || agency?.branding?.logoUrl || profile?.avatarUrl || "/placeholder.svg"} />
+            <div className="relative">
+              <Button variant="ghost" size="icon" className="relative h-9 w-9" onClick={() => setNotificationsOpen((prev) => !prev)}>
+                <Bell className="h-5 w-5" />
+                {unreadNotifications > 0 && <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-primary" />}
+              </Button>
+              {notificationsOpen ? renderNotificationsMenu() : null}
+            </div>
+            <Avatar className="h-8 w-8 border border-white/10">
+              <AvatarImage src={profile?.avatarUrl || "/placeholder.svg"} />
               <AvatarFallback className="bg-primary/20 text-xs text-primary">{initials}</AvatarFallback>
             </Avatar>
           </div>
@@ -408,87 +447,38 @@ function AgencyLayoutInner({ children }: { children: React.ReactNode }) {
                 Nova Viagem
               </Button>
             </Link>
-            <DropdownMenu open={notificationsOpen} onOpenChange={setNotificationsOpen}>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="relative h-10 w-10">
-                  <Bell className="h-5 w-5" />
-                  {(pendingRequests > 0 || unreadNotifications > 0) && (
-                    <span className="absolute right-2 top-2 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-black">
-                      {Math.max(pendingRequests, unreadNotifications)}
-                    </span>
-                  )}
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-80 border-white/10 bg-card/95 backdrop-blur-xl">
-                <div className="flex items-center justify-between border-b border-white/5 px-4 py-2">
-                  <span className="text-sm font-semibold">Notificacoes</span>
-                  {agencyNotifications.length > 0 && (
-                    <button onClick={clearAgencyNotifications} className="text-xs text-primary hover:underline">
-                      Limpar notificacoes
-                    </button>
-                  )}
-                </div>
-                <div className="max-h-64 overflow-y-auto">
-                  {agencyNotifications.length === 0 ? (
-                    <p className="py-8 text-center text-sm text-muted-foreground">Sem notificacoes</p>
-                  ) : (
-                    agencyNotifications.map((notification) => (
-                      <div
-                        key={notification.id}
-                        className={`cursor-pointer border-b border-white/5 px-4 py-3 transition-colors hover:bg-white/5 ${!notification.read ? "bg-primary/5" : ""}`}
-                        onClick={() => markAgencyNotificationRead(notification.id)}
-                      >
-                        <div className="flex items-start gap-3">
-                          <div
-                            className={`mt-1.5 h-2 w-2 rounded-full ${
-                              notification.type === "success"
-                                ? "bg-emerald-400"
-                                : notification.type === "warning"
-                                  ? "bg-amber-400"
-                                  : "bg-primary"
-                            }`}
-                          />
-                          <div className="min-w-0">
-                            <p className="text-sm font-medium">{notification.title}</p>
-                            <p className="text-xs text-muted-foreground">{notification.message}</p>
-                            <Link
-                              href={notification.href}
-                              className="mt-2 inline-block text-xs text-primary hover:underline"
-                              onClick={() => setNotificationsOpen(false)}
-                            >
-                              Abrir item relacionado
-                            </Link>
-                          </div>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-                <DropdownMenuSeparator className="bg-white/5" />
-                <DropdownMenuItem
-                  className="justify-center text-xs text-muted-foreground"
-                  onClick={() => {
-                    setAgencyNotifications((prev) => prev.map((notification) => ({ ...notification, read: true })))
-                    setNotificationsOpen(false)
-                  }}
-                >
-                  Marcar como lidas
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <div className="relative">
+              <Button variant="ghost" size="icon" className="relative h-10 w-10" onClick={() => setNotificationsOpen((prev) => !prev)}>
+                <Bell className="h-5 w-5" />
+                {(pendingRequests > 0 || unreadNotifications > 0) && (
+                  <span className="absolute right-2 top-2 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-black">
+                    {Math.max(pendingRequests, unreadNotifications)}
+                  </span>
+                )}
+              </Button>
+              {notificationsOpen ? renderNotificationsMenu() : null}
+            </div>
             <div className="flex items-center gap-3 border-l border-white/10 pl-3">
               <div className="text-right">
                 <div className="text-sm font-medium text-foreground">{displayName}</div>
                 <div className="text-xs text-muted-foreground">{displayPlan}</div>
               </div>
               <Avatar className="h-10 w-10 border-2 border-primary/30">
-                <AvatarImage src={agency?.logo || agency?.branding?.logoUrl || profile?.avatarUrl || "/placeholder.svg"} />
+                <AvatarImage src={profile?.avatarUrl || "/placeholder.svg"} />
                 <AvatarFallback className="bg-primary/20 text-primary">{initials}</AvatarFallback>
               </Avatar>
             </div>
           </div>
         </div>
       </header>
+
+      {notificationsOpen ? (
+        <div
+          className="fixed inset-0 z-20"
+          onClick={() => setNotificationsOpen(false)}
+          aria-hidden="true"
+        />
+      ) : null}
 
       {/* Main Content */}
       <main

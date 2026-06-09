@@ -341,11 +341,11 @@ export default function SettingsPage() {
                       </Button>
                     </div>
                     <div className="flex-1">
-                      <p className="font-medium text-foreground">Logo da Agencia</p>
-                      <p className="text-xs text-muted-foreground">PNG ou JPG, max 2MB</p>
+                      <p className="font-medium text-foreground">Branding da Agencia</p>
+                      <p className="text-xs text-muted-foreground">Este logo aparece nos links da viagem. O avatar do usuario continua separado no perfil.</p>
                     </div>
                     <Button variant="outline" className="border-white/10" onClick={() => setShowPhotoModal(true)}>
-                      Alterar foto
+                      Gerenciar logo
                     </Button>
                   </div>
 
@@ -400,11 +400,11 @@ export default function SettingsPage() {
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
               <Card className="border-white/5 bg-card/50">
                 <CardHeader>
-                  <CardTitle className="text-base">Personalizacao</CardTitle>
+                  <CardTitle className="text-base">Branding do Link</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <p className="text-sm text-muted-foreground">
-                    Personalize a aparencia dos links compartilhaveis com sua marca.
+                    Personalize o logo exibido nos links compartilhaveis sem alterar a foto de perfil do usuario.
                   </p>
                   <div className="rounded-xl border border-white/5 bg-white/[0.02] p-4">
                     <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
@@ -553,8 +553,8 @@ export default function SettingsPage() {
       <Dialog open={showPhotoModal} onOpenChange={setShowPhotoModal}>
         <DialogContent className="border-white/10 bg-card sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Alterar foto</DialogTitle>
-            <DialogDescription>Envie um novo logo ou imagem da agencia.</DialogDescription>
+            <DialogTitle>Atualizar branding</DialogTitle>
+            <DialogDescription>Envie o logo da agencia que sera exibido no link da viagem.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="flex justify-center">
@@ -576,13 +576,13 @@ export default function SettingsPage() {
                 onClick={() => {
                   setShowPhotoModal(false)
                   if (shouldUseSupabase() && !agency) {
-                    showToast("Agencia nao encontrada no Supabase para salvar a foto.")
+                    showToast("Agencia nao encontrada no Supabase para salvar o branding.")
                     return
                   }
-                  void handleSave("Foto da agencia atualizada.")
+                  void handleSave("Logo da agencia atualizado.")
                 }}
               >
-                Salvar foto
+                Salvar logo
               </Button>
             </div>
           </div>

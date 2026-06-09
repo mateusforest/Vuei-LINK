@@ -9,8 +9,8 @@ import { extractTripsStoragePayload } from "@/lib/mappers/trip-mappers"
 import { shouldUseSupabase } from "@/lib/data-source"
 import { getAgencyById } from "@/lib/repositories/agencies-repository"
 import { getTripByAdminToken, getTripByPublicToken, getTripBySlug } from "@/lib/repositories/trips-repository"
-import { createDocumentMetadata, getSignedDocumentUrl, listDocumentsByTrip, listPublicTripDocuments, uploadDocumentFile } from "@/lib/repositories/documents-repository"
-import { listPublicTripFlights, listTripFlights, requestTripFlightExtraction, upsertTripFlight } from "@/lib/repositories/trip-flights-repository"
+import { createDocumentMetadata, deleteDocument, deleteDocumentFile, getSignedDocumentUrl, listDocumentsByTrip, listPublicTripDocuments, uploadDocumentFile } from "@/lib/repositories/documents-repository"
+import { deleteTripFlight, listPublicTripFlights, listTripFlights, requestTripFlightExtraction, upsertTripFlight } from "@/lib/repositories/trip-flights-repository"
 import { createTripHotel, deleteTripHotel, listTripHotels, updateTripHotel } from "@/lib/repositories/trip-hotels-repository"
 import { listConversationsByTrip, listMessages } from "@/lib/repositories/ai-repository"
 import { validateDocumentFile } from "@/lib/files/file-validation"
@@ -671,15 +671,17 @@ function TripHeader({
     >
       <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <div className="flex flex-col gap-1">
-            <Image
-              src={agencyBranding.logoUrl || "/vuei-logo.png"}
-              alt={agencyBranding.name || "Vuei"}
-              width={100}
-              height={36}
-              className="h-7 w-auto object-contain"
-            />
-            <span className="text-[10px] uppercase tracking-[0.2em] text-white/40">Powered by Vuei</span>
+          <div className="rounded-2xl border border-white/10 bg-white/95 px-4 py-3 shadow-[0_18px_60px_rgba(0,0,0,0.22)] backdrop-blur">
+            <div className="flex flex-col gap-1">
+              <Image
+                src={agencyBranding.logoUrl || "/vuei-logo.png"}
+                alt={agencyBranding.name || "Vuei"}
+                width={144}
+                height={48}
+                className="h-9 w-auto max-w-[140px] object-contain sm:h-10 sm:max-w-[160px]"
+              />
+              <span className="text-[10px] uppercase tracking-[0.2em] text-black/45">Powered by Vuei</span>
+            </div>
           </div>
           <div className={cn("hidden sm:flex items-center gap-2 transition-opacity duration-300", scrolled ? "opacity-100" : "opacity-0")}>
             <span className="text-white/40">|</span>
@@ -935,7 +937,23 @@ function EditTripModal({ open, onClose, tripData, onSave }: { open: boolean; onC
 }
 
 // Flight Card
-function FlightCard({ flight, index, onEdit, onViewQR, onOpenDetails, onOpenDocument }: { flight: any; index: number; onEdit: () => void; onViewQR: () => void; onOpenDetails: () => void; onOpenDocument: () => void }) {
+function FlightCard({
+  flight,
+  index,
+  onEdit,
+  onViewQR,
+  onOpenDetails,
+  onOpenDocument,
+  onDelete,
+}: {
+  flight: any
+  index: number
+  onEdit: () => void
+  onViewQR: () => void
+  onOpenDetails: () => void
+  onOpenDocument: () => void
+  onDelete: () => void
+}) {
   const [expanded, setExpanded] = useState(false)
   const { isAdmin } = useContext(PermissionContext)
   const statusCopy = getFlightStatusCopy(flight)
@@ -1054,6 +1072,12 @@ function FlightCard({ flight, index, onEdit, onViewQR, onOpenDetails, onOpenDocu
                     <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); onEdit() }} className="text-white/60 hover:bg-white/10">
                       <Edit3 className="w-4 h-4 mr-2" />
                       Editar
+                    </Button>
+                  )}
+                  {isAdmin && (
+                    <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); void onDelete() }} className="text-red-300 hover:bg-red-500/10">
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      Excluir
                     </Button>
                   )}
                   {flight.qrCodePayload ? (
@@ -1304,7 +1328,27 @@ function FlightDetailsModal({
 }
 
 // Flights Section
-function FlightsSection({ tripData, onUpdateFlight, onAddFlight, tripId, ownerUserId, agencyId, ensureSensitiveAccess }: { tripData: any; onUpdateFlight: (id: string, data: any) => Promise<void>; onAddFlight: (data: any) => void; tripId: string; ownerUserId: string | null; agencyId: string | null; ensureSensitiveAccess: () => boolean }) {
+function FlightsSection({
+  tripData,
+  onUpdateFlight,
+  onAddFlight,
+  onDeleteFlight,
+  onDeleteDocument,
+  tripId,
+  ownerUserId,
+  agencyId,
+  ensureSensitiveAccess,
+}: {
+  tripData: any
+  onUpdateFlight: (id: string, data: any) => Promise<void>
+  onAddFlight: (data: any) => void
+  onDeleteFlight: (flightId: string) => Promise<void>
+  onDeleteDocument: (documentId: string) => Promise<void>
+  tripId: string
+  ownerUserId: string | null
+  agencyId: string | null
+  ensureSensitiveAccess: () => boolean
+}) {
   const [editingFlight, setEditingFlight] = useState<any>(null)
   const [viewingQR, setViewingQR] = useState<any>(null)
   const [selectedFlight, setSelectedFlight] = useState<any>(null)
@@ -1370,6 +1414,7 @@ function FlightsSection({ tripData, onUpdateFlight, onAddFlight, tripId, ownerUs
               onViewQR={() => setViewingQR(flight)}
               onOpenDetails={() => setSelectedFlight(flight)}
               onOpenDocument={() => flight.document ? void handleOpenTicketDocument(flight.document) : undefined}
+              onDelete={() => onDeleteFlight(flight.id)}
             />
           ))}
           {ticketDocuments.map((document: any) => (
@@ -1377,11 +1422,17 @@ function FlightsSection({ tripData, onUpdateFlight, onAddFlight, tripId, ownerUs
               <p className="text-sm font-medium text-white">{document.name}</p>
               <p className="mt-2 text-xs text-white/40">Passagem anexada, extracao pendente</p>
               <p className="mt-1 text-xs text-white/30">{document.mimeType || "Nao informado"}</p>
-              <div className="mt-4">
+              <div className="mt-4 flex flex-wrap gap-2">
                 <Button size="sm" variant="outline" className="border-white/10 text-white/70" onClick={() => void handleOpenTicketDocument(document)}>
                   <ExternalLink className="mr-2 h-4 w-4" />
                   Ver passagem original
                 </Button>
+                {isAdmin ? (
+                  <Button size="sm" variant="ghost" className="text-red-300 hover:bg-red-500/10" onClick={() => void onDeleteDocument(document.id)}>
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Excluir
+                  </Button>
+                ) : null}
               </div>
             </div>
           ))}
@@ -1415,16 +1466,23 @@ function AddFlightModal({ open, onClose, onSave, tripId, ownerUserId, agencyId, 
   const [fileName, setFileName] = useState("")
   const [error, setError] = useState("")
 
+  useEffect(() => {
+    if (open) {
+      setError("")
+      return
+    }
+
+    setUploading(false)
+    setError("")
+    setFileName("")
+  }, [open])
+
   const handleFileUpload = async (file?: File | null) => {
     if (!file) return
-    if (!ownerUserId) {
-      setError("Desbloqueie com PIN ou Face ID para anexar esta passagem.")
-      return
-    }
     if (!ensureSensitiveAccess()) {
-      setError("Desbloqueie com PIN ou biometria antes de anexar passagens.")
       return
     }
+    if (!ownerUserId) return
 
     console.log("[TICKET] file selected", file.name)
     setError("")
@@ -2134,6 +2192,7 @@ function AddItineraryItemModal({ open, onClose, day, onSave }: { open: boolean; 
 function DocumentsSection({
   tripData,
   onAddDocument,
+  onDeleteDocument,
   tripId,
   ownerUserId,
   agencyId,
@@ -2143,6 +2202,7 @@ function DocumentsSection({
 }: {
   tripData: any
   onAddDocument: (data: any) => void
+  onDeleteDocument: (documentId: string) => Promise<void>
   tripId: string
   ownerUserId: string | null
   agencyId: string | null
@@ -2205,7 +2265,7 @@ function DocumentsSection({
         ) : (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
           {publicDocs.map((doc: any, i: number) => (
-            <motion.button
+            <motion.div
               key={doc.id}
               initial={{ opacity: 0, scale: 0.95 }}
               whileInView={{ opacity: 1, scale: 1 }}
@@ -2214,12 +2274,34 @@ function DocumentsSection({
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               onClick={() => setViewingDoc(doc)}
-              className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.06] hover:border-[#5de0e6]/30 transition-all duration-300 text-left"
+              className="cursor-pointer p-4 rounded-xl bg-white/[0.02] border border-white/[0.06] hover:border-[#5de0e6]/30 transition-all duration-300 text-left"
+              role="button"
+              tabIndex={0}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault()
+                  setViewingDoc(doc)
+                }
+              }}
             >
-              <span className="text-2xl">{getDocIcon(doc.type)}</span>
+              <div className="flex items-start justify-between gap-3">
+                <span className="text-2xl">{getDocIcon(doc.type)}</span>
+                {isAdmin ? (
+                  <button
+                    type="button"
+                    className="rounded-lg p-1 text-white/40 hover:bg-red-500/10 hover:text-red-300"
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      void onDeleteDocument(doc.id)
+                    }}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                ) : null}
+              </div>
               <p className="text-sm text-white font-medium mt-2 truncate">{doc.name}</p>
               <p className="text-xs text-white/40 mt-1">Compartilhavel</p>
-            </motion.button>
+            </motion.div>
           ))}
         </div>
         )}
@@ -2255,20 +2337,40 @@ function DocumentsSection({
                 <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.3 }} className="overflow-hidden">
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-4 border-t border-white/[0.06]">
                     {privateDocs.map((doc: any, i: number) => (
-                      <motion.button
+                      <motion.div
                         key={doc.id}
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: i * 0.1 }}
                         onClick={() => setViewingDoc(doc)}
-                        className="p-3 rounded-xl bg-[#004aad]/10 border border-[#004aad]/30 hover:border-[#5de0e6]/50 transition-all duration-300 text-left"
+                        className="cursor-pointer p-3 rounded-xl bg-[#004aad]/10 border border-[#004aad]/30 hover:border-[#5de0e6]/50 transition-all duration-300 text-left"
+                        role="button"
+                        tabIndex={0}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter" || event.key === " ") {
+                            event.preventDefault()
+                            setViewingDoc(doc)
+                          }
+                        }}
                       >
-                        <div className="flex items-center gap-2">
-                          <span className="text-xl">{getDocIcon(doc.type)}</span>
-                          <Shield className="w-3 h-3 text-[#5de0e6]" />
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xl">{getDocIcon(doc.type)}</span>
+                            <Shield className="w-3 h-3 text-[#5de0e6]" />
+                          </div>
+                          <button
+                            type="button"
+                            className="rounded-lg p-1 text-white/40 hover:bg-red-500/10 hover:text-red-300"
+                            onClick={(event) => {
+                              event.stopPropagation()
+                              void onDeleteDocument(doc.id)
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
                         </div>
                         <p className="text-sm text-white font-medium mt-2 truncate">{doc.name}</p>
-                      </motion.button>
+                      </motion.div>
                     ))}
                   </div>
                 </motion.div>
@@ -2466,16 +2568,22 @@ function AddDocumentModal({ open, onClose, onSave, tripId, ownerUserId, agencyId
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState("")
 
+  useEffect(() => {
+    if (open) {
+      setError("")
+      return
+    }
+
+    setUploading(false)
+    setError("")
+  }, [open])
+
   const handleUpload = async (file?: File | null) => {
     if (!file) return
-    if (!ownerUserId) {
-      setError("Desbloqueie com PIN ou Face ID para anexar este documento.")
-      return
-    }
     if (!ensureSensitiveAccess()) {
-      setError("Desbloqueie com PIN ou biometria antes de anexar documentos.")
       return
     }
+    if (!ownerUserId) return
     console.log("[DOCUMENT] file selected", file.name)
     setError("")
     const validation = validateDocumentFile(file)
@@ -4049,6 +4157,113 @@ export default function TripPage() {
     })
   }
 
+  const handleDeleteFlight = async (flightId: string) => {
+    if (!sensitiveAccessGranted) {
+      requireSensitiveAccess(() => { void handleDeleteFlight(flightId) })
+      return
+    }
+
+    const flight = (Array.isArray(tripData.flights) ? tripData.flights : []).find((entry: any) => entry.id === flightId)
+    if (!flight) {
+      showToast("Passagem nao encontrada para exclusao.", "error")
+      return
+    }
+
+    const confirmed = window.confirm(
+      flight.document ? "Excluir esta passagem e o arquivo original vinculado?" : "Excluir esta passagem?"
+    )
+    if (!confirmed) return
+
+    let storageWarning: string | null = null
+    if (flight.document?.filePath) {
+      const storageResult = await deleteDocumentFile(flight.document.filePath)
+      if (!storageResult.success) {
+        console.error("[TICKET] storage delete error", storageResult.error)
+        storageWarning = storageResult.error || "Nao foi possivel remover o arquivo do storage."
+      }
+    }
+
+    const flightResult = await deleteTripFlight(flightId)
+    if (!flightResult.success) {
+      console.error("[TICKET] flight delete error", flightResult.error)
+      showToast(resolveProtectedWriteError(flightResult.error || "Nao foi possivel excluir a passagem."), "error")
+      return
+    }
+
+    if (flight.document?.id) {
+      const documentResult = await deleteDocument(flight.document.id)
+      if (!documentResult.success) {
+        console.error("[TICKET] document delete error", documentResult.error)
+        showToast(resolveProtectedWriteError(documentResult.error || "A passagem foi removida, mas o documento vinculado nao foi excluido."), "error")
+        return
+      }
+    }
+
+    setTripData((prev) => ({
+      ...prev,
+      flights: (Array.isArray(prev.flights) ? prev.flights : []).filter((entry: any) => entry.id !== flightId),
+      documents: flight.document?.id
+        ? (Array.isArray(prev.documents) ? prev.documents : []).filter((document: any) => document.id !== flight.document.id)
+        : prev.documents,
+    }))
+
+    showToast(storageWarning ? `Passagem excluida. Aviso do storage: ${storageWarning}` : "Passagem excluida com sucesso.", storageWarning ? "info" : "success")
+  }
+
+  const handleDeleteDocument = async (documentId: string) => {
+    if (!sensitiveAccessGranted) {
+      requireSensitiveAccess(() => { void handleDeleteDocument(documentId) })
+      return
+    }
+
+    const document = (Array.isArray(tripData.documents) ? tripData.documents : []).find((entry: any) => entry.id === documentId)
+    if (!document) {
+      showToast("Arquivo nao encontrado para exclusao.", "error")
+      return
+    }
+
+    const linkedFlight = (Array.isArray(tripData.flights) ? tripData.flights : []).find((entry: any) => entry.document?.id === documentId)
+    const confirmed = window.confirm(
+      linkedFlight ? "Excluir este arquivo e a passagem vinculada?" : "Excluir este arquivo?"
+    )
+    if (!confirmed) return
+
+    let storageWarning: string | null = null
+    if (document.filePath) {
+      const storageResult = await deleteDocumentFile(document.filePath)
+      if (!storageResult.success) {
+        console.error("[DOCUMENT] storage delete error", storageResult.error)
+        storageWarning = storageResult.error || "Nao foi possivel remover o arquivo do storage."
+      }
+    }
+
+    if (linkedFlight) {
+      const flightResult = await deleteTripFlight(linkedFlight.id)
+      if (!flightResult.success) {
+        console.error("[DOCUMENT] linked flight delete error", flightResult.error)
+        showToast(resolveProtectedWriteError(flightResult.error || "Nao foi possivel excluir a passagem vinculada."), "error")
+        return
+      }
+    }
+
+    const documentResult = await deleteDocument(documentId)
+    if (!documentResult.success) {
+      console.error("[DOCUMENT] delete error", documentResult.error)
+      showToast(resolveProtectedWriteError(documentResult.error || "Nao foi possivel excluir o arquivo."), "error")
+      return
+    }
+
+    setTripData((prev) => ({
+      ...prev,
+      documents: (Array.isArray(prev.documents) ? prev.documents : []).filter((entry: any) => entry.id !== documentId),
+      flights: linkedFlight
+        ? (Array.isArray(prev.flights) ? prev.flights : []).filter((entry: any) => entry.id !== linkedFlight.id)
+        : prev.flights,
+    }))
+
+    showToast(storageWarning ? `Arquivo excluido. Aviso do storage: ${storageWarning}` : "Arquivo excluido com sucesso.", storageWarning ? "info" : "success")
+  }
+
   const handleUpdateTravelers = (travelers: { name: string; avatar?: string; role: string }[]) => {
     requireSensitiveAccess(() => {
       setTripData(prev => ({ ...prev, travelers }))
@@ -4136,10 +4351,10 @@ export default function TripPage() {
           <TripHeader tripData={tripData} agencyBranding={agencyBranding} onOpenShare={() => setShareOpen(true)} onOpenMenu={() => setMenuOpen(true)} />
           <TripHero tripData={tripData} onEditTrip={() => setEditTripOpen(true)} />
           <QuickAccessCards tripData={tripData} onNavigate={handleNavigate} />
-  <FlightsSection tripData={tripData} onUpdateFlight={handleUpdateFlight} onAddFlight={handleAddFlight} tripId={tripData.id} ownerUserId={tripOwnerUserId} agencyId={profile?.agencyId ?? null} ensureSensitiveAccess={ensureSensitiveAccess} />
+  <FlightsSection tripData={tripData} onUpdateFlight={handleUpdateFlight} onAddFlight={handleAddFlight} onDeleteFlight={handleDeleteFlight} onDeleteDocument={handleDeleteDocument} tripId={tripData.id} ownerUserId={tripOwnerUserId} agencyId={profile?.agencyId ?? null} ensureSensitiveAccess={ensureSensitiveAccess} />
   <HotelSection tripData={tripData} onSaveHotel={handleSaveHotel} onDeleteHotel={handleDeleteHotel} />
   <ItinerarySection tripData={tripData} onUpdateItinerary={handleUpdateItinerary} />
-  <DocumentsSection tripData={tripData} onAddDocument={handleAddDocument} tripId={tripData.id} ownerUserId={tripOwnerUserId} agencyId={profile?.agencyId ?? null} tripOwnerUserId={tripOwnerUserId} profileSettings={profile?.settings ?? null} ensureSensitiveAccess={ensureSensitiveAccess} />
+  <DocumentsSection tripData={tripData} onAddDocument={handleAddDocument} onDeleteDocument={handleDeleteDocument} tripId={tripData.id} ownerUserId={tripOwnerUserId} agencyId={profile?.agencyId ?? null} tripOwnerUserId={tripOwnerUserId} profileSettings={profile?.settings ?? null} ensureSensitiveAccess={ensureSensitiveAccess} />
   <ConciergeSection tripData={tripData} onOpenCredits={() => setCreditsOpen(true)} />
           <OfflineSection tripData={tripData} />
           <QuickInfoSection tripData={tripData} />

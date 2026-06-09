@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
@@ -27,7 +27,6 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { useAgency, type Client, type AgencyTrip } from "@/contexts/agency-context"
 import { useAuth } from "@/contexts/auth-context"
-import { getAgencyByOwner } from "@/lib/repositories/agencies-repository"
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -308,30 +307,11 @@ function GenerateItineraryModal({ open, onClose, clients, trips, onGenerate }: {
 
 export default function AgencyDashboard() {
   const router = useRouter()
-  const { user, profile } = useAuth()
-  const { clients, trips, credits, activities, conciergeRequests, addClient, useCredits, setupIncomplete, workspaceError } = useAgency()
+  const { profile } = useAuth()
+  const { clients, trips, credits, activities, conciergeRequests, addClient, useCredits, setupIncomplete, workspaceError, agency, workspaceLoading } = useAgency()
   const [newClientOpen, setNewClientOpen] = useState(false)
   const [generateItineraryOpen, setGenerateItineraryOpen] = useState(false)
-  const [agencyName, setAgencyName] = useState(profile?.name || "Agencia")
-
-  useEffect(() => {
-    if (!user?.id) return
-
-    let active = true
-
-    const loadAgency = async () => {
-      const result = await getAgencyByOwner(user.id)
-      if (active && result.data?.name) {
-        setAgencyName(result.data.name)
-      }
-    }
-
-    void loadAgency()
-
-    return () => {
-      active = false
-    }
-  }, [user?.id])
+  const agencyName = agency?.name || profile?.name || "Agencia"
 
   // Calculate stats from real data
   const upcomingTrips = trips.filter(t => t.status === "upcoming")
@@ -386,6 +366,23 @@ export default function AgencyDashboard() {
       case "credits": return Sparkles
       default: return Clock
     }
+  }
+
+  if (workspaceLoading) {
+    return (
+      <div className="space-y-6 pb-20 lg:pb-0">
+        <div className="h-20 rounded-3xl border border-white/5 bg-card/50 animate-pulse" />
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, index) => (
+            <div key={index} className="h-36 rounded-3xl border border-white/5 bg-card/50 animate-pulse" />
+          ))}
+        </div>
+        <div className="grid gap-6 lg:grid-cols-3">
+          <div className="h-80 rounded-3xl border border-white/5 bg-card/50 animate-pulse lg:col-span-2" />
+          <div className="h-80 rounded-3xl border border-white/5 bg-card/50 animate-pulse" />
+        </div>
+      </div>
+    )
   }
 
   return (
