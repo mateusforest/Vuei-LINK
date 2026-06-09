@@ -10,6 +10,7 @@ import { shouldUseSupabase } from "@/lib/data-source"
 import { getAgencyById } from "@/lib/repositories/agencies-repository"
 import { getTripByAdminToken, getTripByPublicToken, getTripBySlug } from "@/lib/repositories/trips-repository"
 import { createDocumentMetadata, getSignedDocumentUrl, listDocumentsByTrip, listPublicTripDocuments, uploadDocumentFile } from "@/lib/repositories/documents-repository"
+import { listPublicTripFlights, listTripFlights, upsertTripFlight } from "@/lib/repositories/trip-flights-repository"
 import { createTripHotel, deleteTripHotel, listTripHotels, updateTripHotel } from "@/lib/repositories/trip-hotels-repository"
 import { listConversationsByTrip, listMessages } from "@/lib/repositories/ai-repository"
 import { validateDocumentFile } from "@/lib/files/file-validation"
@@ -17,6 +18,7 @@ import { getDestinationCoverImage, getDestinationMetadata } from "@/lib/trip-des
 import { getOfflineWarningMessage, saveTripOfflinePackage } from "@/lib/offline/trip-offline"
 import { useAuth } from "@/contexts/auth-context"
 import { buildAdminTripUrl, buildPublicTripUrl, isAdminLinkMode } from "@/lib/security/link-tokens"
+import type { TripFlightRecord } from "@/types/flight"
 import {
   authenticateQuickAccessBiometric,
   getQuickAccessMethods,
@@ -305,6 +307,68 @@ function normalizeTravelers(travelers?: any, fallbackCount?: number) {
   return buildTravelers(fallbackCount)
 }
 
+function formatFlightDateTime(dateString?: string | null) {
+  if (!dateString) return { date: "Nao informado", time: "--:--" }
+
+  const date = new Date(dateString)
+  return {
+    date: date.toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" }),
+    time: date.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
+  }
+}
+
+function calculateFlightDuration(departureAt?: string | null, arrivalAt?: string | null) {
+  if (!departureAt || !arrivalAt) return "Horario nao informado"
+
+  const diff = new Date(arrivalAt).getTime() - new Date(departureAt).getTime()
+  if (!Number.isFinite(diff) || diff <= 0) return "Horario nao informado"
+
+  const totalMinutes = Math.round(diff / 60000)
+  const hours = Math.floor(totalMinutes / 60)
+  const minutes = totalMinutes % 60
+  return `${hours}h ${minutes.toString().padStart(2, "0")}m`
+}
+
+function normalizeAirportCode(value?: string | null) {
+  if (!value) return "---"
+  const match = value.match(/\b[A-Z]{3}\b/)
+  return match?.[0] ?? value.slice(0, 3).toUpperCase()
+}
+
+function mapFlightRecordToView(flight: TripFlightRecord, documents?: any[]) {
+  const departure = formatFlightDateTime(flight.departureAt)
+  const arrival = formatFlightDateTime(flight.arrivalAt)
+  const linkedDocument = Array.isArray(documents) ? documents.find((document: any) => document.id === flight.documentId) ?? null : null
+
+  return {
+    id: flight.id,
+    airline: flight.airline || "Passagem anexada",
+    flightNumber: flight.flightNumber || "Voo nao identificado",
+    bookingReference: flight.bookingReference,
+    extractionStatus: flight.extractionStatus,
+    extractedData: flight.extractedData ?? {},
+    passengerName: flight.passengerName,
+    baggageInfo: flight.baggageInfo,
+    terminal: flight.terminal,
+    gate: flight.gate,
+    seat: flight.seat,
+    qrCodePayload: flight.qrCodePayload,
+    date: departure.date,
+    duration: calculateFlightDuration(flight.departureAt, flight.arrivalAt),
+    origin: {
+      code: normalizeAirportCode(flight.originAirport),
+      city: flight.originAirport || "Origem nao informada",
+      time: departure.time,
+    },
+    destination: {
+      code: normalizeAirportCode(flight.destinationAirport),
+      city: flight.destinationAirport || "Destino nao informado",
+      time: arrival.time,
+    },
+    document: linkedDocument,
+  }
+}
+
 function normalizeTripViewData(tripData: any) {
   const travelers = normalizeTravelers(tripData?.travelers, tripData?.travelersCount)
   const flights = Array.isArray(tripData?.flights) ? tripData.flights : []
@@ -354,9 +418,37 @@ function buildTripDataFromStoredTrip(storedTrip: any) {
         ? [storedTrip.accommodation]
         : []
   const hotel = hotels[0] ?? null
-  const flights = Array.isArray(storedTrip.flights) ? storedTrip.flights : []
+  const rawFlights = Array.isArray(storedTrip.flights) ? storedTrip.flights : []
   const itinerary = Array.isArray(storedTrip.itinerary) ? storedTrip.itinerary : []
   const documents = Array.isArray(storedTrip.documents) ? storedTrip.documents : []
+  const flights = rawFlights.map((flight: any) => {
+    if (flight?.origin && flight?.destination) return flight
+    return mapFlightRecordToView(
+      {
+        id: flight.id || `flight-${Math.random()}`,
+        tripId: storedTrip.id || "",
+        documentId: flight.documentId ?? null,
+        airline: flight.airline ?? null,
+        flightNumber: flight.flightNumber ?? null,
+        bookingReference: flight.bookingReference ?? null,
+        originAirport: flight.originAirport ?? null,
+        destinationAirport: flight.destinationAirport ?? null,
+        departureAt: flight.departureAt ?? null,
+        arrivalAt: flight.arrivalAt ?? null,
+        passengerName: flight.passengerName ?? null,
+        qrCodePayload: flight.qrCodePayload ?? null,
+        baggageInfo: flight.baggageInfo ?? null,
+        terminal: flight.terminal ?? null,
+        gate: flight.gate ?? null,
+        seat: flight.seat ?? null,
+        extractedData: flight.extractedData ?? {},
+        extractionStatus: flight.extractionStatus ?? "pending",
+        createdAt: flight.createdAt ?? new Date().toISOString(),
+        updatedAt: flight.updatedAt ?? new Date().toISOString(),
+      },
+      documents,
+    )
+  })
   const heroImage = storedTrip.coverImage || getDestinationCoverImage(storedTrip.destination, storedTrip.city || city, storedTrip.country || country)
   const quickInfo = buildQuickInfo(storedTrip.destination, storedTrip.country || country, storedTrip.city || city)
 
@@ -776,9 +868,17 @@ function EditTripModal({ open, onClose, tripData, onSave }: { open: boolean; onC
 }
 
 // Flight Card
-function FlightCard({ flight, index, onEdit, onViewQR }: { flight: any; index: number; onEdit: () => void; onViewQR: () => void }) {
+function FlightCard({ flight, index, onEdit, onViewQR, onOpenDetails, onOpenDocument }: { flight: any; index: number; onEdit: () => void; onViewQR: () => void; onOpenDetails: () => void; onOpenDocument: () => void }) {
   const [expanded, setExpanded] = useState(false)
   const { isAdmin } = useContext(PermissionContext)
+  const extractionLabel =
+    flight.extractionStatus === "completed"
+      ? "Dados extraidos por IA"
+      : flight.extractionStatus === "manual"
+        ? "Dados preenchidos manualmente"
+        : flight.extractionStatus === "failed"
+          ? "Extracao nao concluida"
+          : "Passagem anexada, extracao pendente"
 
   return (
     <motion.div
@@ -797,10 +897,10 @@ function FlightCard({ flight, index, onEdit, onViewQR }: { flight: any; index: n
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#5de0e6]/20 to-[#004aad]/20 flex items-center justify-center">
-              <Plane className={cn("w-5 h-5 text-[#5de0e6]", flight.type === "volta" && "rotate-180")} />
+              <Plane className="w-5 h-5 text-[#5de0e6]" />
             </div>
             <div>
-              <p className="text-sm text-white/50">{flight.type === "ida" ? "Ida" : "Volta"}</p>
+              <p className="text-sm text-white/50">{extractionLabel}</p>
               <p className="text-white font-medium">{flight.airline}</p>
             </div>
           </div>
@@ -846,31 +946,41 @@ function FlightCard({ flight, index, onEdit, onViewQR }: { flight: any; index: n
               <div className="mt-4 pt-4 border-t border-white/[0.06] grid grid-cols-3 gap-4">
                 <div>
                   <p className="text-[10px] text-white/40 uppercase tracking-wider">Terminal</p>
-                  <p className="text-sm text-white font-medium">{flight.terminal}</p>
+                  <p className="text-sm text-white font-medium">{flight.terminal || "-"}</p>
                 </div>
                 <div>
                   <p className="text-[10px] text-white/40 uppercase tracking-wider">Portao</p>
-                  <p className="text-sm text-white font-medium">{flight.gate}</p>
+                  <p className="text-sm text-white font-medium">{flight.gate || "-"}</p>
                 </div>
                 <div>
                   <p className="text-[10px] text-white/40 uppercase tracking-wider">Assento</p>
-                  <p className="text-sm text-white font-medium">{flight.seat}</p>
+                  <p className="text-sm text-white font-medium">{flight.seat || "-"}</p>
                 </div>
               </div>
               
               <div className="mt-4 flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-emerald-500" />
-                  <span className="text-xs text-emerald-400">Confirmado</span>
+                  <div className={cn("w-2 h-2 rounded-full", flight.extractionStatus === "completed" || flight.extractionStatus === "manual" ? "bg-emerald-500" : "bg-amber-400")} />
+                  <span className={cn("text-xs", flight.extractionStatus === "completed" || flight.extractionStatus === "manual" ? "text-emerald-400" : "text-amber-300")}>{extractionLabel}</span>
                 </div>
                 <div className="flex gap-2">
+                  <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); onOpenDetails() }} className="text-white/60 hover:bg-white/10">
+                    <Eye className="w-4 h-4 mr-2" />
+                    Detalhes
+                  </Button>
+                  {flight.document && (
+                    <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); onOpenDocument() }} className="text-white/60 hover:bg-white/10">
+                      <ExternalLink className="w-4 h-4 mr-2" />
+                      Original
+                    </Button>
+                  )}
                   {isAdmin && (
                     <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); onEdit() }} className="text-white/60 hover:bg-white/10">
                       <Edit3 className="w-4 h-4 mr-2" />
                       Editar
                     </Button>
                   )}
-                  <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); onViewQR() }} className="text-[#5de0e6] hover:bg-[#5de0e6]/10">
+                  <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); onViewQR() }} className="text-[#5de0e6] hover:bg-[#5de0e6]/10" disabled={!flight.qrCodePayload}>
                     <QrCode className="w-4 h-4 mr-2" />
                     Ver QR Code
                   </Button>
@@ -904,7 +1014,7 @@ function EditFlightModal({ open, onClose, flight, onSave }: { open: boolean; onC
   if (!flight) return null
 
   return (
-    <Modal open={open} onClose={onClose} title={`Editar Voo ${flight.type === "ida" ? "de Ida" : "de Volta"}`}>
+    <Modal open={open} onClose={onClose} title={`Editar passagem ${flight.flightNumber || ""}`.trim()}>
       <div className="space-y-4">
         <div className="grid grid-cols-2 gap-4">
           <div>
@@ -928,20 +1038,40 @@ function EditFlightModal({ open, onClose, flight, onSave }: { open: boolean; onC
         </div>
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="text-xs text-white/50 uppercase tracking-wider">Origem (Codigo)</label>
+            <label className="text-xs text-white/50 uppercase tracking-wider">Origem</label>
             <input
               type="text"
-              value={formData.origin?.code || ""}
-              onChange={(e) => setFormData({ ...formData, origin: { ...formData.origin, code: e.target.value } })}
+              value={formData.origin?.city || ""}
+              onChange={(e) => setFormData({ ...formData, origin: { ...formData.origin, city: e.target.value, code: normalizeAirportCode(e.target.value) } })}
               className="w-full mt-1 px-4 py-3 rounded-xl bg-white/[0.05] border border-white/[0.08] text-white focus:outline-none focus:border-[#5de0e6]/50"
             />
           </div>
           <div>
-            <label className="text-xs text-white/50 uppercase tracking-wider">Destino (Codigo)</label>
+            <label className="text-xs text-white/50 uppercase tracking-wider">Destino</label>
             <input
               type="text"
-              value={formData.destination?.code || ""}
-              onChange={(e) => setFormData({ ...formData, destination: { ...formData.destination, code: e.target.value } })}
+              value={formData.destination?.city || ""}
+              onChange={(e) => setFormData({ ...formData, destination: { ...formData.destination, city: e.target.value, code: normalizeAirportCode(e.target.value) } })}
+              className="w-full mt-1 px-4 py-3 rounded-xl bg-white/[0.05] border border-white/[0.08] text-white focus:outline-none focus:border-[#5de0e6]/50"
+            />
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="text-xs text-white/50 uppercase tracking-wider">Localizador</label>
+            <input
+              type="text"
+              value={formData.bookingReference || ""}
+              onChange={(e) => setFormData({ ...formData, bookingReference: e.target.value })}
+              className="w-full mt-1 px-4 py-3 rounded-xl bg-white/[0.05] border border-white/[0.08] text-white focus:outline-none focus:border-[#5de0e6]/50"
+            />
+          </div>
+          <div>
+            <label className="text-xs text-white/50 uppercase tracking-wider">Passageiro</label>
+            <input
+              type="text"
+              value={formData.passengerName || ""}
+              onChange={(e) => setFormData({ ...formData, passengerName: e.target.value })}
               className="w-full mt-1 px-4 py-3 rounded-xl bg-white/[0.05] border border-white/[0.08] text-white focus:outline-none focus:border-[#5de0e6]/50"
             />
           </div>
@@ -975,6 +1105,15 @@ function EditFlightModal({ open, onClose, flight, onSave }: { open: boolean; onC
             />
           </div>
         </div>
+        <div>
+          <label className="text-xs text-white/50 uppercase tracking-wider">Bagagem</label>
+          <input
+            type="text"
+            value={formData.baggageInfo || ""}
+            onChange={(e) => setFormData({ ...formData, baggageInfo: e.target.value })}
+            className="w-full mt-1 px-4 py-3 rounded-xl bg-white/[0.05] border border-white/[0.08] text-white focus:outline-none focus:border-[#5de0e6]/50"
+          />
+        </div>
         <Button onClick={handleSave} className="w-full mt-4 bg-gradient-to-r from-[#5de0e6] to-[#004aad] hover:opacity-90 text-white border-0">
           Salvar Alteracoes
         </Button>
@@ -988,31 +1127,124 @@ function QRCodeModal({ open, onClose, flight }: { open: boolean; onClose: () => 
   if (!flight) return null
 
   return (
-    <Modal open={open} onClose={onClose} title="Boarding Pass">
+    <Modal open={open} onClose={onClose} title="QR Code da passagem">
       <div className="text-center">
         <div className="w-48 h-48 mx-auto mb-6 bg-white rounded-2xl p-4 flex items-center justify-center">
-          <div className="w-full h-full bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyMDAiIGhlaWdodD0iMjAwIj48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0iI2ZmZiIvPjxwYXRoIGQ9Ik0xMCAxMGgyMHYyMEgxMHptMzAgMGgyMHYyMEg0MHptMzAgMGgyMHYyMEg3MHptMzAgMGgyMHYyMEgxMDB6bTMwIDBoMjB2MjBIMTMwem0zMCAwaDIwdjIwSDE2MHptLTE1MCAzMGgyMHYyMEgxMHptNjAgMGgyMHYyMEg3MHptNjAgMGgyMHYyMEgxMzB6bS0xMjAgMzBoMjB2MjBIMTB6bTMwIDBoMjB2MjBINDB6bTMwIDBoMjB2MjBINzB6bTMwIDBoMjB2MjBIMTAwem0zMCAwaDIwdjIwSDEzMHptMzAgMGgyMHYyMEgxNjB6bS0xNTAgMzBoMjB2MjBIMTB6bTYwIDBoMjB2MjBINzB6bTMwIDBoMjB2MjBIMTAwem0zMCAwaDIwdjIwSDEzMHptMzAgMGgyMHYyMEgxNjB6bS0xNTAgMzBoMjB2MjBIMTB6bTMwIDBoMjB2MjBINDB6bTMwIDBoMjB2MjBINzB6bTMwIDBoMjB2MjBIMTAwem0zMCAwaDIwdjIwSDEzMHptMzAgMGgyMHYyMEgxNjB6bS0xNTAgMzBoMjB2MjBIMTB6bTMwIDBoMjB2MjBINDB6bTMwIDBoMjB2MjBINzB6bTYwIDBoMjB2MjBIMTYweiIgZmlsbD0iIzAwMCIvPjwvc3ZnPg==')] bg-contain" />
+          {flight.qrCodePayload ? (
+            <div className="w-full h-full flex items-center justify-center rounded-xl border border-black/10 bg-black/5 px-4 text-center text-xs text-black">
+              {flight.qrCodePayload}
+            </div>
+          ) : (
+            <div className="w-full h-full flex items-center justify-center rounded-xl border border-dashed border-black/20 px-4 text-center text-xs text-black/60">
+              Nenhum QR code foi extraido desta passagem.
+            </div>
+          )}
         </div>
         <p className="text-white font-semibold text-lg">{flight.flightNumber}</p>
         <p className="text-white/60 text-sm mt-1">{flight.origin.code} → {flight.destination.code}</p>
-        <p className="text-white/40 text-xs mt-4">Apresente este codigo no embarque</p>
+        <p className="text-white/40 text-xs mt-4">{flight.qrCodePayload ? "Apresente este codigo no embarque" : "Quando o QR code estiver disponivel, ele aparecera aqui."}</p>
+      </div>
+    </Modal>
+  )
+}
+
+function FlightDetailsModal({
+  open,
+  onClose,
+  flight,
+  onOpenDocument,
+}: {
+  open: boolean
+  onClose: () => void
+  flight: any
+  onOpenDocument: (document: any) => Promise<void>
+}) {
+  if (!flight) return null
+
+  const extractionLabel =
+    flight.extractionStatus === "completed"
+      ? "Dados extraidos por IA"
+      : flight.extractionStatus === "manual"
+        ? "Dados preenchidos manualmente"
+        : flight.extractionStatus === "failed"
+          ? "Extracao nao concluida"
+          : "Passagem anexada, extracao pendente"
+
+  return (
+    <Modal open={open} onClose={onClose} title="Detalhes da passagem">
+      <div className="space-y-5">
+        <div className="rounded-2xl border border-white/[0.06] bg-white/[0.03] p-4">
+          <p className="text-xs uppercase tracking-wider text-white/40">Status</p>
+          <p className="mt-2 text-sm text-white">{extractionLabel}</p>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <p className="text-xs uppercase tracking-wider text-white/40">Companhia</p>
+            <p className="mt-2 text-sm text-white">{flight.airline || "Nao informado"}</p>
+          </div>
+          <div>
+            <p className="text-xs uppercase tracking-wider text-white/40">Voo</p>
+            <p className="mt-2 text-sm text-white">{flight.flightNumber || "Nao identificado"}</p>
+          </div>
+          <div>
+            <p className="text-xs uppercase tracking-wider text-white/40">Localizador</p>
+            <p className="mt-2 text-sm text-white">{flight.bookingReference || "Nao informado"}</p>
+          </div>
+          <div>
+            <p className="text-xs uppercase tracking-wider text-white/40">Passageiro</p>
+            <p className="mt-2 text-sm text-white">{flight.passengerName || "Nao informado"}</p>
+          </div>
+          <div>
+            <p className="text-xs uppercase tracking-wider text-white/40">Origem</p>
+            <p className="mt-2 text-sm text-white">{flight.origin.city}</p>
+          </div>
+          <div>
+            <p className="text-xs uppercase tracking-wider text-white/40">Destino</p>
+            <p className="mt-2 text-sm text-white">{flight.destination.city}</p>
+          </div>
+          <div>
+            <p className="text-xs uppercase tracking-wider text-white/40">Saida</p>
+            <p className="mt-2 text-sm text-white">{flight.date} • {flight.origin.time}</p>
+          </div>
+          <div>
+            <p className="text-xs uppercase tracking-wider text-white/40">Chegada</p>
+            <p className="mt-2 text-sm text-white">{flight.destination.time}</p>
+          </div>
+          <div>
+            <p className="text-xs uppercase tracking-wider text-white/40">Terminal / Portao</p>
+            <p className="mt-2 text-sm text-white">{flight.terminal || "-"} / {flight.gate || "-"}</p>
+          </div>
+          <div>
+            <p className="text-xs uppercase tracking-wider text-white/40">Assento / Bagagem</p>
+            <p className="mt-2 text-sm text-white">{flight.seat || "-"} / {flight.baggageInfo || "-"}</p>
+          </div>
+        </div>
+
+        {flight.document && (
+          <Button variant="outline" className="w-full border-white/10 text-white/80" onClick={() => void onOpenDocument(flight.document)}>
+            <ExternalLink className="mr-2 h-4 w-4" />
+            Ver passagem original
+          </Button>
+        )}
       </div>
     </Modal>
   )
 }
 
 // Flights Section
-function FlightsSection({ tripData, onUpdateFlight, onAddFlight, tripId, ownerUserId, agencyId, ensureSensitiveAccess }: { tripData: any; onUpdateFlight: (id: number, data: any) => void; onAddFlight: (data: any) => void; tripId: string; ownerUserId: string | null; agencyId: string | null; ensureSensitiveAccess: () => boolean }) {
+function FlightsSection({ tripData, onUpdateFlight, onAddFlight, tripId, ownerUserId, agencyId, ensureSensitiveAccess }: { tripData: any; onUpdateFlight: (id: string, data: any) => Promise<void>; onAddFlight: (data: any) => void; tripId: string; ownerUserId: string | null; agencyId: string | null; ensureSensitiveAccess: () => boolean }) {
   const [editingFlight, setEditingFlight] = useState<any>(null)
   const [viewingQR, setViewingQR] = useState<any>(null)
+  const [selectedFlight, setSelectedFlight] = useState<any>(null)
   const [addingFlight, setAddingFlight] = useState(false)
   const { isAdmin } = useContext(PermissionContext)
   const { showToast } = useToast()
   const flights = Array.isArray(tripData.flights) ? tripData.flights : []
-  const ticketDocuments = Array.isArray(tripData.documents) ? tripData.documents.filter((document: any) => document.type === "ticket") : []
+  const ticketDocuments = Array.isArray(tripData.documents) ? tripData.documents.filter((document: any) => document.type === "ticket" && !flights.some((flight: any) => flight.document?.id === document.id)) : []
 
-  const handleSaveFlight = (data: any) => {
-    onUpdateFlight(data.id, data)
+  const handleSaveFlight = async (data: any) => {
+    await onUpdateFlight(data.id, data)
     showToast("Voo atualizado com sucesso!", "success")
   }
 
@@ -1041,7 +1273,7 @@ function FlightsSection({ tripData, onUpdateFlight, onAddFlight, tripId, ownerUs
             </div>
             <div>
               <h2 className="text-xl font-semibold text-white">Passagens</h2>
-              <p className="text-sm text-white/40">{flights.length > 0 ? `${flights.length} voos confirmados` : `${ticketDocuments.length} passagem(ns) anexada(s)`}</p>
+              <p className="text-sm text-white/40">{flights.length > 0 ? `${flights.length} voo(s) salvo(s)` : `${ticketDocuments.length} passagem(ns) anexada(s)`}</p>
             </div>
           </div>
           {isAdmin && (
@@ -1059,23 +1291,25 @@ function FlightsSection({ tripData, onUpdateFlight, onAddFlight, tripId, ownerUs
         ) : (
         <div className="grid sm:grid-cols-2 gap-4">
           {flights.map((flight: any, i: number) => (
-            <FlightCard 
-              key={flight.id} 
-              flight={flight} 
-              index={i} 
+            <FlightCard
+              key={flight.id}
+              flight={flight}
+              index={i}
               onEdit={() => setEditingFlight(flight)}
               onViewQR={() => setViewingQR(flight)}
+              onOpenDetails={() => setSelectedFlight(flight)}
+              onOpenDocument={() => flight.document ? void handleOpenTicketDocument(flight.document) : undefined}
             />
           ))}
           {ticketDocuments.map((document: any) => (
             <div key={document.id} className="rounded-3xl border border-white/[0.06] bg-white/[0.02] p-5">
               <p className="text-sm font-medium text-white">{document.name}</p>
-              <p className="mt-2 text-xs text-white/40">Arquivo de passagem anexado</p>
+              <p className="mt-2 text-xs text-white/40">Passagem anexada, extracao pendente</p>
               <p className="mt-1 text-xs text-white/30">{document.mimeType || "Nao informado"}</p>
               <div className="mt-4">
                 <Button size="sm" variant="outline" className="border-white/10 text-white/70" onClick={() => void handleOpenTicketDocument(document)}>
-                  <Download className="mr-2 h-4 w-4" />
-                  Abrir anexo
+                  <ExternalLink className="mr-2 h-4 w-4" />
+                  Ver passagem original
                 </Button>
               </div>
             </div>
@@ -1084,9 +1318,22 @@ function FlightsSection({ tripData, onUpdateFlight, onAddFlight, tripId, ownerUs
         )}
       </div>
 
-      <EditFlightModal open={!!editingFlight} onClose={() => setEditingFlight(null)} flight={editingFlight} onSave={handleSaveFlight} />
+      <EditFlightModal open={!!editingFlight} onClose={() => setEditingFlight(null)} flight={editingFlight} onSave={(data) => void handleSaveFlight(data)} />
       <QRCodeModal open={!!viewingQR} onClose={() => setViewingQR(null)} flight={viewingQR} />
-      <AddFlightModal open={addingFlight} onClose={() => setAddingFlight(false)} tripId={tripId} ownerUserId={ownerUserId} agencyId={agencyId} ensureSensitiveAccess={ensureSensitiveAccess} onSave={(data) => { onAddFlight(data); showToast("Arquivo anexado. A leitura automatica estara disponivel em breve.", "info"); setAddingFlight(false) }} />
+      <FlightDetailsModal open={!!selectedFlight} onClose={() => setSelectedFlight(null)} flight={selectedFlight} onOpenDocument={handleOpenTicketDocument} />
+      <AddFlightModal
+        open={addingFlight}
+        onClose={() => setAddingFlight(false)}
+        tripId={tripId}
+        ownerUserId={ownerUserId}
+        agencyId={agencyId}
+        ensureSensitiveAccess={ensureSensitiveAccess}
+        onSave={(data) => {
+          onAddFlight(data)
+          showToast("Passagem anexada. A extracao automatica ainda esta pendente.", "info")
+          setAddingFlight(false)
+        }}
+      />
     </section>
   )
 }
@@ -1150,8 +1397,25 @@ function AddFlightModal({ open, onClose, onSave, tripId, ownerUserId, agencyId, 
       return
     }
 
+    const flightResult = await upsertTripFlight({
+      tripId,
+      documentId: metadataResult.data.id,
+      extractionStatus: "pending",
+      extractedData: {},
+    })
+
+    if (flightResult.error || !flightResult.data) {
+      console.error("[TICKET] flight persistence error", flightResult.error)
+      setError(resolveProtectedWriteError(flightResult.error || "Nao foi possivel registrar a passagem anexada."))
+      setUploading(false)
+      return
+    }
+
     console.log("[TICKET] upload success", metadataResult.data.id)
-    onSave(metadataResult.data)
+    onSave({
+      flight: mapFlightRecordToView(flightResult.data, [metadataResult.data]),
+      document: metadataResult.data,
+    })
     setUploading(false)
     setFileName("")
   }
@@ -1187,7 +1451,7 @@ function AddFlightModal({ open, onClose, onSave, tripId, ownerUserId, agencyId, 
         </label>
 
         <div className="rounded-xl border border-white/[0.08] bg-white/[0.03] p-4">
-          <p className="text-sm text-white/70">Arquivo anexado. A leitura automatica estara disponivel em breve.</p>
+          <p className="text-sm text-white/70">A passagem sera salva imediatamente e aparecera no link com o estado honesto: extracao pendente.</p>
         </div>
 
         {error && <p className="text-sm text-red-300">{error}</p>}
@@ -3330,6 +3594,9 @@ export default function TripPage() {
           const documentsResult = canWriteTrip
             ? await listDocumentsByTrip(repositoryTrip.data.id)
             : await listPublicTripDocuments(repositoryTrip.data.id)
+          const flightsResult = canWriteTrip
+            ? await listTripFlights(repositoryTrip.data.id)
+            : await listPublicTripFlights(repositoryTrip.data.id)
           const hotelsResult = await listTripHotels(repositoryTrip.data.id)
           const agencyResult = repositoryTrip.data.agencyId ? await getAgencyById(repositoryTrip.data.agencyId) : null
 
@@ -3358,7 +3625,7 @@ export default function TripPage() {
               coverImage: repositoryTrip.data.coverImage ?? undefined,
               adminLink: repositoryTrip.data.adminLink,
               shareLink: repositoryTrip.data.publicLink,
-              flights: repositoryTrip.data.flights,
+              flights: (flightsResult.data ?? []).map((flight) => mapFlightRecordToView(flight, documentsResult.data)),
               hotel: hotelsResult.data[0]
                 ? {
                     ...hotelsResult.data[0],
@@ -3507,19 +3774,48 @@ export default function TripPage() {
     })
   }
 
-  const handleUpdateFlight = (id: number, data: any) => {
-  if (!ensureSensitiveAccess()) return
-  setTripData(prev => ({
-  ...prev,
-  flights: prev.flights.map(f => f.id === id ? data : f)
-  }))
+  const handleUpdateFlight = async (id: string, data: any) => {
+    if (!ensureSensitiveAccess()) return
+    const result = await upsertTripFlight({
+      id,
+      tripId: tripData.id,
+      documentId: data.document?.id ?? data.documentId ?? null,
+      airline: data.airline ?? null,
+      flightNumber: data.flightNumber ?? null,
+      bookingReference: data.bookingReference ?? null,
+      originAirport: data.origin?.city ?? null,
+      destinationAirport: data.destination?.city ?? null,
+      departureAt: data.departureAt ?? null,
+      arrivalAt: data.arrivalAt ?? null,
+      passengerName: data.passengerName ?? null,
+      qrCodePayload: data.qrCodePayload ?? null,
+      baggageInfo: data.baggageInfo ?? null,
+      terminal: data.terminal ?? null,
+      gate: data.gate ?? null,
+      seat: data.seat ?? null,
+      extractedData: data.extractedData ?? {},
+      extractionStatus: "manual",
+    })
+
+    if (result.error || !result.data) {
+      showToast(resolveProtectedWriteError(result.error || "Nao foi possivel atualizar a passagem."), "error")
+      return
+    }
+
+    setTripData(prev => ({
+      ...prev,
+      flights: prev.flights.map((flight: any) =>
+        flight.id === id ? mapFlightRecordToView(result.data!, prev.documents) : flight
+      )
+    }))
   }
 
   const handleAddFlight = (data: any) => {
     if (!ensureSensitiveAccess()) return
     setTripData(prev => ({
       ...prev,
-      documents: [...prev.documents, { ...data, private: data.private ?? false }]
+      documents: data.document ? [...prev.documents, { ...data.document, private: data.document.private ?? false }] : prev.documents,
+      flights: data.flight ? [...prev.flights, data.flight] : prev.flights,
     }))
   }
 

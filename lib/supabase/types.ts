@@ -456,6 +456,72 @@ export interface Database {
           updated_at?: string
         }
       }
+      trip_flights: {
+        Row: {
+          id: string
+          trip_id: string
+          document_id: string | null
+          airline: string | null
+          flight_number: string | null
+          booking_reference: string | null
+          origin_airport: string | null
+          destination_airport: string | null
+          departure_at: string | null
+          arrival_at: string | null
+          passenger_name: string | null
+          qr_code_payload: string | null
+          baggage_info: string | null
+          terminal: string | null
+          gate: string | null
+          seat: string | null
+          extracted_data: Json
+          extraction_status: "pending" | "processing" | "completed" | "failed" | "manual"
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          trip_id: string
+          document_id?: string | null
+          airline?: string | null
+          flight_number?: string | null
+          booking_reference?: string | null
+          origin_airport?: string | null
+          destination_airport?: string | null
+          departure_at?: string | null
+          arrival_at?: string | null
+          passenger_name?: string | null
+          qr_code_payload?: string | null
+          baggage_info?: string | null
+          terminal?: string | null
+          gate?: string | null
+          seat?: string | null
+          extracted_data?: Json
+          extraction_status?: "pending" | "processing" | "completed" | "failed" | "manual"
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          trip_id?: string
+          document_id?: string | null
+          airline?: string | null
+          flight_number?: string | null
+          booking_reference?: string | null
+          origin_airport?: string | null
+          destination_airport?: string | null
+          departure_at?: string | null
+          arrival_at?: string | null
+          passenger_name?: string | null
+          qr_code_payload?: string | null
+          baggage_info?: string | null
+          terminal?: string | null
+          gate?: string | null
+          seat?: string | null
+          extracted_data?: Json
+          extraction_status?: "pending" | "processing" | "completed" | "failed" | "manual"
+          updated_at?: string
+        }
+      }
       trips: {
         Row: {
           id: string
