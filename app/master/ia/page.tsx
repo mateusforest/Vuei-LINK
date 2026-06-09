@@ -10,6 +10,7 @@ import {
   Check,
   FileText,
   MessageSquare,
+  Plane,
   Save,
   Shield,
   Sliders,
@@ -46,7 +47,7 @@ export default function MasterIAPage() {
     }, {})
 
     const usageGroups = aiUsageLogs.reduce<Record<string, number>>((accumulator, log) => {
-      accumulator[log.module] = (accumulator[log.module] ?? 0) + 1
+      accumulator[log.feature] = (accumulator[log.feature] ?? 0) + 1
       return accumulator
     }, {})
 
@@ -60,11 +61,19 @@ export default function MasterIAPage() {
         prompts: promptGroups.concierge ?? 0,
       },
       {
+        id: "flight_extraction",
+        name: "Extracao de Passagens",
+        description: "Leitura operacional de voos",
+        icon: Plane,
+        usage: usageGroups.flight_extraction ?? 0,
+        prompts: 0,
+      },
+      {
         id: "itinerary",
         name: "Roteiros IA",
         description: "Geracao de itinerarios",
         icon: Sparkles,
-        usage: usageGroups.itinerary ?? 0,
+        usage: usageGroups.itinerary_generation ?? 0,
         prompts: promptGroups.itinerary ?? 0,
       },
       {
@@ -72,7 +81,7 @@ export default function MasterIAPage() {
         name: "Leitura de Documentos",
         description: "Extracao operacional de dados",
         icon: FileText,
-        usage: usageGroups.documents ?? 0,
+        usage: usageGroups.document_extraction ?? 0,
         prompts: promptGroups.documents ?? 0,
       },
       {
@@ -287,20 +296,20 @@ export default function MasterIAPage() {
                     <div className="flex items-start justify-between gap-4">
                       <div className="space-y-1 min-w-0">
                         <div className="flex items-center gap-2">
-                          <span className="text-sm font-medium text-foreground">{log.module}</span>
-                          <Badge variant="outline" className={log.status === "success" ? "border-emerald-500/30 text-emerald-400" : "border-amber-500/30 text-amber-400"}>
+                          <span className="text-sm font-medium text-foreground">{log.feature}</span>
+                          <Badge variant="outline" className={log.status === "completed" ? "border-emerald-500/30 text-emerald-400" : "border-amber-500/30 text-amber-400"}>
                             {log.status}
                           </Badge>
                         </div>
                         <div className="text-xs text-muted-foreground">
-                          {log.model || "Modelo nao informado"} • {log.totalTokens} tokens • {log.creditsCharged} credito(s)
+                          {log.model || "Modelo nao informado"} • {log.totalTokens} tokens • {log.creditAmount} credito(s)
                         </div>
                         <div className="text-xs text-muted-foreground">
                           {new Date(log.createdAt).toLocaleString("pt-BR")}
                         </div>
                       </div>
                       <div className="text-right text-xs text-muted-foreground">
-                        {log.estimatedCost != null ? `$${log.estimatedCost.toFixed(6)}` : "Sem custo estimado"}
+                        Sem custo estimado
                       </div>
                     </div>
                   </div>

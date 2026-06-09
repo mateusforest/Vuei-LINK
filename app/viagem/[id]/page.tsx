@@ -335,34 +335,61 @@ function normalizeAirportCode(value?: string | null) {
   return match?.[0] ?? value.slice(0, 3).toUpperCase()
 }
 
+function getFlightExtractedValue(flight: TripFlightRecord, key: string) {
+  const extractedData =
+    flight.extractedData && typeof flight.extractedData === "object"
+      ? (flight.extractedData as Record<string, unknown>)
+      : {}
+  const structuredResult =
+    extractedData.structured_result && typeof extractedData.structured_result === "object"
+      ? (extractedData.structured_result as Record<string, unknown>)
+      : extractedData
+
+  const value = structuredResult[key]
+  return typeof value === "string" && value.trim() ? value.trim() : null
+}
+
 function mapFlightRecordToView(flight: TripFlightRecord, documents?: any[]) {
-  const departure = formatFlightDateTime(flight.departureAt)
-  const arrival = formatFlightDateTime(flight.arrivalAt)
+  const airline = flight.airline || getFlightExtractedValue(flight, "airline")
+  const flightNumber = flight.flightNumber || getFlightExtractedValue(flight, "flight_number")
+  const bookingReference = flight.bookingReference || getFlightExtractedValue(flight, "booking_reference")
+  const originAirport = flight.originAirport || getFlightExtractedValue(flight, "origin_airport")
+  const destinationAirport = flight.destinationAirport || getFlightExtractedValue(flight, "destination_airport")
+  const departureAt = flight.departureAt || getFlightExtractedValue(flight, "departure_at")
+  const arrivalAt = flight.arrivalAt || getFlightExtractedValue(flight, "arrival_at")
+  const passengerName = flight.passengerName || getFlightExtractedValue(flight, "passenger_name")
+  const baggageInfo = flight.baggageInfo || getFlightExtractedValue(flight, "baggage_info")
+  const terminal = flight.terminal || getFlightExtractedValue(flight, "terminal")
+  const gate = flight.gate || getFlightExtractedValue(flight, "gate")
+  const seat = flight.seat || getFlightExtractedValue(flight, "seat")
+  const qrCodePayload = flight.qrCodePayload || getFlightExtractedValue(flight, "qr_code_payload")
+  const departure = formatFlightDateTime(departureAt)
+  const arrival = formatFlightDateTime(arrivalAt)
   const linkedDocument = Array.isArray(documents) ? documents.find((document: any) => document.id === flight.documentId) ?? null : null
 
   return {
     id: flight.id,
-    airline: flight.airline || "Passagem anexada",
-    flightNumber: flight.flightNumber || "Voo nao identificado",
-    bookingReference: flight.bookingReference,
+    airline: airline || "Passagem anexada",
+    flightNumber: flightNumber || "Voo nao identificado",
+    bookingReference,
     extractionStatus: flight.extractionStatus,
     extractedData: flight.extractedData ?? {},
-    passengerName: flight.passengerName,
-    baggageInfo: flight.baggageInfo,
-    terminal: flight.terminal,
-    gate: flight.gate,
-    seat: flight.seat,
-    qrCodePayload: flight.qrCodePayload,
+    passengerName,
+    baggageInfo,
+    terminal,
+    gate,
+    seat,
+    qrCodePayload,
     date: departure.date,
-    duration: calculateFlightDuration(flight.departureAt, flight.arrivalAt),
+    duration: calculateFlightDuration(departureAt, arrivalAt),
     origin: {
-      code: normalizeAirportCode(flight.originAirport),
-      city: flight.originAirport || "Origem nao informada",
+      code: normalizeAirportCode(originAirport),
+      city: originAirport || "Origem nao informada",
       time: departure.time,
     },
     destination: {
-      code: normalizeAirportCode(flight.destinationAirport),
-      city: flight.destinationAirport || "Destino nao informado",
+      code: normalizeAirportCode(destinationAirport),
+      city: destinationAirport || "Destino nao informado",
       time: arrival.time,
     },
     document: linkedDocument,

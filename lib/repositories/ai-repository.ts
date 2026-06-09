@@ -18,14 +18,15 @@ type ConversationRowCompat = Database["public"]["Tables"]["ai_conversations"]["R
 }
 
 type UsageLogRowCompat = Database["public"]["Tables"]["ai_usage_logs"]["Row"] & {
-  owner_type?: "traveler" | "agency" | null
   owner_user_id?: string | null
+  conversation_id?: string | null
+  message_id?: string | null
+  feature?: "concierge" | "flight_extraction" | "itinerary_generation" | "document_extraction" | null
   model?: string | null
   input_tokens?: number | null
   output_tokens?: number | null
   total_tokens?: number | null
-  estimated_cost?: number | null
-  credits_charged?: number | null
+  credit_amount?: number | null
   status?: AiUsageStatus | null
 }
 
@@ -73,21 +74,17 @@ interface AddMessagePayload {
 }
 
 interface LogAiUsagePayload {
-  ownerType?: "traveler" | "agency" | null
   ownerUserId?: string | null
   tripId: string | null
-  userId: string | null
   agencyId: string | null
-  clientId: string | null
-  module: AiModule
-  action: string
+  conversationId?: string | null
+  messageId?: string | null
+  feature: "concierge" | "flight_extraction" | "itinerary_generation" | "document_extraction"
   model?: string | null
   inputTokens?: number
   outputTokens?: number
   totalTokens?: number
-  estimatedCost?: number | null
-  creditsCharged?: number
-  creditsUsed?: number
+  creditAmount?: number
   status?: AiUsageStatus
   metadata?: Record<string, unknown> | null
 }
@@ -96,7 +93,7 @@ interface ListAiUsageLogsParams {
   ownerUserId?: string
   agencyId?: string
   tripId?: string
-  module?: AiModule
+  feature?: "concierge" | "flight_extraction" | "itinerary_generation" | "document_extraction"
   status?: AiUsageStatus
   limit?: number
 }
@@ -213,22 +210,18 @@ function mapMessageRow(row: Database["public"]["Tables"]["ai_messages"]["Row"]):
 function mapUsageLogRow(row: UsageLogRowCompat): AiUsageLog {
   return {
     id: row.id,
-    ownerType: row.owner_type ?? null,
     ownerUserId: row.owner_user_id ?? null,
     tripId: row.trip_id,
-    userId: row.user_id,
     agencyId: row.agency_id,
-    clientId: row.client_id,
-    module: row.module,
-    action: row.action,
+    conversationId: row.conversation_id ?? null,
+    messageId: row.message_id ?? null,
+    feature: row.feature ?? "document_extraction",
     model: row.model ?? null,
     inputTokens: row.input_tokens ?? 0,
     outputTokens: row.output_tokens ?? 0,
     totalTokens: row.total_tokens ?? 0,
-    estimatedCost: row.estimated_cost ?? null,
-    creditsCharged: row.credits_charged ?? row.credits_used ?? 0,
-    creditsUsed: row.credits_used ?? 0,
-    status: row.status ?? "success",
+    creditAmount: row.credit_amount ?? 0,
+    status: row.status ?? "completed",
     metadata: (row.metadata ?? {}) as Record<string, unknown>,
     createdAt: row.created_at,
   }
@@ -604,22 +597,18 @@ export async function logAiUsage(payload: LogAiUsagePayload) {
     const client = createSupabaseBrowserClient()
     if (client) {
       const insertPayload: Database["public"]["Tables"]["ai_usage_logs"]["Insert"] = {
-        owner_type: payload.ownerType ?? null,
         owner_user_id: payload.ownerUserId ?? null,
         trip_id: payload.tripId,
-        user_id: payload.userId,
         agency_id: payload.agencyId,
-        client_id: payload.clientId,
-        module: payload.module,
-        action: payload.action,
+        conversation_id: payload.conversationId ?? null,
+        message_id: payload.messageId ?? null,
+        feature: payload.feature,
         model: payload.model ?? null,
         input_tokens: payload.inputTokens ?? 0,
         output_tokens: payload.outputTokens ?? 0,
         total_tokens: payload.totalTokens ?? 0,
-        estimated_cost: payload.estimatedCost ?? null,
-        credits_charged: payload.creditsCharged ?? payload.creditsUsed ?? 0,
-        credits_used: payload.creditsUsed ?? payload.creditsCharged ?? 0,
-        status: payload.status ?? "success",
+        credit_amount: payload.creditAmount ?? 0,
+        status: payload.status ?? "completed",
         metadata: payload.metadata ?? {},
       }
 
@@ -641,22 +630,18 @@ export async function logAiUsage(payload: LogAiUsagePayload) {
 
   const usageLog: AiUsageLog = {
     id: `ai-usage-${Date.now()}`,
-    ownerType: payload.ownerType ?? null,
     ownerUserId: payload.ownerUserId ?? null,
     tripId: payload.tripId,
-    userId: payload.userId,
     agencyId: payload.agencyId,
-    clientId: payload.clientId,
-    module: payload.module,
-    action: payload.action,
+    conversationId: payload.conversationId ?? null,
+    messageId: payload.messageId ?? null,
+    feature: payload.feature,
     model: payload.model ?? null,
     inputTokens: payload.inputTokens ?? 0,
     outputTokens: payload.outputTokens ?? 0,
     totalTokens: payload.totalTokens ?? 0,
-    estimatedCost: payload.estimatedCost ?? null,
-    creditsCharged: payload.creditsCharged ?? payload.creditsUsed ?? 0,
-    creditsUsed: payload.creditsUsed ?? payload.creditsCharged ?? 0,
-    status: payload.status ?? "success",
+    creditAmount: payload.creditAmount ?? 0,
+    status: payload.status ?? "completed",
     metadata: payload.metadata ?? {},
     createdAt: new Date().toISOString(),
   }
@@ -675,7 +660,7 @@ export async function listAiUsageLogs(params?: ListAiUsageLogsParams) {
       if (params?.ownerUserId) query = query.eq("owner_user_id", params.ownerUserId)
       if (params?.agencyId) query = query.eq("agency_id", params.agencyId)
       if (params?.tripId) query = query.eq("trip_id", params.tripId)
-      if (params?.module) query = query.eq("module", params.module)
+      if (params?.feature) query = query.eq("feature", params.feature)
       if (params?.status) query = query.eq("status", params.status)
       if (params?.limit) query = query.limit(params.limit)
 
@@ -700,7 +685,7 @@ export async function listAiUsageLogs(params?: ListAiUsageLogsParams) {
   if (params?.ownerUserId) data = data.filter((log) => log.ownerUserId === params.ownerUserId)
   if (params?.agencyId) data = data.filter((log) => log.agencyId === params.agencyId)
   if (params?.tripId) data = data.filter((log) => log.tripId === params.tripId)
-  if (params?.module) data = data.filter((log) => log.module === params.module)
+  if (params?.feature) data = data.filter((log) => log.feature === params.feature)
   if (params?.status) data = data.filter((log) => log.status === params.status)
   if (params?.limit) data = data.slice(0, params.limit)
   return { source: "local" as const, data, error: null }

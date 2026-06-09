@@ -161,63 +161,51 @@ export interface Database {
       ai_usage_logs: {
         Row: {
           id: string
-          owner_type: "traveler" | "agency" | null
           owner_user_id: string | null
           trip_id: string | null
-          user_id: string | null
           agency_id: string | null
-          client_id: string | null
-          module: "concierge" | "itinerary" | "documents" | "ticket_reader" | "accommodation_reader" | "flight_reader" | "support_assistant"
-          action: string
+          conversation_id: string | null
+          message_id: string | null
+          feature: "concierge" | "flight_extraction" | "itinerary_generation" | "document_extraction"
           model: string | null
-          input_tokens: number | null
-          output_tokens: number | null
-          total_tokens: number | null
-          estimated_cost: number | null
-          credits_charged: number | null
-          status: "success" | "error" | "blocked" | "insufficient_credits" | null
-          credits_used: number
+          input_tokens: number
+          output_tokens: number
+          total_tokens: number
+          credit_amount: number
+          status: "completed" | "failed" | "skipped"
           metadata: Json
           created_at: string
         }
         Insert: {
           id?: string
-          owner_type?: "traveler" | "agency" | null
           owner_user_id?: string | null
           trip_id?: string | null
-          user_id?: string | null
           agency_id?: string | null
-          client_id?: string | null
-          module: "concierge" | "itinerary" | "documents" | "ticket_reader" | "accommodation_reader" | "flight_reader" | "support_assistant"
-          action: string
+          conversation_id?: string | null
+          message_id?: string | null
+          feature: "concierge" | "flight_extraction" | "itinerary_generation" | "document_extraction"
           model?: string | null
-          input_tokens?: number | null
-          output_tokens?: number | null
-          total_tokens?: number | null
-          estimated_cost?: number | null
-          credits_charged?: number | null
-          status?: "success" | "error" | "blocked" | "insufficient_credits" | null
-          credits_used?: number
+          input_tokens?: number
+          output_tokens?: number
+          total_tokens?: number
+          credit_amount?: number
+          status?: "completed" | "failed" | "skipped"
           metadata?: Json
           created_at?: string
         }
         Update: {
-          owner_type?: "traveler" | "agency" | null
           owner_user_id?: string | null
           trip_id?: string | null
-          user_id?: string | null
           agency_id?: string | null
-          client_id?: string | null
-          module?: "concierge" | "itinerary" | "documents" | "ticket_reader" | "accommodation_reader" | "flight_reader" | "support_assistant"
-          action?: string
+          conversation_id?: string | null
+          message_id?: string | null
+          feature?: "concierge" | "flight_extraction" | "itinerary_generation" | "document_extraction"
           model?: string | null
-          input_tokens?: number | null
-          output_tokens?: number | null
-          total_tokens?: number | null
-          estimated_cost?: number | null
-          credits_charged?: number | null
-          status?: "success" | "error" | "blocked" | "insufficient_credits" | null
-          credits_used?: number
+          input_tokens?: number
+          output_tokens?: number
+          total_tokens?: number
+          credit_amount?: number
+          status?: "completed" | "failed" | "skipped"
           metadata?: Json
         }
       }

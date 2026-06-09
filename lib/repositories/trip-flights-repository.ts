@@ -44,24 +44,30 @@ function getClient() {
 }
 
 function mapRow(row: TripFlightRow): TripFlightRecord {
+  const extractedData = (row.extracted_data ?? {}) as Record<string, unknown>
+  const structuredResult =
+    extractedData.structured_result && typeof extractedData.structured_result === "object"
+      ? (extractedData.structured_result as Record<string, unknown>)
+      : extractedData
+
   return {
     id: row.id,
     tripId: row.trip_id,
     documentId: row.document_id,
-    airline: row.airline,
-    flightNumber: row.flight_number,
-    bookingReference: row.booking_reference,
-    originAirport: row.origin_airport,
-    destinationAirport: row.destination_airport,
-    departureAt: row.departure_at,
-    arrivalAt: row.arrival_at,
-    passengerName: row.passenger_name,
-    qrCodePayload: row.qr_code_payload,
-    baggageInfo: row.baggage_info,
-    terminal: row.terminal,
-    gate: row.gate,
-    seat: row.seat,
-    extractedData: (row.extracted_data ?? {}) as Record<string, unknown>,
+    airline: row.airline ?? (typeof structuredResult.airline === "string" ? structuredResult.airline : null),
+    flightNumber: row.flight_number ?? (typeof structuredResult.flight_number === "string" ? structuredResult.flight_number : null),
+    bookingReference: row.booking_reference ?? (typeof structuredResult.booking_reference === "string" ? structuredResult.booking_reference : null),
+    originAirport: row.origin_airport ?? (typeof structuredResult.origin_airport === "string" ? structuredResult.origin_airport : null),
+    destinationAirport: row.destination_airport ?? (typeof structuredResult.destination_airport === "string" ? structuredResult.destination_airport : null),
+    departureAt: row.departure_at ?? (typeof structuredResult.departure_at === "string" ? structuredResult.departure_at : null),
+    arrivalAt: row.arrival_at ?? (typeof structuredResult.arrival_at === "string" ? structuredResult.arrival_at : null),
+    passengerName: row.passenger_name ?? (typeof structuredResult.passenger_name === "string" ? structuredResult.passenger_name : null),
+    qrCodePayload: row.qr_code_payload ?? (typeof structuredResult.qr_code_payload === "string" ? structuredResult.qr_code_payload : null),
+    baggageInfo: row.baggage_info ?? (typeof structuredResult.baggage_info === "string" ? structuredResult.baggage_info : null),
+    terminal: row.terminal ?? (typeof structuredResult.terminal === "string" ? structuredResult.terminal : null),
+    gate: row.gate ?? (typeof structuredResult.gate === "string" ? structuredResult.gate : null),
+    seat: row.seat ?? (typeof structuredResult.seat === "string" ? structuredResult.seat : null),
+    extractedData,
     extractionStatus: row.extraction_status,
     createdAt: row.created_at,
     updatedAt: row.updated_at,

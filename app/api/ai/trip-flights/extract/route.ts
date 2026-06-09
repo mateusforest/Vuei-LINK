@@ -4,6 +4,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server"
 import type { Database } from "@/lib/supabase/types"
 import { countUsefulFlightFields, requestFlightExtraction } from "@/lib/ai/flight-extraction"
 import { estimateCostUsd, getTicketExtractionCreditCost } from "@/lib/ai/credit-consumption"
+import { createAiUsageLog } from "@/lib/ai/usage-logs"
 
 interface FlightExtractionRequestBody {
   tripId?: string
@@ -407,7 +408,6 @@ export async function POST(request: Request) {
   })
 
   const shouldChargeCredits = aiResult.calledModel
-  const estimatedCost = estimateCostUsd(aiResult.usage.inputTokens, aiResult.usage.outputTokens)
   const extractionPayload = aiResult.data
   const usefulFieldCount = countUsefulFlightFields(extractionPayload)
   const completed = Boolean(extractionPayload?.is_ticket && usefulFieldCount > 0)
@@ -428,6 +428,7 @@ export async function POST(request: Request) {
     failure_reason: failureReason,
     processed_at: new Date().toISOString(),
     mime_type: entityResult.document.mime_type,
+    estimatedCostUsd: estimateCostUsd(aiResult.usage.inputTokens, aiResult.usage.outputTokens),
   }
 
   const flightUpdate = await updateFlightRecord(supabase, entityResult.flight.id, {
@@ -459,28 +460,22 @@ export async function POST(request: Request) {
   }
 
   if (shouldChargeCredits) {
-    const usageInsert = await supabase.from("ai_usage_logs").insert({
-      owner_type: ownerType,
-      owner_user_id: ownerType === "traveler" ? user.id : null,
-      trip_id: accessResult.trip.id,
-      user_id: user.id,
-      agency_id: accessResult.trip.agency_id,
-      client_id: accessResult.trip.client_id,
-      module: "flight_reader",
-      action: "extract_trip_ticket",
+    const usageInsert = await createAiUsageLog(supabase, {
+      ownerUserId: ownerType === "traveler" ? user.id : null,
+      agencyId: accessResult.trip.agency_id,
+      tripId: accessResult.trip.id,
+      feature: "flight_extraction",
       model: aiResult.model,
-      input_tokens: aiResult.usage.inputTokens,
-      output_tokens: aiResult.usage.outputTokens,
-      total_tokens: aiResult.usage.totalTokens,
-      estimated_cost: estimatedCost,
-      credits_charged: creditsPerCall,
-      credits_used: creditsPerCall,
-      status: completed ? "success" : "error",
+      inputTokens: aiResult.usage.inputTokens,
+      outputTokens: aiResult.usage.outputTokens,
+      totalTokens: aiResult.usage.totalTokens,
+      creditAmount: creditsPerCall,
+      status: completed ? "completed" : "failed",
       metadata,
     })
 
     if (usageInsert.error) {
-      console.error("[AI][FLIGHT_EXTRACTION] usage log error", usageInsert.error.message)
+      console.error("[AI][FLIGHT_EXTRACTION] usage log error", usageInsert.error)
     }
 
     const creditsInsert = await supabase.from("credit_transactions").insert({

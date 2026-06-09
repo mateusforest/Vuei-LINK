@@ -9,7 +9,9 @@ export type AiModule =
 
 export type AiRole = "user" | "assistant" | "agent" | "system"
 
-export type AiUsageStatus = "success" | "error" | "blocked" | "insufficient_credits"
+export type AiUsageFeature = "concierge" | "flight_extraction" | "itinerary_generation" | "document_extraction"
+
+export type AiUsageStatus = "completed" | "failed" | "skipped"
 
 export interface AiStructuredResult<TData = Record<string, unknown>> {
   success: boolean
@@ -109,21 +111,17 @@ export interface AiPrompt {
 
 export interface AiUsageLog {
   id: string
-  ownerType: "traveler" | "agency" | null
   ownerUserId: string | null
   tripId: string | null
-  userId: string | null
   agencyId: string | null
-  clientId: string | null
-  module: AiModule
-  action: string
+  conversationId: string | null
+  messageId: string | null
+  feature: AiUsageFeature
   model: string | null
   inputTokens: number
   outputTokens: number
   totalTokens: number
-  estimatedCost: number | null
-  creditsCharged: number
-  creditsUsed: number
+  creditAmount: number
   status: AiUsageStatus
   metadata: Record<string, unknown> | null
   createdAt: string

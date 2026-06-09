@@ -558,9 +558,9 @@ function buildMasterState(data: {
       totalConversations: conversations.length,
       totalMessages: messages.length,
       totalTokens: aiUsageLogs.reduce((total, log) => total + (log.totalTokens ?? 0), 0),
-      totalEstimatedCost: aiUsageLogs.reduce((total, log) => total + (log.estimatedCost ?? 0), 0),
-      totalCreditsCharged: aiUsageLogs.reduce((total, log) => total + (log.creditsCharged ?? 0), 0),
-      recentErrors: aiUsageLogs.filter((log) => log.status === "error" || log.status === "blocked").length,
+      totalEstimatedCost: 0,
+      totalCreditsCharged: aiUsageLogs.reduce((total, log) => total + (log.creditAmount ?? 0), 0),
+      recentErrors: aiUsageLogs.filter((log) => log.status === "failed").length,
     },
     activities,
     stats: {
@@ -573,7 +573,7 @@ function buildMasterState(data: {
       totalClients: clients.length,
       totalDocuments: documents.length,
       monthlyRevenue: 0,
-      totalCreditsConsumed: aiUsageLogs.reduce((total, log) => total + (log.creditsCharged ?? 0), 0),
+      totalCreditsConsumed: aiUsageLogs.reduce((total, log) => total + (log.creditAmount ?? 0), 0),
     },
   }
 }

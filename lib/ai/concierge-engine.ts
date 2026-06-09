@@ -10,6 +10,13 @@ export async function requestConciergeReply(systemPrompt: string, history: Conci
   if (!apiKey) {
     return {
       ok: false as const,
+      calledModel: false as const,
+      model: null,
+      usage: {
+        inputTokens: 0,
+        outputTokens: 0,
+        totalTokens: 0,
+      },
       error: "A IA operacional ainda nao esta configurada no servidor. Defina OPENAI_API_KEY para habilitar respostas reais.",
     }
   }
@@ -40,6 +47,13 @@ export async function requestConciergeReply(systemPrompt: string, history: Conci
   if (!response.ok) {
     return {
       ok: false as const,
+      calledModel: true as const,
+      model: OPENAI_MODEL,
+      usage: {
+        inputTokens: data?.usage?.prompt_tokens ?? 0,
+        outputTokens: data?.usage?.completion_tokens ?? 0,
+        totalTokens: data?.usage?.total_tokens ?? 0,
+      },
       error: data?.error?.message || "A chamada real de IA falhou no servidor.",
     }
   }
@@ -48,12 +62,20 @@ export async function requestConciergeReply(systemPrompt: string, history: Conci
   if (!content) {
     return {
       ok: false as const,
+      calledModel: true as const,
+      model: OPENAI_MODEL,
+      usage: {
+        inputTokens: data?.usage?.prompt_tokens ?? 0,
+        outputTokens: data?.usage?.completion_tokens ?? 0,
+        totalTokens: data?.usage?.total_tokens ?? 0,
+      },
       error: "A IA nao retornou uma resposta valida para esta pergunta.",
     }
   }
 
   return {
     ok: true as const,
+    calledModel: true as const,
     content,
     model: OPENAI_MODEL,
     usage: {

@@ -7,6 +7,7 @@ import { requestConciergeReply } from "@/lib/ai/concierge-engine"
 import { getConciergeCreditCost, estimateCostUsd } from "@/lib/ai/credit-consumption"
 import { buildFallbackConciergePrompt, buildPromptInput } from "@/lib/ai/prompts"
 import { buildTripContextSummary } from "@/lib/ai/trip-context"
+import { createAiUsageLog } from "@/lib/ai/usage-logs"
 
 type JsonObject = Record<string, unknown>
 
@@ -333,11 +334,36 @@ export async function POST(request: Request) {
   const aiResult = await requestConciergeReply(promptResult.prompt.systemPrompt, history, userPrompt)
 
   if (!aiResult.ok) {
+    if (aiResult.calledModel) {
+      const usageResult = await createAiUsageLog(supabase, {
+        ownerUserId: ownerType === "traveler" ? user.id : null,
+        agencyId: accessResult.trip.agency_id,
+        tripId: accessResult.trip.id,
+        conversationId: conversationResult.conversationId,
+        feature: "concierge",
+        model: aiResult.model,
+        inputTokens: aiResult.usage.inputTokens,
+        outputTokens: aiResult.usage.outputTokens,
+        totalTokens: aiResult.usage.totalTokens,
+        creditAmount: creditsPerCall,
+        status: "failed",
+        metadata: {
+          origin,
+          promptCode: promptResult.prompt.code,
+          promptFallback: promptResult.error ? true : false,
+          error: aiResult.error,
+        },
+      })
+
+      if (usageResult.error) {
+        console.error("[AI] usage log error", usageResult.error)
+      }
+    }
+
     return NextResponse.json({ error: aiResult.error }, { status: 503 })
   }
 
   const assistantMessage = aiResult.content
-  const estimatedCost = estimateCostUsd(aiResult.usage.inputTokens, aiResult.usage.outputTokens)
   const creditsToCharge = creditsPerCall
 
   const userInsert = await supabase.from("ai_messages").insert({
@@ -380,62 +406,58 @@ export async function POST(request: Request) {
     )
   }
 
-  const usageInsert = await supabase.from("ai_usage_logs").insert({
-    owner_type: ownerType,
-    owner_user_id: ownerType === "traveler" ? user.id : null,
-    trip_id: accessResult.trip.id,
-    user_id: user.id,
-    agency_id: accessResult.trip.agency_id,
-    client_id: accessResult.trip.client_id,
-    module: "concierge",
-    action: "chat_completion",
-      model: aiResult.model,
-    input_tokens: aiResult.usage.inputTokens,
-    output_tokens: aiResult.usage.outputTokens,
-    total_tokens: aiResult.usage.totalTokens,
-    estimated_cost: estimatedCost,
-    credits_charged: creditsToCharge,
-    credits_used: creditsToCharge,
-    status: "success",
+  const usageInsert = await createAiUsageLog(supabase, {
+    ownerUserId: ownerType === "traveler" ? user.id : null,
+    agencyId: accessResult.trip.agency_id,
+    tripId: accessResult.trip.id,
+    conversationId: conversationResult.conversationId,
+    feature: "concierge",
+    model: aiResult.model,
+    inputTokens: aiResult.usage.inputTokens,
+    outputTokens: aiResult.usage.outputTokens,
+    totalTokens: aiResult.usage.totalTokens,
+    creditAmount: creditsToCharge,
+    status: "completed",
     metadata: {
       origin,
       promptCode: promptResult.prompt.code,
       promptFallback: promptResult.error ? true : false,
+      estimatedCostUsd: estimateCostUsd(aiResult.usage.inputTokens, aiResult.usage.outputTokens),
     },
   })
 
   let warning: string | null = null
 
   if (usageInsert.error) {
-    console.error("[AI] usage log error", usageInsert.error.message)
+    console.error("[AI] usage log error", usageInsert.error)
     warning = "A resposta foi gerada, mas o log operacional da IA ainda nao foi salvo. Revise o schema de ai_usage_logs."
-  } else {
-    const creditsInsert = await supabase.from("credit_transactions").insert({
-      owner_type: ownerType,
-      owner_user_id: ownerType === "traveler" ? user.id : null,
-      agency_id: ownerType === "agency" ? accessResult.trip.agency_id : null,
-      type: "consume",
-      amount: -creditsToCharge,
-      reason: `Consumo do concierge IA para ${accessResult.trip.title}`,
-      source: "ai_concierge",
-      metadata: {
-        module: "concierge",
-        trip_id: accessResult.trip.id,
-        conversation_id: conversationResult.conversationId,
-      },
-      created_by: user.id,
-    })
+  }
 
-    if (creditsInsert.error) {
-      console.error("[AI] credits consume error", creditsInsert.error.message)
-      warning = "A resposta foi gerada, mas o consumo de creditos ainda nao foi registrado. Revise o ledger de creditos."
-    }
+  const creditsInsert = await supabase.from("credit_transactions").insert({
+    owner_type: ownerType,
+    owner_user_id: ownerType === "traveler" ? user.id : null,
+    agency_id: ownerType === "agency" ? accessResult.trip.agency_id : null,
+    type: "consume",
+    amount: -creditsToCharge,
+    reason: `Consumo do concierge IA para ${accessResult.trip.title}`,
+    source: "ai_concierge",
+    metadata: {
+      module: "concierge",
+      trip_id: accessResult.trip.id,
+      conversation_id: conversationResult.conversationId,
+    },
+    created_by: user.id,
+  })
+
+  if (creditsInsert.error) {
+    console.error("[AI] credits consume error", creditsInsert.error.message)
+    warning = "A resposta foi gerada, mas o consumo de creditos ainda nao foi registrado. Revise o ledger de creditos."
   }
 
   return NextResponse.json({
     conversationId: conversationResult.conversationId,
     assistantMessage,
-    model: OPENAI_MODEL,
+    model: aiResult.model,
     creditsCharged: warning ? 0 : creditsToCharge,
     warning,
   })
