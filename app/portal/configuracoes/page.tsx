@@ -369,8 +369,8 @@ export default function ConfiguracoesPage() {
   }
 
   const handleSignOut = async () => {
-    await signOut()
-    router.push("/login")
+    void signOut()
+    router.replace("/login")
   }
 
   const handleSaveBiometricPreference = async () => {

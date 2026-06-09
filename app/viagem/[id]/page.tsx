@@ -43,6 +43,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { cn } from "@/lib/utils"
+import { devLog, startPerfMeasure } from "@/lib/dev/perf"
 
 const TRIPS_STORAGE_KEY = "vuei_trips"
 const AGENCY_STORAGE_KEY = "vuei_agency"
@@ -1442,6 +1443,7 @@ function FlightDetailsModal({
 // Flights Section
 function FlightsSection({
   tripData,
+  loading,
   onUpdateFlight,
   onAddFlight,
   onDeleteFlight,
@@ -1452,6 +1454,7 @@ function FlightsSection({
   ensureSensitiveAccess,
 }: {
   tripData: any
+  loading: boolean
   onUpdateFlight: (id: string, data: any) => Promise<void>
   onAddFlight: (data: any) => void
   onDeleteFlight: (flightId: string) => Promise<void>
@@ -1511,7 +1514,17 @@ function FlightsSection({
           )}
         </motion.div>
 
-        {flights.length === 0 && ticketDocuments.length === 0 ? (
+        {loading ? (
+          <div className="grid gap-4 sm:grid-cols-2">
+            {[0, 1].map((item) => (
+              <div key={item} className="rounded-3xl border border-white/[0.06] bg-white/[0.02] p-5 animate-pulse">
+                <div className="h-4 w-28 rounded bg-white/10" />
+                <div className="mt-3 h-3 w-40 rounded bg-white/5" />
+                <div className="mt-6 h-10 rounded-xl bg-white/5" />
+              </div>
+            ))}
+          </div>
+        ) : flights.length === 0 && ticketDocuments.length === 0 ? (
           <div className="rounded-3xl border border-white/[0.06] bg-white/[0.02] p-6 text-sm text-white/50">
             Nenhuma passagem adicionada.
           </div>
@@ -1747,10 +1760,12 @@ function AddFlightModal({ open, onClose, onSave, tripId, ownerUserId, agencyId, 
 // Hotel Section
 function HotelSection({
   tripData,
+  loading,
   onSaveHotel,
   onDeleteHotel,
 }: {
   tripData: any
+  loading: boolean
   onSaveHotel: (data: any) => void
   onDeleteHotel: (hotelId: string) => void
 }) {
@@ -1788,7 +1803,16 @@ function HotelSection({
           )}
         </motion.div>
 
-        {hotels.length === 0 ? (
+        {loading ? (
+          <div className="grid gap-4 lg:grid-cols-2">
+            {[0, 1].map((item) => (
+              <div key={item} className="rounded-3xl border border-white/[0.06] bg-white/[0.02] p-6 animate-pulse">
+                <div className="h-5 w-40 rounded bg-white/10" />
+                <div className="mt-4 h-24 rounded-2xl bg-white/5" />
+              </div>
+            ))}
+          </div>
+        ) : hotels.length === 0 ? (
           <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="rounded-3xl border border-white/[0.06] bg-white/[0.02] p-6 text-sm text-white/50">
             Nenhuma hospedagem adicionada.
           </motion.div>
@@ -2088,6 +2112,7 @@ function UploadExistingItineraryModal({
 // Itinerary Section
 function ItinerarySection({
   tripData,
+  loading,
   itineraryRecords,
   tripId,
   ownerUserId,
@@ -2100,6 +2125,7 @@ function ItinerarySection({
   onDeleteItinerary,
 }: {
   tripData: any
+  loading: boolean
   itineraryRecords: TripItineraryRecord[]
   tripId: string
   ownerUserId: string | null
@@ -2248,7 +2274,14 @@ function ItinerarySection({
           ) : null}
         </motion.div>
 
-        {!simpleRecord && documentRecords.length === 0 && !hasGenerating ? (
+        {loading ? (
+          <div className="space-y-4">
+            <div className="rounded-3xl border border-white/[0.06] bg-white/[0.02] p-6 animate-pulse">
+              <div className="h-5 w-40 rounded bg-white/10" />
+              <div className="mt-4 h-24 rounded-2xl bg-white/5" />
+            </div>
+          </div>
+        ) : !simpleRecord && documentRecords.length === 0 && !hasGenerating ? (
           <div className="rounded-3xl border border-white/[0.06] bg-white/[0.02] p-6 text-sm text-white/50">
             Nenhum roteiro criado.
           </div>
@@ -2669,6 +2702,7 @@ function AddItineraryItemModal({ open, onClose, day, onSave }: { open: boolean; 
 // Documents Section
 function DocumentsSection({
   tripData,
+  loading,
   onAddDocument,
   onDeleteDocument,
   tripId,
@@ -2677,6 +2711,7 @@ function DocumentsSection({
   ensureSensitiveAccess,
 }: {
   tripData: any
+  loading: boolean
   onAddDocument: (data: any) => void
   onDeleteDocument: (documentId: string) => Promise<void>
   tripId: string
@@ -2732,7 +2767,17 @@ function DocumentsSection({
           )}
         </motion.div>
 
-        {documents.length === 0 ? (
+        {loading ? (
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 mb-6">
+            {[0, 1, 2, 3].map((item) => (
+              <div key={item} className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4 animate-pulse">
+                <div className="h-8 w-8 rounded bg-white/10" />
+                <div className="mt-3 h-4 rounded bg-white/10" />
+                <div className="mt-2 h-3 w-20 rounded bg-white/5" />
+              </div>
+            ))}
+          </div>
+        ) : documents.length === 0 ? (
           <div className="rounded-3xl border border-white/[0.06] bg-white/[0.02] p-6 text-sm text-white/50">
             Nenhum documento adicionado.
           </div>
@@ -4479,6 +4524,12 @@ export default function TripPage() {
   const [securityModalOpen, setSecurityModalOpen] = useState(false)
   const [quickAccessGateRequired, setQuickAccessGateRequired] = useState(false)
   const [agencyBranding, setAgencyBranding] = useState<{ name: string | null; logoUrl: string | null; isAgency: boolean }>({ name: null, logoUrl: null, isAgency: false })
+  const [sectionsLoading, setSectionsLoading] = useState({
+    flights: true,
+    hotels: true,
+    itineraries: true,
+    documents: true,
+  })
   const pendingSensitiveActionRef = useRef<(() => void) | null>(null)
   const loadRequestRef = useRef(0)
 
@@ -4511,14 +4562,20 @@ export default function TripPage() {
     setIsAdmin(false)
     setCanWrite(false)
     setTripItineraryRecords([])
+    setSectionsLoading({
+      flights: true,
+      hotels: true,
+      itineraries: true,
+      documents: true,
+    })
     const requestId = loadRequestRef.current + 1
     loadRequestRef.current = requestId
 
     const loadTrip = async () => {
+      const tripPerf = startPerfMeasure("trip.base")
       setIsLoadingTrip(true)
       setLoadError(null)
-      console.log("[TRIP] carregando link", routeSlug)
-      console.log("[LINK] loading trip", routeSlug)
+      devLog("trip.loading", routeSlug)
 
       const useSupabase = shouldUseSupabase()
 
@@ -4552,28 +4609,6 @@ export default function TripPage() {
           setIsAdmin(canEditTrip)
           setCanWrite(canWriteTrip)
 
-          const documentsResult = canWriteTrip
-            ? await listDocumentsByTrip(repositoryTrip.data.id)
-            : await listPublicTripDocuments(repositoryTrip.data.id)
-          const flightsResult = canWriteTrip
-            ? await listTripFlights(repositoryTrip.data.id)
-            : await listPublicTripFlights(repositoryTrip.data.id)
-          const itinerariesResult = await listTripItineraries(repositoryTrip.data.id)
-          const hotelsResult = await listTripHotels(repositoryTrip.data.id)
-          const agencyResult = repositoryTrip.data.agencyId ? await getAgencyById(repositoryTrip.data.agencyId) : null
-
-          if (loadRequestRef.current !== requestId) return
-
-          const simpleItinerary = resolveSimpleTripItinerary(itinerariesResult.data ?? [])
-          setTripItineraryRecords(itinerariesResult.data ?? [])
-
-          setAgencyBranding({
-            name: agencyResult?.data?.name ?? null,
-            logoUrl: agencyResult?.data?.branding?.linkLogoUrl || agencyResult?.data?.branding?.logoUrl || agencyResult?.data?.logo || null,
-            isAgency: Boolean(repositoryTrip.data.agencyId),
-          })
-
-          console.log("[LINK] trip loaded", repositoryTrip.data.id)
           setTripData(
             buildTripDataFromStoredTrip({
               id: repositoryTrip.data.id,
@@ -4591,25 +4626,88 @@ export default function TripPage() {
               coverImage: repositoryTrip.data.coverImage ?? undefined,
               adminLink: repositoryTrip.data.adminLink,
               shareLink: repositoryTrip.data.publicLink,
-              flights: (flightsResult.data ?? []).map((flight) => mapFlightRecordToView(flight, documentsResult.data)),
-              hotel: hotelsResult.data[0]
-                ? {
-                    ...hotelsResult.data[0],
-                    image: repositoryTrip.data.coverImage ?? undefined,
-                    amenities: [],
-                  }
-                : repositoryTrip.data.accommodations?.[0] ?? null,
-              hotels: hotelsResult.data.map((hotel) => ({
-                ...hotel,
-                image: repositoryTrip.data.coverImage ?? undefined,
-                amenities: [],
-              })),
-              itinerary: simpleItinerary ? mapItineraryContentToLegacyDays(simpleItinerary.content) : repositoryTrip.data.itinerary,
-              documents: documentsResult.data,
+              flights: [],
+              hotels: [],
+              hotel: repositoryTrip.data.accommodations?.[0] ?? null,
+              itinerary: repositoryTrip.data.itinerary,
+              documents: [],
               travelersCount: repositoryTrip.data.travelersCount,
             })
           )
           setIsLoadingTrip(false)
+          tripPerf.end({ tripId: repositoryTrip.data.id })
+
+          void (async () => {
+            const sectionsPerf = startPerfMeasure("trip.sections")
+            const [documentsResult, flightsResult, itinerariesResult, hotelsResult, agencyResult] = await Promise.all([
+              canWriteTrip ? listDocumentsByTrip(repositoryTrip.data.id) : listPublicTripDocuments(repositoryTrip.data.id),
+              canWriteTrip ? listTripFlights(repositoryTrip.data.id) : listPublicTripFlights(repositoryTrip.data.id),
+              listTripItineraries(repositoryTrip.data.id),
+              listTripHotels(repositoryTrip.data.id),
+              repositoryTrip.data.agencyId ? getAgencyById(repositoryTrip.data.agencyId) : Promise.resolve(null),
+            ])
+
+            if (loadRequestRef.current !== requestId) return
+
+            const simpleItinerary = resolveSimpleTripItinerary(itinerariesResult.data ?? [])
+            setTripItineraryRecords(itinerariesResult.data ?? [])
+            setAgencyBranding({
+              name: agencyResult?.data?.name ?? null,
+              logoUrl: agencyResult?.data?.branding?.linkLogoUrl || agencyResult?.data?.branding?.logoUrl || agencyResult?.data?.logo || null,
+              isAgency: Boolean(repositoryTrip.data.agencyId),
+            })
+
+            setTripData((prev) =>
+              buildTripDataFromStoredTrip({
+                id: repositoryTrip.data.id,
+                slug: repositoryTrip.data.slug,
+                name: repositoryTrip.data.title,
+                destination: repositoryTrip.data.destination,
+                agencyId: repositoryTrip.data.agencyId ?? null,
+                clientId: repositoryTrip.data.clientId ?? null,
+                country: repositoryTrip.data.country ?? undefined,
+                city: repositoryTrip.data.city ?? undefined,
+                startDate: repositoryTrip.data.startDate ?? undefined,
+                endDate: repositoryTrip.data.endDate ?? undefined,
+                passengersCount: repositoryTrip.data.travelersCount,
+                status: repositoryTrip.data.status,
+                coverImage: repositoryTrip.data.coverImage ?? undefined,
+                adminLink: repositoryTrip.data.adminLink,
+                shareLink: repositoryTrip.data.publicLink,
+                flights: (flightsResult.data ?? []).map((flight) => mapFlightRecordToView(flight, documentsResult.data)),
+                hotel: hotelsResult.data[0]
+                  ? {
+                      ...hotelsResult.data[0],
+                      image: repositoryTrip.data.coverImage ?? undefined,
+                      amenities: [],
+                    }
+                  : repositoryTrip.data.accommodations?.[0] ?? null,
+                hotels: hotelsResult.data.map((hotel) => ({
+                  ...hotel,
+                  image: repositoryTrip.data.coverImage ?? undefined,
+                  amenities: [],
+                })),
+                itinerary: simpleItinerary ? mapItineraryContentToLegacyDays(simpleItinerary.content) : repositoryTrip.data.itinerary,
+                documents: documentsResult.data,
+                travelersCount: repositoryTrip.data.travelersCount,
+              })
+            )
+            setSectionsLoading({
+              flights: false,
+              hotels: false,
+              itineraries: false,
+              documents: false,
+            })
+            sectionsPerf.end({ tripId: repositoryTrip.data.id })
+          })().catch((error) => {
+            console.error("[TRIP] section load error", error)
+            setSectionsLoading({
+              flights: false,
+              hotels: false,
+              itineraries: false,
+              documents: false,
+            })
+          })
           return
         }
         if (useSupabase) {
@@ -4630,7 +4728,7 @@ export default function TripPage() {
       }
 
       if (isPublicRoute || isAdminRoute) {
-        console.log("[LINK] trip not found", routeSlug)
+        devLog("trip.notFound", routeSlug)
         setLoadError("Viagem nao encontrada ou link expirado.")
         setIsLoadingTrip(false)
         return
@@ -4645,6 +4743,12 @@ export default function TripPage() {
         if (matchedTrip) {
           setAgencyBranding({ name: null, logoUrl: null, isAgency: false })
           setTripData(buildTripDataFromStoredTrip(matchedTrip))
+          setSectionsLoading({
+            flights: false,
+            hotels: false,
+            itineraries: false,
+            documents: false,
+          })
           setIsLoadingTrip(false)
           return
         }
@@ -4653,7 +4757,7 @@ export default function TripPage() {
         console.error("[TRIP] erro ao carregar link", message)
       }
 
-      console.log("[LINK] trip not found", routeSlug)
+      devLog("trip.notFound", routeSlug)
       setLoadError("Viagem nao encontrada ou link expirado.")
       setIsLoadingTrip(false)
     }
@@ -5240,9 +5344,10 @@ export default function TripPage() {
           <TripHeader tripData={tripData} agencyBranding={agencyBranding} onOpenShare={() => setShareOpen(true)} onOpenMenu={() => setMenuOpen(true)} />
           <TripHero tripData={tripData} onEditTrip={() => setEditTripOpen(true)} />
           <QuickAccessCards tripData={tripData} onNavigate={handleNavigate} />
-  <FlightsSection tripData={tripData} onUpdateFlight={handleUpdateFlight} onAddFlight={handleAddFlight} onDeleteFlight={handleDeleteFlight} onDeleteDocument={handleDeleteDocument} tripId={tripData.id} ownerUserId={tripOwnerUserId} agencyId={profile?.agencyId ?? null} ensureSensitiveAccess={ensureSensitiveAccess} />
-  <HotelSection tripData={tripData} onSaveHotel={handleSaveHotel} onDeleteHotel={handleDeleteHotel} />
+  <FlightsSection loading={sectionsLoading.flights} tripData={tripData} onUpdateFlight={handleUpdateFlight} onAddFlight={handleAddFlight} onDeleteFlight={handleDeleteFlight} onDeleteDocument={handleDeleteDocument} tripId={tripData.id} ownerUserId={tripOwnerUserId} agencyId={profile?.agencyId ?? null} ensureSensitiveAccess={ensureSensitiveAccess} />
+  <HotelSection loading={sectionsLoading.hotels} tripData={tripData} onSaveHotel={handleSaveHotel} onDeleteHotel={handleDeleteHotel} />
   <ItinerarySection
+    loading={sectionsLoading.itineraries}
     tripData={tripData}
     itineraryRecords={tripItineraryRecords}
     tripId={tripData.id}
@@ -5255,7 +5360,7 @@ export default function TripPage() {
     onSaveUploadedItinerary={handleSaveUploadedItinerary}
     onDeleteItinerary={handleDeleteItinerary}
   />
-  <DocumentsSection tripData={tripData} onAddDocument={handleAddDocument} onDeleteDocument={handleDeleteDocument} tripId={tripData.id} ownerUserId={tripOwnerUserId} agencyId={profile?.agencyId ?? null} ensureSensitiveAccess={ensureSensitiveAccess} />
+  <DocumentsSection loading={sectionsLoading.documents} tripData={tripData} onAddDocument={handleAddDocument} onDeleteDocument={handleDeleteDocument} tripId={tripData.id} ownerUserId={tripOwnerUserId} agencyId={profile?.agencyId ?? null} ensureSensitiveAccess={ensureSensitiveAccess} />
   <ConciergeSection tripData={tripData} onOpenCredits={() => setCreditsOpen(true)} />
           <OfflineSection tripData={tripData} />
           <QuickInfoSection tripData={tripData} />

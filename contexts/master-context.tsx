@@ -1,6 +1,6 @@
 "use client"
 
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react"
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import type { AgencyPlanCode, AiPrompt as CanonicalAiPrompt, AiUsageLog, CreditPackage, TripStatus } from "@/types"
 import { listProfiles } from "@/lib/repositories/profiles-repository"
 import { listAgencies, listAllAgencyMembers, type AgencyMember } from "@/lib/repositories/agencies-repository"
@@ -17,6 +17,7 @@ import {
 } from "@/lib/repositories/ai-repository"
 import { shouldUseSupabase } from "@/lib/data-source"
 import { useAuth } from "@/contexts/auth-context"
+import { startPerfMeasure } from "@/lib/dev/perf"
 
 interface Agency {
   id: string
@@ -243,6 +244,7 @@ type MasterState = {
 }
 
 const MasterContext = createContext<MasterContextType | null>(null)
+const MASTER_CACHE_KEY = "vuei_master_workspace_cache"
 
 const EMPTY_STATS: MasterStats = {
   totalAgencies: 0,
@@ -585,13 +587,33 @@ export function MasterProvider({ children }: { children: ReactNode }) {
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [settings, setSettings] = useState<MasterSettings>(INITIAL_SETTINGS)
   const [dataErrors, setDataErrors] = useState(EMPTY_DATA_ERRORS)
+  const hydratedCacheRef = useRef(false)
 
   useEffect(() => {
     let active = true
 
     async function loadMasterData() {
       if (loading) return
-      setLoadingState(true)
+
+      if (!hydratedCacheRef.current && typeof window !== "undefined") {
+        try {
+          const raw = window.sessionStorage.getItem(MASTER_CACHE_KEY)
+          if (raw) {
+            const parsed = JSON.parse(raw) as { state: MasterState; notifications: Notification[]; dataErrors: typeof EMPTY_DATA_ERRORS }
+            setState(parsed.state)
+            setNotifications(parsed.notifications)
+            setDataErrors(parsed.dataErrors)
+            setLoadingState(false)
+            hydratedCacheRef.current = true
+          }
+        } catch (error) {
+          console.error("[MASTER] cache hydrate error", error)
+        }
+      }
+
+      if (!hydratedCacheRef.current) {
+        setLoadingState(true)
+      }
 
       if (!shouldUseSupabase()) {
         if (!active) return
@@ -620,6 +642,7 @@ export function MasterProvider({ children }: { children: ReactNode }) {
         return
       }
 
+      const perf = startPerfMeasure("master.workspace")
       const [profilesResult, agenciesResult, membersResult, clientsResult, tripsResult, documentsResult, conversationsResult, aiUsageLogsResult, aiPromptsResult] = await Promise.all([
         listProfiles(),
         listAgencies(),
@@ -778,7 +801,20 @@ export function MasterProvider({ children }: { children: ReactNode }) {
       setState(nextState)
       setDataErrors(nextErrors)
       setNotifications(nextNotifications)
+      if (typeof window !== "undefined") {
+        try {
+          window.sessionStorage.setItem(MASTER_CACHE_KEY, JSON.stringify({
+            state: nextState,
+            notifications: nextNotifications,
+            dataErrors: nextErrors,
+          }))
+        } catch (error) {
+          console.error("[MASTER] cache persist error", error)
+        }
+      }
       setLoadingState(false)
+      hydratedCacheRef.current = true
+      perf.end({ agencies: nextState.agencies.length, users: nextState.users.length, trips: nextState.trips.length })
     }
 
     void loadMasterData()

@@ -7,6 +7,7 @@ import { createSupabaseBrowserClient } from "@/lib/supabase/client"
 import { shouldUseSupabase } from "@/lib/data-source"
 import { ensureProfile } from "@/lib/auth/ensure-profile"
 import { withTimeout } from "@/lib/async/with-timeout"
+import { devLog, startPerfMeasure } from "@/lib/dev/perf"
 
 interface SignInPayload {
   email: string
@@ -58,11 +59,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!nextUser || !supabase) {
         setProfile(null)
         profileRef.current = null
-        console.log("[BOOT] profile loaded", null)
+        devLog("boot.profile.loaded", null)
         return null
       }
 
       try {
+        const perf = startPerfMeasure("auth.profile")
         const ensuredProfile = await withTimeout(
           ensureProfile(nextUser, supabase),
           BOOTSTRAP_TIMEOUT_MS,
@@ -75,13 +77,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         setProfile(ensuredProfile)
         profileRef.current = ensuredProfile
-        console.log("[BOOT] profile loaded", ensuredProfile?.id ?? null)
-        console.log("[AUTH] profile loaded", ensuredProfile)
+        perf.end({ userId: nextUser.id, profileId: ensuredProfile?.id ?? null })
+        devLog("boot.profile.loaded", ensuredProfile?.id ?? null)
         return ensuredProfile
       } catch (error) {
         const message = error instanceof Error ? error.message : "Falha ao carregar profile."
         console.error("[AUTH ERROR]", message)
-        console.log("[BOOT] profile loaded", profileRef.current?.id ?? null)
+        devLog("boot.profile.loaded", profileRef.current?.id ?? null)
         return profileRef.current
       }
     },
@@ -89,7 +91,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   )
 
   const syncAuthState = useCallback(
-    async (nextSession: Session | null) => {
+    async (nextSession: Session | null, options?: { deferProfile?: boolean }) => {
       const nextUser = nextSession?.user ?? null
       const nextSignature = nextSession?.access_token ?? nextUser?.id ?? "guest"
       const isSameSession = sessionSignatureRef.current === nextSignature
@@ -97,25 +99,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSession(nextSession)
       setUser(nextUser)
 
-      console.log("[BOOT] session loaded", nextUser?.id ?? null)
-      console.log("[AUTH] session user", nextUser?.id ?? null)
-      console.log("[AUTH] metadata", nextUser?.user_metadata ?? null)
+      devLog("boot.session.loaded", nextUser?.id ?? null)
 
       if (!nextUser) {
         sessionSignatureRef.current = nextSignature
         setProfile(null)
         profileRef.current = null
-        console.log("[BOOT] profile loaded", null)
+        devLog("boot.profile.loaded", null)
         return null
       }
 
       if (isSameSession && profileRef.current?.id === nextUser.id) {
-        console.log("[BOOT] profile loaded", profileRef.current.id)
-        console.log("[AUTH] profile loaded", profileRef.current)
+        devLog("boot.profile.loaded", profileRef.current.id)
         return profileRef.current
       }
 
       sessionSignatureRef.current = nextSignature
+      if (options?.deferProfile) {
+        void loadProfile(nextUser)
+        return profileRef.current
+      }
+
       return loadProfile(nextUser)
     },
     [loadProfile],
@@ -143,7 +147,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     const bootstrap = async () => {
-      console.log("[BOOT] started")
+      const perf = startPerfMeasure("auth.bootstrap")
       setLoading(true)
 
       try {
@@ -155,7 +159,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         if (!mounted || bootstrapRunRef.current !== currentRun) return
 
-        await syncAuthState(sessionResult.data.session ?? null)
+        await syncAuthState(sessionResult.data.session ?? null, { deferProfile: true })
       } catch (error) {
         const message = error instanceof Error ? error.message : "Falha ao inicializar sessao."
         console.error("[AUTH ERROR]", message)
@@ -169,7 +173,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (mounted && bootstrapRunRef.current === currentRun) {
           setLoading(false)
           setInitialized(true)
-          console.log("[BOOT] finished")
+          perf.end({ userId: session?.user?.id ?? null })
         }
       }
     }
@@ -181,7 +185,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } = supabase.auth.onAuthStateChange(async (_event, nextSession) => {
       if (!mounted) return
 
-      await syncAuthState(nextSession ?? null)
+      setSession(nextSession ?? null)
+      setUser(nextSession?.user ?? null)
+      setLoading(false)
+      setInitialized(true)
+
+      void syncAuthState(nextSession ?? null)
     })
 
     return () => {
@@ -269,18 +278,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const signOut = async () => {
+    setUser(null)
+    setSession(null)
+    setProfile(null)
+    sessionSignatureRef.current = "guest"
+    profileRef.current = null
+
     if (supabaseEnabled && supabase) {
       try {
-        await withTimeout(supabase.auth.signOut(), BOOTSTRAP_TIMEOUT_MS, "Auth signout timeout.")
+        void withTimeout(supabase.auth.signOut(), BOOTSTRAP_TIMEOUT_MS, "Auth signout timeout.").catch((error) => {
+          const message = error instanceof Error ? error.message : "Falha ao encerrar sessao."
+          console.error("[AUTH ERROR]", message)
+        })
       } catch (error) {
         const message = error instanceof Error ? error.message : "Falha ao encerrar sessao."
         console.error("[AUTH ERROR]", message)
       }
     }
-
-    setUser(null)
-    setSession(null)
-    setProfile(null)
   }
 
   return (

@@ -1,6 +1,6 @@
 "use client"
 
-import { createContext, useContext, useState, useEffect, useCallback, useMemo, type ReactNode } from "react"
+import { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef, type ReactNode } from "react"
 import type { Client as CanonicalClient, CreditBalance, CreditTransaction, Trip as CanonicalTrip, TripStatus } from "@/types"
 import {
   AGENCY_STORAGE_SCHEMA_VERSION,
@@ -29,6 +29,7 @@ import {
 import { createTrip as createTripRecord, deleteTrip as deleteTripRecord, listTripsByAgency, updateTrip as updateTripRecord } from "@/lib/repositories/trips-repository"
 import { getProfileByEmail } from "@/lib/repositories/profiles-repository"
 import { updateProfile as updateProfileRecord } from "@/lib/repositories/profiles-repository"
+import { startPerfMeasure } from "@/lib/dev/perf"
 import {
   addMessage as addAiMessage,
   listConversations,
@@ -340,6 +341,7 @@ function buildCanonicalCredits(balance: number, history: AgencyCredits["history"
 }
 
 const AGENCY_STORAGE_KEY = "vuei_agency"
+const AGENCY_WORKSPACE_CACHE_KEY = "vuei_agency_workspace_cache"
 type PersistedAgencyState = AgencyStorageState<AgencyTrip, AgencyDocument, ConciergeRequest, TeamMember, Activity, AgencyCredits>
 
 const initialClients: Client[] = [
@@ -457,6 +459,70 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
   })
   const [isLoaded, setIsLoaded] = useState(false)
   const clientNameById = useMemo(() => new Map(clients.map((client) => [client.id, client.name])), [clients])
+  const lastWorkspaceKeyRef = useRef<string | null>(null)
+  const hasWarmStateRef = useRef(false)
+
+  useEffect(() => {
+    hasWarmStateRef.current = Boolean(agency || clients.length || trips.length || documents.length || teamMembers.length)
+  }, [agency, clients.length, trips.length, documents.length, teamMembers.length])
+
+  const hydrateWorkspaceCache = useCallback((cacheKey: string) => {
+    if (typeof window === "undefined") return false
+
+    try {
+      const raw = window.sessionStorage.getItem(`${AGENCY_WORKSPACE_CACHE_KEY}:${cacheKey}`)
+      if (!raw) return false
+
+      const parsed = JSON.parse(raw) as {
+        agency: Agency | null
+        agencyId: string | null
+        clients: Client[]
+        trips: AgencyTrip[]
+        documents: AgencyDocument[]
+        conciergeRequests: ConciergeRequest[]
+        teamMembers: TeamMember[]
+        credits: AgencyCredits
+        workspaceError: string | null
+      }
+
+      setAgency(parsed.agency)
+      setAgencyId(parsed.agencyId)
+      setClients(parsed.clients)
+      setTrips(parsed.trips)
+      setDocuments(parsed.documents)
+      setConciergeRequests(parsed.conciergeRequests)
+      setTeamMembers(parsed.teamMembers)
+      setCredits(parsed.credits)
+      setWorkspaceError(parsed.workspaceError)
+      setSetupIncomplete(false)
+      setIsLoaded(true)
+      setWorkspaceLoading(false)
+      return true
+    } catch (error) {
+      console.error("[AGENCY] cache hydrate error", error)
+      return false
+    }
+  }, [])
+
+  const persistWorkspaceCache = useCallback((cacheKey: string, payload: {
+    agency: Agency | null
+    agencyId: string | null
+    clients: Client[]
+    trips: AgencyTrip[]
+    documents: AgencyDocument[]
+    conciergeRequests: ConciergeRequest[]
+    teamMembers: TeamMember[]
+    credits: AgencyCredits
+    workspaceError: string | null
+  }) => {
+    if (typeof window === "undefined") return
+
+    try {
+      window.sessionStorage.setItem(`${AGENCY_WORKSPACE_CACHE_KEY}:${cacheKey}`, JSON.stringify(payload))
+    } catch (error) {
+      console.error("[AGENCY] cache persist error", error)
+    }
+  }, [])
 
   useEffect(() => {
     if (typeof window === "undefined") return
@@ -526,7 +592,17 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
 
   const refreshAgencyWorkspace = useCallback(async () => {
     if (!isUsingRealData) return
-    setWorkspaceLoading(true)
+    const workspaceKey = profile?.agencyId ? `agency:${profile.agencyId}` : user?.id ? `owner:${user.id}` : "anonymous"
+    const hasWarmState = hasWarmStateRef.current
+    const isSameWorkspace = lastWorkspaceKeyRef.current === workspaceKey
+
+    if ((!isSameWorkspace || !hasWarmState) && hydrateWorkspaceCache(workspaceKey)) {
+      lastWorkspaceKeyRef.current = workspaceKey
+    }
+
+    if (!hasWarmState) {
+      setWorkspaceLoading(true)
+    }
     if (!user?.id) {
       setAgency(null)
       setAgencyId(null)
@@ -548,6 +624,8 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
       setWorkspaceLoading(false)
       return
     }
+
+    const perf = startPerfMeasure("agency.workspace")
 
     const agencyResult = profile?.agencyId ? await getAgencyById(profile.agencyId) : await getAgencyByOwner(user.id)
     const resolvedAgency = agencyResult.data
@@ -589,12 +667,14 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
       }
     }
 
-    const [clientsResult, tripsResult, documentsResult] = await Promise.all([
+    lastWorkspaceKeyRef.current = workspaceKey
+
+    const [clientsResult, tripsResult, documentsResult, membersResult] = await Promise.all([
       listClients(resolvedAgency.id),
       listTripsByAgency(resolvedAgency.id),
       listDocuments({ agencyId: resolvedAgency.id }),
+      listAgencyMembers(resolvedAgency.id),
     ])
-    const membersResult = await listAgencyMembers(resolvedAgency.id)
 
     const mappedClients: Client[] = (clientsResult.data ?? []).map((client) => ({
       id: client.id,
@@ -614,22 +694,6 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
       mapCanonicalTripToAgencyTrip(trip, trip.clientId ? tripClientNameMap.get(trip.clientId) ?? "" : "")
     )
 
-    const conversationsResult = await listConversations({
-      agencyId: resolvedAgency.id,
-      channel: "concierge",
-    })
-    const conversations = conversationsResult.data ?? []
-    const conversationIds = conversations.map((conversation) => conversation.id)
-    const messagesResult = await listMessagesByConversationIds(conversationIds)
-    const conversationMessages = messagesResult.data ?? []
-    const messagesByConversationId = conversationMessages.reduce<Map<string, typeof conversationMessages>>((accumulator, message) => {
-      const current = accumulator.get(message.conversationId) ?? []
-      current.push(message)
-      accumulator.set(message.conversationId, current)
-      return accumulator
-    }, new Map())
-    const tripById = new Map(canonicalTrips.map((trip) => [trip.id, trip]))
-
     const mappedDocuments: AgencyDocument[] = (documentsResult.data ?? []).map(mapDocumentRecordToAgencyDocument)
     const mappedTeamMembers: TeamMember[] = (membersResult.data ?? []).map((member) => ({
       id: member.id,
@@ -648,56 +712,6 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
       createdAt: member.createdAt,
     }))
 
-    const mappedConciergeRequests: ConciergeRequest[] = conversations
-      .map((conversation) => {
-        if (!conversation.tripId) return null
-
-        const trip = tripById.get(conversation.tripId)
-        if (!trip) return null
-
-        const messages = (messagesByConversationId.get(conversation.id) ?? []).slice().sort((left, right) => {
-          return new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime()
-        })
-        const userMessage = messages.find((message) => message.role === "user")
-        if (!userMessage) return null
-
-        const responseMessage = [...messages]
-          .reverse()
-          .find((message) => message.role === "assistant" || message.role === "agent")
-        const lastMessage = messages[messages.length - 1]
-        const clientId = conversation.clientId ?? trip.clientId ?? ""
-
-        return {
-          id: conversation.id,
-          conversationId: conversation.id,
-          tripId: trip.id,
-          clientId,
-          clientName: clientId ? tripClientNameMap.get(clientId) ?? "Cliente sem nome" : "Cliente sem nome",
-          tripName: trip.title,
-          destination: trip.destination,
-          question: userMessage.content,
-          response: responseMessage?.content,
-          status:
-            conversation.status === "closed" || conversation.status === "archived"
-              ? "resolved"
-              : responseMessage
-                ? "answered"
-                : "pending",
-          createdAt: conversation.createdAt,
-          lastInteractionAt: lastMessage?.createdAt ?? conversation.updatedAt,
-          messages: messages.map((message) => ({
-            id: message.id,
-            role: message.role,
-            content: message.content,
-            createdAt: message.createdAt,
-          })),
-        } satisfies ConciergeRequest
-      })
-      .filter((request): request is ConciergeRequest => Boolean(request))
-      .sort((left, right) => {
-        return new Date(right.lastInteractionAt ?? right.createdAt).getTime() - new Date(left.lastInteractionAt ?? left.createdAt).getTime()
-      })
-
     const history =
       resolvedAgency.creditsBalance > 0
         ? [{ action: "Saldo da agencia", amount: resolvedAgency.creditsBalance, date: new Date().toISOString(), source: "Supabase" }]
@@ -712,7 +726,6 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
     setClients(mappedClients)
     setTrips(mappedTrips)
     setDocuments(mappedDocuments)
-    setConciergeRequests(mappedConciergeRequests)
     setTeamMembers(mappedTeamMembers)
     setActivities([])
     setCredits({
@@ -721,9 +734,102 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
       history,
       ...buildCanonicalCredits(resolvedAgency.creditsBalance, history),
     })
+
+    persistWorkspaceCache(workspaceKey, {
+      agency: resolvedAgency,
+      agencyId: resolvedAgency.id,
+      clients: mappedClients,
+      trips: mappedTrips,
+      documents: mappedDocuments,
+      conciergeRequests: [],
+      teamMembers: mappedTeamMembers,
+      credits: {
+        balance: resolvedAgency.creditsBalance,
+        plan: resolvedAgency.plan === "pro" ? "professional" : resolvedAgency.plan,
+        history,
+        ...buildCanonicalCredits(resolvedAgency.creditsBalance, history),
+      },
+      workspaceError: agencyResult.error || clientsResult.error || tripsResult.error || documentsResult.error || membersResult.error || null,
+    })
+
     setIsLoaded(true)
     setWorkspaceLoading(false)
-  }, [isUsingRealData, profile?.agencyId, profile?.id, profile?.role, user?.id])
+    perf.end({ agencyId: resolvedAgency.id })
+
+    void (async () => {
+      const conciergePerf = startPerfMeasure("agency.concierge")
+      const conversationsResult = await listConversations({
+        agencyId: resolvedAgency.id,
+        channel: "concierge",
+      })
+      const conversations = conversationsResult.data ?? []
+      const conversationIds = conversations.map((conversation) => conversation.id)
+      const messagesResult = await listMessagesByConversationIds(conversationIds)
+      const conversationMessages = messagesResult.data ?? []
+      const messagesByConversationId = conversationMessages.reduce<Map<string, typeof conversationMessages>>((accumulator, message) => {
+        const current = accumulator.get(message.conversationId) ?? []
+        current.push(message)
+        accumulator.set(message.conversationId, current)
+        return accumulator
+      }, new Map())
+      const tripById = new Map(canonicalTrips.map((trip) => [trip.id, trip]))
+
+      const mappedConciergeRequests: ConciergeRequest[] = conversations
+        .map((conversation) => {
+          if (!conversation.tripId) return null
+
+          const trip = tripById.get(conversation.tripId)
+          if (!trip) return null
+
+          const messages = (messagesByConversationId.get(conversation.id) ?? []).slice().sort((left, right) => {
+            return new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime()
+          })
+          const userMessage = messages.find((message) => message.role === "user")
+          if (!userMessage) return null
+
+          const responseMessage = [...messages]
+            .reverse()
+            .find((message) => message.role === "assistant" || message.role === "agent")
+          const lastMessage = messages[messages.length - 1]
+          const clientId = conversation.clientId ?? trip.clientId ?? ""
+
+          return {
+            id: conversation.id,
+            conversationId: conversation.id,
+            tripId: trip.id,
+            clientId,
+            clientName: clientId ? tripClientNameMap.get(clientId) ?? "Cliente sem nome" : "Cliente sem nome",
+            tripName: trip.title,
+            destination: trip.destination,
+            question: userMessage.content,
+            response: responseMessage?.content,
+            status:
+              conversation.status === "closed" || conversation.status === "archived"
+                ? "resolved"
+                : responseMessage
+                  ? "answered"
+                  : "pending",
+            createdAt: conversation.createdAt,
+            lastInteractionAt: lastMessage?.createdAt ?? conversation.updatedAt,
+            messages: messages.map((message) => ({
+              id: message.id,
+              role: message.role,
+              content: message.content,
+              createdAt: message.createdAt,
+            })),
+          } satisfies ConciergeRequest
+        })
+        .filter((request): request is ConciergeRequest => Boolean(request))
+        .sort((left, right) => {
+          return new Date(right.lastInteractionAt ?? right.createdAt).getTime() - new Date(left.lastInteractionAt ?? left.createdAt).getTime()
+        })
+
+      setConciergeRequests(mappedConciergeRequests)
+      conciergePerf.end({ agencyId: resolvedAgency.id, conversations: mappedConciergeRequests.length })
+    })().catch((error) => {
+      console.error("[AGENCY] concierge refresh error", error)
+    })
+  }, [hydrateWorkspaceCache, isUsingRealData, persistWorkspaceCache, profile?.agencyId, profile?.id, profile?.role, user?.id])
 
   useEffect(() => {
     if (!isUsingRealData) return

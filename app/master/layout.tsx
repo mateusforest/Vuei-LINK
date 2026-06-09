@@ -128,8 +128,8 @@ function MasterLayoutInner({ children }: { children: React.ReactNode }) {
     .toUpperCase()
 
   const handleSignOut = async () => {
-    await signOut()
-    router.push("/login")
+    void signOut()
+    router.replace("/login")
   }
 
   return (
