@@ -4,6 +4,10 @@ export function getConciergeCreditCost() {
   return getAiCreditCost("concierge_message")
 }
 
+export function getTicketExtractionCreditCost() {
+  return getAiCreditCost("ticket_reading")
+}
+
 export function estimateCostUsd(inputTokens: number, outputTokens: number) {
   const inputRate = Number(process.env.OPENAI_PRICE_INPUT_PER_1M_USD ?? "")
   const outputRate = Number(process.env.OPENAI_PRICE_OUTPUT_PER_1M_USD ?? "")

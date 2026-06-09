@@ -256,3 +256,29 @@ export async function deleteTripFlight(id: string) {
 
   return { source: "supabase" as const, success: true, error: null }
 }
+
+export async function requestTripFlightExtraction(payload: { tripId: string; documentId: string; flightId: string }) {
+  if (!shouldUseSupabase()) {
+    return {
+      source: "local" as const,
+      data: null,
+      error: "A extracao operacional de passagens so fica disponivel com Supabase ativo.",
+    }
+  }
+
+  const response = await fetch("/api/ai/trip-flights/extract", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  })
+
+  const data = await response.json().catch(() => null)
+
+  return {
+    source: "api" as const,
+    data,
+    error: response.ok ? null : data?.error || "Nao foi possivel processar a passagem anexada.",
+  }
+}

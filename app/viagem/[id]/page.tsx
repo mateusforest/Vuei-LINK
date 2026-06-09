@@ -10,7 +10,7 @@ import { shouldUseSupabase } from "@/lib/data-source"
 import { getAgencyById } from "@/lib/repositories/agencies-repository"
 import { getTripByAdminToken, getTripByPublicToken, getTripBySlug } from "@/lib/repositories/trips-repository"
 import { createDocumentMetadata, getSignedDocumentUrl, listDocumentsByTrip, listPublicTripDocuments, uploadDocumentFile } from "@/lib/repositories/documents-repository"
-import { listPublicTripFlights, listTripFlights, upsertTripFlight } from "@/lib/repositories/trip-flights-repository"
+import { listPublicTripFlights, listTripFlights, requestTripFlightExtraction, upsertTripFlight } from "@/lib/repositories/trip-flights-repository"
 import { createTripHotel, deleteTripHotel, listTripHotels, updateTripHotel } from "@/lib/repositories/trip-hotels-repository"
 import { listConversationsByTrip, listMessages } from "@/lib/repositories/ai-repository"
 import { validateDocumentFile } from "@/lib/files/file-validation"
@@ -366,6 +366,46 @@ function mapFlightRecordToView(flight: TripFlightRecord, documents?: any[]) {
       time: arrival.time,
     },
     document: linkedDocument,
+  }
+}
+
+function getFlightStatusCopy(flight: any) {
+  if (flight.extractionStatus === "completed") {
+    return {
+      eyebrow: "Dados extraidos por IA",
+      detail: "Passagem processada",
+      tone: "success" as const,
+    }
+  }
+
+  if (flight.extractionStatus === "manual") {
+    return {
+      eyebrow: "Dados preenchidos manualmente",
+      detail: "Passagem revisada",
+      tone: "success" as const,
+    }
+  }
+
+  if (flight.extractionStatus === "processing") {
+    return {
+      eyebrow: "Passagem anexada",
+      detail: "Analisando passagem...",
+      tone: "pending" as const,
+    }
+  }
+
+  if (flight.extractionStatus === "failed") {
+    return {
+      eyebrow: "Passagem anexada",
+      detail: "Nao foi possivel identificar esta passagem",
+      tone: "error" as const,
+    }
+  }
+
+  return {
+    eyebrow: "Passagem anexada",
+    detail: "Extracao pendente",
+    tone: "pending" as const,
   }
 }
 
@@ -871,14 +911,7 @@ function EditTripModal({ open, onClose, tripData, onSave }: { open: boolean; onC
 function FlightCard({ flight, index, onEdit, onViewQR, onOpenDetails, onOpenDocument }: { flight: any; index: number; onEdit: () => void; onViewQR: () => void; onOpenDetails: () => void; onOpenDocument: () => void }) {
   const [expanded, setExpanded] = useState(false)
   const { isAdmin } = useContext(PermissionContext)
-  const extractionLabel =
-    flight.extractionStatus === "completed"
-      ? "Dados extraidos por IA"
-      : flight.extractionStatus === "manual"
-        ? "Dados preenchidos manualmente"
-        : flight.extractionStatus === "failed"
-          ? "Extracao nao concluida"
-          : "Passagem anexada, extracao pendente"
+  const statusCopy = getFlightStatusCopy(flight)
 
   return (
     <motion.div
@@ -900,7 +933,7 @@ function FlightCard({ flight, index, onEdit, onViewQR, onOpenDetails, onOpenDocu
               <Plane className="w-5 h-5 text-[#5de0e6]" />
             </div>
             <div>
-              <p className="text-sm text-white/50">{extractionLabel}</p>
+              <p className="text-sm text-white/50">{statusCopy.eyebrow}</p>
               <p className="text-white font-medium">{flight.airline}</p>
             </div>
           </div>
@@ -960,8 +993,24 @@ function FlightCard({ flight, index, onEdit, onViewQR, onOpenDetails, onOpenDocu
               
               <div className="mt-4 flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <div className={cn("w-2 h-2 rounded-full", flight.extractionStatus === "completed" || flight.extractionStatus === "manual" ? "bg-emerald-500" : "bg-amber-400")} />
-                  <span className={cn("text-xs", flight.extractionStatus === "completed" || flight.extractionStatus === "manual" ? "text-emerald-400" : "text-amber-300")}>{extractionLabel}</span>
+                  <div
+                    className={cn(
+                      "w-2 h-2 rounded-full",
+                      statusCopy.tone === "success" && "bg-emerald-500",
+                      statusCopy.tone === "pending" && "bg-amber-400",
+                      statusCopy.tone === "error" && "bg-red-400",
+                    )}
+                  />
+                  <span
+                    className={cn(
+                      "text-xs",
+                      statusCopy.tone === "success" && "text-emerald-400",
+                      statusCopy.tone === "pending" && "text-amber-300",
+                      statusCopy.tone === "error" && "text-red-300",
+                    )}
+                  >
+                    {statusCopy.detail}
+                  </span>
                 </div>
                 <div className="flex gap-2">
                   <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); onOpenDetails() }} className="text-white/60 hover:bg-white/10">
@@ -980,10 +1029,12 @@ function FlightCard({ flight, index, onEdit, onViewQR, onOpenDetails, onOpenDocu
                       Editar
                     </Button>
                   )}
-                  <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); onViewQR() }} className="text-[#5de0e6] hover:bg-[#5de0e6]/10" disabled={!flight.qrCodePayload}>
-                    <QrCode className="w-4 h-4 mr-2" />
-                    Ver QR Code
-                  </Button>
+                  {flight.qrCodePayload ? (
+                    <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); onViewQR() }} className="text-[#5de0e6] hover:bg-[#5de0e6]/10">
+                      <QrCode className="w-4 h-4 mr-2" />
+                      Ver QR Code
+                    </Button>
+                  ) : null}
                 </div>
               </div>
             </motion.div>
@@ -1161,21 +1212,14 @@ function FlightDetailsModal({
 }) {
   if (!flight) return null
 
-  const extractionLabel =
-    flight.extractionStatus === "completed"
-      ? "Dados extraidos por IA"
-      : flight.extractionStatus === "manual"
-        ? "Dados preenchidos manualmente"
-        : flight.extractionStatus === "failed"
-          ? "Extracao nao concluida"
-          : "Passagem anexada, extracao pendente"
+  const statusCopy = getFlightStatusCopy(flight)
 
   return (
     <Modal open={open} onClose={onClose} title="Detalhes da passagem">
       <div className="space-y-5">
         <div className="rounded-2xl border border-white/[0.06] bg-white/[0.03] p-4">
           <p className="text-xs uppercase tracking-wider text-white/40">Status</p>
-          <p className="mt-2 text-sm text-white">{extractionLabel}</p>
+          <p className="mt-2 text-sm text-white">{statusCopy.detail}</p>
         </div>
 
         <div className="grid grid-cols-2 gap-4">
@@ -1330,7 +1374,7 @@ function FlightsSection({ tripData, onUpdateFlight, onAddFlight, tripId, ownerUs
         ensureSensitiveAccess={ensureSensitiveAccess}
         onSave={(data) => {
           onAddFlight(data)
-          showToast("Passagem anexada. A extracao automatica ainda esta pendente.", "info")
+          showToast("Passagem anexada. A analise automatica sera iniciada no backend.", "info")
           setAddingFlight(false)
         }}
       />
@@ -1416,6 +1460,46 @@ function AddFlightModal({ open, onClose, onSave, tripId, ownerUserId, agencyId, 
       flight: mapFlightRecordToView(flightResult.data, [metadataResult.data]),
       document: metadataResult.data,
     })
+
+    if (shouldUseSupabase()) {
+      onSave({
+        flight: mapFlightRecordToView(
+          {
+            ...flightResult.data,
+            extractionStatus: "processing",
+          },
+          [metadataResult.data],
+        ),
+      })
+
+      void requestTripFlightExtraction({
+        tripId,
+        documentId: metadataResult.data.id,
+        flightId: flightResult.data.id,
+      })
+        .then((processingResult) => {
+          if (processingResult.error) {
+            console.error("[TICKET] extraction error", processingResult.error)
+          }
+
+          const nextDocument = processingResult.data?.document ?? metadataResult.data
+          const nextFlight = processingResult.data?.flight
+
+          if (nextDocument) {
+            onSave({ document: nextDocument })
+          }
+
+          if (nextFlight) {
+            onSave({
+              flight: mapFlightRecordToView(nextFlight, [nextDocument]),
+            })
+          }
+        })
+        .catch((processingError) => {
+          console.error("[TICKET] extraction request failed", processingError)
+        })
+    }
+
     setUploading(false)
     setFileName("")
   }
@@ -3812,10 +3896,23 @@ export default function TripPage() {
 
   const handleAddFlight = (data: any) => {
     if (!ensureSensitiveAccess()) return
+
+    const upsertById = (items: any[], item: any) => {
+      const index = items.findIndex((entry) => entry?.id === item?.id)
+      if (index === -1) return [...items, item]
+
+      const nextItems = [...items]
+      nextItems[index] = {
+        ...nextItems[index],
+        ...item,
+      }
+      return nextItems
+    }
+
     setTripData(prev => ({
       ...prev,
-      documents: data.document ? [...prev.documents, { ...data.document, private: data.document.private ?? false }] : prev.documents,
-      flights: data.flight ? [...prev.flights, data.flight] : prev.flights,
+      documents: data.document ? upsertById(prev.documents, { ...data.document, private: data.document.private ?? false }) : prev.documents,
+      flights: data.flight ? upsertById(prev.flights, data.flight) : prev.flights,
     }))
   }
 
