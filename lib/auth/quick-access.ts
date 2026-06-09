@@ -20,11 +20,48 @@ interface QuickAccessState {
   records: QuickAccessRecord[]
 }
 
+const TRIP_LINK_SECURITY_STORAGE_KEY = "vuei_trip_link_security_v1"
+
+interface TripLinkPinVerifier {
+  algorithm: "aes-gcm-pbkdf2"
+  salt: string
+  iv: string
+  cipherText: string
+  iterations: number
+}
+
+interface TripLinkSecurityRecord {
+  version: number
+  scopeKey: string
+  tripId: string
+  pinEnabled: boolean
+  pinVerifier?: TripLinkPinVerifier
+  biometricEnabled: boolean
+  webAuthnCredentialId?: string
+  deviceLabel: string
+  updatedAt: string
+}
+
+interface TripLinkSecurityState {
+  records: TripLinkSecurityRecord[]
+}
+
 export interface QuickAccessMethods {
   configured: boolean
   pinEnabled: boolean
   biometricEnabled: boolean
   biometricSupported: boolean
+}
+
+export interface TripLinkQuickAccessMethods {
+  configured: boolean
+  pinEnabled: boolean
+  biometricEnabled: boolean
+  biometricSupported: boolean
+  devices: Array<{
+    label: string
+    updatedAt: string
+  }>
 }
 
 interface QuickAccessPinVerificationOptions {
@@ -55,6 +92,25 @@ function writeState(state: QuickAccessState) {
   window.localStorage.setItem(QUICK_ACCESS_STORAGE_KEY, JSON.stringify(state))
 }
 
+function readTripLinkSecurityState(): TripLinkSecurityState {
+  if (typeof window === "undefined") return { records: [] }
+
+  try {
+    const raw = window.localStorage.getItem(TRIP_LINK_SECURITY_STORAGE_KEY)
+    const parsed = raw ? JSON.parse(raw) : null
+    return {
+      records: Array.isArray(parsed?.records) ? parsed.records : [],
+    }
+  } catch {
+    return { records: [] }
+  }
+}
+
+function writeTripLinkSecurityState(state: TripLinkSecurityState) {
+  if (typeof window === "undefined") return
+  window.localStorage.setItem(TRIP_LINK_SECURITY_STORAGE_KEY, JSON.stringify(state))
+}
+
 function upsertRecord(nextRecord: QuickAccessRecord) {
   const state = readState()
   const nextRecords = state.records.filter((record) => record.ownerUserId !== nextRecord.ownerUserId)
@@ -70,6 +126,42 @@ function removeRecord(ownerUserId: string) {
   const state = readState()
   writeState({
     records: state.records.filter((record) => record.ownerUserId !== ownerUserId),
+  })
+}
+
+function getTripLinkScopeKey(tripId: string) {
+  return `trip-link:${tripId}`
+}
+
+function getTripLinkDeviceLabel() {
+  if (typeof window === "undefined") return "Este dispositivo"
+
+  const platform = navigator.platform?.trim()
+  const language = navigator.language?.trim()
+  const parts = [platform, language].filter(Boolean)
+
+  return parts.length > 0 ? `Este dispositivo (${parts.join(" • ")})` : "Este dispositivo"
+}
+
+function getTripLinkSecurityRecord(tripId: string | null | undefined) {
+  if (!tripId) return null
+
+  const scopeKey = getTripLinkScopeKey(tripId)
+  return readTripLinkSecurityState().records.find((record) => record.scopeKey === scopeKey) ?? null
+}
+
+function upsertTripLinkSecurityRecord(nextRecord: TripLinkSecurityRecord) {
+  const state = readTripLinkSecurityState()
+  const nextRecords = state.records.filter((record) => record.scopeKey !== nextRecord.scopeKey)
+  nextRecords.push(nextRecord)
+  writeTripLinkSecurityState({ records: nextRecords })
+}
+
+function removeTripLinkSecurityRecord(tripId: string) {
+  const scopeKey = getTripLinkScopeKey(tripId)
+  const state = readTripLinkSecurityState()
+  writeTripLinkSecurityState({
+    records: state.records.filter((record) => record.scopeKey !== scopeKey),
   })
 }
 
@@ -111,6 +203,99 @@ async function hashPin(pin: string, salt: string, iterations = PIN_HASH_ITERATIO
   }
 
   return bytesToBase64(current)
+}
+
+async function derivePinProtectionKey(pin: string, salt: string, iterations = PIN_HASH_ITERATIONS) {
+  const resolvedCrypto = getWindowCrypto()
+  if (!resolvedCrypto?.subtle) {
+    throw new Error("Protecao de PIN indisponivel neste navegador.")
+  }
+
+  const importedKey = await resolvedCrypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(pin),
+    "PBKDF2",
+    false,
+    ["deriveKey"],
+  )
+
+  return resolvedCrypto.subtle.deriveKey(
+    {
+      name: "PBKDF2",
+      salt: base64ToBytes(salt),
+      iterations,
+      hash: "SHA-256",
+    },
+    importedKey,
+    {
+      name: "AES-GCM",
+      length: 256,
+    },
+    false,
+    ["encrypt", "decrypt"],
+  )
+}
+
+async function createTripLinkPinVerifier(scopeKey: string, pin: string): Promise<TripLinkPinVerifier> {
+  if (!/^\d{4}$/.test(pin)) {
+    throw new Error("O PIN precisa ter 4 digitos.")
+  }
+
+  const resolvedCrypto = getWindowCrypto()
+  if (!resolvedCrypto?.subtle) {
+    throw new Error("Protecao de PIN indisponivel neste navegador.")
+  }
+
+  const salt = createRandomBase64(16)
+  const ivBytes = new Uint8Array(12)
+  resolvedCrypto.getRandomValues(ivBytes)
+  const iv = bytesToBase64(ivBytes)
+  const iterations = PIN_HASH_ITERATIONS
+  const key = await derivePinProtectionKey(pin, salt, iterations)
+  const marker = new TextEncoder().encode(`vuei-trip-link:${scopeKey}:verified`)
+  const cipherBuffer = await resolvedCrypto.subtle.encrypt(
+    {
+      name: "AES-GCM",
+      iv: ivBytes,
+    },
+    key,
+    marker,
+  )
+
+  return {
+    algorithm: "aes-gcm-pbkdf2",
+    salt,
+    iv,
+    cipherText: bytesToBase64(new Uint8Array(cipherBuffer)),
+    iterations,
+  }
+}
+
+async function verifyTripLinkPinVerifier(scopeKey: string, pin: string, verifier?: TripLinkPinVerifier) {
+  if (!verifier) {
+    throw new Error("PIN nao configurado neste dispositivo para esta viagem.")
+  }
+
+  const resolvedCrypto = getWindowCrypto()
+  if (!resolvedCrypto?.subtle) {
+    throw new Error("Protecao de PIN indisponivel neste navegador.")
+  }
+
+  try {
+    const key = await derivePinProtectionKey(pin, verifier.salt, verifier.iterations)
+    const decrypted = await resolvedCrypto.subtle.decrypt(
+      {
+        name: "AES-GCM",
+        iv: base64ToBytes(verifier.iv),
+      },
+      key,
+      base64ToBytes(verifier.cipherText),
+    )
+    const message = new TextDecoder().decode(decrypted)
+    return message === `vuei-trip-link:${scopeKey}:verified`
+  } catch {
+    return false
+  }
 }
 
 function getProfilePinSettings(settings?: ProfileSettings | null): ProfileQuickAccessSettings | null {
@@ -314,6 +499,172 @@ export async function authenticateQuickAccessBiometric(ownerUserId: string) {
   const record = getRecord(ownerUserId)
   if (!record?.biometricEnabled || !record.webAuthnCredentialId) {
     throw new Error("Acesso rapido por biometria nao configurado neste dispositivo.")
+  }
+
+  if (!isBiometricQuickAccessSupported()) {
+    throw new Error("Biometria indisponivel neste dispositivo ou navegador.")
+  }
+
+  const credential = (await navigator.credentials.get({
+    publicKey: {
+      challenge: base64ToBytes(createRandomBase64(32)),
+      allowCredentials: [
+        {
+          id: base64ToBytes(record.webAuthnCredentialId),
+          type: "public-key",
+        },
+      ],
+      timeout: 60_000,
+      userVerification: "required",
+    },
+  })) as PublicKeyCredential | null
+
+  return Boolean(credential)
+}
+
+export function getTripLinkQuickAccessMethods(tripId: string | null | undefined): TripLinkQuickAccessMethods {
+  const record = tripId ? getTripLinkSecurityRecord(tripId) : null
+
+  return {
+    configured: Boolean(record?.pinEnabled || (record?.biometricEnabled && record.webAuthnCredentialId)),
+    pinEnabled: Boolean(record?.pinEnabled && record.pinVerifier),
+    biometricEnabled: Boolean(record?.biometricEnabled && record.webAuthnCredentialId),
+    biometricSupported: isBiometricQuickAccessSupported(),
+    devices: record
+      ? [
+          {
+            label: record.deviceLabel,
+            updatedAt: record.updatedAt,
+          },
+        ]
+      : [],
+  }
+}
+
+export async function saveTripLinkPin(tripId: string, pin: string) {
+  if (!tripId) {
+    throw new Error("Viagem invalida para configurar o PIN local.")
+  }
+
+  const scopeKey = getTripLinkScopeKey(tripId)
+  const pinVerifier = await createTripLinkPinVerifier(scopeKey, pin)
+  const current = getTripLinkSecurityRecord(tripId)
+
+  upsertTripLinkSecurityRecord({
+    version: 1,
+    scopeKey,
+    tripId,
+    pinEnabled: true,
+    pinVerifier,
+    biometricEnabled: current?.biometricEnabled ?? false,
+    webAuthnCredentialId: current?.webAuthnCredentialId,
+    deviceLabel: getTripLinkDeviceLabel(),
+    updatedAt: new Date().toISOString(),
+  })
+}
+
+export async function verifyTripLinkPin(tripId: string, pin: string) {
+  if (!tripId) {
+    throw new Error("Viagem invalida para validar o PIN local.")
+  }
+
+  const record = getTripLinkSecurityRecord(tripId)
+  if (!record?.pinEnabled || !record.pinVerifier) {
+    throw new Error("PIN nao configurado neste dispositivo para esta viagem.")
+  }
+
+  return verifyTripLinkPinVerifier(record.scopeKey, pin, record.pinVerifier)
+}
+
+export function disableTripLinkPin(tripId: string) {
+  const current = getTripLinkSecurityRecord(tripId)
+  if (!current) return
+
+  if (!current.biometricEnabled) {
+    removeTripLinkSecurityRecord(tripId)
+    return
+  }
+
+  upsertTripLinkSecurityRecord({
+    ...current,
+    pinEnabled: false,
+    pinVerifier: undefined,
+    updatedAt: new Date().toISOString(),
+  })
+}
+
+export async function registerTripLinkBiometric(tripId: string, displayName: string) {
+  if (!tripId) {
+    throw new Error("Viagem invalida para configurar biometria.")
+  }
+
+  if (!isBiometricQuickAccessSupported()) {
+    throw new Error("Biometria indisponivel neste dispositivo ou navegador.")
+  }
+
+  const publicKey: PublicKeyCredentialCreationOptions = {
+    challenge: base64ToBytes(createRandomBase64(32)),
+    rp: {
+      name: "Vuei",
+    },
+    user: {
+      id: new TextEncoder().encode(getTripLinkScopeKey(tripId)).slice(0, 64),
+      name: displayName || tripId,
+      displayName: displayName || "Vuei trip link",
+    },
+    pubKeyCredParams: [
+      { type: "public-key", alg: -7 },
+      { type: "public-key", alg: -257 },
+    ],
+    timeout: 60_000,
+    attestation: "none",
+    authenticatorSelection: {
+      residentKey: "preferred",
+      userVerification: "required",
+    },
+  }
+
+  const credential = (await navigator.credentials.create({ publicKey })) as PublicKeyCredential | null
+  if (!credential) {
+    throw new Error("Nao foi possivel registrar a biometria neste dispositivo.")
+  }
+
+  const current = getTripLinkSecurityRecord(tripId)
+
+  upsertTripLinkSecurityRecord({
+    version: current?.version ?? 1,
+    scopeKey: getTripLinkScopeKey(tripId),
+    tripId,
+    pinEnabled: current?.pinEnabled ?? false,
+    pinVerifier: current?.pinVerifier,
+    biometricEnabled: true,
+    webAuthnCredentialId: bytesToBase64(new Uint8Array(credential.rawId)),
+    deviceLabel: getTripLinkDeviceLabel(),
+    updatedAt: new Date().toISOString(),
+  })
+}
+
+export function disableTripLinkBiometric(tripId: string) {
+  const current = getTripLinkSecurityRecord(tripId)
+  if (!current) return
+
+  if (!current.pinEnabled) {
+    removeTripLinkSecurityRecord(tripId)
+    return
+  }
+
+  upsertTripLinkSecurityRecord({
+    ...current,
+    biometricEnabled: false,
+    webAuthnCredentialId: undefined,
+    updatedAt: new Date().toISOString(),
+  })
+}
+
+export async function authenticateTripLinkBiometric(tripId: string) {
+  const record = getTripLinkSecurityRecord(tripId)
+  if (!record?.biometricEnabled || !record.webAuthnCredentialId) {
+    throw new Error("Biometria nao configurada neste dispositivo para esta viagem.")
   }
 
   if (!isBiometricQuickAccessSupported()) {

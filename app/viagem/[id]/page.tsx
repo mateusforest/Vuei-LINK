@@ -20,9 +20,13 @@ import { useAuth } from "@/contexts/auth-context"
 import { buildAdminTripUrl, buildPublicTripUrl, isAdminLinkMode } from "@/lib/security/link-tokens"
 import type { TripFlightRecord } from "@/types/flight"
 import {
-  authenticateQuickAccessBiometric,
-  getQuickAccessMethods,
-  verifyQuickAccessPin,
+  authenticateTripLinkBiometric,
+  disableTripLinkBiometric,
+  disableTripLinkPin,
+  getTripLinkQuickAccessMethods,
+  registerTripLinkBiometric,
+  saveTripLinkPin,
+  verifyTripLinkPin,
 } from "@/lib/auth/quick-access"
 import {
   Plane, Hotel, MapPin, FileText, MessageCircle, Share2, WifiOff, 
@@ -1482,7 +1486,10 @@ function AddFlightModal({ open, onClose, onSave, tripId, ownerUserId, agencyId, 
     if (!ensureSensitiveAccess()) {
       return
     }
-    if (!ownerUserId) return
+    if (!ownerUserId) {
+      setError("Esta passagem exige autenticacao real para ser anexada no Supabase. Entre com login para continuar.")
+      return
+    }
 
     console.log("[TICKET] file selected", file.name)
     setError("")
@@ -2196,8 +2203,6 @@ function DocumentsSection({
   tripId,
   ownerUserId,
   agencyId,
-  tripOwnerUserId,
-  profileSettings,
   ensureSensitiveAccess,
 }: {
   tripData: any
@@ -2206,8 +2211,6 @@ function DocumentsSection({
   tripId: string
   ownerUserId: string | null
   agencyId: string | null
-  tripOwnerUserId: string | null
-  profileSettings: any
   ensureSensitiveAccess: () => boolean
 }) {
   const [showPrivate, setShowPrivate] = useState(false)
@@ -2390,8 +2393,7 @@ function DocumentsSection({
       <PinModal
         open={pinModal}
         onClose={() => setPinModal(false)}
-        ownerUserId={tripOwnerUserId}
-        profileSettings={profileSettings ?? null}
+        tripId={tripId}
         onSuccess={() => {
           setUnlocked(true)
           setPinModal(false)
@@ -2409,28 +2411,36 @@ function PinModal({
   open,
   onClose,
   onSuccess,
-  ownerUserId,
-  profileSettings,
+  tripId,
 }: {
   open: boolean
   onClose: () => void
   onSuccess: () => void
-  ownerUserId: string | null
-  profileSettings: any
+  tripId: string
 }) {
   const [pin, setPin] = useState("")
+  const [confirmPin, setConfirmPin] = useState("")
   const [error, setError] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const quickAccessMethods = getQuickAccessMethods(ownerUserId, profileSettings)
+  const quickAccessMethods = getTripLinkQuickAccessMethods(tripId)
+
+  useEffect(() => {
+    if (!open) {
+      setPin("")
+      setConfirmPin("")
+      setError("")
+      setIsSubmitting(false)
+    }
+  }, [open])
 
   const handleSubmit = async () => {
-    if (pin.length !== 4 || !ownerUserId) return
+    if (pin.length !== 4) return
 
     setIsSubmitting(true)
     setError("")
 
     try {
-      const isValid = await verifyQuickAccessPin(ownerUserId, pin, { profileSettings })
+      const isValid = await verifyTripLinkPin(tripId, pin)
       if (!isValid) {
         setError("PIN invalido")
         return
@@ -2446,14 +2456,35 @@ function PinModal({
     }
   }
 
-  const handleBiometricUnlock = async () => {
-    if (!ownerUserId) return
+  const handleCreatePin = async () => {
+    if (pin.length !== 4 || confirmPin.length !== 4) return
+    if (pin !== confirmPin) {
+      setError("Os PINs nao conferem.")
+      return
+    }
 
     setIsSubmitting(true)
     setError("")
 
     try {
-      const isValid = await authenticateQuickAccessBiometric(ownerUserId)
+      await saveTripLinkPin(tripId, pin)
+      onSuccess()
+      setPin("")
+      setConfirmPin("")
+    } catch (pinError) {
+      const message = pinError instanceof Error ? pinError.message : "Nao foi possivel configurar o PIN neste dispositivo."
+      setError(message)
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const handleBiometricUnlock = async () => {
+    setIsSubmitting(true)
+    setError("")
+
+    try {
+      const isValid = await authenticateTripLinkBiometric(tripId)
       if (!isValid) {
         setError("Nao foi possivel validar a biometria neste dispositivo.")
         return
@@ -2474,41 +2505,49 @@ function PinModal({
         <div className="w-16 h-16 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-[#5de0e6]/20 to-[#004aad]/20 flex items-center justify-center">
           <Fingerprint className="w-8 h-8 text-[#5de0e6]" />
         </div>
-        <p className="text-white/60 text-sm mb-6">Digite seu PIN de 4 digitos</p>
-        <div className="flex justify-center gap-3 mb-6">
-          {[0, 1, 2, 3].map((i) => (
-            <div key={i} className={cn(
-              "w-12 h-12 rounded-xl border flex items-center justify-center text-xl font-bold transition-all",
-              pin.length > i ? "bg-[#5de0e6]/20 border-[#5de0e6]/50 text-white" : "bg-white/[0.05] border-white/10 text-white/20"
-            )}>
-              {pin.length > i ? "•" : ""}
-            </div>
-          ))}
-        </div>
+        <p className="text-white/60 text-sm mb-6">
+          {quickAccessMethods.pinEnabled
+            ? "Use PIN ou biometria deste dispositivo para acessar os documentos protegidos."
+            : "Crie um PIN neste dispositivo para proteger acoes sensiveis desta viagem."}
+        </p>
         <input
           type="tel"
           maxLength={4}
           value={pin}
-          onChange={(e) => setPin(e.target.value.replace(/\D/g, ""))}
+          onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 4))}
           className="w-full px-4 py-3 rounded-xl bg-white/[0.05] border border-white/[0.08] text-white text-center text-xl tracking-[1em] focus:outline-none focus:border-[#5de0e6]/50"
-          placeholder="• • • •"
+          placeholder={quickAccessMethods.pinEnabled ? "Digite seu PIN" : "Crie um PIN"}
         />
+        {!quickAccessMethods.pinEnabled ? (
+          <input
+            type="tel"
+            maxLength={4}
+            value={confirmPin}
+            onChange={(e) => setConfirmPin(e.target.value.replace(/\D/g, "").slice(0, 4))}
+            className="mt-3 w-full px-4 py-3 rounded-xl bg-white/[0.05] border border-white/[0.08] text-white text-center text-xl tracking-[1em] focus:outline-none focus:border-[#5de0e6]/50"
+            placeholder="Confirme o PIN"
+          />
+        ) : null}
         {error && <p className="mt-4 text-sm text-red-300">{error}</p>}
-        <Button onClick={() => void handleSubmit()} disabled={isSubmitting || pin.length !== 4 || !ownerUserId} className="w-full mt-4 bg-gradient-to-r from-[#5de0e6] to-[#004aad] hover:opacity-90 text-white border-0 disabled:opacity-50">
-          Desbloquear
+        <Button
+          onClick={() => void (quickAccessMethods.pinEnabled ? handleSubmit() : handleCreatePin())}
+          disabled={isSubmitting || pin.length !== 4 || (!quickAccessMethods.pinEnabled && confirmPin.length !== 4)}
+          className="w-full mt-4 bg-gradient-to-r from-[#5de0e6] to-[#004aad] hover:opacity-90 text-white border-0 disabled:opacity-50"
+        >
+          {quickAccessMethods.pinEnabled ? "Desbloquear" : "Criar PIN neste dispositivo"}
         </Button>
         {quickAccessMethods.biometricEnabled && (
           <Button
             variant="outline"
             onClick={() => void handleBiometricUnlock()}
-            disabled={isSubmitting || !ownerUserId}
+            disabled={isSubmitting}
             className="w-full mt-3 border-white/[0.08] bg-transparent text-white/80 hover:bg-white/[0.06]"
           >
             <Fingerprint className="mr-2 h-4 w-4" />
             Usar Face ID / biometria
           </Button>
         )}
-        <p className="text-xs text-white/30 mt-4">O PIN desta area usa a configuracao de acesso rapido vinculada a sua conta. A biometria continua sendo por dispositivo.</p>
+        <p className="text-xs text-white/30 mt-4">O PIN deste link pertence apenas a este dispositivo e nao e compartilhado com o portal ou com outros aparelhos.</p>
       </div>
     </Modal>
   )
@@ -2583,7 +2622,10 @@ function AddDocumentModal({ open, onClose, onSave, tripId, ownerUserId, agencyId
     if (!ensureSensitiveAccess()) {
       return
     }
-    if (!ownerUserId) return
+    if (!ownerUserId) {
+      setError("Este documento exige autenticacao real para ser anexado no Supabase. Entre com login para continuar.")
+      return
+    }
     console.log("[DOCUMENT] file selected", file.name)
     setError("")
     const validation = validateDocumentFile(file)
@@ -3034,12 +3076,14 @@ function MenuModal({
   onClose,
   onOpenTravelers,
   onOpenSettings,
+  onOpenSecurity,
   onOpenCredits,
 }: {
   open: boolean
   onClose: () => void
   onOpenTravelers: () => void
   onOpenSettings: () => void
+  onOpenSecurity: () => void
   onOpenCredits: () => void
 }) {
   const { isAdmin } = useContext(PermissionContext)
@@ -3047,6 +3091,7 @@ function MenuModal({
     ...(isAdmin ? [
       { icon: User, label: "Viajantes", action: onOpenTravelers },
       { icon: Settings, label: "Configuracoes", action: onOpenSettings },
+      { icon: Shield, label: "Seguranca", action: onOpenSecurity },
     ] : []),
     { icon: CreditCard, label: "Credito", action: onOpenCredits },
   ]
@@ -3307,6 +3352,186 @@ function TripSettingsModal({
   )
 }
 
+function TripSecurityModal({
+  open,
+  onClose,
+  tripId,
+  tripTitle,
+  onSecurityUpdated,
+}: {
+  open: boolean
+  onClose: () => void
+  tripId: string
+  tripTitle: string
+  onSecurityUpdated: () => void
+}) {
+  const [pin, setPin] = useState("")
+  const [confirmPin, setConfirmPin] = useState("")
+  const [error, setError] = useState("")
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const securityMethods = getTripLinkQuickAccessMethods(tripId)
+
+  useEffect(() => {
+    if (!open) {
+      setPin("")
+      setConfirmPin("")
+      setError("")
+      setIsSubmitting(false)
+    }
+  }, [open])
+
+  const handleSavePin = async () => {
+    if (pin.length !== 4 || confirmPin.length !== 4) return
+    if (pin !== confirmPin) {
+      setError("Os PINs nao conferem.")
+      return
+    }
+
+    setIsSubmitting(true)
+    setError("")
+
+    try {
+      await saveTripLinkPin(tripId, pin)
+      setPin("")
+      setConfirmPin("")
+      onSecurityUpdated()
+    } catch (securityError) {
+      const message = securityError instanceof Error ? securityError.message : "Nao foi possivel salvar o PIN neste dispositivo."
+      setError(message)
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const handleRemovePin = () => {
+    disableTripLinkPin(tripId)
+    setPin("")
+    setConfirmPin("")
+    setError("")
+    onSecurityUpdated()
+  }
+
+  const handleToggleBiometric = async () => {
+    setIsSubmitting(true)
+    setError("")
+
+    try {
+      if (securityMethods.biometricEnabled) {
+        disableTripLinkBiometric(tripId)
+      } else {
+        await registerTripLinkBiometric(tripId, tripTitle)
+      }
+
+      onSecurityUpdated()
+    } catch (securityError) {
+      const message = securityError instanceof Error ? securityError.message : "Nao foi possivel atualizar a biometria neste dispositivo."
+      setError(message)
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  return (
+    <Modal open={open} onClose={onClose} title="Seguranca">
+      <div className="space-y-5">
+        <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4">
+          <p className="text-sm font-medium text-white">Proteja acoes sensiveis desta viagem utilizando PIN ou biometria neste dispositivo.</p>
+          <p className="mt-2 text-xs text-white/40">O PIN do link e independente do portal, nao e compartilhado com a agencia e fica restrito a este aparelho.</p>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4">
+            <p className="text-xs uppercase tracking-wider text-white/40">Status do PIN</p>
+            <p className="mt-2 text-sm text-white">{securityMethods.pinEnabled ? "PIN configurado" : "PIN nao configurado"}</p>
+          </div>
+          <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4">
+            <p className="text-xs uppercase tracking-wider text-white/40">Biometria</p>
+            <p className="mt-2 text-sm text-white">
+              {securityMethods.biometricEnabled ? "Biometria ativa" : securityMethods.biometricSupported ? "Biometria inativa" : "Biometria indisponivel"}
+            </p>
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4 space-y-3">
+          <p className="text-sm font-medium text-white">{securityMethods.pinEnabled ? "Alterar PIN" : "Criar PIN"}</p>
+          <Input
+            type="password"
+            inputMode="numeric"
+            maxLength={4}
+            value={pin}
+            onChange={(event) => setPin(event.target.value.replace(/\D/g, "").slice(0, 4))}
+            placeholder="Digite 4 digitos"
+            className="text-center text-xl tracking-[0.6em]"
+          />
+          <Input
+            type="password"
+            inputMode="numeric"
+            maxLength={4}
+            value={confirmPin}
+            onChange={(event) => setConfirmPin(event.target.value.replace(/\D/g, "").slice(0, 4))}
+            placeholder="Confirme o PIN"
+            className="text-center text-xl tracking-[0.6em]"
+          />
+          <div className="flex flex-wrap gap-3">
+            <Button
+              onClick={() => void handleSavePin()}
+              disabled={isSubmitting || pin.length !== 4 || confirmPin.length !== 4}
+              className="flex-1 bg-gradient-to-r from-[#5de0e6] to-[#004aad] text-white"
+            >
+              {securityMethods.pinEnabled ? "Alterar PIN" : "Salvar PIN"}
+            </Button>
+            {securityMethods.pinEnabled ? (
+              <Button variant="outline" onClick={handleRemovePin} className="border-white/10 text-red-300 hover:bg-red-500/10">
+                Remover PIN
+              </Button>
+            ) : null}
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4 space-y-3">
+          <p className="text-sm font-medium text-white">Biometria neste dispositivo</p>
+          <p className="text-xs text-white/40">Use Face ID, Touch ID ou WebAuthn quando o navegador oferecer suporte confiavel.</p>
+          <Button
+            variant="outline"
+            onClick={() => void handleToggleBiometric()}
+            disabled={isSubmitting || !securityMethods.biometricSupported}
+            className="w-full border-white/[0.08] bg-transparent text-white/80 hover:bg-white/[0.06]"
+          >
+            <Fingerprint className="mr-2 h-4 w-4" />
+            {securityMethods.biometricEnabled ? "Desativar biometria" : "Ativar biometria"}
+          </Button>
+        </div>
+
+        <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4">
+          <p className="text-sm font-medium text-white">Dispositivos protegidos</p>
+          {securityMethods.devices.length > 0 ? (
+            <div className="mt-3 space-y-2">
+              {securityMethods.devices.map((device) => (
+                <div key={device.updatedAt} className="rounded-xl border border-white/[0.06] bg-white/[0.03] p-3">
+                  <p className="text-sm text-white">{device.label}</p>
+                  <p className="text-xs text-white/40">Ultima atualizacao: {new Date(device.updatedAt).toLocaleString("pt-BR")}</p>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="mt-3 text-xs text-white/40">Nenhum dispositivo protegido ainda para esta viagem.</p>
+          )}
+        </div>
+
+        <div className="rounded-2xl border border-amber-500/20 bg-amber-500/10 p-4 text-xs text-amber-200">
+          Use PIN ou biometria para liberar acoes administrativas desta viagem. Se o banco exigir autenticacao real para gravar algo no Supabase, o login continua sendo o fallback tardio.
+        </div>
+
+        {error ? (
+          <div className="rounded-2xl border border-red-500/20 bg-red-500/10 p-4 text-sm text-red-300">
+            {error}
+          </div>
+        ) : null}
+      </div>
+    </Modal>
+  )
+}
+
 // Offline Section
 function OfflineSection({ tripData }: { tripData: any }) {
   const [downloading, setDownloading] = useState(false)
@@ -3560,37 +3785,40 @@ function TripFooter({ agencyBranding }: { agencyBranding: { name: string | null;
 
 function SensitiveAccessModal({
   open,
-  ownerUserId,
-  profileSettings,
+  tripId,
   onClose,
   onSuccess,
   onLogin,
   onConfigureQuickAccess,
 }: {
   open: boolean
-  ownerUserId: string | null
-  profileSettings: any
+  tripId: string
   onClose: () => void
   onSuccess: () => void
   onLogin: () => void
   onConfigureQuickAccess: () => void
 }) {
   const [pin, setPin] = useState("")
+  const [confirmPin, setConfirmPin] = useState("")
   const [error, setError] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const quickAccessMethods = getQuickAccessMethods(ownerUserId, profileSettings)
+  const quickAccessMethods = getTripLinkQuickAccessMethods(tripId)
+
+  useEffect(() => {
+    if (!open) {
+      setPin("")
+      setConfirmPin("")
+      setError("")
+      setIsSubmitting(false)
+    }
+  }, [open])
 
   const handlePinUnlock = async () => {
-    if (!ownerUserId) {
-      setError("Configure o PIN desta conta ou use a biometria deste dispositivo para continuar.")
-      return
-    }
-
     setIsSubmitting(true)
     setError("")
 
     try {
-      const isValid = await verifyQuickAccessPin(ownerUserId, pin, { profileSettings })
+      const isValid = await verifyTripLinkPin(tripId, pin)
       if (!isValid) {
         setError("PIN invalido")
         return
@@ -3606,9 +3834,10 @@ function SensitiveAccessModal({
     }
   }
 
-  const handleBiometricUnlock = async () => {
-    if (!ownerUserId) {
-      setError("Configure o PIN desta conta ou use a biometria deste dispositivo para continuar.")
+  const handleCreatePin = async () => {
+    if (pin.length !== 4 || confirmPin.length !== 4) return
+    if (pin !== confirmPin) {
+      setError("Os PINs nao conferem.")
       return
     }
 
@@ -3616,7 +3845,24 @@ function SensitiveAccessModal({
     setError("")
 
     try {
-      const success = await authenticateQuickAccessBiometric(ownerUserId)
+      await saveTripLinkPin(tripId, pin)
+      onSuccess()
+    } catch (unlockError) {
+      const message = unlockError instanceof Error ? unlockError.message : "Nao foi possivel configurar o PIN neste dispositivo."
+      setError(message)
+    } finally {
+      setIsSubmitting(false)
+      setPin("")
+      setConfirmPin("")
+    }
+  }
+
+  const handleBiometricUnlock = async () => {
+    setIsSubmitting(true)
+    setError("")
+
+    try {
+      const success = await authenticateTripLinkBiometric(tripId)
       if (!success) {
         setError("Nao foi possivel validar a biometria neste dispositivo.")
         return
@@ -3638,7 +3884,9 @@ function SensitiveAccessModal({
           <Lock className="h-8 w-8 text-[#5de0e6]" />
         </div>
         <p className="mt-3 text-center text-sm text-white/55">
-          Use PIN ou biometria para liberar acoes sensiveis desta viagem. Se o banco exigir autenticacao para salvar, voce podera entrar apenas nesse momento.
+          {quickAccessMethods.pinEnabled
+            ? "Use PIN ou biometria para liberar acoes administrativas desta viagem."
+            : "Crie um PIN neste dispositivo para proteger acoes sensiveis desta viagem."}
         </p>
 
         <div className="mt-6 space-y-3">
@@ -3675,9 +3923,34 @@ function SensitiveAccessModal({
             </div>
           )}
 
-          {!quickAccessMethods.pinEnabled && !quickAccessMethods.biometricEnabled && (
-            <div className="rounded-2xl border border-amber-500/20 bg-amber-500/10 p-4 text-sm text-amber-300">
-              Acesso rapido nao configurado neste dispositivo ou nesta conta.
+          {!quickAccessMethods.pinEnabled && (
+            <div className="space-y-3 rounded-2xl border border-amber-500/20 bg-amber-500/10 p-4">
+              <p className="text-sm text-amber-100">Crie um PIN neste dispositivo para proteger acoes sensiveis desta viagem.</p>
+              <Input
+                type="password"
+                inputMode="numeric"
+                maxLength={4}
+                placeholder="Crie um PIN"
+                value={pin}
+                onChange={(event) => setPin(event.target.value.replace(/\D/g, "").slice(0, 4))}
+                className="text-center text-xl tracking-[0.6em]"
+              />
+              <Input
+                type="password"
+                inputMode="numeric"
+                maxLength={4}
+                placeholder="Confirme o PIN"
+                value={confirmPin}
+                onChange={(event) => setConfirmPin(event.target.value.replace(/\D/g, "").slice(0, 4))}
+                className="text-center text-xl tracking-[0.6em]"
+              />
+              <Button
+                onClick={() => void handleCreatePin()}
+                disabled={isSubmitting || pin.length !== 4 || confirmPin.length !== 4}
+                className="w-full bg-gradient-to-r from-[#5de0e6] to-[#004aad] text-white border-0 hover:opacity-90"
+              >
+                Criar PIN neste dispositivo
+              </Button>
             </div>
           )}
 
@@ -3700,7 +3973,7 @@ function SensitiveAccessModal({
           onClick={onConfigureQuickAccess}
           className="mt-3 w-full text-[#5de0e6] hover:bg-white/[0.04] hover:text-[#5de0e6]"
         >
-          Configurar acesso rapido neste dispositivo
+          Gerenciar seguranca neste dispositivo
         </Button>
       </div>
     </Modal>
@@ -3725,6 +3998,7 @@ export default function TripPage() {
   const [editTripOpen, setEditTripOpen] = useState(false)
   const [travelersOpen, setTravelersOpen] = useState(false)
   const [tripSettingsOpen, setTripSettingsOpen] = useState(false)
+  const [securitySettingsOpen, setSecuritySettingsOpen] = useState(false)
   const [creditsOpen, setCreditsOpen] = useState(false)
   const [tripOwnerUserId, setTripOwnerUserId] = useState<string | null>(null)
   const [sensitiveAccessGranted, setSensitiveAccessGranted] = useState(false)
@@ -3733,6 +4007,11 @@ export default function TripPage() {
   const [agencyBranding, setAgencyBranding] = useState<{ name: string | null; logoUrl: string | null }>({ name: null, logoUrl: null })
   const pendingSensitiveActionRef = useRef<(() => void) | null>(null)
   const loadRequestRef = useRef(0)
+
+  const handleCloseSensitiveAccessModal = () => {
+    setSecurityModalOpen(false)
+    pendingSensitiveActionRef.current = null
+  }
 
   useEffect(() => {
     setSensitiveAccessGranted(false)
@@ -3779,8 +4058,6 @@ export default function TripPage() {
           if (loadRequestRef.current !== requestId) return
           setTripOwnerUserId(repositoryTrip.data.ownerUserId ?? null)
           const isOwner = Boolean(user?.id && repositoryTrip.data.ownerUserId && user.id === repositoryTrip.data.ownerUserId)
-          const quickAccessMethods = getQuickAccessMethods(repositoryTrip.data.ownerUserId ?? null, null)
-          const requiresQuickAccessGate = Boolean(isAdminRoute && !user && quickAccessMethods.configured)
 
           if (isAdminRoute && authLoading) {
             return
@@ -3793,19 +4070,9 @@ export default function TripPage() {
             return
           }
 
-          if (isAdminRoute && !user) {
-            if (!quickAccessMethods.configured) {
-              const redirectTarget = pathname || `/viagem/${repositoryTrip.data.slug}/admin`
-              router.replace(`/login?redirect=${encodeURIComponent(redirectTarget)}`)
-              setIsLoadingTrip(false)
-              return
-            }
-            setQuickAccessGateRequired(requiresQuickAccessGate)
-          } else {
-            setQuickAccessGateRequired(false)
-          }
+          setQuickAccessGateRequired(false)
 
-          const canEditTrip = isAdminRoute && (Boolean(user) ? isOwner : !requiresQuickAccessGate)
+          const canEditTrip = isAdminRoute && (Boolean(user) ? isOwner : true)
           const canWriteTrip = isAdminRoute && isOwner
           setIsAdmin(canEditTrip)
           setCanWrite(canWriteTrip)
@@ -3930,7 +4197,7 @@ export default function TripPage() {
   }
 
   const requireSensitiveAccess = (onGranted: () => void) => {
-    if (!tripOwnerUserId) {
+    if (!tripData.id) {
       showToast("Nao foi possivel validar a seguranca desta viagem.", "error")
       return
     }
@@ -3945,7 +4212,7 @@ export default function TripPage() {
   }
 
   const ensureSensitiveAccess = () => {
-    if (!tripOwnerUserId) {
+    if (!tripData.id) {
       showToast("Nao foi possivel validar a seguranca desta viagem.", "error")
       return false
     }
@@ -3959,15 +4226,8 @@ export default function TripPage() {
   }
 
   const handleConfigureQuickAccess = () => {
-    const routeSlug =
-      typeof params?.id === "string"
-        ? params.id
-        : typeof params?.slug === "string"
-          ? params.slug
-          : tripData.id
-    const target = pathname || `/viagem/${routeSlug}/admin`
-    const quickAccessTarget = `/portal/configuracoes?quickAccess=1&returnTo=${encodeURIComponent(target)}`
-    router.replace(`/login?redirect=${encodeURIComponent(quickAccessTarget)}`)
+    setSecurityModalOpen(false)
+    setSecuritySettingsOpen(true)
   }
 
   const handleNavigate = (section: string) => {
@@ -4319,9 +4579,8 @@ export default function TripPage() {
           </p>
           <SensitiveAccessModal
             open
-            onClose={() => setSecurityModalOpen(false)}
-            ownerUserId={tripOwnerUserId}
-            profileSettings={null}
+            onClose={handleCloseSensitiveAccessModal}
+            tripId={tripData.id}
             onSuccess={() => {
               setSensitiveAccessGranted(true)
               setQuickAccessGateRequired(false)
@@ -4354,7 +4613,7 @@ export default function TripPage() {
   <FlightsSection tripData={tripData} onUpdateFlight={handleUpdateFlight} onAddFlight={handleAddFlight} onDeleteFlight={handleDeleteFlight} onDeleteDocument={handleDeleteDocument} tripId={tripData.id} ownerUserId={tripOwnerUserId} agencyId={profile?.agencyId ?? null} ensureSensitiveAccess={ensureSensitiveAccess} />
   <HotelSection tripData={tripData} onSaveHotel={handleSaveHotel} onDeleteHotel={handleDeleteHotel} />
   <ItinerarySection tripData={tripData} onUpdateItinerary={handleUpdateItinerary} />
-  <DocumentsSection tripData={tripData} onAddDocument={handleAddDocument} onDeleteDocument={handleDeleteDocument} tripId={tripData.id} ownerUserId={tripOwnerUserId} agencyId={profile?.agencyId ?? null} tripOwnerUserId={tripOwnerUserId} profileSettings={profile?.settings ?? null} ensureSensitiveAccess={ensureSensitiveAccess} />
+  <DocumentsSection tripData={tripData} onAddDocument={handleAddDocument} onDeleteDocument={handleDeleteDocument} tripId={tripData.id} ownerUserId={tripOwnerUserId} agencyId={profile?.agencyId ?? null} ensureSensitiveAccess={ensureSensitiveAccess} />
   <ConciergeSection tripData={tripData} onOpenCredits={() => setCreditsOpen(true)} />
           <OfflineSection tripData={tripData} />
           <QuickInfoSection tripData={tripData} />
@@ -4363,9 +4622,8 @@ export default function TripPage() {
           <ShareModal open={shareOpen} onClose={() => setShareOpen(false)} tripData={tripData} />
           <SensitiveAccessModal
             open={securityModalOpen}
-            onClose={() => setSecurityModalOpen(false)}
-            ownerUserId={tripOwnerUserId}
-            profileSettings={profile?.settings ?? null}
+            onClose={handleCloseSensitiveAccessModal}
+            tripId={tripData.id}
             onSuccess={() => {
               setSensitiveAccessGranted(true)
               setSecurityModalOpen(false)
@@ -4388,6 +4646,10 @@ export default function TripPage() {
               setMenuOpen(false)
               setTripSettingsOpen(true)
             }}
+            onOpenSecurity={() => {
+              setMenuOpen(false)
+              setSecuritySettingsOpen(true)
+            }}
             onOpenCredits={() => {
               setMenuOpen(false)
               setCreditsOpen(true)
@@ -4396,6 +4658,7 @@ export default function TripPage() {
           <EditTripModal open={editTripOpen} onClose={() => setEditTripOpen(false)} tripData={tripData} onSave={handleUpdateTrip} />
           <TravelersModal open={travelersOpen} onClose={() => setTravelersOpen(false)} travelers={tripData.travelers} onUpdateTravelers={handleUpdateTravelers} />
           <TripSettingsModal open={tripSettingsOpen} onClose={() => setTripSettingsOpen(false)} tripData={tripData} onSave={handleSaveTripSettings} />
+          <TripSecurityModal open={securitySettingsOpen} onClose={() => setSecuritySettingsOpen(false)} tripId={tripData.id} tripTitle={tripData.destination} onSecurityUpdated={() => setToast({ message: "Seguranca do dispositivo atualizada.", type: "success" })} />
           <CreditsModal open={creditsOpen} onClose={() => setCreditsOpen(false)} credits={tripData.credits} />
 
           <AnimatePresence>
