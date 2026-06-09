@@ -12,6 +12,7 @@ import { getTripByAdminToken, getTripByPublicToken, getTripBySlug } from "@/lib/
 import { createDocumentMetadata, deleteDocument, deleteDocumentFile, getSignedDocumentUrl, listDocumentsByTrip, listPublicTripDocuments, uploadDocumentFile } from "@/lib/repositories/documents-repository"
 import { deleteTripFlight, listPublicTripFlights, listTripFlights, requestTripFlightExtraction, upsertTripFlight } from "@/lib/repositories/trip-flights-repository"
 import { createTripHotel, deleteTripHotel, listTripHotels, updateTripHotel } from "@/lib/repositories/trip-hotels-repository"
+import { deleteTripItinerary, listTripItineraries, requestAiItineraryGeneration, upsertTripItinerary } from "@/lib/repositories/trip-itineraries-repository"
 import { listConversationsByTrip, listMessages } from "@/lib/repositories/ai-repository"
 import { validateDocumentFile } from "@/lib/files/file-validation"
 import { getDestinationCoverImage, getDestinationMetadata } from "@/lib/trip-destination"
@@ -19,6 +20,7 @@ import { getOfflineWarningMessage, saveTripOfflinePackage } from "@/lib/offline/
 import { useAuth } from "@/contexts/auth-context"
 import { buildAdminTripUrl, buildPublicTripUrl, isAdminLinkMode } from "@/lib/security/link-tokens"
 import type { TripFlightRecord } from "@/types/flight"
+import type { TripItineraryRecord, TripItineraryContent } from "@/types"
 import {
   authenticateTripLinkBiometric,
   disableTripLinkBiometric,
@@ -438,6 +440,79 @@ function getFlightStatusCopy(flight: any) {
     detail: "Extracao pendente",
     tone: "pending" as const,
   }
+}
+
+function mapItineraryContentToLegacyDays(content?: TripItineraryContent | null) {
+  if (!content?.days?.length) return [] as any[]
+
+  return content.days.map((day) => ({
+    day: day.day,
+    date: day.date || `Dia ${day.day}`,
+    title: day.title,
+    items: day.activities.map((activity) => ({
+      id: activity.id,
+      time: activity.time || "",
+      title: activity.title,
+      type: activity.type,
+      highlight: activity.highlight,
+      description: activity.description,
+      location: activity.location,
+      icon:
+        activity.type === "food"
+          ? "UtensilsCrossed"
+          : activity.type === "transport"
+            ? "Car"
+            : activity.type === "hotel"
+              ? "Hotel"
+              : activity.type === "flight"
+                ? "Plane"
+                : "MapPin",
+    })),
+    summary: day.summary,
+    tips: day.tips,
+    important: day.important,
+  }))
+}
+
+function mapLegacyDaysToItineraryContent(days: any[], previousContent?: TripItineraryContent | null): TripItineraryContent {
+  return {
+    summary: previousContent?.summary ?? null,
+    travelStyle: previousContent?.travelStyle ?? null,
+    usefulTips: previousContent?.usefulTips ?? [],
+    observations: previousContent?.observations ?? [],
+    contacts: previousContent?.contacts ?? [],
+    days: (Array.isArray(days) ? days : []).map((day: any, dayIndex: number) => ({
+      id: typeof day?.id === "string" ? day.id : `day-${dayIndex + 1}`,
+      day: typeof day?.day === "number" ? day.day : dayIndex + 1,
+      date: typeof day?.date === "string" ? day.date : null,
+      title: typeof day?.title === "string" ? day.title : `Dia ${dayIndex + 1}`,
+      summary: typeof day?.summary === "string" ? day.summary : null,
+      tips: typeof day?.tips === "string" ? day.tips : null,
+      important: typeof day?.important === "string" ? day.important : null,
+      activities: (Array.isArray(day?.items) ? day.items : []).map((item: any, itemIndex: number) => ({
+        id: typeof item?.id === "string" ? item.id : `activity-${dayIndex + 1}-${itemIndex + 1}`,
+        time: typeof item?.time === "string" && item.time.trim() ? item.time : null,
+        title: typeof item?.title === "string" ? item.title : "Atividade",
+        location: typeof item?.location === "string" ? item.location : null,
+        description: typeof item?.description === "string" ? item.description : null,
+        type:
+          item?.type === "attraction" ||
+          item?.type === "food" ||
+          item?.type === "transport" ||
+          item?.type === "hotel" ||
+          item?.type === "experience" ||
+          item?.type === "flight" ||
+          item?.type === "other"
+            ? item.type
+            : "other",
+        highlight: item?.highlight === true,
+      })),
+    })),
+  }
+}
+
+function resolveSimpleTripItinerary(itineraries: TripItineraryRecord[]) {
+  return itineraries.find((record) => record.mode === "simple" && (record.status === "completed" || record.status === "draft" || record.status === "generating")) ?? null
 }
 
 function normalizeTripViewData(tripData: any) {
@@ -1840,194 +1915,458 @@ function EditHotelModal({ open, onClose, hotel, onSave }: { open: boolean; onClo
   )
 }
 
+function UploadExistingItineraryModal({
+  open,
+  onClose,
+  tripId,
+  ownerUserId,
+  agencyId,
+  ensureSensitiveAccess,
+  onSave,
+}: {
+  open: boolean
+  onClose: () => void
+  tripId: string
+  ownerUserId: string | null
+  agencyId: string | null
+  ensureSensitiveAccess: () => boolean
+  onSave: (payload: { itinerary: TripItineraryRecord; document: any }) => void
+}) {
+  const [title, setTitle] = useState("")
+  const [uploading, setUploading] = useState(false)
+  const [error, setError] = useState("")
+
+  useEffect(() => {
+    if (!open) {
+      setTitle("")
+      setUploading(false)
+      setError("")
+    }
+  }, [open])
+
+  const handleUpload = async (file?: File | null) => {
+    if (!file) return
+    if (!ensureSensitiveAccess()) return
+    if (!ownerUserId) {
+      setError("Este anexo exige autenticacao real para ser salvo no Supabase. Entre com login para continuar.")
+      return
+    }
+
+    const validation = validateDocumentFile(file)
+    if (!validation.valid) {
+      setError(validation.error || "Arquivo invalido.")
+      return
+    }
+
+    setUploading(true)
+    setError("")
+
+    const path = `${ownerUserId}/${tripId}/itineraries/${Date.now()}-${file.name.replace(/\s+/g, "-")}`
+    const uploadResult = await uploadDocumentFile(file, path)
+    if (uploadResult.error || !uploadResult.data) {
+      setError(uploadResult.error || "Nao foi possivel anexar o roteiro.")
+      setUploading(false)
+      return
+    }
+
+    const metadataResult = await createDocumentMetadata({
+      tripId,
+      clientId: null,
+      agencyId,
+      ownerUserId,
+      name: title.trim() || file.name.replace(/\.[^.]+$/, ""),
+      type: "itinerary",
+      filePath: uploadResult.data.path,
+      fileUrl: uploadResult.data.fileUrl,
+      mimeType: file.type,
+      size: file.size,
+      isPrivate: false,
+      visibility: "public_trip",
+      aiExtractedData: {
+        source: "manual_itinerary_upload",
+        ai_used: false,
+      },
+    })
+
+    if (metadataResult.error || !metadataResult.data) {
+      setError(metadataResult.error || "Nao foi possivel registrar o roteiro anexado.")
+      setUploading(false)
+      return
+    }
+
+    const itineraryResult = await upsertTripItinerary({
+      tripId,
+      documentId: metadataResult.data.id,
+      title: title.trim() || file.name.replace(/\.[^.]+$/, ""),
+      mode: "uploaded",
+      status: "uploaded",
+      content: { days: [] },
+      pdfUrl: metadataResult.data.filePath,
+      createdBy: ownerUserId,
+    })
+
+    if (itineraryResult.error || !itineraryResult.data) {
+      setError(itineraryResult.error || "Nao foi possivel registrar o modo de roteiro anexado.")
+      setUploading(false)
+      return
+    }
+
+    onSave({ itinerary: itineraryResult.data, document: metadataResult.data })
+    setUploading(false)
+    onClose()
+  }
+
+  return (
+    <Modal open={open} onClose={onClose} title="Anexar roteiro existente">
+      <div className="space-y-4">
+        <div>
+          <label className="text-xs text-white/50 uppercase tracking-wider">Titulo do roteiro</label>
+          <input
+            type="text"
+            value={title}
+            onChange={(event) => setTitle(event.target.value)}
+            placeholder="Ex: Roteiro completo de Paris"
+            className="w-full mt-1 px-4 py-3 rounded-xl bg-white/[0.05] border border-white/[0.08] text-white placeholder:text-white/30 focus:outline-none focus:border-[#5de0e6]/50"
+          />
+        </div>
+
+        <label className="block p-8 rounded-xl border-2 border-dashed border-white/10 hover:border-[#5de0e6]/30 transition-colors text-center cursor-pointer">
+          {uploading ? (
+            <div className="flex flex-col items-center gap-3">
+              <div className="w-8 h-8 border-2 border-white/30 border-t-[#5de0e6] rounded-full animate-spin" />
+              <p className="text-sm text-white/60">Enviando roteiro...</p>
+            </div>
+          ) : (
+            <>
+              <Upload className="w-8 h-8 mx-auto text-white/40 mb-3" />
+              <p className="text-sm text-white/60">Clique para selecionar PDF, imagem ou documento</p>
+              <p className="text-xs text-white/30 mt-1">Sem leitura de IA e sem consumo de creditos</p>
+            </>
+          )}
+          <input type="file" accept=".pdf,.png,.jpg,.jpeg,.doc,.docx" className="hidden" onChange={(event) => void handleUpload(event.target.files?.[0])} />
+        </label>
+
+        {error ? <p className="text-sm text-red-300">{error}</p> : null}
+      </div>
+    </Modal>
+  )
+}
+
 // Itinerary Section
-function ItinerarySection({ tripData, onUpdateItinerary }: { tripData: any; onUpdateItinerary: (data: any) => void }) {
+function ItinerarySection({
+  tripData,
+  itineraryRecords,
+  tripId,
+  ownerUserId,
+  agencyId,
+  ensureSensitiveAccess,
+  onUpdateItinerary,
+  onGenerateSimple,
+  onGenerateComplete,
+  onSaveUploadedItinerary,
+  onDeleteItinerary,
+}: {
+  tripData: any
+  itineraryRecords: TripItineraryRecord[]
+  tripId: string
+  ownerUserId: string | null
+  agencyId: string | null
+  ensureSensitiveAccess: () => boolean
+  onUpdateItinerary: (data: any) => void
+  onGenerateSimple: () => Promise<void>
+  onGenerateComplete: () => Promise<void>
+  onSaveUploadedItinerary: (payload: { itinerary: TripItineraryRecord; document: any }) => void
+  onDeleteItinerary: (record: TripItineraryRecord) => Promise<void>
+}) {
   const [activeDay, setActiveDay] = useState(1)
   const [editingItem, setEditingItem] = useState<any>(null)
   const [addingItem, setAddingItem] = useState(false)
+  const [uploadOpen, setUploadOpen] = useState(false)
+  const [busyAction, setBusyAction] = useState<"simple" | "complete" | null>(null)
   const { isAdmin } = useContext(PermissionContext)
   const { showToast } = useToast()
   const itinerary = Array.isArray(tripData.itinerary) ? tripData.itinerary : []
-
   const activeItinerary = itinerary.find((d: any) => d.day === activeDay)
+  const simpleRecord = itineraryRecords.find((record) => record.mode === "simple" && (record.status === "completed" || record.status === "draft" || record.status === "generating")) ?? null
+  const documentRecords = itineraryRecords.filter((record) => record.mode !== "simple")
+  const hasGenerating = itineraryRecords.some((record) => record.status === "generating")
+
+  useEffect(() => {
+    if (!activeItinerary && itinerary[0]?.day) {
+      setActiveDay(itinerary[0].day)
+    }
+  }, [activeItinerary, itinerary])
 
   const upsertItineraryDay = (dayNumber: number, updater: (currentItems: any[]) => any[]) => {
     const existingDay = itinerary.find((entry: any) => entry.day === dayNumber)
     const nextItems = updater(Array.isArray(existingDay?.items) ? existingDay.items : [])
 
-    if (!existingDay) {
-      onUpdateItinerary([
-        ...itinerary,
-        {
-          day: dayNumber,
-          date: `Dia ${dayNumber}`,
-          title: `Dia ${dayNumber}`,
-          items: nextItems,
-        },
-      ])
+    const nextDays = !existingDay
+      ? [
+          ...itinerary,
+          {
+            day: dayNumber,
+            date: `Dia ${dayNumber}`,
+            title: `Dia ${dayNumber}`,
+            items: nextItems,
+          },
+        ]
+      : itinerary.map((entry: any) =>
+          entry.day === dayNumber
+            ? {
+                ...entry,
+                items: nextItems,
+              }
+            : entry,
+        )
+
+    onUpdateItinerary(nextDays)
+  }
+
+  const handleGenerate = async (mode: "simple" | "complete") => {
+    if (!ensureSensitiveAccess()) return
+    setBusyAction(mode)
+
+    try {
+      if (mode === "simple") {
+        await onGenerateSimple()
+      } else {
+        await onGenerateComplete()
+      }
+    } finally {
+      setBusyAction(null)
+    }
+  }
+
+  const handleOpenItineraryDocument = async (record: TripItineraryRecord) => {
+    const document = Array.isArray(tripData.documents) ? tripData.documents.find((entry: any) => entry.id === record.documentId) : null
+    if (!document) {
+      showToast("Documento do roteiro nao encontrado.", "error")
       return
     }
 
-    onUpdateItinerary(
-      itinerary.map((entry: any) =>
-        entry.day === dayNumber
-          ? {
-              ...entry,
-              items: nextItems,
-            }
-          : entry,
-      ),
-    )
+    const resolvedUrl = document.fileUrl
+      ? { data: document.fileUrl, error: null }
+      : document.filePath
+        ? await getSignedDocumentUrl(document.filePath)
+        : { data: null, error: "Arquivo indisponivel para visualizacao." }
+
+    if (resolvedUrl.error || !resolvedUrl.data) {
+      showToast(resolvedUrl.error || "Nao foi possivel abrir o roteiro.", "error")
+      return
+    }
+
+    window.open(resolvedUrl.data, "_blank", "noopener,noreferrer")
   }
 
   return (
     <section id="itinerary" className="py-12 px-4">
       <div className="max-w-6xl mx-auto">
-        <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="flex items-center justify-between mb-6">
+        <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="flex flex-col gap-4 mb-6 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#5de0e6] to-[#004aad] flex items-center justify-center">
               <MapPin className="w-5 h-5 text-white" />
             </div>
             <div>
               <h2 className="text-xl font-semibold text-white">Roteiro</h2>
-              <p className="text-sm text-white/40">{itinerary.length} dias planejados</p>
+              <p className="text-sm text-white/40">
+                {simpleRecord ? `${itinerary.length} dias planejados` : documentRecords.length > 0 ? `${documentRecords.length} roteiro(s) salvo(s)` : "Nenhum roteiro criado"}
+              </p>
             </div>
           </div>
-          {isAdmin && (
-            <Button size="sm" variant="ghost" className="text-[#5de0e6] hover:bg-[#5de0e6]/10" onClick={() => setAddingItem(true)}>
-              <Plus className="w-4 h-4 mr-2" />
-              Adicionar
-            </Button>
-          )}
+
+          {isAdmin ? (
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" variant="ghost" className="text-[#5de0e6] hover:bg-[#5de0e6]/10" onClick={() => void handleGenerate("simple")} disabled={busyAction !== null}>
+                <Sparkles className="w-4 h-4 mr-2" />
+                {busyAction === "simple" ? "Gerando..." : "Criar roteiro simples"}
+              </Button>
+              <Button size="sm" variant="ghost" className="text-white/80 hover:bg-white/10" onClick={() => void handleGenerate("complete")} disabled={busyAction !== null}>
+                <FileText className="w-4 h-4 mr-2" />
+                {busyAction === "complete" ? "Gerando PDF..." : "Criar roteiro completo em PDF"}
+              </Button>
+              <Button size="sm" variant="ghost" className="text-white/80 hover:bg-white/10" onClick={() => setUploadOpen(true)} disabled={busyAction !== null}>
+                <Upload className="w-4 h-4 mr-2" />
+                Anexar roteiro existente
+              </Button>
+              {simpleRecord?.status === "completed" ? (
+                <Button size="sm" variant="ghost" className="text-[#5de0e6] hover:bg-[#5de0e6]/10" onClick={() => setAddingItem(true)}>
+                  <Plus className="w-4 h-4 mr-2" />
+                  Editar roteiro simples
+                </Button>
+              ) : null}
+            </div>
+          ) : null}
         </motion.div>
 
-        {itinerary.length === 0 ? (
+        {!simpleRecord && documentRecords.length === 0 && !hasGenerating ? (
           <div className="rounded-3xl border border-white/[0.06] bg-white/[0.02] p-6 text-sm text-white/50">
             Nenhum roteiro criado.
           </div>
-        ) : (
-        <>
-        <div className="flex gap-2 mb-6 overflow-x-auto pb-2 scrollbar-hide">
-          {itinerary.map((day: any) => (
-            <motion.button
-              key={day.day}
-              onClick={() => setActiveDay(day.day)}
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              className={cn(
-                "flex-shrink-0 px-4 py-3 rounded-xl border transition-all duration-300",
-                activeDay === day.day
-                  ? "bg-gradient-to-br from-[#5de0e6]/20 to-[#004aad]/20 border-[#5de0e6]/40 text-white"
-                  : "bg-white/[0.02] border-white/[0.06] text-white/60 hover:text-white hover:border-white/10"
-              )}
-            >
-              <p className="text-[10px] uppercase tracking-wider opacity-60">Dia {day.day}</p>
-              <p className="text-sm font-medium mt-0.5">{day.date}</p>
-            </motion.button>
-          ))}
-        </div>
+        ) : null}
 
-        <AnimatePresence mode="wait">
-          {activeItinerary && (
-            <motion.div
-              key={activeDay}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              transition={{ duration: 0.3 }}
-              className="relative"
-            >
-              <h3 className="text-lg font-medium text-white mb-6">{activeItinerary.title}</h3>
-              
-              <div className="relative pl-8">
-                <div className="absolute left-[11px] top-2 bottom-2 w-px bg-gradient-to-b from-[#5de0e6]/50 via-[#004aad]/30 to-transparent" />
-                
-                <div className="space-y-6">
-                  {activeItinerary.items.map((item: any, i: number) => {
-                    const IconComponent = iconMap[item.icon] || MapPin
-                    return (
-                      <motion.div
-                        key={item.id}
-                        initial={{ opacity: 0, x: -10 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: i * 0.1 }}
-                        className="relative group"
-                      >
-                        <div className={cn(
-                          "absolute -left-8 top-1 w-6 h-6 rounded-full flex items-center justify-center",
-                          item.highlight ? "bg-gradient-to-br from-[#5de0e6] to-[#004aad]" : "bg-white/10 border border-white/20"
-                        )}>
-                          <IconComponent className={cn("w-3 h-3", item.highlight ? "text-white" : "text-white/60")} />
-                        </div>
+        {hasGenerating ? (
+          <div className="mb-6 rounded-3xl border border-[#5de0e6]/20 bg-[#5de0e6]/10 p-6 text-sm text-white/80">
+            Gerando roteiro. Aguarde a finalizacao no backend para ver o resultado real.
+          </div>
+        ) : null}
 
-                        <div 
-                          onClick={() => isAdmin && setEditingItem(item)}
-                          className={cn(
-                            "p-4 rounded-xl transition-all duration-300",
-                            item.highlight
-                              ? "bg-gradient-to-br from-[#5de0e6]/10 to-[#004aad]/10 border border-[#5de0e6]/20"
-                              : "bg-white/[0.02] border border-white/[0.06] hover:border-white/10",
-                            isAdmin && "cursor-pointer"
-                          )}
-                        >
-                          <div className="flex items-start justify-between">
-                            <div>
-                              <p className="text-xs text-[#5de0e6] font-medium">{item.time}</p>
-                              <p className="text-white font-medium mt-1">{item.title}</p>
+        {simpleRecord?.status === "completed" && itinerary.length > 0 ? (
+          <>
+            <div className="mb-4 rounded-2xl border border-[#5de0e6]/20 bg-[#5de0e6]/10 p-4 text-sm text-white/80">
+              Roteiro simples criado com IA e salvo para edicao no modo admin.
+            </div>
+            <div className="flex gap-2 mb-6 overflow-x-auto pb-2 scrollbar-hide">
+              {itinerary.map((day: any) => (
+                <motion.button
+                  key={day.day}
+                  onClick={() => setActiveDay(day.day)}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  className={cn(
+                    "flex-shrink-0 px-4 py-3 rounded-xl border transition-all duration-300",
+                    activeDay === day.day
+                      ? "bg-gradient-to-br from-[#5de0e6]/20 to-[#004aad]/20 border-[#5de0e6]/40 text-white"
+                      : "bg-white/[0.02] border-white/[0.06] text-white/60 hover:text-white hover:border-white/10",
+                  )}
+                >
+                  <p className="text-[10px] uppercase tracking-wider opacity-60">Dia {day.day}</p>
+                  <p className="text-sm font-medium mt-0.5">{day.date}</p>
+                </motion.button>
+              ))}
+            </div>
+
+            <AnimatePresence mode="wait">
+              {activeItinerary ? (
+                <motion.div
+                  key={activeDay}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.3 }}
+                  className="relative"
+                >
+                  <h3 className="text-lg font-medium text-white mb-6">{activeItinerary.title}</h3>
+
+                  <div className="relative pl-8">
+                    <div className="absolute left-[11px] top-2 bottom-2 w-px bg-gradient-to-b from-[#5de0e6]/50 via-[#004aad]/30 to-transparent" />
+
+                    <div className="space-y-6">
+                      {activeItinerary.items.map((item: any, i: number) => {
+                        const IconComponent = iconMap[item.icon] || MapPin
+                        return (
+                          <motion.div
+                            key={item.id}
+                            initial={{ opacity: 0, x: -10 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ delay: i * 0.1 }}
+                            className="relative group"
+                          >
+                            <div className={cn("absolute -left-8 top-1 w-6 h-6 rounded-full flex items-center justify-center", item.highlight ? "bg-gradient-to-br from-[#5de0e6] to-[#004aad]" : "bg-white/10 border border-white/20")}>
+                              <IconComponent className={cn("w-3 h-3", item.highlight ? "text-white" : "text-white/60")} />
                             </div>
-                            {isAdmin ? (
-                              <Edit3 className="w-4 h-4 text-white/30 opacity-0 group-hover:opacity-100 transition-opacity" />
-                            ) : (
-                              <ChevronRight className="w-4 h-4 text-white/30" />
-                            )}
-                          </div>
-                        </div>
-                      </motion.div>
-                    )
-                  })}
+
+                            <div
+                              onClick={() => isAdmin && setEditingItem(item)}
+                              className={cn(
+                                "p-4 rounded-xl transition-all duration-300",
+                                item.highlight ? "bg-gradient-to-br from-[#5de0e6]/10 to-[#004aad]/10 border border-[#5de0e6]/20" : "bg-white/[0.02] border border-white/[0.06] hover:border-white/10",
+                                isAdmin && "cursor-pointer",
+                              )}
+                            >
+                              <div className="flex items-start justify-between">
+                                <div>
+                                  <p className="text-xs text-[#5de0e6] font-medium">{item.time}</p>
+                                  <p className="text-white font-medium mt-1">{item.title}</p>
+                                </div>
+                                {isAdmin ? <Edit3 className="w-4 h-4 text-white/30 opacity-0 group-hover:opacity-100 transition-opacity" /> : <ChevronRight className="w-4 h-4 text-white/30" />}
+                              </div>
+                            </div>
+                          </motion.div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                </motion.div>
+              ) : null}
+            </AnimatePresence>
+          </>
+        ) : null}
+
+        {documentRecords.length > 0 ? (
+          <div className="mt-8 grid gap-4 sm:grid-cols-2">
+            {documentRecords.map((record) => (
+              <div key={record.id} className="rounded-3xl border border-white/[0.06] bg-white/[0.02] p-5">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-medium text-white">{record.title}</p>
+                    <p className="mt-1 text-xs text-white/40">
+                      {record.mode === "complete_pdf" ? "PDF completo gerado com IA" : "Roteiro anexado manualmente"}
+                    </p>
+                  </div>
+                  <span className="rounded-full border border-white/10 px-2 py-1 text-[10px] uppercase tracking-wider text-white/50">
+                    {record.status === "completed" ? "Concluido" : record.status === "uploaded" ? "Anexado" : record.status}
+                  </span>
+                </div>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <Button size="sm" variant="outline" className="border-white/10 text-white/80" onClick={() => void handleOpenItineraryDocument(record)}>
+                    <ExternalLink className="mr-2 h-4 w-4" />
+                    Abrir
+                  </Button>
+                  {isAdmin ? (
+                    <Button size="sm" variant="ghost" className="text-red-300 hover:bg-red-500/10" onClick={() => void onDeleteItinerary(record)}>
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Excluir
+                    </Button>
+                  ) : null}
                 </div>
               </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-        </>
-        )}
+            ))}
+          </div>
+        ) : null}
       </div>
 
-      <EditItineraryItemModal 
-        open={!!editingItem} 
-        onClose={() => setEditingItem(null)} 
-        item={editingItem} 
-        onSave={(data) => { 
-          upsertItineraryDay(activeDay, (items) =>
-            items.map((item: any) => (item.id === editingItem.id ? { ...item, ...data } : item)),
-          )
-          showToast("Atividade atualizada!", "success"); 
-          setEditingItem(null) 
+      <EditItineraryItemModal
+        open={!!editingItem}
+        onClose={() => setEditingItem(null)}
+        item={editingItem}
+        onSave={(data) => {
+          upsertItineraryDay(activeDay, (items) => items.map((item: any) => (item.id === editingItem.id ? { ...item, ...data } : item)))
+          showToast("Atividade atualizada!", "success")
+          setEditingItem(null)
         }}
         onDelete={() => {
           upsertItineraryDay(activeDay, (items) => items.filter((item: any) => item.id !== editingItem.id))
-          showToast("Atividade removida!", "success");
+          showToast("Atividade removida!", "success")
           setEditingItem(null)
         }}
       />
-  <AddItineraryItemModal
-  open={addingItem}
-  onClose={() => setAddingItem(false)}
-  day={activeDay}
-  onSave={(data) => {
-  upsertItineraryDay(activeDay, (items) => [
-  ...items,
-  {
-  id: Date.now(),
-  icon: data.type === "food" ? "UtensilsCrossed" : data.type === "transport" ? "Car" : "MapPin",
-  ...data,
-  },
-  ])
-  showToast("Atividade adicionada!", "success");
-  setAddingItem(false)
-  }}
-  />
+      <AddItineraryItemModal
+        open={addingItem}
+        onClose={() => setAddingItem(false)}
+        day={activeDay}
+        onSave={(data) => {
+          upsertItineraryDay(activeDay, (items) => [
+            ...items,
+            {
+              id: `manual-item-${Date.now()}`,
+              icon: data.type === "food" ? "UtensilsCrossed" : data.type === "transport" ? "Car" : "MapPin",
+              ...data,
+            },
+          ])
+          showToast("Atividade adicionada!", "success")
+          setAddingItem(false)
+        }}
+      />
+      <UploadExistingItineraryModal
+        open={uploadOpen}
+        onClose={() => setUploadOpen(false)}
+        tripId={tripId}
+        ownerUserId={ownerUserId}
+        agencyId={agencyId}
+        ensureSensitiveAccess={ensureSensitiveAccess}
+        onSave={onSaveUploadedItinerary}
+      />
     </section>
   )
 }
@@ -2115,7 +2454,7 @@ function AddItineraryItemModal({ open, onClose, day, onSave }: { open: boolean; 
           </div>
           <div>
             <p className="text-sm font-medium text-white">Dia {day}</p>
-            <p className="text-xs text-white/40">Adicione atividades manualmente. A geracao automatica ainda nao esta conectada.</p>
+            <p className="text-xs text-white/40">Adicione atividades manualmente ou complemente o roteiro simples gerado por IA.</p>
           </div>
         </div>
 
@@ -4001,6 +4340,7 @@ export default function TripPage() {
   const [securitySettingsOpen, setSecuritySettingsOpen] = useState(false)
   const [creditsOpen, setCreditsOpen] = useState(false)
   const [tripOwnerUserId, setTripOwnerUserId] = useState<string | null>(null)
+  const [tripItineraryRecords, setTripItineraryRecords] = useState<TripItineraryRecord[]>([])
   const [sensitiveAccessGranted, setSensitiveAccessGranted] = useState(false)
   const [securityModalOpen, setSecurityModalOpen] = useState(false)
   const [quickAccessGateRequired, setQuickAccessGateRequired] = useState(false)
@@ -4036,6 +4376,7 @@ export default function TripPage() {
 
     setIsAdmin(false)
     setCanWrite(false)
+    setTripItineraryRecords([])
     const requestId = loadRequestRef.current + 1
     loadRequestRef.current = requestId
 
@@ -4083,10 +4424,14 @@ export default function TripPage() {
           const flightsResult = canWriteTrip
             ? await listTripFlights(repositoryTrip.data.id)
             : await listPublicTripFlights(repositoryTrip.data.id)
+          const itinerariesResult = await listTripItineraries(repositoryTrip.data.id)
           const hotelsResult = await listTripHotels(repositoryTrip.data.id)
           const agencyResult = repositoryTrip.data.agencyId ? await getAgencyById(repositoryTrip.data.agencyId) : null
 
           if (loadRequestRef.current !== requestId) return
+
+          const simpleItinerary = resolveSimpleTripItinerary(itinerariesResult.data ?? [])
+          setTripItineraryRecords(itinerariesResult.data ?? [])
 
           setAgencyBranding({
             name: agencyResult?.data?.name ?? null,
@@ -4124,7 +4469,7 @@ export default function TripPage() {
                 image: repositoryTrip.data.coverImage ?? undefined,
                 amenities: [],
               })),
-              itinerary: repositoryTrip.data.itinerary,
+              itinerary: simpleItinerary ? mapItineraryContentToLegacyDays(simpleItinerary.content) : repositoryTrip.data.itinerary,
               documents: documentsResult.data,
               travelersCount: repositoryTrip.data.travelersCount,
             })
@@ -4404,8 +4749,152 @@ export default function TripPage() {
     showToast("Hospedagem removida com sucesso.", "success")
   }
 
-  const handleUpdateItinerary = (data: any) => {
-    setTripData(prev => ({ ...prev, itinerary: data }))
+  const syncTripItineraryRecord = (record: TripItineraryRecord) => {
+    setTripItineraryRecords((prev) => [record, ...prev.filter((entry) => entry.id !== record.id)])
+  }
+
+  const handleUpdateItinerary = async (data: any) => {
+    const normalizedDays = Array.isArray(data) ? data : []
+    setTripData((prev) => ({ ...prev, itinerary: normalizedDays }))
+
+    const currentSimpleRecord = resolveSimpleTripItinerary(tripItineraryRecords)
+    const payloadContent = mapLegacyDaysToItineraryContent(normalizedDays, currentSimpleRecord?.content ?? null)
+    const title = currentSimpleRecord?.title || `Roteiro simples - ${tripData.destination || "Viagem"}`
+
+    if (shouldUseSupabase()) {
+      if (!sensitiveAccessGranted) {
+        requireSensitiveAccess(() => { void handleUpdateItinerary(normalizedDays) })
+        return
+      }
+
+      if (!tripOwnerUserId) {
+        showToast("Entre com login para salvar o roteiro simples desta viagem.", "error")
+        return
+      }
+    }
+
+    const result = await upsertTripItinerary({
+      id: currentSimpleRecord?.id,
+      tripId: tripData.id,
+      title,
+      mode: "simple",
+      status: "completed",
+      content: payloadContent,
+      createdBy: currentSimpleRecord?.createdBy ?? tripOwnerUserId,
+    })
+
+    if (result.error || !result.data) {
+      console.error("[ITINERARY] save simple error", result.error)
+      showToast(resolveProtectedWriteError(result.error || "Nao foi possivel salvar o roteiro simples."), "error")
+      return
+    }
+
+    syncTripItineraryRecord(result.data)
+    showToast("Roteiro simples salvo com sucesso.", "success")
+  }
+
+  const handleGenerateItinerary = async (mode: "simple" | "complete_pdf") => {
+    if (!ensureSensitiveAccess()) return
+
+    const label = mode === "simple" ? "roteiro simples" : "roteiro completo"
+
+    if (shouldUseSupabase() && !tripOwnerUserId) {
+      showToast(`Entre com login para gerar o ${label} desta viagem.`, "error")
+      return
+    }
+
+    const result = await requestAiItineraryGeneration({
+      tripId: tripData.id,
+      mode,
+    })
+
+    if (result.error || !result.data?.itinerary) {
+      console.error("[ITINERARY] generate error", result.error || result.data?.error)
+      showToast(resolveProtectedWriteError(result.error || result.data?.error || `Nao foi possivel gerar o ${label}.`), "error")
+      return
+    }
+
+    const nextItinerary = result.data.itinerary as TripItineraryRecord
+    syncTripItineraryRecord(nextItinerary)
+
+    if (nextItinerary.mode === "simple") {
+      setTripData((prev) => ({
+        ...prev,
+        itinerary: mapItineraryContentToLegacyDays(nextItinerary.content),
+      }))
+      showToast("Roteiro simples gerado com IA.", "success")
+    } else {
+      if (result.data.document) {
+        setTripData((prev) => ({
+          ...prev,
+          documents: [result.data.document, ...(Array.isArray(prev.documents) ? prev.documents.filter((entry: any) => entry.id !== result.data.document.id) : [])],
+        }))
+      }
+      showToast("Roteiro completo em PDF gerado com sucesso.", "success")
+    }
+  }
+
+  const handleSaveUploadedItinerary = (payload: { itinerary: TripItineraryRecord; document: any }) => {
+    syncTripItineraryRecord(payload.itinerary)
+    setTripData((prev) => ({
+      ...prev,
+      documents: [payload.document, ...(Array.isArray(prev.documents) ? prev.documents.filter((entry: any) => entry.id !== payload.document.id) : [])],
+    }))
+    showToast("Roteiro anexado com sucesso.", "success")
+  }
+
+  const handleDeleteItinerary = async (record: TripItineraryRecord) => {
+    if (!sensitiveAccessGranted) {
+      requireSensitiveAccess(() => { void handleDeleteItinerary(record) })
+      return
+    }
+
+    const linkedDocument = record.documentId
+      ? (Array.isArray(tripData.documents) ? tripData.documents : []).find((entry: any) => entry.id === record.documentId)
+      : null
+
+    const confirmed = window.confirm(
+      linkedDocument
+        ? "Excluir este roteiro e o arquivo vinculado?"
+        : "Excluir este roteiro?"
+    )
+    if (!confirmed) return
+
+    let storageWarning: string | null = null
+    if (linkedDocument?.filePath) {
+      const storageResult = await deleteDocumentFile(linkedDocument.filePath)
+      if (!storageResult.success) {
+        console.error("[ITINERARY] storage delete error", storageResult.error)
+        storageWarning = storageResult.error || "Nao foi possivel remover o arquivo do storage."
+      }
+    }
+
+    const itineraryResult = await deleteTripItinerary(record.id)
+    if (!itineraryResult.success) {
+      console.error("[ITINERARY] delete error", itineraryResult.error)
+      showToast(resolveProtectedWriteError(itineraryResult.error || "Nao foi possivel excluir o roteiro."), "error")
+      return
+    }
+
+    if (linkedDocument?.id) {
+      const documentResult = await deleteDocument(linkedDocument.id)
+      if (!documentResult.success) {
+        console.error("[ITINERARY] linked document delete error", documentResult.error)
+        showToast(resolveProtectedWriteError(documentResult.error || "O roteiro foi removido, mas o documento vinculado nao foi excluido."), "error")
+        return
+      }
+    }
+
+    setTripItineraryRecords((prev) => prev.filter((entry) => entry.id !== record.id))
+    setTripData((prev) => ({
+      ...prev,
+      itinerary: record.mode === "simple" ? [] : prev.itinerary,
+      documents: linkedDocument?.id
+        ? (Array.isArray(prev.documents) ? prev.documents : []).filter((entry: any) => entry.id !== linkedDocument.id)
+        : prev.documents,
+    }))
+
+    showToast(storageWarning ? `Roteiro excluido. Aviso do storage: ${storageWarning}` : "Roteiro excluido com sucesso.", storageWarning ? "info" : "success")
   }
 
   const handleAddDocument = (data: any) => {
@@ -4612,7 +5101,19 @@ export default function TripPage() {
           <QuickAccessCards tripData={tripData} onNavigate={handleNavigate} />
   <FlightsSection tripData={tripData} onUpdateFlight={handleUpdateFlight} onAddFlight={handleAddFlight} onDeleteFlight={handleDeleteFlight} onDeleteDocument={handleDeleteDocument} tripId={tripData.id} ownerUserId={tripOwnerUserId} agencyId={profile?.agencyId ?? null} ensureSensitiveAccess={ensureSensitiveAccess} />
   <HotelSection tripData={tripData} onSaveHotel={handleSaveHotel} onDeleteHotel={handleDeleteHotel} />
-  <ItinerarySection tripData={tripData} onUpdateItinerary={handleUpdateItinerary} />
+  <ItinerarySection
+    tripData={tripData}
+    itineraryRecords={tripItineraryRecords}
+    tripId={tripData.id}
+    ownerUserId={tripOwnerUserId}
+    agencyId={profile?.agencyId ?? null}
+    ensureSensitiveAccess={ensureSensitiveAccess}
+    onUpdateItinerary={handleUpdateItinerary}
+    onGenerateSimple={() => handleGenerateItinerary("simple")}
+    onGenerateComplete={() => handleGenerateItinerary("complete_pdf")}
+    onSaveUploadedItinerary={handleSaveUploadedItinerary}
+    onDeleteItinerary={handleDeleteItinerary}
+  />
   <DocumentsSection tripData={tripData} onAddDocument={handleAddDocument} onDeleteDocument={handleDeleteDocument} tripId={tripData.id} ownerUserId={tripOwnerUserId} agencyId={profile?.agencyId ?? null} ensureSensitiveAccess={ensureSensitiveAccess} />
   <ConciergeSection tripData={tripData} onOpenCredits={() => setCreditsOpen(true)} />
           <OfflineSection tripData={tripData} />

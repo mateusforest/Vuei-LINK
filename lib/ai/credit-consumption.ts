@@ -8,6 +8,14 @@ export function getTicketExtractionCreditCost() {
   return getAiCreditCost("ticket_reading")
 }
 
+export function getSimpleItineraryCreditCost() {
+  return getAiCreditCost("itinerary_generation_simple")
+}
+
+export function getCompleteItineraryCreditCost() {
+  return getAiCreditCost("itinerary_generation_complete")
+}
+
 export function estimateCostUsd(inputTokens: number, outputTokens: number) {
   const inputRate = Number(process.env.OPENAI_PRICE_INPUT_PER_1M_USD ?? "")
   const outputRate = Number(process.env.OPENAI_PRICE_OUTPUT_PER_1M_USD ?? "")

@@ -360,6 +360,45 @@ export interface Database {
           updated_at?: string
         }
       }
+      trip_itineraries: {
+        Row: {
+          id: string
+          trip_id: string
+          document_id: string | null
+          title: string
+          mode: "simple" | "complete_pdf" | "uploaded"
+          status: "draft" | "generating" | "completed" | "failed" | "uploaded"
+          content: Json
+          pdf_url: string | null
+          created_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          trip_id: string
+          document_id?: string | null
+          title: string
+          mode: "simple" | "complete_pdf" | "uploaded"
+          status?: "draft" | "generating" | "completed" | "failed" | "uploaded"
+          content?: Json
+          pdf_url?: string | null
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          trip_id?: string
+          document_id?: string | null
+          title?: string
+          mode?: "simple" | "complete_pdf" | "uploaded"
+          status?: "draft" | "generating" | "completed" | "failed" | "uploaded"
+          content?: Json
+          pdf_url?: string | null
+          created_by?: string | null
+          updated_at?: string
+        }
+      }
       credit_transactions: {
         Row: {
           id: string
