@@ -627,136 +627,141 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
 
     const perf = startPerfMeasure("agency.workspace")
 
-    const agencyResult = profile?.agencyId ? await getAgencyById(profile.agencyId) : await getAgencyByOwner(user.id)
-    const resolvedAgency = agencyResult.data
+    try {
+      const agencyResult = profile?.agencyId ? await getAgencyById(profile.agencyId) : await getAgencyByOwner(user.id)
+      const resolvedAgency = agencyResult.data
 
-    if (!resolvedAgency) {
-      setAgency(null)
-      setAgencyId(null)
-      setSetupIncomplete(profile?.role === "agency_owner")
-      setWorkspaceError(
-        profile?.role === "agency_owner"
-          ? "Sua conta de agencia foi criada, mas a agencia ainda nao foi persistida corretamente no Supabase."
-          : agencyResult.error ?? null
+      if (!resolvedAgency) {
+        setAgency(null)
+        setAgencyId(null)
+        setSetupIncomplete(profile?.role === "agency_owner")
+        setWorkspaceError(
+          profile?.role === "agency_owner"
+            ? "Sua conta de agencia foi criada, mas a agencia ainda nao foi persistida corretamente no Supabase."
+            : agencyResult.error ?? null
+        )
+        setClients([])
+        setTrips([])
+        setDocuments([])
+        setConciergeRequests([])
+        setTeamMembers([])
+        setActivities([])
+        setCredits({
+          balance: 0,
+          plan: "starter",
+          history: [],
+          ...buildCanonicalCredits(0, []),
+        })
+        setIsLoaded(true)
+        return
+      }
+
+      if (profile?.agencyId !== resolvedAgency.id && profile?.id) {
+        const profileUpdate = await updateProfileRecord(profile.id, {
+          agencyId: resolvedAgency.id,
+          role: profile.role === "agency_member" ? "agency_member" : "agency_owner",
+        })
+
+        if (!profileUpdate.data && profileUpdate.error) {
+          console.error("[AUTH ERROR]", profileUpdate.error)
+        }
+      }
+
+      lastWorkspaceKeyRef.current = workspaceKey
+
+      const [clientsResult, tripsResult, documentsResult, membersResult] = await Promise.all([
+        listClients(resolvedAgency.id),
+        listTripsByAgency(resolvedAgency.id),
+        listDocuments({ agencyId: resolvedAgency.id }),
+        listAgencyMembers(resolvedAgency.id),
+      ])
+
+      const mappedClients: Client[] = (clientsResult.data ?? []).map((client) => ({
+        id: client.id,
+        name: client.name,
+        email: client.email ?? "",
+        phone: client.phone ?? "",
+        document: client.document ?? undefined,
+        notes: client.notes ?? undefined,
+        status: client.status === "inactive" ? "inactive" : "active",
+        createdAt: client.createdAt,
+        updatedAt: client.updatedAt,
+      }))
+
+      const tripClientNameMap = new Map(mappedClients.map((client) => [client.id, client.name]))
+      const canonicalTrips = tripsResult.data ?? []
+      const mappedTrips = canonicalTrips.map((trip) =>
+        mapCanonicalTripToAgencyTrip(trip, trip.clientId ? tripClientNameMap.get(trip.clientId) ?? "" : "")
       )
-      setClients([])
-      setTrips([])
-      setDocuments([])
-      setConciergeRequests([])
-      setTeamMembers([])
+
+      const mappedDocuments: AgencyDocument[] = (documentsResult.data ?? []).map(mapDocumentRecordToAgencyDocument)
+      const mappedTeamMembers: TeamMember[] = (membersResult.data ?? []).map((member) => ({
+        id: member.id,
+        profileId: member.profileId,
+        name: member.name || member.email || "Membro sem nome",
+        email: member.email || "",
+        role:
+          member.role === "owner" || member.role === "admin" || member.role === "viewer"
+            ? member.role
+            : "agent",
+        status:
+          member.status === "inactive" || member.status === "pending"
+            ? member.status
+            : "active",
+        avatar: member.avatarUrl,
+        createdAt: member.createdAt,
+      }))
+
+      const history =
+        resolvedAgency.creditsBalance > 0
+          ? [{ action: "Saldo da agencia", amount: resolvedAgency.creditsBalance, date: new Date().toISOString(), source: "Supabase" }]
+          : []
+
+      const primaryWorkspaceError =
+        agencyResult.error ||
+        clientsResult.error ||
+        tripsResult.error ||
+        documentsResult.error ||
+        membersResult.error ||
+        null
+
+      setAgency(resolvedAgency)
+      setAgencyId(resolvedAgency.id)
+      setSetupIncomplete(false)
+      setWorkspaceError(primaryWorkspaceError)
+      setClients(mappedClients)
+      setTrips(mappedTrips)
+      setDocuments(mappedDocuments)
+      setTeamMembers(mappedTeamMembers)
       setActivities([])
       setCredits({
-        balance: 0,
-        plan: "starter",
-        history: [],
-        ...buildCanonicalCredits(0, []),
-      })
-      setIsLoaded(true)
-      setWorkspaceLoading(false)
-      return
-    }
-
-    if (profile?.agencyId !== resolvedAgency.id && profile?.id) {
-      const profileUpdate = await updateProfileRecord(profile.id, {
-        agencyId: resolvedAgency.id,
-        role: profile.role === "agency_member" ? "agency_member" : "agency_owner",
-      })
-
-      if (!profileUpdate.data && profileUpdate.error) {
-        console.error("[AUTH ERROR]", profileUpdate.error)
-      }
-    }
-
-    lastWorkspaceKeyRef.current = workspaceKey
-
-    const [clientsResult, tripsResult, documentsResult, membersResult] = await Promise.all([
-      listClients(resolvedAgency.id),
-      listTripsByAgency(resolvedAgency.id),
-      listDocuments({ agencyId: resolvedAgency.id }),
-      listAgencyMembers(resolvedAgency.id),
-    ])
-
-    const mappedClients: Client[] = (clientsResult.data ?? []).map((client) => ({
-      id: client.id,
-      name: client.name,
-      email: client.email ?? "",
-      phone: client.phone ?? "",
-      document: client.document ?? undefined,
-      notes: client.notes ?? undefined,
-      status: client.status === "inactive" ? "inactive" : "active",
-      createdAt: client.createdAt,
-      updatedAt: client.updatedAt,
-    }))
-
-    const tripClientNameMap = new Map(mappedClients.map((client) => [client.id, client.name]))
-    const canonicalTrips = tripsResult.data ?? []
-    const mappedTrips = canonicalTrips.map((trip) =>
-      mapCanonicalTripToAgencyTrip(trip, trip.clientId ? tripClientNameMap.get(trip.clientId) ?? "" : "")
-    )
-
-    const mappedDocuments: AgencyDocument[] = (documentsResult.data ?? []).map(mapDocumentRecordToAgencyDocument)
-    const mappedTeamMembers: TeamMember[] = (membersResult.data ?? []).map((member) => ({
-      id: member.id,
-      profileId: member.profileId,
-      name: member.name || member.email || "Membro sem nome",
-      email: member.email || "",
-      role:
-        member.role === "owner" || member.role === "admin" || member.role === "viewer"
-          ? member.role
-          : "agent",
-      status:
-        member.status === "inactive" || member.status === "pending"
-          ? member.status
-          : "active",
-      avatar: member.avatarUrl,
-      createdAt: member.createdAt,
-    }))
-
-    const history =
-      resolvedAgency.creditsBalance > 0
-        ? [{ action: "Saldo da agencia", amount: resolvedAgency.creditsBalance, date: new Date().toISOString(), source: "Supabase" }]
-        : []
-
-    setAgency(resolvedAgency)
-    setAgencyId(resolvedAgency.id)
-    setSetupIncomplete(false)
-    setWorkspaceError(
-      agencyResult.error || clientsResult.error || tripsResult.error || documentsResult.error || membersResult.error || conversationsResult.error || messagesResult.error || null
-    )
-    setClients(mappedClients)
-    setTrips(mappedTrips)
-    setDocuments(mappedDocuments)
-    setTeamMembers(mappedTeamMembers)
-    setActivities([])
-    setCredits({
-      balance: resolvedAgency.creditsBalance,
-      plan: resolvedAgency.plan === "pro" ? "professional" : resolvedAgency.plan,
-      history,
-      ...buildCanonicalCredits(resolvedAgency.creditsBalance, history),
-    })
-
-    persistWorkspaceCache(workspaceKey, {
-      agency: resolvedAgency,
-      agencyId: resolvedAgency.id,
-      clients: mappedClients,
-      trips: mappedTrips,
-      documents: mappedDocuments,
-      conciergeRequests: [],
-      teamMembers: mappedTeamMembers,
-      credits: {
         balance: resolvedAgency.creditsBalance,
         plan: resolvedAgency.plan === "pro" ? "professional" : resolvedAgency.plan,
         history,
         ...buildCanonicalCredits(resolvedAgency.creditsBalance, history),
-      },
-      workspaceError: agencyResult.error || clientsResult.error || tripsResult.error || documentsResult.error || membersResult.error || null,
-    })
+      })
 
-    setIsLoaded(true)
-    setWorkspaceLoading(false)
-    perf.end({ agencyId: resolvedAgency.id })
+      persistWorkspaceCache(workspaceKey, {
+        agency: resolvedAgency,
+        agencyId: resolvedAgency.id,
+        clients: mappedClients,
+        trips: mappedTrips,
+        documents: mappedDocuments,
+        conciergeRequests: [],
+        teamMembers: mappedTeamMembers,
+        credits: {
+          balance: resolvedAgency.creditsBalance,
+          plan: resolvedAgency.plan === "pro" ? "professional" : resolvedAgency.plan,
+          history,
+          ...buildCanonicalCredits(resolvedAgency.creditsBalance, history),
+        },
+        workspaceError: primaryWorkspaceError,
+      })
 
-    void (async () => {
+      setIsLoaded(true)
+      perf.end({ agencyId: resolvedAgency.id })
+
+      void (async () => {
       const conciergePerf = startPerfMeasure("agency.concierge")
       const conversationsResult = await listConversations({
         agencyId: resolvedAgency.id,
@@ -829,6 +834,14 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
     })().catch((error) => {
       console.error("[AGENCY] concierge refresh error", error)
     })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Nao foi possivel carregar o workspace da agencia."
+      console.error("[AGENCY] workspace refresh error", message)
+      setWorkspaceError(message)
+      setIsLoaded(true)
+    } finally {
+      setWorkspaceLoading(false)
+    }
   }, [hydrateWorkspaceCache, isUsingRealData, persistWorkspaceCache, profile?.agencyId, profile?.id, profile?.role, user?.id])
 
   useEffect(() => {
