@@ -62,7 +62,8 @@ export function mapLegacyClientToClient(client: LegacyAgencyClient, agencyId: st
 export function mapAgencySettingsToAgency(
   agencyData: LegacyAgencySettings,
   notifications: LegacyAgencyNotifications,
-  creditsBalance: number
+  creditsBalance: number,
+  brandingLinkLogo: string | null = null,
 ): Agency {
   const now = new Date().toISOString()
   const name = agencyData.name || "Agencia Vuei"
@@ -97,7 +98,8 @@ export function mapAgencySettingsToAgency(
       twoFactorEnabled: false,
     },
     branding: {
-      logoUrl: agencyData.logo || null,
+      logoUrl: null,
+      linkLogoUrl: brandingLinkLogo,
     },
     createdAt: now,
     updatedAt: now,

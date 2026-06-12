@@ -81,7 +81,8 @@ export default function SettingsPage() {
   const [showPhotoModal, setShowPhotoModal] = useState(false)
   const [showPasswordModal, setShowPasswordModal] = useState(false)
   const [showPlanModal, setShowPlanModal] = useState(false)
-  const [photoFile, setPhotoFile] = useState<File | null>(null)
+  const [agencyLogoFile, setAgencyLogoFile] = useState<File | null>(null)
+  const [brandingLogoFile, setBrandingLogoFile] = useState<File | null>(null)
 
   const [agencyData, setAgencyData] = useState({
     name: "Agencia Viaje+",
@@ -91,6 +92,9 @@ export default function SettingsPage() {
     address: "Av. Paulista, 1000 - Sao Paulo, SP",
     logo: "",
     plan: "Pro",
+  })
+  const [brandingData, setBrandingData] = useState({
+    linkLogo: "",
   })
 
   const [notifications, setNotifications] = useState({
@@ -120,6 +124,9 @@ export default function SettingsPage() {
           logo: agency.logo || prev.logo,
           plan: agency.plan ? agency.plan[0].toUpperCase() + agency.plan.slice(1) : prev.plan,
         }))
+        setBrandingData({
+          linkLogo: agency.branding?.linkLogoUrl || "",
+        })
       }
 
       if (agency?.settings?.notifications) {
@@ -140,6 +147,7 @@ export default function SettingsPage() {
     try {
       const parsed = JSON.parse(savedState)
       if (parsed.agencyData) setAgencyData(parsed.agencyData)
+      if (parsed.brandingData) setBrandingData(parsed.brandingData)
       if (parsed.notifications) setNotifications(parsed.notifications)
     } catch {
       // fallback silencioso
@@ -149,8 +157,8 @@ export default function SettingsPage() {
   useEffect(() => {
     if (typeof window === "undefined") return
     if (shouldUseSupabase() && user?.id) return
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ agencyData, notifications }))
-  }, [agencyData, notifications, user?.id])
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ agencyData, brandingData, notifications }))
+  }, [agencyData, brandingData, notifications, user?.id])
 
   const showToast = (message: string) => {
     setToastMessage(message)
@@ -169,7 +177,7 @@ export default function SettingsPage() {
 
       let nextLogo = agencyData.logo
 
-      if (photoFile) {
+      if (agencyLogoFile) {
         const client = createSupabaseBrowserClient()
         if (!client) {
           setSaving(false)
@@ -177,9 +185,9 @@ export default function SettingsPage() {
           return
         }
 
-        const extension = photoFile.name.split(".").pop()?.toLowerCase() || "png"
-        const filePath = `${user.id}/agency/${agency.id}/logo-${Date.now()}.${extension}`
-        const uploadResult = await client.storage.from("vuei-avatars").upload(filePath, photoFile, {
+        const extension = agencyLogoFile.name.split(".").pop()?.toLowerCase() || "png"
+        const filePath = `${user.id}/agency/${agency.id}/agency-logo-${Date.now()}.${extension}`
+        const uploadResult = await client.storage.from("vuei-avatars").upload(filePath, agencyLogoFile, {
           cacheControl: "3600",
           upsert: true,
         })
@@ -216,10 +224,6 @@ export default function SettingsPage() {
           address: agencyData.address,
           notifications,
         },
-        branding: {
-          ...(agency.branding ?? { logoUrl: null }),
-          logoUrl: nextLogo || null,
-        },
       })
 
       if (!updateResult.data) {
@@ -229,7 +233,7 @@ export default function SettingsPage() {
       }
 
       setAgencyData((prev) => ({ ...prev, logo: nextLogo }))
-      setPhotoFile(null)
+      setAgencyLogoFile(null)
       await refreshAgencyWorkspace()
     } else {
       await new Promise((resolve) => setTimeout(resolve, 700))
@@ -241,9 +245,9 @@ export default function SettingsPage() {
     setTimeout(() => setSaved(false), 1500)
   }
 
-  const handleLogoSelected = (file?: File) => {
+  const handleAgencyLogoSelected = (file?: File) => {
     if (!file) return
-    setPhotoFile(file)
+    setAgencyLogoFile(file)
 
     const reader = new FileReader()
     reader.onload = () => {
@@ -253,6 +257,86 @@ export default function SettingsPage() {
       }))
     }
     reader.readAsDataURL(file)
+  }
+
+  const handleBrandingLogoSelected = (file?: File) => {
+    if (!file) return
+    setBrandingLogoFile(file)
+
+    const reader = new FileReader()
+    reader.onload = () => {
+      setBrandingData((prev) => ({
+        ...prev,
+        linkLogo: typeof reader.result === "string" ? reader.result : prev.linkLogo,
+      }))
+    }
+    reader.readAsDataURL(file)
+  }
+
+  const handleSaveBranding = async () => {
+    setSaving(true)
+
+    if (shouldUseSupabase() && user?.id) {
+      if (!agency) {
+        setSaving(false)
+        showToast("Agencia nao encontrada no Supabase.")
+        return
+      }
+
+      let nextLinkLogo = brandingData.linkLogo
+
+      if (brandingLogoFile) {
+        const client = createSupabaseBrowserClient()
+        if (!client) {
+          setSaving(false)
+          showToast("Cliente Supabase indisponivel para upload da logo.")
+          return
+        }
+
+        const extension = brandingLogoFile.name.split(".").pop()?.toLowerCase() || "png"
+        const filePath = `${user.id}/agency/${agency.id}/link-logo-${Date.now()}.${extension}`
+        const uploadResult = await client.storage.from("vuei-avatars").upload(filePath, brandingLogoFile, {
+          cacheControl: "3600",
+          upsert: true,
+        })
+
+        if (uploadResult.error) {
+          setSaving(false)
+          showToast(
+            uploadResult.error.message.includes("Bucket not found")
+              ? "Bucket 'vuei-avatars' nao existe. Rode o SQL de configuracao antes de salvar a logo."
+              : uploadResult.error.message
+          )
+          return
+        }
+
+        nextLinkLogo = client.storage.from("vuei-avatars").getPublicUrl(filePath).data.publicUrl
+      }
+
+      const updateResult = await updateAgencyRepository(agency.id, {
+        branding: {
+          ...(agency.branding ?? { logoUrl: null }),
+          linkLogoUrl: nextLinkLogo || null,
+        },
+      })
+
+      if (!updateResult.data) {
+        setSaving(false)
+        showToast(updateResult.error || "Nao foi possivel salvar a agencia no Supabase.")
+        return
+      }
+
+      setBrandingData({ linkLogo: nextLinkLogo || "" })
+      setBrandingLogoFile(null)
+      await refreshAgencyWorkspace()
+    } else {
+      await new Promise((resolve) => setTimeout(resolve, 700))
+    }
+
+    setSaving(false)
+    setSaved(true)
+    showToast("Logo da agencia salva com sucesso.")
+    setTimeout(() => setSaved(false), 1500)
   }
 
   const handleSavePassword = () => {
@@ -329,7 +413,7 @@ export default function SettingsPage() {
                   <div className="flex items-center gap-4">
                     <div className="relative">
                       <Avatar className="h-20 w-20 border-2 border-white/10">
-                        <AvatarImage src={agencyData.logo || "/placeholder.svg"} />
+                        <AvatarImage src={agencyData.logo || "/placeholder-logo.svg"} />
                         <AvatarFallback className="bg-primary/20 text-xl text-primary">V+</AvatarFallback>
                       </Avatar>
                       <Button
@@ -409,19 +493,19 @@ export default function SettingsPage() {
                   <div className="rounded-xl border border-white/5 bg-white/[0.02] p-4">
                     <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
                       <div className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-muted/20">
-                        {agencyData.logo ? (
-                          <img src={agencyData.logo} alt="Logo da agencia" className="h-full w-full object-cover" />
+                        {brandingData.linkLogo ? (
+                          <img src={brandingData.linkLogo} alt="Logo da agencia" className="h-full w-full object-cover" />
                         ) : (
                           <Upload className="h-6 w-6 text-muted-foreground" />
                         )}
                       </div>
                       <div className="flex-1">
                         <Label className="text-muted-foreground">Logo da agencia</Label>
-                        <Input type="file" accept="image/*" onChange={(e) => handleLogoSelected(e.target.files?.[0])} className="mt-1.5 border-white/10 bg-white/5" />
+                        <Input type="file" accept="image/*" onChange={(e) => handleBrandingLogoSelected(e.target.files?.[0])} className="mt-1.5 border-white/10 bg-white/5" />
                       </div>
                     </div>
                   </div>
-                  <Button className="gap-2 bg-gradient-to-r from-primary to-accent text-white" onClick={() => handleSave("Logo da agencia salva com sucesso.")} disabled={saving || (shouldUseSupabase() && !agency)}>
+                  <Button className="gap-2 bg-gradient-to-r from-primary to-accent text-white" onClick={() => void handleSaveBranding()} disabled={saving || (shouldUseSupabase() && !agency)}>
                     <Save className="h-4 w-4" />
                     Salvar Branding
                   </Button>
@@ -566,7 +650,7 @@ export default function SettingsPage() {
                 )}
               </div>
             </div>
-            <Input type="file" accept="image/*" onChange={(e) => handleLogoSelected(e.target.files?.[0])} className="border-white/10 bg-white/5" />
+            <Input type="file" accept="image/*" onChange={(e) => handleAgencyLogoSelected(e.target.files?.[0])} className="border-white/10 bg-white/5" />
             <div className="flex gap-3">
               <Button variant="outline" className="flex-1 border-white/10" onClick={() => setShowPhotoModal(false)}>
                 Cancelar

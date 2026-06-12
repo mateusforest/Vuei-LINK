@@ -41,6 +41,9 @@ interface AgencyConfigState {
     logo?: string
     plan?: string
   }
+  brandingData?: {
+    linkLogo?: string
+  }
   notifications?: {
     concierge?: boolean
     trips?: boolean
@@ -76,7 +79,7 @@ function buildAgency() {
   const workspace = readAgencyWorkspace()
   const creditsBalance = typeof workspace?.credits?.balance === "number" ? workspace.credits.balance : 0
 
-  return mapAgencySettingsToAgency(config.agencyData ?? {}, config.notifications ?? {}, creditsBalance)
+  return mapAgencySettingsToAgency(config.agencyData ?? {}, config.notifications ?? {}, creditsBalance, config.brandingData?.linkLogo ?? null)
 }
 
 function buildAgencyMembers(agencyId: string): AgencyMember[] {
@@ -134,7 +137,7 @@ function mapAgencyRowToAgency(row: Database["public"]["Tables"]["agencies"]["Row
       twoFactorEnabled: typeof settings.twoFactorEnabled === "boolean" ? settings.twoFactorEnabled : false,
     },
     branding: {
-      logoUrl: row.logo_url,
+      logoUrl: typeof branding.logoUrl === "string" ? branding.logoUrl : null,
       linkLogoUrl: typeof branding.linkLogoUrl === "string" ? branding.linkLogoUrl : null,
     },
     createdAt: row.created_at,
@@ -405,8 +408,12 @@ export async function updateAgency(id: string, payload: Partial<Agency>) {
       phone: payload.settings?.phone ?? config.agencyData?.phone,
       cnpj: payload.settings?.cnpj ?? config.agencyData?.cnpj,
       address: payload.settings?.address ?? config.agencyData?.address,
-      logo: payload.logo ?? payload.branding?.logoUrl ?? config.agencyData?.logo,
+      logo: payload.logo ?? config.agencyData?.logo,
       plan: payload.plan ?? config.agencyData?.plan,
+    },
+    brandingData: {
+      ...config.brandingData,
+      linkLogo: payload.branding?.linkLogoUrl ?? config.brandingData?.linkLogo,
     },
   }
 
