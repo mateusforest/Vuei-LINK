@@ -782,20 +782,31 @@ function TripHeader({
     >
       <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="rounded-2xl border border-white/10 bg-white/92 px-3 py-2 shadow-[0_16px_48px_rgba(0,0,0,0.2)] backdrop-blur">
-            <div className="flex flex-col gap-0.5">
-              <Image
-                src={agencyBranding.logoUrl || "/vuei-logo.png"}
-                alt={agencyBranding.name || "Vuei"}
-                width={144}
-                height={48}
-                className="h-7 w-auto max-w-[120px] object-contain sm:h-8 sm:max-w-[150px]"
-              />
-              <span className="text-[9px] uppercase tracking-[0.16em] text-black/40">
-                {agencyBranding.isAgency ? "Powered by Vuei" : "Vuei"}
-              </span>
+          {agencyBranding.isAgency ? (
+            <div className="rounded-2xl border border-white/10 bg-white/92 px-3 py-2 shadow-[0_16px_48px_rgba(0,0,0,0.2)] backdrop-blur">
+              <div className="flex flex-col gap-0.5">
+                <Image
+                  src={agencyBranding.logoUrl || "/vuei-logo.png"}
+                  alt={agencyBranding.name || "Vuei"}
+                  width={144}
+                  height={48}
+                  className="h-7 w-auto max-w-[120px] object-contain sm:h-8 sm:max-w-[150px]"
+                />
+                <span className="text-[9px] uppercase tracking-[0.16em] text-black/40">
+                  Powered by Vuei
+                </span>
+              </div>
             </div>
-          </div>
+          ) : (
+            <Image
+              src="/vuei-logo.png"
+              alt="Vuei"
+              width={176}
+              height={64}
+              className="h-9 w-auto max-w-[148px] object-contain sm:h-10 sm:max-w-[176px]"
+              priority
+            />
+          )}
           <div className={cn("hidden sm:flex items-center gap-2 transition-opacity duration-300", scrolled ? "opacity-100" : "opacity-0")}>
             <span className="text-white/40">|</span>
             <span className="text-white/80 font-medium">{tripData.destination}</span>
@@ -4276,18 +4287,28 @@ function TripFooter({ agencyBranding }: { agencyBranding: { name: string | null;
       <div className="max-w-6xl mx-auto">
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="flex flex-col gap-0.5">
+            {agencyBranding.isAgency ? (
+              <div className="flex flex-col gap-0.5">
+                <Image
+                  src={agencyBranding.logoUrl || "/vuei-logo.png"}
+                  alt={agencyBranding.name || "Vuei"}
+                  width={80}
+                  height={32}
+                  className="h-5 w-auto object-contain opacity-75"
+                />
+                <span className="text-[9px] uppercase tracking-[0.14em] text-white/30">
+                  Powered by Vuei
+                </span>
+              </div>
+            ) : (
               <Image
-                src={agencyBranding.logoUrl || "/vuei-logo.png"}
-                alt={agencyBranding.name || "Vuei"}
-                width={80}
-                height={32}
-                className="h-5 w-auto object-contain opacity-75"
+                src="/vuei-logo.png"
+                alt="Vuei"
+                width={104}
+                height={36}
+                className="h-6 w-auto object-contain opacity-80"
               />
-              <span className="text-[9px] uppercase tracking-[0.14em] text-white/30">
-                {agencyBranding.isAgency ? "Powered by Vuei" : "Vuei"}
-              </span>
-            </div>
+            )}
             <span className="text-sm text-white/30">{agencyBranding.name ? `${agencyBranding.name} no seu link inteligente` : "Sua viagem inteligente"}</span>
           </div>
           <div className="flex items-center gap-6">
