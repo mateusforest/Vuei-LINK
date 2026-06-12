@@ -2911,7 +2911,7 @@ function DocumentsSection({
           </div>
         ) : documents.length === 0 ? (
           <div className="rounded-3xl border border-white/[0.06] bg-white/[0.02] p-6 text-sm text-white/50">
-            Nenhum documento adicionado.
+            {isAdmin ? "Nenhum documento adicionado." : "Nenhum documento publico adicionado."}
           </div>
         ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-6">

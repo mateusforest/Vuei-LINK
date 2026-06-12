@@ -1,4 +1,4 @@
-const destinationCoverMap: Array<{
+type DestinationProfile = {
   matches: string[]
   image: string
   country: string
@@ -6,7 +6,9 @@ const destinationCoverMap: Array<{
   timezone: string
   currency: { name: string; symbol: string; rate: string }
   emergency: string
-}> = [
+}
+
+const destinationCoverMap: DestinationProfile[] = [
   {
     matches: ["new york", "nova york", "orlando", "eua", "usa", "estados unidos"],
     image: "https://images.unsplash.com/photo-1496442226666-8d4d0e62e6e9?w=1920&q=80",
@@ -122,12 +124,33 @@ function resolveDestinationEntry(destination?: string | null, city?: string | nu
   return destinationCoverMap.find((entry) => entry.matches.some((match) => target.includes(normalizeText(match)))) ?? null
 }
 
+function resolveCountryEntry(country?: string | null) {
+  const normalizedCountry = normalizeText(country)
+  if (!normalizedCountry) return null
+
+  return (
+    destinationCoverMap.find((entry) => normalizeText(entry.country) === normalizedCountry) ??
+    destinationCoverMap.find((entry) => entry.matches.some((match) => normalizeText(match) === normalizedCountry)) ??
+    null
+  )
+}
+
+function buildEmbassyFallback(country?: string | null) {
+  const normalizedCountry = normalizeText(country)
+  if (!normalizedCountry) return "Nao informado"
+  if (normalizedCountry === "brasil" || normalizedCountry === "brazil") {
+    return "Nao se aplica para viagens nacionais."
+  }
+
+  return `Consulado/embaixada brasileira em ${country}`
+}
+
 export function getDestinationCoverImage(destination?: string | null, city?: string | null, country?: string | null) {
   return resolveDestinationEntry(destination, city, country)?.image ?? neutralCover
 }
 
 export function getDestinationMetadata(destination?: string | null, country?: string | null, city?: string | null) {
-  const entry = resolveDestinationEntry(destination, city, country)
+  const entry = resolveDestinationEntry(destination, city, country) ?? resolveCountryEntry(country)
 
   const resolvedCountry = country?.trim() || entry?.country || "Nao informado"
 
@@ -136,7 +159,7 @@ export function getDestinationMetadata(destination?: string | null, country?: st
     language: entry?.language ?? "Nao informado",
     timezone: entry?.timezone ?? "Nao informado",
     emergency: entry?.emergency ?? "Nao informado",
-    embassy: resolvedCountry !== "Nao informado" ? `Consulado/embaixada brasileira em ${resolvedCountry}` : "Nao informado",
+    embassy: buildEmbassyFallback(resolvedCountry !== "Nao informado" ? resolvedCountry : null),
     country: resolvedCountry,
   }
 }

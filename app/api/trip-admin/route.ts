@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createSupabaseAdminClient } from "@/lib/supabase/admin"
+import { createSupabaseAdminClient, hasSupabaseAdminEnv, isMissingSupabaseAdminEnvError } from "@/lib/supabase/admin"
 import type { Database } from "@/lib/supabase/types"
 
 export const runtime = "nodejs"
@@ -132,6 +132,13 @@ async function resolveTripAdminAccess(params: {
   return { supabase, trip, error: null as string | null }
 }
 
+function getMissingAdminConfigResponse() {
+  return NextResponse.json(
+    { error: "A configuracao administrativa do servidor nao esta disponivel no momento." },
+    { status: 503 },
+  )
+}
+
 async function uploadToStorage(supabase: ReturnType<typeof createSupabaseAdminClient>, file: File, path: string) {
   const arrayBuffer = await file.arrayBuffer()
   const buffer = Buffer.from(arrayBuffer)
@@ -158,6 +165,18 @@ async function deleteStoragePath(supabase: ReturnType<typeof createSupabaseAdmin
 
 export async function GET(request: NextRequest) {
   try {
+    if (!hasSupabaseAdminEnv()) {
+      console.error("[TRIP ADMIN] missing admin env", {
+        hasPublicSupabaseUrl: Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL),
+        hasServiceRoleKey: Boolean(
+          process.env.SUPABASE_SERVICE_ROLE_KEY ||
+          process.env.SUPABASE_SERVICE_KEY ||
+          process.env.SUPABASE_SECRET_KEY,
+        ),
+      })
+      return getMissingAdminConfigResponse()
+    }
+
     const url = new URL(request.url)
     const tripId = url.searchParams.get("tripId")
     const tripSlug = url.searchParams.get("tripSlug")
@@ -192,6 +211,11 @@ export async function GET(request: NextRequest) {
       itineraries: (itinerariesResult.data ?? []).map((row) => mapItineraryRow(row as ItineraryRow)),
     })
   } catch (error) {
+    if (isMissingSupabaseAdminEnvError(error)) {
+      console.error("[TRIP ADMIN] get error", error)
+      return getMissingAdminConfigResponse()
+    }
+
     const message = error instanceof Error ? error.message : "Nao foi possivel carregar os dados administrativos da viagem."
     console.error("[TRIP ADMIN] get error", message)
     return NextResponse.json({ error: message }, { status: 500 })
@@ -200,6 +224,18 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    if (!hasSupabaseAdminEnv()) {
+      console.error("[TRIP ADMIN] missing admin env", {
+        hasPublicSupabaseUrl: Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL),
+        hasServiceRoleKey: Boolean(
+          process.env.SUPABASE_SERVICE_ROLE_KEY ||
+          process.env.SUPABASE_SERVICE_KEY ||
+          process.env.SUPABASE_SECRET_KEY,
+        ),
+      })
+      return getMissingAdminConfigResponse()
+    }
+
     const contentType = request.headers.get("content-type") ?? ""
 
     if (contentType.includes("multipart/form-data")) {
@@ -531,6 +567,11 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ error: "Acao administrativa invalida." }, { status: 400 })
   } catch (error) {
+    if (isMissingSupabaseAdminEnvError(error)) {
+      console.error("[TRIP ADMIN] post error", error)
+      return getMissingAdminConfigResponse()
+    }
+
     const message = error instanceof Error ? error.message : "Nao foi possivel concluir esta acao administrativa."
     console.error("[TRIP ADMIN] post error", message)
     return NextResponse.json({ error: message }, { status: 500 })

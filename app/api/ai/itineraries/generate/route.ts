@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import { shouldUseSupabase } from "@/lib/data-source"
 import { createSupabaseServerClient } from "@/lib/supabase/server"
-import { createSupabaseAdminClient } from "@/lib/supabase/admin"
+import { createSupabaseAdminClient, hasSupabaseAdminEnv } from "@/lib/supabase/admin"
 import type { Database } from "@/lib/supabase/types"
 import { requestItineraryGeneration } from "@/lib/ai/itinerary-generation"
 import { buildTripItineraryPdf } from "@/lib/ai/itinerary-pdf"
@@ -299,6 +299,25 @@ export async function POST(request: Request) {
   }
 
   const adminAccessRequested = Boolean(adminToken || tripSlug)
+  if (adminAccessRequested && !hasSupabaseAdminEnv()) {
+    console.error("[AI][ITINERARY] missing admin env", {
+      tripId,
+      tripSlug,
+      hasAdminToken: Boolean(adminToken),
+      hasPublicSupabaseUrl: Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL),
+      hasServiceRoleKey: Boolean(
+        process.env.SUPABASE_SERVICE_ROLE_KEY ||
+        process.env.SUPABASE_SERVICE_KEY ||
+        process.env.SUPABASE_SECRET_KEY,
+      ),
+    })
+
+    return NextResponse.json(
+      { error: "A configuracao administrativa do servidor nao esta disponivel no momento." },
+      { status: 503 },
+    )
+  }
+
   const supabase = adminAccessRequested ? createSupabaseAdminClient() : await createSupabaseServerClient()
   if (!supabase) {
     return NextResponse.json({ error: "Supabase server client indisponivel." }, { status: 503 })
