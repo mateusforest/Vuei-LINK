@@ -11,6 +11,7 @@ import type { Document } from "@/types/document"
 import type { TripItineraryRecord, TripItineraryContent } from "@/types/itinerary"
 
 export const runtime = "nodejs"
+export const maxDuration = 60
 
 type JsonObject = Record<string, unknown>
 type TripRow = Database["public"]["Tables"]["trips"]["Row"]

@@ -12,6 +12,15 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
+  serverExternalPackages: ["@sparticuz/chromium", "puppeteer-core"],
+  outputFileTracingIncludes: {
+    "/api/ai/itineraries/generate": [
+      "./node_modules/@sparticuz/chromium/bin/**",
+      "./node_modules/@sparticuz/chromium/build/**",
+      "./node_modules/.pnpm/@sparticuz+chromium@*/node_modules/@sparticuz/chromium/bin/**",
+      "./node_modules/.pnpm/@sparticuz+chromium@*/node_modules/@sparticuz/chromium/build/**",
+    ],
+  },
   turbopack: {
     root: __dirname,
   },

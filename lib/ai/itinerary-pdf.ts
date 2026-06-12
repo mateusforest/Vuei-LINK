@@ -1,8 +1,8 @@
 import { readFile } from "node:fs/promises"
 import path from "node:path"
-import chromium from "@sparticuz/chromium"
-import puppeteer from "puppeteer-core"
 import type { GeneratedItineraryContent, GeneratedItineraryDay, GeneratedItineraryActivity } from "@/lib/ai/itinerary-generation"
+type ChromiumRuntime = typeof import("@sparticuz/chromium")["default"]
+type PuppeteerRuntime = typeof import("puppeteer-core")["default"]
 
 interface TripPdfBranding {
   agencyName: string | null
@@ -85,6 +85,16 @@ const SOFT = "#eef7fb"
 function logItineraryPdfDev(stage: string, details?: Record<string, unknown>) {
   if (process.env.NODE_ENV !== "development") return
   console.log("[AI][ITINERARY][PDF]", stage, details ?? {})
+}
+
+async function loadPuppeteerRuntime(): Promise<PuppeteerRuntime> {
+  const module = await import("puppeteer-core")
+  return module.default
+}
+
+async function loadChromiumRuntime(): Promise<ChromiumRuntime> {
+  const module = await import("@sparticuz/chromium")
+  return module.default
 }
 
 function escapeHtml(value: string) {
@@ -662,7 +672,7 @@ function renderHtml(input: TripPdfInput, assets: { heroImage: string | null; age
   </html>`
 }
 
-async function resolveExecutablePath() {
+async function resolveExecutablePath(chromium: ChromiumRuntime | null) {
   const envExecutable = process.env.PUPPETEER_EXECUTABLE_PATH
   if (envExecutable) return envExecutable
 
@@ -684,6 +694,11 @@ async function resolveExecutablePath() {
     }
   }
 
+  if (!chromium) {
+    throw new Error("Chromium serverless indisponivel para este runtime.")
+  }
+
+  chromium.setGraphicsMode = false
   return chromium.executablePath()
 }
 
@@ -709,18 +724,29 @@ export async function buildTripItineraryPdf(input: TripPdfInput) {
     htmlLength: html.length,
   })
 
-  const executablePath = await resolveExecutablePath()
+  const puppeteer = await loadPuppeteerRuntime()
+  const chromium = process.platform === "win32" && !process.env.PUPPETEER_EXECUTABLE_PATH
+    ? null
+    : await loadChromiumRuntime()
+  const executablePath = await resolveExecutablePath(chromium)
+  const launchArgs =
+    process.platform === "win32"
+      ? ["--headless=new", "--disable-gpu", "--disable-crash-reporter", "--disable-features=Crashpad", "--no-first-run", "--allow-file-access-from-files"]
+      : await puppeteer.defaultArgs({
+          args: chromium?.args ?? [],
+          headless: "shell",
+        })
+
   logItineraryPdfDev("executable_resolved", {
     executablePath,
     platform: process.platform,
+    chromiumMode: chromium ? "serverless" : "local",
   })
 
   const browser = await puppeteer.launch({
     executablePath,
-    args: process.platform === "win32"
-      ? ["--headless=new", "--disable-gpu", "--disable-crash-reporter", "--disable-features=Crashpad", "--no-first-run", "--allow-file-access-from-files"]
-      : [...chromium.args, "--disable-gpu", "--no-sandbox"],
-    headless: true,
+    args: launchArgs,
+    headless: process.platform === "win32" ? true : "shell",
     defaultViewport: {
       width: 1440,
       height: 2048,
