@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { shouldUseSupabase } from "@/lib/data-source"
 import { createSupabaseServerClient } from "@/lib/supabase/server"
+import { createSupabaseAdminClient } from "@/lib/supabase/admin"
 import type { Database } from "@/lib/supabase/types"
 import { requestItineraryGeneration } from "@/lib/ai/itinerary-generation"
 import { buildTripItineraryPdf } from "@/lib/ai/itinerary-pdf"
@@ -78,6 +79,32 @@ function mapItineraryRowToRecord(row: TripItineraryRow): TripItineraryRecord {
 interface GenerateItineraryRequestBody {
   tripId?: string
   mode?: "simple" | "complete_pdf"
+  tripSlug?: string
+  adminToken?: string
+}
+
+async function getTripByAdminAccess(
+  client: ReturnType<typeof createSupabaseAdminClient>,
+  payload: { tripId: string; tripSlug?: string | null; adminToken?: string | null },
+) {
+  const { data, error } = await client.from("trips").select("*").eq("id", payload.tripId).maybeSingle()
+  if (error) {
+    return { trip: null as TripRow | null, membership: null as AgencyMemberRow | null, error: error.message }
+  }
+
+  const trip = data as TripRow | null
+  if (!trip) {
+    return { trip: null as TripRow | null, membership: null as AgencyMemberRow | null, error: "Viagem nao encontrada." }
+  }
+
+  const tokenMatches = Boolean(payload.adminToken && trip.admin_token === payload.adminToken)
+  const slugMatches = Boolean(payload.tripSlug && trip.slug === payload.tripSlug)
+
+  if (!tokenMatches && !slugMatches) {
+    return { trip: null as TripRow | null, membership: null as AgencyMemberRow | null, error: "Voce nao tem permissao para gerar roteiros desta viagem." }
+  }
+
+  return { trip, membership: null as AgencyMemberRow | null, error: null }
 }
 
 async function getProfile(client: NonNullable<Awaited<ReturnType<typeof createSupabaseServerClient>>>, userId: string) {
@@ -264,36 +291,50 @@ export async function POST(request: Request) {
   const body = (await request.json().catch(() => null)) as GenerateItineraryRequestBody | null
   const tripId = body?.tripId?.trim?.()
   const mode = body?.mode
+  const tripSlug = body?.tripSlug?.trim?.() ?? null
+  const adminToken = body?.adminToken?.trim?.() ?? null
 
   if (!tripId || (mode !== "simple" && mode !== "complete_pdf")) {
     return NextResponse.json({ error: "Trip e modo valido sao obrigatorios para gerar o roteiro." }, { status: 400 })
   }
 
-  const supabase = await createSupabaseServerClient()
+  const adminAccessRequested = Boolean(adminToken || tripSlug)
+  const supabase = adminAccessRequested ? createSupabaseAdminClient() : await createSupabaseServerClient()
   if (!supabase) {
     return NextResponse.json({ error: "Supabase server client indisponivel." }, { status: 503 })
   }
 
-  const { data: authData, error: authError } = await supabase.auth.getUser()
-  if (authError) {
-    return NextResponse.json({ error: authError.message }, { status: 401 })
-  }
-  if (!authData.user) {
-    return NextResponse.json({ error: "Entre para gerar roteiros reais desta viagem." }, { status: 401 })
-  }
+  let actingUserId: string | null = null
+  let accessResult: Awaited<ReturnType<typeof getAccessibleTrip>> | Awaited<ReturnType<typeof getTripByAdminAccess>>
 
-  const profileResult = await getProfile(supabase, authData.user.id)
-  if (!profileResult.data) {
-    return NextResponse.json({ error: profileResult.error ?? "Perfil do usuario nao encontrado." }, { status: 403 })
-  }
+  if (adminAccessRequested) {
+    accessResult = await getTripByAdminAccess(supabase, { tripId, tripSlug, adminToken })
+    actingUserId = accessResult.trip?.owner_user_id ?? null
+  } else {
+    const { data: authData, error: authError } = await supabase.auth.getUser()
+    if (authError) {
+      return NextResponse.json({ error: authError.message }, { status: 401 })
+    }
+    if (!authData.user) {
+      return NextResponse.json({ error: "Entre para gerar roteiros reais desta viagem." }, { status: 401 })
+    }
 
-  const accessResult = await getAccessibleTrip(supabase, authData.user.id, tripId, profileResult.data)
+    const profileResult = await getProfile(supabase, authData.user.id)
+    if (!profileResult.data) {
+      return NextResponse.json({ error: profileResult.error ?? "Perfil do usuario nao encontrado." }, { status: 403 })
+    }
+
+    accessResult = await getAccessibleTrip(supabase, authData.user.id, tripId, profileResult.data)
+    actingUserId = authData.user.id
+  }
   if (!accessResult.trip) {
     return NextResponse.json({ error: accessResult.error ?? "Viagem nao encontrada." }, { status: 403 })
   }
 
   const ownerType = accessResult.membership ? "agency" : "traveler"
-  const ownerId = ownerType === "agency" ? accessResult.trip.agency_id : authData.user.id
+  const ownerId = ownerType === "agency" ? accessResult.trip.agency_id : actingUserId
+  const actingOwnerUserId = actingUserId ?? accessResult.trip.owner_user_id ?? null
+  const fileOwnerKey = accessResult.trip.owner_user_id ?? accessResult.trip.agency_id ?? accessResult.trip.id
   if (!ownerId) {
     return NextResponse.json({ error: "Nao foi possivel identificar o responsavel pelos creditos desta geracao." }, { status: 400 })
   }
@@ -312,7 +353,7 @@ export async function POST(request: Request) {
     accessResult.trip.id,
     mode === "simple" ? `Roteiro simples • ${accessResult.trip.title}` : `Roteiro completo • ${accessResult.trip.title}`,
     mode,
-    authData.user.id,
+    actingUserId ?? accessResult.trip.owner_user_id ?? accessResult.trip.agency_id ?? accessResult.trip.id,
   )
 
   if (!generatingRecord.data) {
@@ -393,7 +434,7 @@ export async function POST(request: Request) {
     })
 
     await createAiUsageLog(supabase, {
-      ownerUserId: ownerType === "traveler" ? authData.user.id : null,
+      ownerUserId: ownerType === "traveler" ? actingOwnerUserId : null,
       agencyId: accessResult.trip.agency_id,
       tripId: accessResult.trip.id,
       feature: "itinerary_generation",
@@ -408,13 +449,13 @@ export async function POST(request: Request) {
 
     const failedCreditInsert = await registerItineraryCreditConsumption(supabase, {
       ownerType,
-      ownerUserId: authData.user.id,
+      ownerUserId: actingOwnerUserId,
       agencyId: accessResult.trip.agency_id,
       amount: creditCost,
       tripId: accessResult.trip.id,
       itineraryId: generatingRecord.data.id,
       mode,
-      createdBy: authData.user.id,
+      createdBy: actingOwnerUserId,
       failed: true,
     })
 
@@ -525,7 +566,7 @@ export async function POST(request: Request) {
       bytes: pdfBytes.byteLength,
     })
 
-    pdfPath = `${authData.user.id}/${accessResult.trip.id}/itineraries/${Date.now()}-roteiro-completo.pdf`
+    pdfPath = `${fileOwnerKey}/${accessResult.trip.id}/itineraries/${Date.now()}-roteiro-completo.pdf`
     const upload = await supabase.storage.from("vuei-documents").upload(pdfPath, pdfBytes, {
       contentType: "application/pdf",
       upsert: true,
@@ -547,7 +588,7 @@ export async function POST(request: Request) {
       })
 
       await createAiUsageLog(supabase, {
-        ownerUserId: ownerType === "traveler" ? authData.user.id : null,
+        ownerUserId: ownerType === "traveler" ? actingOwnerUserId : null,
         agencyId: accessResult.trip.agency_id,
         tripId: accessResult.trip.id,
         feature: "itinerary_generation",
@@ -565,13 +606,13 @@ export async function POST(request: Request) {
 
       const failedCreditInsert = await registerItineraryCreditConsumption(supabase, {
         ownerType,
-        ownerUserId: authData.user.id,
+        ownerUserId: actingOwnerUserId,
         agencyId: accessResult.trip.agency_id,
         amount: creditCost,
         tripId: accessResult.trip.id,
         itineraryId: generatingRecord.data.id,
         mode,
-        createdBy: authData.user.id,
+        createdBy: actingOwnerUserId,
         failed: true,
       })
 
@@ -598,7 +639,7 @@ export async function POST(request: Request) {
       })
 
       await createAiUsageLog(supabase, {
-        ownerUserId: ownerType === "traveler" ? authData.user.id : null,
+        ownerUserId: ownerType === "traveler" ? actingOwnerUserId : null,
         agencyId: accessResult.trip.agency_id,
         tripId: accessResult.trip.id,
         feature: "itinerary_generation",
@@ -616,13 +657,13 @@ export async function POST(request: Request) {
 
       const failedCreditInsert = await registerItineraryCreditConsumption(supabase, {
         ownerType,
-        ownerUserId: authData.user.id,
+        ownerUserId: actingOwnerUserId,
         agencyId: accessResult.trip.agency_id,
         amount: creditCost,
         tripId: accessResult.trip.id,
         itineraryId: generatingRecord.data.id,
         mode,
-        createdBy: authData.user.id,
+        createdBy: actingOwnerUserId,
         failed: true,
       })
 
@@ -670,7 +711,7 @@ export async function POST(request: Request) {
       })
 
       await createAiUsageLog(supabase, {
-        ownerUserId: ownerType === "traveler" ? authData.user.id : null,
+        ownerUserId: ownerType === "traveler" ? actingOwnerUserId : null,
         agencyId: accessResult.trip.agency_id,
         tripId: accessResult.trip.id,
         feature: "itinerary_generation",
@@ -688,13 +729,13 @@ export async function POST(request: Request) {
 
       const failedCreditInsert = await registerItineraryCreditConsumption(supabase, {
         ownerType,
-        ownerUserId: authData.user.id,
+        ownerUserId: actingOwnerUserId,
         agencyId: accessResult.trip.agency_id,
         amount: creditCost,
         tripId: accessResult.trip.id,
         itineraryId: generatingRecord.data.id,
         mode,
-        createdBy: authData.user.id,
+        createdBy: actingOwnerUserId,
         failed: true,
       })
 
@@ -723,7 +764,7 @@ export async function POST(request: Request) {
       })
 
       await createAiUsageLog(supabase, {
-        ownerUserId: ownerType === "traveler" ? authData.user.id : null,
+        ownerUserId: ownerType === "traveler" ? actingOwnerUserId : null,
         agencyId: accessResult.trip.agency_id,
         tripId: accessResult.trip.id,
         feature: "itinerary_generation",
@@ -741,13 +782,13 @@ export async function POST(request: Request) {
 
       const failedCreditInsert = await registerItineraryCreditConsumption(supabase, {
         ownerType,
-        ownerUserId: authData.user.id,
+        ownerUserId: actingOwnerUserId,
         agencyId: accessResult.trip.agency_id,
         amount: creditCost,
         tripId: accessResult.trip.id,
         itineraryId: generatingRecord.data.id,
         mode,
-        createdBy: authData.user.id,
+        createdBy: actingOwnerUserId,
         failed: true,
       })
 
@@ -769,7 +810,7 @@ export async function POST(request: Request) {
 
   if (!itineraryUpdate.data) {
     await createAiUsageLog(supabase, {
-      ownerUserId: ownerType === "traveler" ? authData.user.id : null,
+      ownerUserId: ownerType === "traveler" ? actingOwnerUserId : null,
       agencyId: accessResult.trip.agency_id,
       tripId: accessResult.trip.id,
       feature: "itinerary_generation",
@@ -787,13 +828,13 @@ export async function POST(request: Request) {
 
     const failedCreditInsert = await registerItineraryCreditConsumption(supabase, {
       ownerType,
-      ownerUserId: authData.user.id,
+      ownerUserId: actingOwnerUserId,
       agencyId: accessResult.trip.agency_id,
       amount: creditCost,
       tripId: accessResult.trip.id,
       itineraryId: generatingRecord.data.id,
       mode,
-      createdBy: authData.user.id,
+      createdBy: actingOwnerUserId,
       failed: true,
     })
 
@@ -812,7 +853,7 @@ export async function POST(request: Request) {
   })
 
   const usageInsert = await createAiUsageLog(supabase, {
-    ownerUserId: ownerType === "traveler" ? authData.user.id : null,
+    ownerUserId: ownerType === "traveler" ? actingOwnerUserId : null,
     agencyId: accessResult.trip.agency_id,
     tripId: accessResult.trip.id,
     feature: "itinerary_generation",
@@ -831,13 +872,13 @@ export async function POST(request: Request) {
 
   const creditInsert = await registerItineraryCreditConsumption(supabase, {
     ownerType,
-    ownerUserId: authData.user.id,
+    ownerUserId: actingOwnerUserId,
     agencyId: accessResult.trip.agency_id,
     amount: creditCost,
     tripId: accessResult.trip.id,
     itineraryId: itineraryUpdate.data.id,
     mode,
-    createdBy: authData.user.id,
+    createdBy: actingOwnerUserId,
   })
 
   if (creditInsert.error) {

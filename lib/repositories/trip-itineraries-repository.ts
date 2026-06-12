@@ -266,7 +266,7 @@ export async function deleteTripItinerary(id: string) {
   return { source: "local" as const, success: true, error: null }
 }
 
-export async function requestAiItineraryGeneration(payload: { tripId: string; mode: "simple" | "complete_pdf" }) {
+export async function requestAiItineraryGeneration(payload: { tripId: string; mode: "simple" | "complete_pdf"; tripSlug?: string | null; adminToken?: string | null }) {
   if (!shouldUseSupabase()) {
     return {
       source: "local" as const,

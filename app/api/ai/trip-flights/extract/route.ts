@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { shouldUseSupabase } from "@/lib/data-source"
 import { createSupabaseServerClient } from "@/lib/supabase/server"
+import { createSupabaseAdminClient } from "@/lib/supabase/admin"
 import type { Database } from "@/lib/supabase/types"
 import { countUsefulFlightFields, requestFlightExtraction } from "@/lib/ai/flight-extraction"
 import { estimateCostUsd, getTicketExtractionCreditCost } from "@/lib/ai/credit-consumption"
@@ -10,6 +11,8 @@ interface FlightExtractionRequestBody {
   tripId?: string
   documentId?: string
   flightId?: string
+  tripSlug?: string
+  adminToken?: string
 }
 
 type JsonObject = Record<string, unknown>
@@ -18,6 +21,30 @@ type ProfileRow = Database["public"]["Tables"]["profiles"]["Row"]
 type AgencyMemberRow = Database["public"]["Tables"]["agency_members"]["Row"]
 type DocumentRow = Database["public"]["Tables"]["documents"]["Row"]
 type TripFlightRow = Database["public"]["Tables"]["trip_flights"]["Row"]
+
+async function getTripByAdminAccess(
+  client: ReturnType<typeof createSupabaseAdminClient>,
+  payload: { tripId: string; tripSlug?: string | null; adminToken?: string | null },
+) {
+  const { data, error } = await client.from("trips").select("*").eq("id", payload.tripId).maybeSingle()
+  if (error) {
+    return { trip: null as TripRow | null, membership: null as AgencyMemberRow | null, error: error.message }
+  }
+
+  const trip = data as TripRow | null
+  if (!trip) {
+    return { trip: null as TripRow | null, membership: null as AgencyMemberRow | null, error: "Viagem nao encontrada." }
+  }
+
+  const tokenMatches = Boolean(payload.adminToken && trip.admin_token === payload.adminToken)
+  const slugMatches = Boolean(payload.tripSlug && trip.slug === payload.tripSlug)
+
+  if (!tokenMatches && !slugMatches) {
+    return { trip: null as TripRow | null, membership: null as AgencyMemberRow | null, error: "Voce nao tem permissao para processar esta passagem." }
+  }
+
+  return { trip, membership: null as AgencyMemberRow | null, error: null }
+}
 
 async function getProfile(client: NonNullable<Awaited<ReturnType<typeof createSupabaseServerClient>>>, userId: string) {
   const { data, error } = await client
@@ -246,35 +273,47 @@ export async function POST(request: Request) {
   const tripId = body?.tripId?.trim?.()
   const documentId = body?.documentId?.trim?.()
   const flightId = body?.flightId?.trim?.()
+  const tripSlug = body?.tripSlug?.trim?.() ?? null
+  const adminToken = body?.adminToken?.trim?.() ?? null
 
   if (!tripId || !documentId || !flightId) {
     return NextResponse.json({ error: "Trip, document e flight sao obrigatorios para processar a passagem." }, { status: 400 })
   }
 
-  const supabase = await createSupabaseServerClient()
+  const adminAccessRequested = Boolean(adminToken || tripSlug)
+  const supabase = adminAccessRequested ? createSupabaseAdminClient() : await createSupabaseServerClient()
   if (!supabase) {
     return NextResponse.json({ error: "Supabase server client indisponivel." }, { status: 503 })
   }
 
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser()
+  let actingUserId: string | null = null
+  let accessResult: Awaited<ReturnType<typeof getAccessibleTrip>> | Awaited<ReturnType<typeof getTripByAdminAccess>>
 
-  if (authError) {
-    return NextResponse.json({ error: authError.message }, { status: 401 })
+  if (adminAccessRequested) {
+    accessResult = await getTripByAdminAccess(supabase, { tripId, tripSlug, adminToken })
+    actingUserId = accessResult.trip?.owner_user_id ?? null
+  } else {
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser()
+
+    if (authError) {
+      return NextResponse.json({ error: authError.message }, { status: 401 })
+    }
+
+    if (!user) {
+      return NextResponse.json({ error: "Entre para processar passagens reais desta viagem." }, { status: 401 })
+    }
+
+    const profileResult = await getProfile(supabase, user.id)
+    if (!profileResult.data) {
+      return NextResponse.json({ error: profileResult.error ?? "Perfil do usuario nao encontrado." }, { status: 403 })
+    }
+
+    accessResult = await getAccessibleTrip(supabase, user.id, tripId, profileResult.data)
+    actingUserId = user.id
   }
-
-  if (!user) {
-    return NextResponse.json({ error: "Entre para processar passagens reais desta viagem." }, { status: 401 })
-  }
-
-  const profileResult = await getProfile(supabase, user.id)
-  if (!profileResult.data) {
-    return NextResponse.json({ error: profileResult.error ?? "Perfil do usuario nao encontrado." }, { status: 403 })
-  }
-
-  const accessResult = await getAccessibleTrip(supabase, user.id, tripId, profileResult.data)
   if (!accessResult.trip) {
     return NextResponse.json({ error: accessResult.error ?? "Viagem nao encontrada." }, { status: 403 })
   }
@@ -308,7 +347,7 @@ export async function POST(request: Request) {
   }
 
   const ownerType = accessResult.membership ? "agency" : "traveler"
-  const ownerId = accessResult.membership ? accessResult.trip.agency_id : user.id
+  const ownerId = accessResult.membership ? accessResult.trip.agency_id : actingUserId
 
   if (!ownerId) {
     return NextResponse.json({ error: "Nao foi possivel identificar o saldo responsavel por esta extracao." }, { status: 400 })
@@ -461,7 +500,7 @@ export async function POST(request: Request) {
 
   if (shouldChargeCredits) {
     const usageInsert = await createAiUsageLog(supabase, {
-      ownerUserId: ownerType === "traveler" ? user.id : null,
+      ownerUserId: ownerType === "traveler" ? actingUserId : null,
       agencyId: accessResult.trip.agency_id,
       tripId: accessResult.trip.id,
       feature: "flight_extraction",
@@ -480,7 +519,7 @@ export async function POST(request: Request) {
 
     const creditsInsert = await supabase.from("credit_transactions").insert({
       owner_type: ownerType,
-      owner_user_id: ownerType === "traveler" ? user.id : null,
+      owner_user_id: ownerType === "traveler" ? actingUserId : null,
       agency_id: ownerType === "agency" ? accessResult.trip.agency_id : null,
       type: "consume",
       amount: -creditsPerCall,
@@ -492,7 +531,7 @@ export async function POST(request: Request) {
         document_id: entityResult.document.id,
         flight_id: entityResult.flight.id,
       },
-      created_by: user.id,
+      created_by: actingUserId,
     })
 
     if (creditsInsert.error) {

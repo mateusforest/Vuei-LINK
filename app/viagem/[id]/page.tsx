@@ -686,7 +686,7 @@ function resolveProtectedWriteError(error?: string | null) {
     normalized.includes("auth") ||
     normalized.includes("unauthorized")
   ) {
-    return "Desbloqueio concluido, mas esta acao ainda exige login da conta proprietaria para salvar no banco."
+    return "Nao foi possivel concluir esta acao administrativa neste dispositivo."
   }
 
   return error || "Nao foi possivel concluir esta acao."
@@ -1617,6 +1617,9 @@ function FlightsSection({
         tripId={tripId}
         ownerUserId={ownerUserId}
         agencyId={agencyId}
+        tripSlug={routeSlug}
+        adminToken={tripAdminToken}
+        adminProxyMode={adminLinkMutationMode}
         ensureSensitiveAccess={ensureSensitiveAccess}
         onSave={(data) => {
           onAddFlight(data)
@@ -1629,7 +1632,7 @@ function FlightsSection({
 }
 
 // Add Flight Modal
-function AddFlightModal({ open, onClose, onSave, tripId, ownerUserId, agencyId, ensureSensitiveAccess }: { open: boolean; onClose: () => void; onSave: (data: any) => void; tripId: string; ownerUserId: string | null; agencyId: string | null; ensureSensitiveAccess: () => boolean }) {
+function AddFlightModal({ open, onClose, onSave, tripId, ownerUserId, agencyId, tripSlug, adminToken, adminProxyMode, ensureSensitiveAccess }: { open: boolean; onClose: () => void; onSave: (data: any) => void; tripId: string; ownerUserId: string | null; agencyId: string | null; tripSlug: string; adminToken: string | null; adminProxyMode: boolean; ensureSensitiveAccess: () => boolean }) {
   const [uploading, setUploading] = useState(false)
   const [fileName, setFileName] = useState("")
   const [error, setError] = useState("")
@@ -1650,7 +1653,7 @@ function AddFlightModal({ open, onClose, onSave, tripId, ownerUserId, agencyId, 
     if (!ensureSensitiveAccess()) {
       return
     }
-    if (!ownerUserId) {
+    if (!ownerUserId && !adminProxyMode) {
       setError("Esta passagem exige autenticacao real para ser anexada no Supabase. Entre com login para continuar.")
       return
     }
@@ -1665,80 +1668,101 @@ function AddFlightModal({ open, onClose, onSave, tripId, ownerUserId, agencyId, 
 
     setUploading(true)
 
-    const path = `${ownerUserId}/${tripId}/tickets/${Date.now()}-${file.name.replace(/\s+/g, "-")}`
-    const uploadResult = await uploadDocumentFile(file, path)
-    if (uploadResult.error || !uploadResult.data) {
-      console.error("[TICKET] upload error", uploadResult.error)
-      setError(resolveProtectedWriteError(uploadResult.error || "Nao foi possivel anexar a passagem."))
+    const savedTicket = adminProxyMode
+      ? await (async () => {
+          const formData = new FormData()
+          formData.set("action", "uploadTicket")
+          formData.set("tripId", tripId)
+          formData.set("tripSlug", tripSlug)
+          if (adminToken) formData.set("adminToken", adminToken)
+          formData.set("name", fileName.trim() || file.name.replace(/\.[^.]+$/, ""))
+          formData.set("file", file)
+          const response = await fetch("/api/trip-admin", { method: "POST", body: formData })
+          const data = await response.json().catch(() => null)
+          return {
+            error: response.ok ? null : data?.error || "Nao foi possivel registrar a passagem anexada.",
+            document: data?.document ?? null,
+            flight: data?.flight ?? null,
+          }
+        })()
+      : await (async () => {
+          const path = `${ownerUserId}/${tripId}/tickets/${Date.now()}-${file.name.replace(/\s+/g, "-")}`
+          const uploadResult = await uploadDocumentFile(file, path)
+          if (uploadResult.error || !uploadResult.data) {
+            return { error: resolveProtectedWriteError(uploadResult.error || "Nao foi possivel anexar a passagem."), document: null, flight: null }
+          }
+
+          const metadataResult = await createDocumentMetadata({
+            tripId,
+            clientId: null,
+            agencyId,
+            ownerUserId,
+            name: fileName.trim() || file.name.replace(/\.[^.]+$/, ""),
+            type: "ticket",
+            filePath: uploadResult.data.path,
+            fileUrl: uploadResult.data.fileUrl,
+            mimeType: file.type,
+            size: file.size,
+            isPrivate: false,
+            visibility: "public_trip",
+            aiExtractedData: {},
+          })
+
+          if (metadataResult.error || !metadataResult.data) {
+            return { error: resolveProtectedWriteError(metadataResult.error || "Nao foi possivel registrar a passagem."), document: null, flight: null }
+          }
+
+          const flightResult = await upsertTripFlight({
+            tripId,
+            documentId: metadataResult.data.id,
+            extractionStatus: "pending",
+            extractedData: {},
+          })
+
+          if (flightResult.error || !flightResult.data) {
+            return { error: resolveProtectedWriteError(flightResult.error || "Nao foi possivel registrar a passagem anexada."), document: null, flight: null }
+          }
+
+          return { error: null, document: metadataResult.data, flight: flightResult.data }
+        })()
+
+    if (savedTicket.error || !savedTicket.document || !savedTicket.flight) {
+      console.error("[TICKET] upload error", savedTicket.error)
+      setError(savedTicket.error || "Nao foi possivel registrar a passagem anexada.")
       setUploading(false)
       return
     }
 
-    const metadataResult = await createDocumentMetadata({
-      tripId,
-      clientId: null,
-      agencyId,
-      ownerUserId,
-      name: fileName.trim() || file.name.replace(/\.[^.]+$/, ""),
-      type: "ticket",
-      filePath: uploadResult.data.path,
-      fileUrl: uploadResult.data.fileUrl,
-      mimeType: file.type,
-      size: file.size,
-      isPrivate: false,
-      visibility: "public_trip",
-      aiExtractedData: {},
-    })
-
-    if (metadataResult.error || !metadataResult.data) {
-      console.error("[TICKET] upload error", metadataResult.error)
-      setError(resolveProtectedWriteError(metadataResult.error || "Nao foi possivel registrar a passagem."))
-      setUploading(false)
-      return
-    }
-
-    const flightResult = await upsertTripFlight({
-      tripId,
-      documentId: metadataResult.data.id,
-      extractionStatus: "pending",
-      extractedData: {},
-    })
-
-    if (flightResult.error || !flightResult.data) {
-      console.error("[TICKET] flight persistence error", flightResult.error)
-      setError(resolveProtectedWriteError(flightResult.error || "Nao foi possivel registrar a passagem anexada."))
-      setUploading(false)
-      return
-    }
-
-    console.log("[TICKET] upload success", metadataResult.data.id)
+    console.log("[TICKET] upload success", savedTicket.document.id)
     onSave({
-      flight: mapFlightRecordToView(flightResult.data, [metadataResult.data]),
-      document: metadataResult.data,
+      flight: mapFlightRecordToView(savedTicket.flight, [savedTicket.document]),
+      document: savedTicket.document,
     })
 
     if (shouldUseSupabase()) {
       onSave({
         flight: mapFlightRecordToView(
           {
-            ...flightResult.data,
+            ...savedTicket.flight,
             extractionStatus: "processing",
           },
-          [metadataResult.data],
+          [savedTicket.document],
         ),
       })
 
       void requestTripFlightExtraction({
         tripId,
-        documentId: metadataResult.data.id,
-        flightId: flightResult.data.id,
+        documentId: savedTicket.document.id,
+        flightId: savedTicket.flight.id,
+        tripSlug,
+        adminToken,
       })
         .then((processingResult) => {
           if (processingResult.error) {
             console.error("[TICKET] extraction error", processingResult.error)
           }
 
-          const nextDocument = processingResult.data?.document ?? metadataResult.data
+          const nextDocument = processingResult.data?.document ?? savedTicket.document
           const nextFlight = processingResult.data?.flight
 
           if (nextDocument) {
@@ -2021,6 +2045,9 @@ function UploadExistingItineraryModal({
   tripId,
   ownerUserId,
   agencyId,
+  tripSlug,
+  adminToken,
+  adminProxyMode,
   ensureSensitiveAccess,
   onSave,
 }: {
@@ -2029,6 +2056,9 @@ function UploadExistingItineraryModal({
   tripId: string
   ownerUserId: string | null
   agencyId: string | null
+  tripSlug: string
+  adminToken: string | null
+  adminProxyMode: boolean
   ensureSensitiveAccess: () => boolean
   onSave: (payload: { itinerary: TripItineraryRecord; document: any }) => void
 }) {
@@ -2047,7 +2077,7 @@ function UploadExistingItineraryModal({
   const handleUpload = async (file?: File | null) => {
     if (!file) return
     if (!ensureSensitiveAccess()) return
-    if (!ownerUserId) {
+    if (!ownerUserId && !adminProxyMode) {
       setError("Este anexo exige autenticacao real para ser salvo no Supabase. Entre com login para continuar.")
       return
     }
@@ -2061,57 +2091,78 @@ function UploadExistingItineraryModal({
     setUploading(true)
     setError("")
 
-    const path = `${ownerUserId}/${tripId}/itineraries/${Date.now()}-${file.name.replace(/\s+/g, "-")}`
-    const uploadResult = await uploadDocumentFile(file, path)
-    if (uploadResult.error || !uploadResult.data) {
-      setError(uploadResult.error || "Nao foi possivel anexar o roteiro.")
+    const savedUpload = adminProxyMode
+      ? await (async () => {
+          const formData = new FormData()
+          formData.set("action", "uploadItineraryDocument")
+          formData.set("tripId", tripId)
+          formData.set("tripSlug", tripSlug)
+          if (adminToken) formData.set("adminToken", adminToken)
+          formData.set("title", title.trim() || file.name.replace(/\.[^.]+$/, ""))
+          formData.set("file", file)
+          const response = await fetch("/api/trip-admin", { method: "POST", body: formData })
+          const data = await response.json().catch(() => null)
+          return {
+            error: response.ok ? null : data?.error || "Nao foi possivel registrar o roteiro anexado.",
+            itinerary: data?.itinerary ?? null,
+            document: data?.document ?? null,
+          }
+        })()
+      : await (async () => {
+          const path = `${ownerUserId}/${tripId}/itineraries/${Date.now()}-${file.name.replace(/\s+/g, "-")}`
+          const uploadResult = await uploadDocumentFile(file, path)
+          if (uploadResult.error || !uploadResult.data) {
+            return { error: uploadResult.error || "Nao foi possivel anexar o roteiro.", itinerary: null, document: null }
+          }
+
+          const metadataResult = await createDocumentMetadata({
+            tripId,
+            clientId: null,
+            agencyId,
+            ownerUserId,
+            name: title.trim() || file.name.replace(/\.[^.]+$/, ""),
+            type: "itinerary",
+            filePath: uploadResult.data.path,
+            fileUrl: uploadResult.data.fileUrl,
+            mimeType: file.type,
+            size: file.size,
+            isPrivate: false,
+            visibility: "public_trip",
+            aiExtractedData: {
+              source: "manual_itinerary_upload",
+              ai_used: false,
+            },
+          })
+
+          if (metadataResult.error || !metadataResult.data) {
+            return { error: metadataResult.error || "Nao foi possivel registrar o roteiro anexado.", itinerary: null, document: null }
+          }
+
+          const itineraryResult = await upsertTripItinerary({
+            tripId,
+            documentId: metadataResult.data.id,
+            title: title.trim() || file.name.replace(/\.[^.]+$/, ""),
+            mode: "uploaded",
+            status: "uploaded",
+            content: { days: [] },
+            pdfUrl: metadataResult.data.filePath,
+            createdBy: ownerUserId,
+          })
+
+          if (itineraryResult.error || !itineraryResult.data) {
+            return { error: itineraryResult.error || "Nao foi possivel registrar o modo de roteiro anexado.", itinerary: null, document: null }
+          }
+
+          return { error: null, itinerary: itineraryResult.data, document: metadataResult.data }
+        })()
+
+    if (savedUpload.error || !savedUpload.itinerary || !savedUpload.document) {
+      setError(savedUpload.error || "Nao foi possivel registrar o roteiro anexado.")
       setUploading(false)
       return
     }
 
-    const metadataResult = await createDocumentMetadata({
-      tripId,
-      clientId: null,
-      agencyId,
-      ownerUserId,
-      name: title.trim() || file.name.replace(/\.[^.]+$/, ""),
-      type: "itinerary",
-      filePath: uploadResult.data.path,
-      fileUrl: uploadResult.data.fileUrl,
-      mimeType: file.type,
-      size: file.size,
-      isPrivate: false,
-      visibility: "public_trip",
-      aiExtractedData: {
-        source: "manual_itinerary_upload",
-        ai_used: false,
-      },
-    })
-
-    if (metadataResult.error || !metadataResult.data) {
-      setError(metadataResult.error || "Nao foi possivel registrar o roteiro anexado.")
-      setUploading(false)
-      return
-    }
-
-    const itineraryResult = await upsertTripItinerary({
-      tripId,
-      documentId: metadataResult.data.id,
-      title: title.trim() || file.name.replace(/\.[^.]+$/, ""),
-      mode: "uploaded",
-      status: "uploaded",
-      content: { days: [] },
-      pdfUrl: metadataResult.data.filePath,
-      createdBy: ownerUserId,
-    })
-
-    if (itineraryResult.error || !itineraryResult.data) {
-      setError(itineraryResult.error || "Nao foi possivel registrar o modo de roteiro anexado.")
-      setUploading(false)
-      return
-    }
-
-    onSave({ itinerary: itineraryResult.data, document: metadataResult.data })
+    onSave({ itinerary: savedUpload.itinerary, document: savedUpload.document })
     setUploading(false)
     onClose()
   }
@@ -2543,6 +2594,9 @@ function ItinerarySection({
         tripId={tripId}
         ownerUserId={ownerUserId}
         agencyId={agencyId}
+        tripSlug={routeSlug}
+        adminToken={tripAdminToken}
+        adminProxyMode={adminLinkMutationMode}
         ensureSensitiveAccess={ensureSensitiveAccess}
         onSave={onSaveUploadedItinerary}
       />
@@ -2976,7 +3030,7 @@ function DocumentsSection({
         }}
       />
       <ViewDocumentModal open={!!viewingDoc} onClose={() => setViewingDoc(null)} document={viewingDoc} />
-      <AddDocumentModal open={addingDoc} onClose={() => setAddingDoc(false)} tripId={tripId} ownerUserId={ownerUserId} agencyId={agencyId} ensureSensitiveAccess={ensureSensitiveAccess} onSave={(data) => { onAddDocument(data); showToast("Documento adicionado!", "success"); setAddingDoc(false) }} />
+      <AddDocumentModal open={addingDoc} onClose={() => setAddingDoc(false)} tripId={tripId} ownerUserId={ownerUserId} agencyId={agencyId} tripSlug={routeSlug} adminToken={tripAdminToken} adminProxyMode={adminLinkMutationMode} ensureSensitiveAccess={ensureSensitiveAccess} onSave={(data) => { onAddDocument(data); showToast("Documento adicionado!", "success"); setAddingDoc(false) }} />
     </section>
   )
 }
@@ -3189,7 +3243,7 @@ function ViewDocumentModal({ open, onClose, document }: { open: boolean; onClose
 }
 
 // Add Document Modal
-function AddDocumentModal({ open, onClose, onSave, tripId, ownerUserId, agencyId, ensureSensitiveAccess }: { open: boolean; onClose: () => void; onSave: (data: any) => void; tripId: string; ownerUserId: string | null; agencyId: string | null; ensureSensitiveAccess: () => boolean }) {
+function AddDocumentModal({ open, onClose, onSave, tripId, ownerUserId, agencyId, tripSlug, adminToken, adminProxyMode, ensureSensitiveAccess }: { open: boolean; onClose: () => void; onSave: (data: any) => void; tripId: string; ownerUserId: string | null; agencyId: string | null; tripSlug: string; adminToken: string | null; adminProxyMode: boolean; ensureSensitiveAccess: () => boolean }) {
   const [formData, setFormData] = useState({ name: "", type: "voucher", private: false })
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState("")
@@ -3209,7 +3263,7 @@ function AddDocumentModal({ open, onClose, onSave, tripId, ownerUserId, agencyId
     if (!ensureSensitiveAccess()) {
       return
     }
-    if (!ownerUserId) {
+    if (!ownerUserId && !adminProxyMode) {
       setError("Este documento exige autenticacao real para ser anexado no Supabase. Entre com login para continuar.")
       return
     }
@@ -3222,41 +3276,64 @@ function AddDocumentModal({ open, onClose, onSave, tripId, ownerUserId, agencyId
     }
 
     setUploading(true)
-    const path = `${ownerUserId}/${tripId}/documents/${Date.now()}-${file.name.replace(/\s+/g, "-")}`
-    const uploadResult = await uploadDocumentFile(file, path)
-    if (uploadResult.error || !uploadResult.data) {
-      console.error("[DOCUMENT] upload error", uploadResult.error)
-      setError(resolveProtectedWriteError(uploadResult.error || "Nao foi possivel anexar o documento."))
+    const savedDocument = adminProxyMode
+      ? await (async () => {
+          const uploadForm = new FormData()
+          uploadForm.set("action", "uploadDocument")
+          uploadForm.set("tripId", tripId)
+          uploadForm.set("tripSlug", tripSlug)
+          if (adminToken) uploadForm.set("adminToken", adminToken)
+          uploadForm.set("name", formData.name.trim() || file.name.replace(/\.[^.]+$/, ""))
+          uploadForm.set("type", formData.type)
+          uploadForm.set("isPrivate", String(formData.private))
+          uploadForm.set("visibility", formData.private ? "private" : "public_trip")
+          uploadForm.set("file", file)
+          const response = await fetch("/api/trip-admin", { method: "POST", body: uploadForm })
+          const data = await response.json().catch(() => null)
+          return {
+            error: response.ok ? null : data?.error || "Nao foi possivel registrar o documento.",
+            document: data?.document ?? null,
+          }
+        })()
+      : await (async () => {
+          const path = `${ownerUserId}/${tripId}/documents/${Date.now()}-${file.name.replace(/\s+/g, "-")}`
+          const uploadResult = await uploadDocumentFile(file, path)
+          if (uploadResult.error || !uploadResult.data) {
+            return { error: resolveProtectedWriteError(uploadResult.error || "Nao foi possivel anexar o documento."), document: null }
+          }
+
+          const metadataResult = await createDocumentMetadata({
+            tripId,
+            clientId: null,
+            agencyId,
+            ownerUserId,
+            name: formData.name.trim() || file.name.replace(/\.[^.]+$/, ""),
+            type: formData.type,
+            filePath: uploadResult.data.path,
+            fileUrl: uploadResult.data.fileUrl,
+            mimeType: file.type,
+            size: file.size,
+            isPrivate: formData.private,
+            visibility: formData.private ? "private" : "public_trip",
+            aiExtractedData: {},
+          })
+
+          return {
+            error: metadataResult.error ? resolveProtectedWriteError(metadataResult.error || "Nao foi possivel registrar o documento.") : null,
+            document: metadataResult.data ?? null,
+          }
+        })()
+
+    if (savedDocument.error || !savedDocument.document) {
+      console.error("[DOCUMENT] upload error", savedDocument.error)
+      setError(savedDocument.error || "Nao foi possivel registrar o documento.")
       setUploading(false)
       return
     }
 
-    const metadataResult = await createDocumentMetadata({
-      tripId,
-      clientId: null,
-      agencyId,
-      ownerUserId,
-      name: formData.name.trim() || file.name.replace(/\.[^.]+$/, ""),
-      type: formData.type,
-      filePath: uploadResult.data.path,
-      fileUrl: uploadResult.data.fileUrl,
-      mimeType: file.type,
-      size: file.size,
-      isPrivate: formData.private,
-      visibility: formData.private ? "private" : "public_trip",
-      aiExtractedData: {},
-    })
-
-    if (metadataResult.error || !metadataResult.data) {
-      console.error("[DOCUMENT] upload error", metadataResult.error)
-      setError(resolveProtectedWriteError(metadataResult.error || "Nao foi possivel registrar o documento."))
-      setUploading(false)
-      return
-    }
-
-    console.log("[DOCUMENT] upload success", metadataResult.data.id)
+    console.log("[DOCUMENT] upload success", savedDocument.document.id)
     setUploading(false)
-    onSave(metadataResult.data)
+    onSave(savedDocument.document)
   }
 
   return (
@@ -4106,7 +4183,7 @@ function TripSecurityModal({
         </div>
 
         <div className="rounded-2xl border border-amber-500/20 bg-amber-500/10 p-4 text-xs text-amber-200">
-          Use PIN ou biometria para liberar acoes administrativas desta viagem. Se o banco exigir autenticacao real para gravar algo no Supabase, o login continua sendo o fallback tardio.
+          Seu PIN e biometria protegem alteracoes importantes desta viagem. Apenas dispositivos autorizados podem realizar acoes administrativas.
         </div>
 
         {error ? (
@@ -4484,7 +4561,7 @@ function SensitiveAccessModal({
         </div>
         <p className="mt-3 text-center text-sm text-white/55">
           {quickAccessMethods.pinEnabled
-            ? "Use PIN ou biometria para liberar acoes administrativas desta viagem."
+            ? "Seu PIN e biometria protegem alteracoes importantes desta viagem. Apenas dispositivos autorizados podem realizar acoes administrativas."
             : "Crie um PIN neste dispositivo para proteger acoes sensiveis desta viagem."}
         </p>
 
@@ -4510,7 +4587,7 @@ function SensitiveAccessModal({
                 placeholder="0000"
                 value={pin}
                 onChange={(event) => setPin(event.target.value.replace(/\D/g, "").slice(0, 4))}
-                className="text-center text-xl tracking-[0.6em]"
+                className="h-12 text-center text-lg font-semibold tracking-[0.22em] sm:tracking-[0.28em] px-3 placeholder:tracking-normal placeholder:text-base"
               />
               <Button
                 onClick={() => void handlePinUnlock()}
@@ -4532,7 +4609,7 @@ function SensitiveAccessModal({
                 placeholder="Crie um PIN"
                 value={pin}
                 onChange={(event) => setPin(event.target.value.replace(/\D/g, "").slice(0, 4))}
-                className="text-center text-xl tracking-[0.6em]"
+                className="h-12 text-center text-lg font-semibold tracking-[0.22em] sm:tracking-[0.28em] px-3 placeholder:tracking-normal placeholder:text-base"
               />
               <Input
                 type="password"
@@ -4541,7 +4618,7 @@ function SensitiveAccessModal({
                 placeholder="Confirme o PIN"
                 value={confirmPin}
                 onChange={(event) => setConfirmPin(event.target.value.replace(/\D/g, "").slice(0, 4))}
-                className="text-center text-xl tracking-[0.6em]"
+                className="h-12 text-center text-lg font-semibold tracking-[0.22em] sm:tracking-[0.28em] px-3 placeholder:tracking-normal placeholder:text-base"
               />
               <Button
                 onClick={() => void handleCreatePin()}
@@ -4586,6 +4663,12 @@ export default function TripPage() {
   const router = useRouter()
   const { user, profile, loading: authLoading } = useAuth()
   const adminRouteActive = Boolean(pathname?.startsWith("/viagem/") && pathname?.endsWith("/admin"))
+  const routeSlug =
+    typeof params?.id === "string"
+      ? params.id
+      : typeof params?.slug === "string"
+        ? params.slug
+        : initialTripData.id
   const [tripData, setTripData] = useState(() => normalizeTripViewData(initialTripData))
   const [isAdmin, setIsAdmin] = useState(false)
   const [canWrite, setCanWrite] = useState(false)
@@ -4600,10 +4683,12 @@ export default function TripPage() {
   const [securitySettingsOpen, setSecuritySettingsOpen] = useState(false)
   const [creditsOpen, setCreditsOpen] = useState(false)
   const [tripOwnerUserId, setTripOwnerUserId] = useState<string | null>(null)
+  const [tripAdminToken, setTripAdminToken] = useState<string | null>(null)
   const [tripItineraryRecords, setTripItineraryRecords] = useState<TripItineraryRecord[]>([])
   const [sensitiveAccessGranted, setSensitiveAccessGranted] = useState(false)
   const [securityModalOpen, setSecurityModalOpen] = useState(false)
   const [quickAccessGateRequired, setQuickAccessGateRequired] = useState(false)
+  const [adminLinkMutationMode, setAdminLinkMutationMode] = useState(false)
   const [agencyBranding, setAgencyBranding] = useState<{ name: string | null; logoUrl: string | null; isAgency: boolean }>({ name: null, logoUrl: null, isAgency: false })
   const [sectionsLoading, setSectionsLoading] = useState({
     flights: true,
@@ -4628,12 +4713,6 @@ export default function TripPage() {
   useEffect(() => {
     if (typeof window === "undefined") return
 
-    const routeSlug =
-      typeof params?.id === "string"
-        ? params.id
-        : typeof params?.slug === "string"
-          ? params.slug
-          : initialTripData.id
     const searchParams = new URLSearchParams(window.location.search)
     const adminToken = searchParams.get("adminToken")
     const publicToken = searchParams.get("token") || searchParams.get("publicToken")
@@ -4642,6 +4721,8 @@ export default function TripPage() {
 
     setIsAdmin(false)
     setCanWrite(false)
+    setTripAdminToken(adminToken)
+    setAdminLinkMutationMode(false)
     setTripItineraryRecords([])
     setSectionsLoading({
       flights: true,
@@ -4678,8 +4759,10 @@ export default function TripPage() {
         if (repositoryTrip.data) {
           if (loadRequestRef.current !== requestId) return
           setTripOwnerUserId(repositoryTrip.data.ownerUserId ?? null)
+          setTripAdminToken(repositoryTrip.data.adminToken ?? adminToken ?? null)
           const isOwner = Boolean(user?.id && repositoryTrip.data.ownerUserId && user.id === repositoryTrip.data.ownerUserId)
           const isPublicLinkRequest = isPublicRoute || Boolean(publicToken)
+          const adminLinkAccessMode = isAdminRoute && !isOwner
 
           logTripDocumentsDev("trip_resolved", {
             routeSlug,
@@ -4702,17 +4785,11 @@ export default function TripPage() {
             return
           }
 
-          if (isAdminRoute && user && !isOwner) {
-            console.error("[TRIP] erro ao carregar link", "Usuario sem permissao para editar a viagem.")
-            setLoadError("Voce nao tem permissao para editar esta viagem.")
-            setIsLoadingTrip(false)
-            return
-          }
-
           setQuickAccessGateRequired(false)
+          setAdminLinkMutationMode(adminLinkAccessMode)
 
-          const canEditTrip = isAdminRoute && (Boolean(user) ? isOwner : true)
-          const canWriteTrip = isAdminRoute && isOwner
+          const canEditTrip = isAdminRoute && (Boolean(user) ? (isOwner || adminLinkAccessMode) : true)
+          const canWriteTrip = isAdminRoute && (isOwner || adminLinkAccessMode)
           setIsAdmin(canEditTrip)
           setCanWrite(canWriteTrip)
 
@@ -4746,11 +4823,29 @@ export default function TripPage() {
 
           void (async () => {
             const sectionsPerf = startPerfMeasure("trip.sections")
+            const adminSectionsPromise = canWriteTrip && adminLinkAccessMode
+              ? fetch(`/api/trip-admin?tripId=${encodeURIComponent(repositoryTrip.data.id)}&tripSlug=${encodeURIComponent(routeSlug)}${repositoryTrip.data.adminToken ? `&adminToken=${encodeURIComponent(repositoryTrip.data.adminToken)}` : ""}`).then(async (response) => {
+                  const data = await response.json().catch(() => null)
+                  if (!response.ok) {
+                    throw new Error(data?.error || "Falha ao carregar dados administrativos da viagem.")
+                  }
+                  return data
+                })
+              : null
+
             const [documentsSettled, flightsSettled, itinerariesSettled, hotelsSettled, agencySettled] = await Promise.allSettled([
-              canWriteTrip ? listDocumentsByTrip(repositoryTrip.data.id) : listPublicTripDocuments(repositoryTrip.data.id),
-              canWriteTrip ? listTripFlights(repositoryTrip.data.id) : listPublicTripFlights(repositoryTrip.data.id),
-              listTripItineraries(repositoryTrip.data.id),
-              listTripHotels(repositoryTrip.data.id),
+              adminSectionsPromise
+                ? adminSectionsPromise.then((data: any) => ({ source: "admin-api" as const, data: data?.documents ?? [], error: null }))
+                : (canWriteTrip ? listDocumentsByTrip(repositoryTrip.data.id) : listPublicTripDocuments(repositoryTrip.data.id)),
+              adminSectionsPromise
+                ? adminSectionsPromise.then((data: any) => ({ source: "admin-api" as const, data: data?.flights ?? [], error: null }))
+                : (canWriteTrip ? listTripFlights(repositoryTrip.data.id) : listPublicTripFlights(repositoryTrip.data.id)),
+              adminSectionsPromise
+                ? adminSectionsPromise.then((data: any) => ({ source: "admin-api" as const, data: data?.itineraries ?? [], error: null }))
+                : listTripItineraries(repositoryTrip.data.id),
+              adminSectionsPromise
+                ? adminSectionsPromise.then((data: any) => ({ source: "admin-api" as const, data: data?.hotels ?? [], error: null }))
+                : listTripHotels(repositoryTrip.data.id),
               repositoryTrip.data.agencyId ? getAgencyById(repositoryTrip.data.agencyId) : Promise.resolve(null),
             ])
 
@@ -4916,13 +5011,55 @@ export default function TripPage() {
     setToast({ message, type })
   }
 
+  const callTripAdminApi = async <T,>(payload: Record<string, unknown>) => {
+    const response = await fetch("/api/trip-admin", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        ...payload,
+        tripId: tripData.id,
+        tripSlug: routeSlug,
+        adminToken: tripAdminToken,
+      }),
+    })
+
+    const data = (await response.json().catch(() => null)) as T & { error?: string } | null
+    return {
+      ok: response.ok,
+      data,
+      error: response.ok ? null : data?.error || "Nao foi possivel concluir a acao administrativa.",
+    }
+  }
+
+  const callTripAdminUploadApi = async <T,>(action: string, file: File, fields: Record<string, string>) => {
+    const formData = new FormData()
+    formData.set("action", action)
+    formData.set("tripId", tripData.id)
+    formData.set("tripSlug", routeSlug)
+    if (tripAdminToken) {
+      formData.set("adminToken", tripAdminToken)
+    }
+    Object.entries(fields).forEach(([key, value]) => {
+      formData.set(key, value)
+    })
+    formData.set("file", file)
+
+    const response = await fetch("/api/trip-admin", {
+      method: "POST",
+      body: formData,
+    })
+
+    const data = (await response.json().catch(() => null)) as T & { error?: string } | null
+    return {
+      ok: response.ok,
+      data,
+      error: response.ok ? null : data?.error || "Nao foi possivel concluir o upload administrativo.",
+    }
+  }
+
   const handleRequireAuthenticatedAdmin = () => {
-    const routeSlug =
-      typeof params?.id === "string"
-        ? params.id
-        : typeof params?.slug === "string"
-          ? params.slug
-          : tripData.id
     const target = pathname || `/viagem/${routeSlug}/admin`
     router.replace(`/login?redirect=${encodeURIComponent(target)}`)
   }
@@ -4986,28 +5123,50 @@ export default function TripPage() {
 
   const handleUpdateFlight = async (id: string, data: any) => {
     if (!ensureSensitiveAccess()) return
-    const result = await upsertTripFlight({
-      id,
-      tripId: tripData.id,
-      documentId: data.document?.id ?? data.documentId ?? null,
-      airline: data.airline ?? null,
-      flightNumber: data.flightNumber ?? null,
-      bookingReference: data.bookingReference ?? null,
-      originAirport: data.origin?.city ?? null,
-      destinationAirport: data.destination?.city ?? null,
-      departureAt: data.departureAt ?? null,
-      arrivalAt: data.arrivalAt ?? null,
-      passengerName: data.passengerName ?? null,
-      qrCodePayload: data.qrCodePayload ?? null,
-      baggageInfo: data.baggageInfo ?? null,
-      terminal: data.terminal ?? null,
-      gate: data.gate ?? null,
-      seat: data.seat ?? null,
-      extractedData: data.extractedData ?? {},
-      extractionStatus: "manual",
-    })
+    const result = adminLinkMutationMode
+      ? await callTripAdminApi<{ flight?: TripFlightRecord }>({
+          action: "upsertFlight",
+          flightId: id,
+          documentId: data.document?.id ?? data.documentId ?? null,
+          airline: data.airline ?? null,
+          flightNumber: data.flightNumber ?? null,
+          bookingReference: data.bookingReference ?? null,
+          originAirport: data.origin?.city ?? null,
+          destinationAirport: data.destination?.city ?? null,
+          departureAt: data.departureAt ?? null,
+          arrivalAt: data.arrivalAt ?? null,
+          passengerName: data.passengerName ?? null,
+          qrCodePayload: data.qrCodePayload ?? null,
+          baggageInfo: data.baggageInfo ?? null,
+          terminal: data.terminal ?? null,
+          gate: data.gate ?? null,
+          seat: data.seat ?? null,
+          extractedData: data.extractedData ?? {},
+          extractionStatus: "manual",
+        })
+      : await upsertTripFlight({
+          id,
+          tripId: tripData.id,
+          documentId: data.document?.id ?? data.documentId ?? null,
+          airline: data.airline ?? null,
+          flightNumber: data.flightNumber ?? null,
+          bookingReference: data.bookingReference ?? null,
+          originAirport: data.origin?.city ?? null,
+          destinationAirport: data.destination?.city ?? null,
+          departureAt: data.departureAt ?? null,
+          arrivalAt: data.arrivalAt ?? null,
+          passengerName: data.passengerName ?? null,
+          qrCodePayload: data.qrCodePayload ?? null,
+          baggageInfo: data.baggageInfo ?? null,
+          terminal: data.terminal ?? null,
+          gate: data.gate ?? null,
+          seat: data.seat ?? null,
+          extractedData: data.extractedData ?? {},
+          extractionStatus: "manual",
+        })
 
-    if (result.error || !result.data) {
+    const nextFlight = adminLinkMutationMode ? result.data?.flight ?? null : result.data
+    if (result.error || !nextFlight) {
       showToast(resolveProtectedWriteError(result.error || "Nao foi possivel atualizar a passagem."), "error")
       return
     }
@@ -5015,7 +5174,7 @@ export default function TripPage() {
     setTripData(prev => ({
       ...prev,
       flights: prev.flights.map((flight: any) =>
-        flight.id === id ? mapFlightRecordToView(result.data!, prev.documents) : flight
+        flight.id === id ? mapFlightRecordToView(nextFlight, prev.documents) : flight
       )
     }))
   }
@@ -5055,8 +5214,10 @@ export default function TripPage() {
       return
     }
 
-    const result = data?.id
-      ? await updateTripHotel(data.id, {
+    const result = adminLinkMutationMode
+      ? await callTripAdminApi<{ hotel?: any }>({
+          action: "saveHotel",
+          hotelId: data?.id ?? null,
           name: data.name,
           address: data.address,
           checkIn: data.checkIn,
@@ -5064,45 +5225,55 @@ export default function TripPage() {
           confirmationCode: data.confirmationCode,
           notes: data.notes,
         })
-      : await createTripHotel({
-          tripId: tripData.id,
-          name: data.name,
-          address: data.address,
-          checkIn: data.checkIn,
-          checkOut: data.checkOut,
-          confirmationCode: data.confirmationCode,
-          notes: data.notes,
-        })
+      : data?.id
+        ? await updateTripHotel(data.id, {
+            name: data.name,
+            address: data.address,
+            checkIn: data.checkIn,
+            checkOut: data.checkOut,
+            confirmationCode: data.confirmationCode,
+            notes: data.notes,
+          })
+        : await createTripHotel({
+            tripId: tripData.id,
+            name: data.name,
+            address: data.address,
+            checkIn: data.checkIn,
+            checkOut: data.checkOut,
+            confirmationCode: data.confirmationCode,
+            notes: data.notes,
+          })
 
-    if (result.error || !result.data) {
+    const savedHotel = adminLinkMutationMode ? result.data?.hotel ?? null : result.data
+    if (result.error || !savedHotel) {
       console.error("[HOTEL] error", result.error)
       showToast(resolveProtectedWriteError(result.error || "Nao foi possivel salvar a hospedagem."), "error")
       return
     }
 
-    console.log("[HOTEL] success", result.data.id)
+    console.log("[HOTEL] success", savedHotel.id)
     setTripData(prev => ({
       ...prev,
       hotels: data?.id
         ? (Array.isArray(prev.hotels) ? prev.hotels : []).map((hotel: any) =>
-            hotel.id === result.data!.id
-              ? { ...hotel, ...result.data, image: hotel.image || prev.heroImage, amenities: hotel.amenities || [] }
+            hotel.id === savedHotel.id
+              ? { ...hotel, ...savedHotel, image: hotel.image || prev.heroImage, amenities: hotel.amenities || [] }
               : hotel,
           )
         : [
             ...(Array.isArray(prev.hotels) ? prev.hotels : []),
             {
-              ...result.data,
+              ...savedHotel,
               image: prev.heroImage,
               amenities: [],
             },
           ],
       hotel:
         data?.id
-          ? ((Array.isArray(prev.hotels) ? prev.hotels : []).find((hotel: any) => hotel.id === result.data!.id)
-              ? { ...(Array.isArray(prev.hotels) ? prev.hotels : []).find((hotel: any) => hotel.id === result.data!.id), ...result.data, image: prev.heroImage, amenities: [] }
-              : { ...result.data, image: prev.heroImage, amenities: [] })
-          : (prev.hotel ?? { ...result.data, image: prev.heroImage, amenities: [] }),
+          ? ((Array.isArray(prev.hotels) ? prev.hotels : []).find((hotel: any) => hotel.id === savedHotel.id)
+              ? { ...(Array.isArray(prev.hotels) ? prev.hotels : []).find((hotel: any) => hotel.id === savedHotel.id), ...savedHotel, image: prev.heroImage, amenities: [] }
+              : { ...savedHotel, image: prev.heroImage, amenities: [] })
+          : (prev.hotel ?? { ...savedHotel, image: prev.heroImage, amenities: [] }),
     }))
     showToast("Hospedagem salva com sucesso.", "success")
   }
@@ -5115,9 +5286,15 @@ export default function TripPage() {
       return
     }
 
-    const result = await deleteTripHotel(hotelId)
+    const result = adminLinkMutationMode
+      ? await callTripAdminApi<{ success?: boolean }>({
+          action: "deleteHotel",
+          hotelId,
+        })
+      : await deleteTripHotel(hotelId)
 
-    if (!result.success) {
+    const hotelDeleted = adminLinkMutationMode ? result.ok : result.success
+    if (!hotelDeleted) {
       console.error("[HOTEL] error", result.error)
       showToast(resolveProtectedWriteError(result.error || "Nao foi possivel excluir a hospedagem."), "error")
       return
@@ -5147,7 +5324,7 @@ export default function TripPage() {
     const payloadContent = mapLegacyDaysToItineraryContent(normalizedDays, currentSimpleRecord?.content ?? null)
     const title = currentSimpleRecord?.title || `Roteiro simples - ${tripData.destination || "Viagem"}`
 
-    if (shouldUseSupabase()) {
+    if (shouldUseSupabase() && !adminLinkMutationMode) {
       if (!sensitiveAccessGranted) {
         requireSensitiveAccess(() => { void handleUpdateItinerary(normalizedDays) })
         return
@@ -5159,23 +5336,31 @@ export default function TripPage() {
       }
     }
 
-    const result = await upsertTripItinerary({
-      id: currentSimpleRecord?.id,
-      tripId: tripData.id,
-      title,
-      mode: "simple",
-      status: "completed",
-      content: payloadContent,
-      createdBy: currentSimpleRecord?.createdBy ?? tripOwnerUserId,
-    })
+    const result = adminLinkMutationMode
+      ? await callTripAdminApi<{ itinerary?: TripItineraryRecord }>({
+          action: "saveSimpleItinerary",
+          itineraryId: currentSimpleRecord?.id ?? null,
+          title,
+          content: payloadContent,
+        })
+      : await upsertTripItinerary({
+          id: currentSimpleRecord?.id,
+          tripId: tripData.id,
+          title,
+          mode: "simple",
+          status: "completed",
+          content: payloadContent,
+          createdBy: currentSimpleRecord?.createdBy ?? tripOwnerUserId,
+        })
 
-    if (result.error || !result.data) {
+    const nextItineraryRecord = adminLinkMutationMode ? result.data?.itinerary ?? null : result.data
+    if (result.error || !nextItineraryRecord) {
       console.error("[ITINERARY] save simple error", result.error)
       showToast(resolveProtectedWriteError(result.error || "Nao foi possivel salvar o roteiro simples."), "error")
       return
     }
 
-    syncTripItineraryRecord(result.data)
+    syncTripItineraryRecord(nextItineraryRecord)
     showToast("Roteiro simples salvo com sucesso.", "success")
   }
 
@@ -5184,7 +5369,7 @@ export default function TripPage() {
 
     const label = mode === "simple" ? "roteiro simples" : "roteiro completo"
 
-    if (shouldUseSupabase() && !tripOwnerUserId) {
+    if (shouldUseSupabase() && !adminLinkMutationMode && !tripOwnerUserId) {
       showToast(`Entre com login para gerar o ${label} desta viagem.`, "error")
       return
     }
@@ -5192,6 +5377,8 @@ export default function TripPage() {
     const result = await requestAiItineraryGeneration({
       tripId: tripData.id,
       mode,
+      tripSlug: routeSlug,
+      adminToken: adminLinkMutationMode ? tripAdminToken : null,
     })
 
     if (result.error || !result.data?.itinerary) {
@@ -5253,27 +5440,47 @@ export default function TripPage() {
     if (!confirmed) return
 
     let storageWarning: string | null = null
-    if (linkedDocument?.filePath) {
-      const storageResult = await deleteDocumentFile(linkedDocument.filePath)
-      if (!storageResult.success) {
-        console.error("[ITINERARY] storage delete error", storageResult.error)
-        storageWarning = storageResult.error || "Nao foi possivel remover o arquivo do storage."
-      }
-    }
 
-    const itineraryResult = await deleteTripItinerary(record.id)
-    if (!itineraryResult.success) {
-      console.error("[ITINERARY] delete error", itineraryResult.error)
-      showToast(resolveProtectedWriteError(itineraryResult.error || "Nao foi possivel excluir o roteiro."), "error")
-      return
-    }
+    if (adminLinkMutationMode) {
+      const deleteResult = await callTripAdminApi<{ success?: boolean }>({
+        action: "deleteItinerary",
+        itineraryId: record.id,
+        documentId: linkedDocument?.id ?? null,
+        documentPath: linkedDocument?.filePath ?? null,
+      })
 
-    if (linkedDocument?.id) {
-      const documentResult = await deleteDocument(linkedDocument.id)
-      if (!documentResult.success) {
-        console.error("[ITINERARY] linked document delete error", documentResult.error)
-        showToast(resolveProtectedWriteError(documentResult.error || "O roteiro foi removido, mas o documento vinculado nao foi excluido."), "error")
+      if (!deleteResult.ok) {
+        console.error("[ITINERARY] delete error", deleteResult.error)
+        showToast(resolveProtectedWriteError(deleteResult.error || "Nao foi possivel excluir o roteiro."), "error")
         return
+      }
+    } else {
+      if (linkedDocument?.filePath) {
+        const storageResult = await deleteDocumentFile(linkedDocument.filePath)
+        if (!storageResult.success) {
+          console.error("[ITINERARY] storage delete error", storageResult.error)
+          storageWarning = storageResult.error || "Nao foi possivel remover o arquivo do storage."
+        }
+      }
+
+      const itineraryResult = await deleteTripItinerary(record.id)
+      if (!itineraryResult.success) {
+        console.error("[ITINERARY] delete error", itineraryResult.error)
+        showToast(resolveProtectedWriteError(itineraryResult.error || "Nao foi possivel excluir o roteiro."), "error")
+        return
+      }
+
+      if (linkedDocument?.id) {
+        const documentResult = await deleteDocument(linkedDocument.id)
+        if (!documentResult.success) {
+          console.error("[ITINERARY] linked document delete error", documentResult.error)
+          showToast(resolveProtectedWriteError(documentResult.error || "O roteiro foi removido, mas o documento vinculado nao foi excluido."), "error")
+          return
+        }
+      }
+
+      if (storageWarning) {
+        showToast(storageWarning, "info")
       }
     }
 
@@ -5316,27 +5523,41 @@ export default function TripPage() {
     if (!confirmed) return
 
     let storageWarning: string | null = null
-    if (flight.document?.filePath) {
-      const storageResult = await deleteDocumentFile(flight.document.filePath)
-      if (!storageResult.success) {
-        console.error("[TICKET] storage delete error", storageResult.error)
-        storageWarning = storageResult.error || "Nao foi possivel remover o arquivo do storage."
-      }
-    }
-
-    const flightResult = await deleteTripFlight(flightId)
-    if (!flightResult.success) {
-      console.error("[TICKET] flight delete error", flightResult.error)
-      showToast(resolveProtectedWriteError(flightResult.error || "Nao foi possivel excluir a passagem."), "error")
-      return
-    }
-
-    if (flight.document?.id) {
-      const documentResult = await deleteDocument(flight.document.id)
-      if (!documentResult.success) {
-        console.error("[TICKET] document delete error", documentResult.error)
-        showToast(resolveProtectedWriteError(documentResult.error || "A passagem foi removida, mas o documento vinculado nao foi excluido."), "error")
+    if (adminLinkMutationMode) {
+      const deleteResult = await callTripAdminApi<{ success?: boolean }>({
+        action: "deleteFlight",
+        flightId,
+        documentId: flight.document?.id ?? null,
+        documentPath: flight.document?.filePath ?? null,
+      })
+      if (!deleteResult.ok) {
+        console.error("[TICKET] flight delete error", deleteResult.error)
+        showToast(resolveProtectedWriteError(deleteResult.error || "Nao foi possivel excluir a passagem."), "error")
         return
+      }
+    } else {
+      if (flight.document?.filePath) {
+        const storageResult = await deleteDocumentFile(flight.document.filePath)
+        if (!storageResult.success) {
+          console.error("[TICKET] storage delete error", storageResult.error)
+          storageWarning = storageResult.error || "Nao foi possivel remover o arquivo do storage."
+        }
+      }
+
+      const flightResult = await deleteTripFlight(flightId)
+      if (!flightResult.success) {
+        console.error("[TICKET] flight delete error", flightResult.error)
+        showToast(resolveProtectedWriteError(flightResult.error || "Nao foi possivel excluir a passagem."), "error")
+        return
+      }
+
+      if (flight.document?.id) {
+        const documentResult = await deleteDocument(flight.document.id)
+        if (!documentResult.success) {
+          console.error("[TICKET] document delete error", documentResult.error)
+          showToast(resolveProtectedWriteError(documentResult.error || "A passagem foi removida, mas o documento vinculado nao foi excluido."), "error")
+          return
+        }
       }
     }
 
@@ -5370,28 +5591,42 @@ export default function TripPage() {
     if (!confirmed) return
 
     let storageWarning: string | null = null
-    if (document.filePath) {
-      const storageResult = await deleteDocumentFile(document.filePath)
-      if (!storageResult.success) {
-        console.error("[DOCUMENT] storage delete error", storageResult.error)
-        storageWarning = storageResult.error || "Nao foi possivel remover o arquivo do storage."
-      }
-    }
-
-    if (linkedFlight) {
-      const flightResult = await deleteTripFlight(linkedFlight.id)
-      if (!flightResult.success) {
-        console.error("[DOCUMENT] linked flight delete error", flightResult.error)
-        showToast(resolveProtectedWriteError(flightResult.error || "Nao foi possivel excluir a passagem vinculada."), "error")
+    if (adminLinkMutationMode) {
+      const deleteResult = await callTripAdminApi<{ success?: boolean }>({
+        action: "deleteDocument",
+        documentId,
+        documentPath: document.filePath ?? null,
+        linkedFlightId: linkedFlight?.id ?? null,
+      })
+      if (!deleteResult.ok) {
+        console.error("[DOCUMENT] delete error", deleteResult.error)
+        showToast(resolveProtectedWriteError(deleteResult.error || "Nao foi possivel excluir o arquivo."), "error")
         return
       }
-    }
+    } else {
+      if (document.filePath) {
+        const storageResult = await deleteDocumentFile(document.filePath)
+        if (!storageResult.success) {
+          console.error("[DOCUMENT] storage delete error", storageResult.error)
+          storageWarning = storageResult.error || "Nao foi possivel remover o arquivo do storage."
+        }
+      }
 
-    const documentResult = await deleteDocument(documentId)
-    if (!documentResult.success) {
-      console.error("[DOCUMENT] delete error", documentResult.error)
-      showToast(resolveProtectedWriteError(documentResult.error || "Nao foi possivel excluir o arquivo."), "error")
-      return
+      if (linkedFlight) {
+        const flightResult = await deleteTripFlight(linkedFlight.id)
+        if (!flightResult.success) {
+          console.error("[DOCUMENT] linked flight delete error", flightResult.error)
+          showToast(resolveProtectedWriteError(flightResult.error || "Nao foi possivel excluir a passagem vinculada."), "error")
+          return
+        }
+      }
+
+      const documentResult = await deleteDocument(documentId)
+      if (!documentResult.success) {
+        console.error("[DOCUMENT] delete error", documentResult.error)
+        showToast(resolveProtectedWriteError(documentResult.error || "Nao foi possivel excluir o arquivo."), "error")
+        return
+      }
     }
 
     setTripData((prev) => ({

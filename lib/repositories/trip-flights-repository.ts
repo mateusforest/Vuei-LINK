@@ -263,7 +263,7 @@ export async function deleteTripFlight(id: string) {
   return { source: "supabase" as const, success: true, error: null }
 }
 
-export async function requestTripFlightExtraction(payload: { tripId: string; documentId: string; flightId: string }) {
+export async function requestTripFlightExtraction(payload: { tripId: string; documentId: string; flightId: string; tripSlug?: string | null; adminToken?: string | null }) {
   if (!shouldUseSupabase()) {
     return {
       source: "local" as const,
