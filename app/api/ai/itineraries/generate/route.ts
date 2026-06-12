@@ -10,6 +10,8 @@ import { getDestinationCoverImage, getDestinationMetadata } from "@/lib/trip-des
 import type { Document } from "@/types/document"
 import type { TripItineraryRecord, TripItineraryContent } from "@/types/itinerary"
 
+export const runtime = "nodejs"
+
 type JsonObject = Record<string, unknown>
 type TripRow = Database["public"]["Tables"]["trips"]["Row"]
 type ProfileRow = Database["public"]["Tables"]["profiles"]["Row"]
@@ -19,6 +21,11 @@ type DocumentRow = Database["public"]["Tables"]["documents"]["Row"]
 type HotelRow = Database["public"]["Tables"]["trip_hotels"]["Row"]
 type FlightRow = Database["public"]["Tables"]["trip_flights"]["Row"]
 type TripItineraryRow = Database["public"]["Tables"]["trip_itineraries"]["Row"]
+
+function logItineraryDev(stage: string, details?: Record<string, unknown>) {
+  if (process.env.NODE_ENV !== "development") return
+  console.log("[AI][ITINERARY]", stage, details ?? {})
+}
 
 function calculateTripDays(startDate?: string | null, endDate?: string | null) {
   if (!startDate || !endDate) return null
@@ -141,11 +148,6 @@ async function getCreditsBalance(
 
 function buildTravelerName(params: { trip: TripRow; ownerProfile: ProfileRow | null; client: ClientRow | null }) {
   return params.client?.name ?? params.ownerProfile?.name ?? (params.trip.travelers_count > 1 ? `${params.trip.travelers_count} viajantes` : "Viajante")
-}
-
-function buildDocumentStatus(documents: DocumentRow[]) {
-  if (documents.length === 0) return "Nenhum documento cadastrado"
-  return `${documents.length} documento(s) cadastrado(s)`
 }
 
 function buildTripContext(params: {
@@ -316,6 +318,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: generatingRecord.error ?? "Nao foi possivel iniciar a geracao do roteiro." }, { status: 500 })
   }
 
+  logItineraryDev("generation_started", {
+    tripId: accessResult.trip.id,
+    mode,
+    itineraryId: generatingRecord.data.id,
+    ownerType,
+  })
+
   const [documentsResult, hotelsResult, flightsResult, agencyResult, clientResult, ownerProfileResult] = await Promise.all([
     supabase.from("documents").select("*").eq("trip_id", accessResult.trip.id).order("created_at", { ascending: false }),
     supabase.from("trip_hotels").select("*").eq("trip_id", accessResult.trip.id).order("created_at", { ascending: true }),
@@ -341,6 +350,14 @@ export async function POST(request: Request) {
     endDate: accessResult.trip.end_date,
     expectedDays,
     travelContext: context,
+  })
+
+  logItineraryDev("ai_finished", {
+    ok: aiResult.ok,
+    calledModel: aiResult.calledModel,
+    model: aiResult.model,
+    hasData: Boolean(aiResult.data),
+    error: aiResult.error ?? null,
   })
 
   if (!aiResult.calledModel) {
@@ -411,6 +428,7 @@ export async function POST(request: Request) {
   let pdfPath: string | null = null
 
   if (mode === "complete_pdf") {
+    try {
     const branding = (agencyResult.data?.branding ?? {}) as Record<string, unknown>
     const agencySettings = (agencyResult.data?.settings ?? {}) as Record<string, unknown>
     const destinationMetadata = getDestinationMetadata(accessResult.trip.destination, accessResult.trip.country, accessResult.trip.city)
@@ -421,6 +439,16 @@ export async function POST(request: Request) {
       hotelsResult.data?.[0]?.name ? `Hospedagem principal: ${hotelsResult.data[0].name}` : null,
       flightsResult.data?.[0]?.booking_reference ? `Localizador principal: ${flightsResult.data[0].booking_reference}` : null,
     ].filter((entry): entry is string => Boolean(entry))
+
+    logItineraryDev("pdf_payload_ready", {
+      tripId: accessResult.trip.id,
+      itineraryId: generatingRecord.data.id,
+      hasHeroImage: Boolean(heroImage),
+      hasAgencyLogo: Boolean((typeof branding.linkLogoUrl === "string" && branding.linkLogoUrl) || agencyResult.data?.logo_url),
+      hotels: (hotelsResult.data ?? []).length,
+      flights: (flightsResult.data ?? []).length,
+      documents: (documentsResult.data ?? []).length,
+    })
 
     const pdfBytes = await buildTripItineraryPdf({
       title: aiResult.data.title,
@@ -492,10 +520,20 @@ export async function POST(request: Request) {
       content: aiResult.data,
     })
 
+    logItineraryDev("pdf_created", {
+      bytes: pdfBytes.byteLength,
+    })
+
     pdfPath = `${authData.user.id}/${accessResult.trip.id}/itineraries/${Date.now()}-roteiro-completo.pdf`
     const upload = await supabase.storage.from("vuei-documents").upload(pdfPath, pdfBytes, {
       contentType: "application/pdf",
       upsert: true,
+    })
+
+    logItineraryDev("storage_upload_finished", {
+      path: pdfPath,
+      ok: !upload.error,
+      error: upload.error?.message ?? null,
     })
 
     if (upload.error) {
@@ -544,6 +582,11 @@ export async function POST(request: Request) {
     }
 
     const signedPdfResult = await supabase.storage.from("vuei-documents").createSignedUrl(pdfPath, 60 * 10)
+    logItineraryDev("storage_validation_finished", {
+      path: pdfPath,
+      ok: !signedPdfResult.error && Boolean(signedPdfResult.data?.signedUrl),
+      error: signedPdfResult.error?.message ?? null,
+    })
     if (signedPdfResult.error || !signedPdfResult.data?.signedUrl) {
       await updateItinerary(supabase, generatingRecord.data.id, {
         status: "failed",
@@ -611,6 +654,11 @@ export async function POST(request: Request) {
       .select("*")
       .single()
 
+    logItineraryDev("document_insert_finished", {
+      ok: !documentInsert.error && Boolean(documentInsert.data),
+      error: documentInsert.error?.message ?? null,
+    })
+
     if (documentInsert.error || !documentInsert.data) {
       await updateItinerary(supabase, generatingRecord.data.id, {
         status: "failed",
@@ -657,6 +705,57 @@ export async function POST(request: Request) {
     }
 
     document = documentInsert.data as DocumentRow
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Falha desconhecida ao gerar o PDF do roteiro."
+      console.error("[AI][ITINERARY] complete pdf runtime error", error)
+      logItineraryDev("pdf_generation_failed", {
+        itineraryId: generatingRecord.data.id,
+        message,
+      })
+
+      await updateItinerary(supabase, generatingRecord.data.id, {
+        status: "failed",
+        content: {
+          ...aiResult.data,
+          error: message,
+        },
+      })
+
+      await createAiUsageLog(supabase, {
+        ownerUserId: ownerType === "traveler" ? authData.user.id : null,
+        agencyId: accessResult.trip.agency_id,
+        tripId: accessResult.trip.id,
+        feature: "itinerary_generation",
+        model: aiResult.model,
+        inputTokens: aiResult.usage.inputTokens,
+        outputTokens: aiResult.usage.outputTokens,
+        totalTokens: aiResult.usage.totalTokens,
+        creditAmount: creditCost,
+        status: "failed",
+        metadata: {
+          ...usageMetadata,
+          pdf_runtime_error: message,
+        },
+      })
+
+      const failedCreditInsert = await registerItineraryCreditConsumption(supabase, {
+        ownerType,
+        ownerUserId: authData.user.id,
+        agencyId: accessResult.trip.agency_id,
+        amount: creditCost,
+        tripId: accessResult.trip.id,
+        itineraryId: generatingRecord.data.id,
+        mode,
+        createdBy: authData.user.id,
+        failed: true,
+      })
+
+      if (failedCreditInsert.error) {
+        console.error("[AI][ITINERARY] failed credit transaction error", failedCreditInsert.error.message)
+      }
+
+      return NextResponse.json({ error: `Falha na geracao do PDF do roteiro: ${message}` }, { status: 500 })
+    }
   }
 
   const itineraryUpdate = await updateItinerary(supabase, generatingRecord.data.id, {
@@ -704,6 +803,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: itineraryUpdate.error ?? "Nao foi possivel finalizar o roteiro gerado." }, { status: 500 })
   }
 
+  logItineraryDev("itinerary_updated", {
+    itineraryId: itineraryUpdate.data.id,
+    status: itineraryUpdate.data.status,
+    documentId: itineraryUpdate.data.document_id,
+    pdfUrl: itineraryUpdate.data.pdf_url,
+  })
+
   const usageInsert = await createAiUsageLog(supabase, {
     ownerUserId: ownerType === "traveler" ? authData.user.id : null,
     agencyId: accessResult.trip.agency_id,
@@ -736,6 +842,11 @@ export async function POST(request: Request) {
   if (creditInsert.error) {
     console.error("[AI][ITINERARY] credit transaction error", creditInsert.error.message)
   }
+
+  logItineraryDev("response_ready", {
+    itineraryId: itineraryUpdate.data.id,
+    hasDocument: Boolean(document),
+  })
 
   return NextResponse.json({
     itinerary: mapItineraryRowToRecord(itineraryUpdate.data),

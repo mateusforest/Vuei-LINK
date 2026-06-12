@@ -82,6 +82,11 @@ const MUTED = "#6b7280"
 const BORDER = "#dbe7f3"
 const SOFT = "#eef7fb"
 
+function logItineraryPdfDev(stage: string, details?: Record<string, unknown>) {
+  if (process.env.NODE_ENV !== "development") return
+  console.log("[AI][ITINERARY][PDF]", stage, details ?? {})
+}
+
 function escapeHtml(value: string) {
   return value
     .replace(/&/g, "&amp;")
@@ -683,13 +688,33 @@ async function resolveExecutablePath() {
 }
 
 export async function buildTripItineraryPdf(input: TripPdfInput) {
+  logItineraryPdfDev("start", {
+    destination: input.destination,
+    days: input.content.days.length,
+    hasHeroImage: Boolean(input.heroImage),
+    hasAgencyLogo: Boolean(input.branding.agencyLogoUrl),
+  })
+
   const [heroImage, agencyLogo] = await Promise.all([
     assetToDataUrl(input.heroImage),
     assetToDataUrl(input.branding.agencyLogoUrl),
   ])
+  logItineraryPdfDev("assets_resolved", {
+    heroImageResolved: Boolean(heroImage),
+    agencyLogoResolved: Boolean(agencyLogo),
+  })
 
   const html = renderHtml(input, { heroImage, agencyLogo })
+  logItineraryPdfDev("html_rendered", {
+    htmlLength: html.length,
+  })
+
   const executablePath = await resolveExecutablePath()
+  logItineraryPdfDev("executable_resolved", {
+    executablePath,
+    platform: process.platform,
+  })
+
   const browser = await puppeteer.launch({
     executablePath,
     args: process.platform === "win32"
@@ -702,10 +727,12 @@ export async function buildTripItineraryPdf(input: TripPdfInput) {
       deviceScaleFactor: 2,
     },
   })
+  logItineraryPdfDev("browser_launched")
 
   try {
     const page = await browser.newPage()
-    await page.setContent(html, { waitUntil: "networkidle0" })
+    await page.setContent(html, { waitUntil: "load" })
+    logItineraryPdfDev("content_loaded")
     await page.evaluate(async () => {
       const pendingImages = Array.from(document.images).filter((image) => !image.complete)
       await Promise.all(
@@ -719,8 +746,9 @@ export async function buildTripItineraryPdf(input: TripPdfInput) {
       )
     })
     await page.emulateMediaType("screen")
+    logItineraryPdfDev("page_ready_for_pdf")
 
-    return Buffer.from(
+    const pdfBytes = Buffer.from(
       await page.pdf({
         format: "A4",
         printBackground: true,
@@ -728,6 +756,18 @@ export async function buildTripItineraryPdf(input: TripPdfInput) {
         margin: { top: "0", right: "0", bottom: "0", left: "0" },
       }),
     )
+
+    logItineraryPdfDev("pdf_created", {
+      bytes: pdfBytes.byteLength,
+    })
+
+    return pdfBytes
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Falha desconhecida ao gerar PDF."
+    logItineraryPdfDev("error", {
+      message,
+    })
+    throw error
   } finally {
     await browser.close()
   }
