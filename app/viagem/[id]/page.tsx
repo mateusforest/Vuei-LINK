@@ -692,6 +692,38 @@ function resolveProtectedWriteError(error?: string | null) {
   return error || "Nao foi possivel concluir esta acao."
 }
 
+function logTripDocumentsDev(stage: string, details?: Record<string, unknown>) {
+  if (process.env.NODE_ENV !== "development") return
+  console.log("[TRIP][DOCUMENTS]", stage, details ?? {})
+}
+
+function getSafeDocumentDebugRows(documents: any[]) {
+  return documents.map((document) => ({
+    id: document?.id ?? null,
+    trip_id: document?.tripId ?? document?.trip_id ?? null,
+    name: document?.name ?? document?.title ?? null,
+    type: document?.type ?? null,
+    category: document?.category ?? null,
+    visibility: document?.visibility ?? null,
+    is_private: document?.isPrivate ?? document?.is_private ?? document?.private ?? null,
+    has_file_url: Boolean(document?.fileUrl ?? document?.file_url),
+  }))
+}
+
+function getDocumentDebugCounts(documents: any[]) {
+  const isPrivate = (document: any) =>
+    document?.private === true || document?.isPrivate === true || document?.is_private === true || document?.visibility === "private"
+
+  return {
+    total: documents.length,
+    public: documents.filter((document) => !isPrivate(document)).length,
+    private: documents.filter((document) => isPrivate(document)).length,
+    tickets: documents.filter((document) => document?.type === "ticket").length,
+    itineraries: documents.filter((document) => document?.type === "itinerary").length,
+    general: documents.filter((document) => !["ticket", "itinerary"].includes(document?.type ?? "")).length,
+  }
+}
+
 const iconMap: Record<string, any> = {
   Plane, Hotel, MapPin, Navigation, Star, Heart
 }
@@ -2745,6 +2777,20 @@ function DocumentsSection({
   const publicDocs = documents.filter((d: any) => !isPrivateDocument(d))
   const privateDocs = documents.filter((d: any) => isPrivateDocument(d))
 
+  useEffect(() => {
+    if (process.env.NODE_ENV !== "development") return
+
+    const isMobileViewport = typeof window !== "undefined" ? window.innerWidth < 768 : false
+    logTripDocumentsDev("section_render", {
+      tripId: tripData?.id ?? null,
+      isMobileViewport,
+      isAdmin,
+      loading,
+      counts: getDocumentDebugCounts(documents),
+      rendered: true,
+    })
+  }, [documents, isAdmin, loading, tripData?.id])
+
   const getDocIcon = (type: string) => {
     switch (type) {
       case "passport": return "🛂"
@@ -4613,6 +4659,14 @@ export default function TripPage() {
       devLog("trip.loading", routeSlug)
 
       const useSupabase = shouldUseSupabase()
+      const routeMode = isAdminRoute ? "admin" : isPublicRoute ? "public" : "portal"
+      const isMobileViewport = typeof window !== "undefined" ? window.innerWidth < 768 : false
+
+      logTripDocumentsDev("trip_load_started", {
+        routeSlug,
+        routeMode,
+        isMobileViewport,
+      })
 
       try {
         const repositoryTrip = adminToken
@@ -4625,6 +4679,16 @@ export default function TripPage() {
           if (loadRequestRef.current !== requestId) return
           setTripOwnerUserId(repositoryTrip.data.ownerUserId ?? null)
           const isOwner = Boolean(user?.id && repositoryTrip.data.ownerUserId && user.id === repositoryTrip.data.ownerUserId)
+
+          logTripDocumentsDev("trip_resolved", {
+            routeSlug,
+            tripId: repositoryTrip.data.id,
+            routeMode,
+            isMobileViewport,
+            hasAdminToken: Boolean(adminToken),
+            hasPublicToken: Boolean(publicToken),
+            isOwner,
+          })
 
           if (isAdminRoute && authLoading) {
             return
@@ -4674,7 +4738,7 @@ export default function TripPage() {
 
           void (async () => {
             const sectionsPerf = startPerfMeasure("trip.sections")
-            const [documentsResult, flightsResult, itinerariesResult, hotelsResult, agencyResult] = await Promise.all([
+            const [documentsSettled, flightsSettled, itinerariesSettled, hotelsSettled, agencySettled] = await Promise.allSettled([
               canWriteTrip ? listDocumentsByTrip(repositoryTrip.data.id) : listPublicTripDocuments(repositoryTrip.data.id),
               canWriteTrip ? listTripFlights(repositoryTrip.data.id) : listPublicTripFlights(repositoryTrip.data.id),
               listTripItineraries(repositoryTrip.data.id),
@@ -4683,6 +4747,37 @@ export default function TripPage() {
             ])
 
             if (loadRequestRef.current !== requestId) return
+
+            const documentsResult =
+              documentsSettled.status === "fulfilled"
+                ? documentsSettled.value
+                : { source: "error" as const, data: [] as any[], error: documentsSettled.reason instanceof Error ? documentsSettled.reason.message : "Falha ao buscar documentos." }
+            const flightsResult =
+              flightsSettled.status === "fulfilled"
+                ? flightsSettled.value
+                : { source: "error" as const, data: [] as any[], error: flightsSettled.reason instanceof Error ? flightsSettled.reason.message : "Falha ao buscar voos." }
+            const itinerariesResult =
+              itinerariesSettled.status === "fulfilled"
+                ? itinerariesSettled.value
+                : { source: "error" as const, data: [] as TripItineraryRecord[], error: itinerariesSettled.reason instanceof Error ? itinerariesSettled.reason.message : "Falha ao buscar roteiros." }
+            const hotelsResult =
+              hotelsSettled.status === "fulfilled"
+                ? hotelsSettled.value
+                : { source: "error" as const, data: [] as any[], error: hotelsSettled.reason instanceof Error ? hotelsSettled.reason.message : "Falha ao buscar hospedagens." }
+            const agencyResult = agencySettled.status === "fulfilled" ? agencySettled.value : null
+            const resolvedDocuments = Array.isArray(documentsResult.data) ? documentsResult.data : []
+
+            logTripDocumentsDev("query_result", {
+              routeSlug,
+              tripId: repositoryTrip.data.id,
+              routeMode,
+              isMobileViewport,
+              adminMode: canWriteTrip,
+              querySource: documentsResult.source,
+              queryError: documentsResult.error ?? null,
+              counts: getDocumentDebugCounts(resolvedDocuments),
+              documents: getSafeDocumentDebugRows(resolvedDocuments),
+            })
 
             const simpleItinerary = resolveSimpleTripItinerary(itinerariesResult.data ?? [])
             setTripItineraryRecords(itinerariesResult.data ?? [])
@@ -4709,7 +4804,7 @@ export default function TripPage() {
                 coverImage: repositoryTrip.data.coverImage ?? undefined,
                 adminLink: repositoryTrip.data.adminLink,
                 shareLink: repositoryTrip.data.publicLink,
-                flights: (flightsResult.data ?? []).map((flight) => mapFlightRecordToView(flight, documentsResult.data)),
+                flights: (flightsResult.data ?? []).map((flight) => mapFlightRecordToView(flight, resolvedDocuments)),
                 hotel: hotelsResult.data[0]
                   ? {
                       ...hotelsResult.data[0],
@@ -4723,10 +4818,19 @@ export default function TripPage() {
                   amenities: [],
                 })),
                 itinerary: simpleItinerary ? mapItineraryContentToLegacyDays(simpleItinerary.content) : repositoryTrip.data.itinerary,
-                documents: documentsResult.data,
+                documents: resolvedDocuments,
                 travelersCount: repositoryTrip.data.travelersCount,
               })
             )
+
+            logTripDocumentsDev("post_filter_counts", {
+              routeSlug,
+              tripId: repositoryTrip.data.id,
+              routeMode,
+              isMobileViewport,
+              adminMode: canWriteTrip,
+              counts: getDocumentDebugCounts(resolvedDocuments),
+            })
             setSectionsLoading({
               flights: false,
               hotels: false,
