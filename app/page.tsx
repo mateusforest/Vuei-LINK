@@ -4,7 +4,6 @@ import { HowItWorksSection } from "@/components/how-it-works-section"
 import { ConciergeSection } from "@/components/concierge-section"
 import { PWASection } from "@/components/pwa-section"
 import { Footer } from "@/components/footer"
-import { PWAPopup } from "@/components/pwa-popup"
 
 export default function Home() {
   return (
@@ -15,7 +14,6 @@ export default function Home() {
       <ConciergeSection />
       <PWASection />
       <Footer />
-      <PWAPopup />
     </main>
   )
 }

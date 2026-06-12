@@ -117,7 +117,7 @@ export default function SettingsPage() {
           email: agency.settings?.email || profile?.email || prev.email,
           phone: agency.settings?.phone || profile?.phone || prev.phone,
           address: agency.settings?.address || prev.address,
-          logo: agency.logo || agency.branding?.logoUrl || prev.logo,
+          logo: agency.logo || prev.logo,
           plan: agency.plan ? agency.plan[0].toUpperCase() + agency.plan.slice(1) : prev.plan,
         }))
       }

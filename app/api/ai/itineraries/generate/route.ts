@@ -420,7 +420,6 @@ export async function POST(request: Request) {
         agencyName: agencyResult.data?.name ?? null,
         agencyLogoUrl:
           (typeof branding.linkLogoUrl === "string" && branding.linkLogoUrl) ||
-          (typeof branding.logoUrl === "string" && branding.logoUrl) ||
           agencyResult.data?.logo_url ||
           null,
       },

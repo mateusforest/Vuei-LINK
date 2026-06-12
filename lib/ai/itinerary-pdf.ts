@@ -27,21 +27,32 @@ interface PdfLine {
   gapAfter?: number
 }
 
+function sanitizePdfText(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[•·]/g, "-")
+    .replace(/[^\x20-\x7E]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+}
+
 function escapePdfText(value: string) {
-  return value.replace(/\\/g, "\\\\").replace(/\(/g, "\\(").replace(/\)/g, "\\)")
+  return sanitizePdfText(value).replace(/\\/g, "\\\\").replace(/\(/g, "\\(").replace(/\)/g, "\\)")
 }
 
 function formatDate(value: string | null) {
   if (!value) return "Nao informado"
   const parsed = new Date(value)
-  if (Number.isNaN(parsed.getTime())) return value
+  if (Number.isNaN(parsed.getTime())) return sanitizePdfText(value)
   return parsed.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" })
 }
 
 function wrapText(text: string, maxChars = 88) {
-  if (!text.trim()) return [""]
+  const normalized = sanitizePdfText(text)
+  if (!normalized) return [""]
 
-  const words = text.trim().split(/\s+/)
+  const words = normalized.split(/\s+/)
   const lines: string[] = []
   let current = ""
 
@@ -63,13 +74,14 @@ function wrapText(text: string, maxChars = 88) {
 function buildPdfLines(input: TripPdfInput): PdfLine[] {
   const headerName = input.branding.agencyName || "Vuei"
   const travelWindow = `${formatDate(input.startDate)} a ${formatDate(input.endDate)}`
+  const subtitle = input.branding.agencyName ? "Roteiro completo da viagem" : "Roteiro completo criado com Vuei"
   const lines: PdfLine[] = [
     { text: headerName, size: 24, color: [0.0, 0.29, 0.68], gapAfter: 10 },
-    { text: input.branding.agencyName ? "Roteiro completo com branding da agencia" : "Roteiro completo criado com Vuei", size: 11, color: [0.18, 0.23, 0.32], gapAfter: 18 },
+    { text: subtitle, size: 11, color: [0.18, 0.23, 0.32], gapAfter: 18 },
     { text: input.title, size: 22, color: [0.06, 0.12, 0.18], gapAfter: 8 },
-    { text: `${input.destination}${input.country ? ` • ${input.country}` : ""}`, size: 14, color: [0.18, 0.23, 0.32], gapAfter: 4 },
+    { text: `${input.destination}${input.country ? ` - ${input.country}` : ""}`, size: 14, color: [0.18, 0.23, 0.32], gapAfter: 4 },
     { text: `Datas: ${travelWindow}`, size: 12, color: [0.18, 0.23, 0.32], gapAfter: 2 },
-    { text: `Viajantes: ${input.travelersLabel || `${input.travelersCount} pessoa(s)`}`, size: 12, color: [0.18, 0.23, 0.32], gapAfter: 18 },
+    { text: `Viajantes: ${sanitizePdfText(input.travelersLabel || `${input.travelersCount} pessoa(s)`)}`, size: 12, color: [0.18, 0.23, 0.32], gapAfter: 18 },
   ]
 
   if (input.tripSummary) {
@@ -89,7 +101,7 @@ function buildPdfLines(input: TripPdfInput): PdfLine[] {
   }
 
   for (const day of input.content.days) {
-    lines.push({ text: `Dia ${day.day} • ${day.title}`, size: 16, color: [0.0, 0.29, 0.68], gapAfter: 6 })
+    lines.push({ text: `Dia ${day.day} - ${day.title}`, size: 16, color: [0.0, 0.29, 0.68], gapAfter: 6 })
     if (day.date) {
       lines.push({ text: day.date, size: 11, color: [0.2, 0.24, 0.34], gapAfter: 6 })
     }
@@ -100,7 +112,7 @@ function buildPdfLines(input: TripPdfInput): PdfLine[] {
     }
 
     for (const activity of day.activities) {
-      const activityTitle = [activity.time, activity.title].filter(Boolean).join(" • ")
+      const activityTitle = [activity.time, activity.title].filter(Boolean).join(" - ")
       lines.push({ text: activityTitle || "Atividade", size: 12, color: [0.06, 0.12, 0.18], gapAfter: 3 })
       if (activity.location) {
         lines.push({ text: `Local: ${activity.location}`, size: 10, color: [0.2, 0.24, 0.34], gapAfter: 2 })
@@ -163,6 +175,14 @@ export function buildTripItineraryPdf(input: TripPdfInput) {
   const pages: string[] = []
   let currentPage = ""
   let currentY = top
+  let pageNumber = 1
+
+  function appendFooter(targetPageNumber: number) {
+    const footerText = input.branding.agencyName ? `${input.branding.agencyName} - Criado com Vuei` : "Criado com Vuei"
+    currentPage += "0.200 0.240 0.340 rg\n/F1 9 Tf\n"
+    currentPage += `1 0 0 1 ${left} 32 Tm\n(${escapePdfText(footerText)}) Tj\n`
+    currentPage += `1 0 0 1 ${pageWidth - 96} 32 Tm\n(${escapePdfText(`Pagina ${targetPageNumber}`)}) Tj\n`
+  }
 
   function startPage() {
     currentPage = "BT\n/F1 11 Tf\n"
@@ -170,8 +190,10 @@ export function buildTripItineraryPdf(input: TripPdfInput) {
   }
 
   function pushPage() {
+    appendFooter(pageNumber)
     currentPage += "ET\n"
     pages.push(currentPage)
+    pageNumber += 1
   }
 
   startPage()
@@ -194,13 +216,6 @@ export function buildTripItineraryPdf(input: TripPdfInput) {
     currentY -= lineHeight
   }
 
-  currentY -= 18
-  if (currentY < bottom) {
-    pushPage()
-    startPage()
-  }
-  currentPage += "0.200 0.240 0.340 rg\n/F1 10 Tf\n"
-  currentPage += `1 0 0 1 ${left} ${currentY} Tm\n(Criado com Vuei) Tj\n`
   pushPage()
 
   const objects: string[] = []
@@ -213,26 +228,32 @@ export function buildTripItineraryPdf(input: TripPdfInput) {
     const pageObjectNumber = 3 + index * 2
     const contentObjectNumber = pageObjectNumber + 1
     objects.push(`${pageObjectNumber} 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pageWidth} ${pageHeight}] /Resources << /Font << /F1 ${3 + pages.length * 2} 0 R >> >> /Contents ${contentObjectNumber} 0 R >> endobj`)
-    objects.push(`${contentObjectNumber} 0 obj << /Length ${content.length} >> stream\n${content}endstream\nendobj`)
+    objects.push(`${contentObjectNumber} 0 obj << /Length ${Buffer.byteLength(content, "utf-8")} >> stream\n${content}endstream\nendobj`)
   })
 
   const fontObjectNumber = 3 + pages.length * 2
   objects.push(`${fontObjectNumber} 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> endobj`)
 
-  let pdf = "%PDF-1.4\n"
+  const pdfParts: Buffer[] = [Buffer.from("%PDF-1.4\n", "utf-8")]
   const offsets: number[] = [0]
+  let totalLength = pdfParts[0].length
+
   for (const object of objects) {
-    offsets.push(pdf.length)
-    pdf += `${object}\n`
+    offsets.push(totalLength)
+    const buffer = Buffer.from(`${object}\n`, "utf-8")
+    pdfParts.push(buffer)
+    totalLength += buffer.length
   }
 
-  const xrefOffset = pdf.length
-  pdf += `xref\n0 ${objects.length + 1}\n`
-  pdf += "0000000000 65535 f \n"
+  let xref = `xref\n0 ${objects.length + 1}\n`
+  xref += "0000000000 65535 f \n"
   for (let index = 1; index < offsets.length; index += 1) {
-    pdf += `${offsets[index].toString().padStart(10, "0")} 00000 n \n`
+    xref += `${offsets[index].toString().padStart(10, "0")} 00000 n \n`
   }
 
-  pdf += `trailer << /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`
-  return Buffer.from(pdf, "utf-8")
+  const xrefBuffer = Buffer.from(xref, "utf-8")
+  const trailerBuffer = Buffer.from(`trailer << /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${totalLength}\n%%EOF`, "utf-8")
+  pdfParts.push(xrefBuffer, trailerBuffer)
+
+  return Buffer.concat(pdfParts)
 }

@@ -4653,7 +4653,7 @@ export default function TripPage() {
             setTripItineraryRecords(itinerariesResult.data ?? [])
             setAgencyBranding({
               name: agencyResult?.data?.name ?? null,
-              logoUrl: agencyResult?.data?.branding?.linkLogoUrl || agencyResult?.data?.branding?.logoUrl || agencyResult?.data?.logo || null,
+              logoUrl: agencyResult?.data?.branding?.linkLogoUrl || agencyResult?.data?.logo || null,
               isAgency: Boolean(repositoryTrip.data.agencyId),
             })
 
