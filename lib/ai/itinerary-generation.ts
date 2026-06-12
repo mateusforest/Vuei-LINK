@@ -56,6 +56,30 @@ export interface GeneratedItineraryResult {
   }
 }
 
+function buildTripCalendar(startDate?: string | null, endDate?: string | null) {
+  if (!startDate || !endDate) return []
+
+  const start = new Date(`${startDate}T12:00:00`)
+  const end = new Date(`${endDate}T12:00:00`)
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end < start) return []
+
+  const dates: Array<{ label: string }> = []
+  const cursor = new Date(start)
+
+  while (cursor <= end) {
+    dates.push({
+      label: cursor.toLocaleDateString("pt-BR", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+      }),
+    })
+    cursor.setDate(cursor.getDate() + 1)
+  }
+
+  return dates
+}
+
 function extractJsonObject(content: string) {
   const trimmed = content.trim()
 
@@ -173,10 +197,10 @@ function parseStructuredContent(payload: unknown): GeneratedItineraryContent | n
 
 function getSystemPrompt(mode: "simple" | "complete_pdf") {
   if (mode === "simple") {
-    return "Voce gera roteiros simples, mas comercialmente fortes, para o Vuei. Use apenas o contexto real fornecido. Nao invente reservas, documentos, horarios obrigatorios ou contatos criticos. Para cada dia, entregue titulo, resumo, observacoes uteis e atividades suficientes para manha, tarde e noite. Cada dia deve ter de 2 a 4 atividades, com horarios sugeridos quando possivel, locais/regioes e descricoes curtas. Quando algo nao existir, deixe null ou trate como sugestao geral. Responda apenas com JSON valido."
+    return "Voce gera roteiros simples, mas comercialmente fortes, para o Vuei. Use apenas o contexto real fornecido. Nao invente reservas, documentos, horarios obrigatorios ou contatos criticos. Para cada dia, entregue titulo, resumo, dicas, observacoes uteis e atividades suficientes para manha, tarde e noite. Cada dia deve ter de 2 a 4 atividades bem distribuidas pelos periodos, com horarios sugeridos quando possivel, locais/regioes e descricoes curtas. Quando algo nao existir, deixe null ou trate como sugestao geral. Responda apenas com JSON valido."
   }
 
-  return "Voce gera roteiros completos para PDF no Vuei. Use apenas o contexto real fornecido. Nao invente reservas, horarios obrigatorios, documentos criticos ou contatos oficiais. Pode sugerir atividades e dicas gerais quando forem apresentadas como sugestoes. Responda apenas com JSON valido."
+  return "Voce gera roteiros completos premium para PDF no Vuei. Use apenas o contexto real fornecido. Nao invente reservas, horarios obrigatorios, documentos criticos ou contatos oficiais. Cada dia precisa refletir manha, tarde e noite por meio do campo period das atividades, com profundidade comercial e sugestoes claras. Pode sugerir atividades, gastronomia, deslocamentos e dicas gerais quando forem apresentadas como sugestoes. Responda apenas com JSON valido."
 }
 
 export async function requestItineraryGeneration({
@@ -188,6 +212,7 @@ export async function requestItineraryGeneration({
   expectedDays,
   travelContext,
 }: ItineraryGenerationRequest): Promise<GeneratedItineraryResult> {
+  const tripCalendar = buildTripCalendar(startDate, endDate)
   const completionBudget = mode === "simple"
     ? Math.min(12_000, Math.max(2_200, 600 + (expectedDays ?? 3) * 260))
     : Math.min(18_000, Math.max(3_600, 1_000 + (expectedDays ?? 3) * 420))
@@ -384,7 +409,14 @@ export async function requestItineraryGeneration({
     model: OPENAI_ITINERARY_MODEL,
     error: null,
     rawText,
-    data: parsed,
+    data: {
+      ...parsed,
+      days: parsed.days.map((day, index) => ({
+        ...day,
+        day: index + 1,
+        date: tripCalendar[index]?.label ?? day.date,
+      })),
+    },
     usage: {
       inputTokens: payload?.usage?.prompt_tokens ?? 0,
       outputTokens: payload?.usage?.completion_tokens ?? 0,

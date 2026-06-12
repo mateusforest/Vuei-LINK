@@ -6,6 +6,7 @@ import { requestItineraryGeneration } from "@/lib/ai/itinerary-generation"
 import { buildTripItineraryPdf } from "@/lib/ai/itinerary-pdf"
 import { getCompleteItineraryCreditCost, getSimpleItineraryCreditCost, estimateCostUsd } from "@/lib/ai/credit-consumption"
 import { createAiUsageLog } from "@/lib/ai/usage-logs"
+import { getDestinationCoverImage, getDestinationMetadata } from "@/lib/trip-destination"
 import type { Document } from "@/types/document"
 import type { TripItineraryRecord, TripItineraryContent } from "@/types/itinerary"
 
@@ -13,6 +14,7 @@ type JsonObject = Record<string, unknown>
 type TripRow = Database["public"]["Tables"]["trips"]["Row"]
 type ProfileRow = Database["public"]["Tables"]["profiles"]["Row"]
 type AgencyMemberRow = Database["public"]["Tables"]["agency_members"]["Row"]
+type ClientRow = Database["public"]["Tables"]["clients"]["Row"]
 type DocumentRow = Database["public"]["Tables"]["documents"]["Row"]
 type HotelRow = Database["public"]["Tables"]["trip_hotels"]["Row"]
 type FlightRow = Database["public"]["Tables"]["trip_flights"]["Row"]
@@ -135,6 +137,15 @@ async function getCreditsBalance(
 
   const { data, error } = await client.from("profiles").select("credits_balance").eq("id", ownerId).maybeSingle()
   return { balance: data?.credits_balance ?? 0, error: error?.message ?? null }
+}
+
+function buildTravelerName(params: { trip: TripRow; ownerProfile: ProfileRow | null; client: ClientRow | null }) {
+  return params.client?.name ?? params.ownerProfile?.name ?? (params.trip.travelers_count > 1 ? `${params.trip.travelers_count} viajantes` : "Viajante")
+}
+
+function buildDocumentStatus(documents: DocumentRow[]) {
+  if (documents.length === 0) return "Nenhum documento cadastrado"
+  return `${documents.length} documento(s) cadastrado(s)`
 }
 
 function buildTripContext(params: {
@@ -305,11 +316,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: generatingRecord.error ?? "Nao foi possivel iniciar a geracao do roteiro." }, { status: 500 })
   }
 
-  const [documentsResult, hotelsResult, flightsResult, agencyResult] = await Promise.all([
+  const [documentsResult, hotelsResult, flightsResult, agencyResult, clientResult, ownerProfileResult] = await Promise.all([
     supabase.from("documents").select("*").eq("trip_id", accessResult.trip.id).order("created_at", { ascending: false }),
     supabase.from("trip_hotels").select("*").eq("trip_id", accessResult.trip.id).order("created_at", { ascending: true }),
     supabase.from("trip_flights").select("*").eq("trip_id", accessResult.trip.id).order("departure_at", { ascending: true, nullsFirst: false }),
-    accessResult.trip.agency_id ? supabase.from("agencies").select("id, name, branding, logo_url").eq("id", accessResult.trip.agency_id).maybeSingle() : Promise.resolve({ data: null, error: null }),
+    accessResult.trip.agency_id ? supabase.from("agencies").select("id, name, branding, logo_url, settings").eq("id", accessResult.trip.agency_id).maybeSingle() : Promise.resolve({ data: null, error: null }),
+    accessResult.trip.client_id ? supabase.from("clients").select("id, name, email, phone").eq("id", accessResult.trip.client_id).maybeSingle() : Promise.resolve({ data: null, error: null }),
+    accessResult.trip.owner_user_id ? supabase.from("profiles").select("id, name, email, phone").eq("id", accessResult.trip.owner_user_id).maybeSingle() : Promise.resolve({ data: null, error: null }),
   ])
 
   const context = buildTripContext({
@@ -399,13 +412,17 @@ export async function POST(request: Request) {
 
   if (mode === "complete_pdf") {
     const branding = (agencyResult.data?.branding ?? {}) as Record<string, unknown>
+    const agencySettings = (agencyResult.data?.settings ?? {}) as Record<string, unknown>
+    const destinationMetadata = getDestinationMetadata(accessResult.trip.destination, accessResult.trip.country, accessResult.trip.city)
+    const heroImage = accessResult.trip.cover_image || getDestinationCoverImage(accessResult.trip.destination, accessResult.trip.city, accessResult.trip.country)
     const usefulInfo = [
       accessResult.trip.country ? `Pais: ${accessResult.trip.country}` : null,
       accessResult.trip.city ? `Cidade base: ${accessResult.trip.city}` : null,
       hotelsResult.data?.[0]?.name ? `Hospedagem principal: ${hotelsResult.data[0].name}` : null,
+      flightsResult.data?.[0]?.booking_reference ? `Localizador principal: ${flightsResult.data[0].booking_reference}` : null,
     ].filter((entry): entry is string => Boolean(entry))
 
-    const pdfBytes = buildTripItineraryPdf({
+    const pdfBytes = await buildTripItineraryPdf({
       title: aiResult.data.title,
       destination: accessResult.trip.destination,
       country: accessResult.trip.country,
@@ -413,15 +430,64 @@ export async function POST(request: Request) {
       endDate: accessResult.trip.end_date,
       travelersCount: accessResult.trip.travelers_count,
       travelersLabel: `${accessResult.trip.travelers_count} pessoa(s)`,
+      travelerName: buildTravelerName({
+        trip: accessResult.trip,
+        ownerProfile: (profileResult.data?.id === accessResult.trip.owner_user_id ? profileResult.data : ownerProfileResult.data) as ProfileRow | null,
+        client: (clientResult.data as ClientRow | null) ?? null,
+      }),
       tripSummary: aiResult.data.summary,
+      heroImage,
       usefulInfo,
-      contacts: [],
+      contacts: [
+        typeof agencySettings.phone === "string" && agencySettings.phone ? { label: "Telefone", value: agencySettings.phone } : null,
+        typeof agencySettings.email === "string" && agencySettings.email ? { label: "E-mail", value: agencySettings.email } : null,
+      ].filter((entry): entry is { label: string; value: string } => Boolean(entry)),
       branding: {
         agencyName: agencyResult.data?.name ?? null,
         agencyLogoUrl:
           (typeof branding.linkLogoUrl === "string" && branding.linkLogoUrl) ||
           agencyResult.data?.logo_url ||
           null,
+        consultantName: profileResult.data?.role === "agency_owner" || profileResult.data?.role === "agency_member" ? profileResult.data?.name ?? null : null,
+        contactEmail: typeof agencySettings.email === "string" ? agencySettings.email : null,
+        contactPhone: typeof agencySettings.phone === "string" ? agencySettings.phone : null,
+        website: typeof agencySettings.website === "string" ? agencySettings.website : null,
+        isAgency: Boolean(accessResult.trip.agency_id),
+      },
+      hotels: ((hotelsResult.data ?? []) as HotelRow[]).map((hotel) => ({
+        name: hotel.name ?? hotel.hotel_name ?? null,
+        address: hotel.address,
+        checkIn: hotel.check_in,
+        checkOut: hotel.check_out,
+        confirmationCode: hotel.confirmation_code ?? hotel.confirmation_number ?? null,
+        notes: hotel.notes,
+      })),
+      flights: ((flightsResult.data ?? []) as FlightRow[]).map((flight) => ({
+        airline: flight.airline,
+        flightNumber: flight.flight_number,
+        bookingReference: flight.booking_reference,
+        originAirport: flight.origin_airport,
+        destinationAirport: flight.destination_airport,
+        departureAt: flight.departure_at,
+        arrivalAt: flight.arrival_at,
+        passengerName: flight.passenger_name,
+        terminal: flight.terminal,
+        gate: flight.gate,
+        seat: flight.seat,
+        baggageInfo: flight.baggage_info,
+      })),
+      documents: ((documentsResult.data ?? []) as DocumentRow[]).map((documentRow) => ({
+        name: documentRow.name,
+        type: documentRow.type,
+      })),
+      quickInfo: {
+        currency: destinationMetadata.currency?.name ?? null,
+        language: destinationMetadata.language,
+        timezone: destinationMetadata.timezone,
+        weather: null,
+        emergency: destinationMetadata.emergency,
+        baggage: ((flightsResult.data ?? []) as FlightRow[]).map((flight) => flight.baggage_info).find((value) => typeof value === "string" && value.trim().length > 0) ?? null,
+        documents: (documentsResult.data ?? []).map((documentRow) => documentRow.name),
       },
       content: aiResult.data,
     })
@@ -475,6 +541,52 @@ export async function POST(request: Request) {
       }
 
       return NextResponse.json({ error: upload.error.message }, { status: 500 })
+    }
+
+    const signedPdfResult = await supabase.storage.from("vuei-documents").createSignedUrl(pdfPath, 60 * 10)
+    if (signedPdfResult.error || !signedPdfResult.data?.signedUrl) {
+      await updateItinerary(supabase, generatingRecord.data.id, {
+        status: "failed",
+        content: {
+          ...aiResult.data,
+          error: signedPdfResult.error?.message || "Nao foi possivel validar o PDF salvo no Storage.",
+        },
+      })
+
+      await createAiUsageLog(supabase, {
+        ownerUserId: ownerType === "traveler" ? authData.user.id : null,
+        agencyId: accessResult.trip.agency_id,
+        tripId: accessResult.trip.id,
+        feature: "itinerary_generation",
+        model: aiResult.model,
+        inputTokens: aiResult.usage.inputTokens,
+        outputTokens: aiResult.usage.outputTokens,
+        totalTokens: aiResult.usage.totalTokens,
+        creditAmount: creditCost,
+        status: "failed",
+        metadata: {
+          ...usageMetadata,
+          signed_url_error: signedPdfResult.error?.message || "Nao foi possivel validar o PDF salvo no Storage.",
+        },
+      })
+
+      const failedCreditInsert = await registerItineraryCreditConsumption(supabase, {
+        ownerType,
+        ownerUserId: authData.user.id,
+        agencyId: accessResult.trip.agency_id,
+        amount: creditCost,
+        tripId: accessResult.trip.id,
+        itineraryId: generatingRecord.data.id,
+        mode,
+        createdBy: authData.user.id,
+        failed: true,
+      })
+
+      if (failedCreditInsert.error) {
+        console.error("[AI][ITINERARY] failed credit transaction error", failedCreditInsert.error.message)
+      }
+
+      return NextResponse.json({ error: signedPdfResult.error?.message || "Nao foi possivel validar o PDF salvo no Storage." }, { status: 500 })
     }
 
     const documentInsert = await supabase
