@@ -20,6 +20,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { useTrips } from "@/contexts/trips-context"
 import { useAuth } from "@/contexts/auth-context"
+import { ensureTripIsPublic } from "@/lib/repositories/trips-repository"
 
 const fadeInUp = {
   initial: { opacity: 0, y: 20 },
@@ -103,7 +104,19 @@ export default function PortalHomePage() {
     setTimeout(() => setCopiedLink(null), 2000)
   }
 
-  const shareTrip = async (link: string) => {
+  const ensureTripShareIsPublic = async (tripId: string) => {
+    const result = await ensureTripIsPublic(tripId)
+    if (result.error) {
+      console.error("[TRIP] publish before share error", result.error)
+      return false
+    }
+    return true
+  }
+
+  const shareTrip = async (tripId: string, link: string) => {
+    const isPublished = await ensureTripShareIsPublic(tripId)
+    if (!isPublished) return
+
     const url = link
 
     if (navigator.share) {
@@ -223,7 +236,7 @@ export default function PortalHomePage() {
                 <Button
                   variant="outline"
                   className="border-border/50"
-                  onClick={() => shareTrip(activeTrip.shareLink)}
+                  onClick={() => shareTrip(activeTrip.id, activeTrip.shareLink)}
                 >
                   <Share2 size={16} className="mr-2" />
                   Compartilhar
@@ -285,7 +298,7 @@ export default function PortalHomePage() {
                     <Button variant="outline" className="border-border/50" onClick={() => copyLink(trip.adminLink, "admin")}>
                       Copiar link
                     </Button>
-                    <Button variant="outline" className="border-border/50" onClick={() => shareTrip(trip.shareLink)}>
+                    <Button variant="outline" className="border-border/50" onClick={() => shareTrip(trip.id, trip.shareLink)}>
                       Compartilhar
                     </Button>
                   </div>

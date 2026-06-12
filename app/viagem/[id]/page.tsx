@@ -4679,6 +4679,7 @@ export default function TripPage() {
           if (loadRequestRef.current !== requestId) return
           setTripOwnerUserId(repositoryTrip.data.ownerUserId ?? null)
           const isOwner = Boolean(user?.id && repositoryTrip.data.ownerUserId && user.id === repositoryTrip.data.ownerUserId)
+          const isPublicLinkRequest = isPublicRoute || Boolean(publicToken)
 
           logTripDocumentsDev("trip_resolved", {
             routeSlug,
@@ -4689,6 +4690,13 @@ export default function TripPage() {
             hasPublicToken: Boolean(publicToken),
             isOwner,
           })
+
+          if (isPublicLinkRequest && repositoryTrip.data.visibility !== "public") {
+            console.error("[TRIP] erro ao carregar link", "Esta viagem nao esta publicada para acesso publico.")
+            setLoadError("Esta viagem nao esta disponivel publicamente.")
+            setIsLoadingTrip(false)
+            return
+          }
 
           if (isAdminRoute && authLoading) {
             return

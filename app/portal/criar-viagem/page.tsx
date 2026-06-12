@@ -139,7 +139,7 @@ export default function CriarViagemPage() {
             endDate: formData.endDate,
             style: formData.style,
             status: "draft",
-            visibility: "private",
+            visibility: "public",
             ownerType: "traveler",
             ownerUserId: user.id,
             travelersCount: companionTypes.find(c => c.id === formData.companions)?.count || 1,

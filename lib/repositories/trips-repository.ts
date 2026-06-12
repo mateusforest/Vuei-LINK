@@ -108,6 +108,7 @@ function writeLocalTrips(nextTrips: Trip[]) {
       ownerUserId: trip.ownerUserId,
       adminToken: trip.adminToken,
       publicToken: trip.publicToken,
+      visibility: trip.visibility,
       createdAt: trip.createdAt,
       updatedAt: trip.updatedAt,
     })),
@@ -201,6 +202,7 @@ function buildTrip(payload: CreateTripPayload, existingTrips: Trip[]): Trip {
     coverImage: payload.coverImage ?? undefined,
     adminToken: payload.adminToken ?? null,
     publicToken: payload.publicToken ?? null,
+    visibility: payload.visibility ?? "public",
     adminLink: payload.adminLink,
     publicLink: payload.publicLink,
     createdAt: now,
@@ -432,7 +434,7 @@ export async function createTrip(payload: CreateTripPayload) {
         admin_link: adminLink,
         public_link: publicLink,
         cover_image: resolvedCoverImage,
-        visibility: trip.ownerType === "agency" ? "public" : "private",
+        visibility: trip.visibility ?? "public",
         travelers_count: trip.travelersCount || 1,
         permissions: trip.permissions ?? {},
         credits_summary: {},
@@ -564,6 +566,10 @@ export async function updateTrip(id: string, payload: Partial<Trip>) {
   })
   writeLocalTrips(nextTrips)
   return { source: "local" as const, data: updatedTrip }
+}
+
+export async function ensureTripIsPublic(id: string) {
+  return updateTrip(id, { visibility: "public" })
 }
 
 export async function deleteTrip(id: string) {

@@ -345,7 +345,7 @@ export function TripsProvider({ children }: { children: ReactNode }) {
           ownerType: "traveler",
           ownerUserId: user.id,
           status: "draft",
-          visibility: "private",
+          visibility: "public",
           creditsSummary: { balance: null, used: null, total: null },
         })
 

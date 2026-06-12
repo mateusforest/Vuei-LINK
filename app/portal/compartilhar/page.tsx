@@ -25,6 +25,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
 import { useTrips } from "@/contexts/trips-context"
+import { ensureTripIsPublic } from "@/lib/repositories/trips-repository"
 
 const fadeInUp = {
   initial: { opacity: 0, y: 20 },
@@ -67,6 +68,16 @@ export default function CompartilharPage() {
     }
   }
 
+  const ensureActiveTripIsPublic = async () => {
+    const result = await ensureTripIsPublic(trip.id)
+    if (result.error) {
+      console.error("[TRIP] publish before share error", result.error)
+      setShareFeedback("Nao foi possivel publicar a viagem para compartilhamento.")
+      return false
+    }
+    return true
+  }
+
   // Se nao tem viagem, mostra tela para criar
   if (!activeTrip && trips.length === 0) {
     return (
@@ -107,23 +118,28 @@ export default function CompartilharPage() {
   const shareUrl = trip.shareLink
 
   const handleShareAction = (channel: "qr" | "whatsapp" | "email") => {
-    const encodedUrl = encodeURIComponent(shareUrl)
-    const encodedText = encodeURIComponent(`Acompanhe a viagem ${trip.name}: ${shareUrl}`)
+    void (async () => {
+      const isPublished = await ensureActiveTripIsPublic()
+      if (!isPublished) return
 
-    if (channel === "qr") {
-      copyToClipboard(trip.shareLink, "share")
-      setShareFeedback("Link copiado para gerar QR Code.")
-      return
-    }
+      const encodedUrl = encodeURIComponent(shareUrl)
+      const encodedText = encodeURIComponent(`Acompanhe a viagem ${trip.name}: ${shareUrl}`)
 
-    if (channel === "whatsapp") {
-      window.open(`https://wa.me/?text=${encodedText}`, "_blank", "noopener,noreferrer")
-      setShareFeedback("Compartilhamento via WhatsApp iniciado.")
-      return
-    }
+      if (channel === "qr") {
+        copyToClipboard(trip.shareLink, "share")
+        setShareFeedback("Link copiado para gerar QR Code.")
+        return
+      }
 
-    window.location.href = `mailto:?subject=${encodeURIComponent(`Viagem ${trip.name}`)}&body=${encodedText}`
-    setShareFeedback("Compartilhamento por e-mail iniciado.")
+      if (channel === "whatsapp") {
+        window.open(`https://wa.me/?text=${encodedText}`, "_blank", "noopener,noreferrer")
+        setShareFeedback("Compartilhamento via WhatsApp iniciado.")
+        return
+      }
+
+      window.location.href = `mailto:?subject=${encodeURIComponent(`Viagem ${trip.name}`)}&body=${encodedText}`
+      setShareFeedback("Compartilhamento por e-mail iniciado.")
+    })()
   }
 
   return (
@@ -204,7 +220,13 @@ export default function CompartilharPage() {
             <Button 
               variant="ghost" 
               size="sm"
-              onClick={() => copyToClipboard(trip.shareLink, 'share')}
+              onClick={() => {
+                void (async () => {
+                  const isPublished = await ensureActiveTripIsPublic()
+                  if (!isPublished) return
+                  copyToClipboard(trip.shareLink, 'share')
+                })()
+              }}
               className="shrink-0"
             >
               {shareCopied ? (

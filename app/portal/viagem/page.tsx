@@ -24,6 +24,7 @@ import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { useTrips } from "@/contexts/trips-context"
+import { ensureTripIsPublic } from "@/lib/repositories/trips-repository"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -71,6 +72,15 @@ export default function ViagemListPage() {
     navigator.clipboard.writeText(link)
     setCopiedLink(type)
     setTimeout(() => setCopiedLink(null), 2000)
+  }
+
+  const copyShareLink = async (tripId: string, link: string, type: string) => {
+    const result = await ensureTripIsPublic(tripId)
+    if (result.error) {
+      console.error("[TRIP] publish before share error", result.error)
+      return
+    }
+    copyLink(link, type)
   }
 
   const formatDate = (dateStr: string) => {
@@ -215,7 +225,7 @@ export default function ViagemListPage() {
                       </div>
                       <div className="flex items-center gap-2">
                         <code className="text-xs truncate flex-1">{trip.shareLink}</code>
-                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => copyLink(trip.shareLink, `share-${trip.id}`)}>
+                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => void copyShareLink(trip.id, trip.shareLink, `share-${trip.id}`)}>
                           {copiedLink === `share-${trip.id}` ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
                         </Button>
                       </div>
@@ -249,7 +259,7 @@ export default function ViagemListPage() {
                           <Plane size={14} className="mr-2" />
                           Definir como ativa
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => copyLink(trip.shareLink, `share-${trip.id}`)} className="cursor-pointer">
+                        <DropdownMenuItem onClick={() => void copyShareLink(trip.id, trip.shareLink, `share-${trip.id}`)} className="cursor-pointer">
                           <Share2 size={14} className="mr-2" />
                           Compartilhar
                         </DropdownMenuItem>

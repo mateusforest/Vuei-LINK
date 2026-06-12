@@ -39,6 +39,7 @@ export interface LegacyStoredTrip {
   clientId?: string | null
   adminToken?: string | null
   publicToken?: string | null
+  visibility?: TripVisibility
 }
 
 export interface LegacyAgencyTrip extends LegacyStoredTrip {
@@ -121,8 +122,8 @@ export function parseTripDestination(destination?: string): { city: string | nul
   }
 }
 
-function normalizeVisibility(_trip?: LegacyStoredTrip): TripVisibility {
-  return "private"
+function normalizeVisibility(trip?: LegacyStoredTrip): TripVisibility {
+  return trip?.visibility === "public" ? "public" : "private"
 }
 
 function normalizeLinks(slug: string, trip?: LegacyStoredTrip) {
