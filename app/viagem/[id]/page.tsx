@@ -1494,6 +1494,9 @@ function FlightsSection({
   tripId,
   ownerUserId,
   agencyId,
+  routeSlug,
+  tripAdminToken,
+  adminLinkMutationMode,
   ensureSensitiveAccess,
 }: {
   tripData: any
@@ -1505,6 +1508,9 @@ function FlightsSection({
   tripId: string
   ownerUserId: string | null
   agencyId: string | null
+  routeSlug: string
+  tripAdminToken: string | null
+  adminLinkMutationMode: boolean
   ensureSensitiveAccess: () => boolean
 }) {
   const [editingFlight, setEditingFlight] = useState<any>(null)
@@ -2211,6 +2217,9 @@ function ItinerarySection({
   tripId,
   ownerUserId,
   agencyId,
+  routeSlug,
+  tripAdminToken,
+  adminLinkMutationMode,
   ensureSensitiveAccess,
   onUpdateItinerary,
   onGenerateSimple,
@@ -2224,6 +2233,9 @@ function ItinerarySection({
   tripId: string
   ownerUserId: string | null
   agencyId: string | null
+  routeSlug: string
+  tripAdminToken: string | null
+  adminLinkMutationMode: boolean
   ensureSensitiveAccess: () => boolean
   onUpdateItinerary: (data: any) => Promise<void> | void
   onGenerateSimple: () => Promise<void>
@@ -2805,6 +2817,9 @@ function DocumentsSection({
   tripId,
   ownerUserId,
   agencyId,
+  routeSlug,
+  tripAdminToken,
+  adminLinkMutationMode,
   ensureSensitiveAccess,
 }: {
   tripData: any
@@ -2814,6 +2829,9 @@ function DocumentsSection({
   tripId: string
   ownerUserId: string | null
   agencyId: string | null
+  routeSlug: string
+  tripAdminToken: string | null
+  adminLinkMutationMode: boolean
   ensureSensitiveAccess: () => boolean
 }) {
   const [showPrivate, setShowPrivate] = useState(false)
@@ -5726,23 +5744,26 @@ export default function TripPage() {
           <TripHeader tripData={tripData} agencyBranding={agencyBranding} onOpenShare={() => setShareOpen(true)} onOpenMenu={() => setMenuOpen(true)} />
           <TripHero tripData={tripData} onEditTrip={() => setEditTripOpen(true)} />
           <QuickAccessCards tripData={tripData} onNavigate={handleNavigate} />
-  <FlightsSection loading={sectionsLoading.flights} tripData={tripData} onUpdateFlight={handleUpdateFlight} onAddFlight={handleAddFlight} onDeleteFlight={handleDeleteFlight} onDeleteDocument={handleDeleteDocument} tripId={tripData.id} ownerUserId={tripOwnerUserId} agencyId={profile?.agencyId ?? null} ensureSensitiveAccess={ensureSensitiveAccess} />
+  <FlightsSection loading={sectionsLoading.flights} tripData={tripData} onUpdateFlight={handleUpdateFlight} onAddFlight={handleAddFlight} onDeleteFlight={handleDeleteFlight} onDeleteDocument={handleDeleteDocument} tripId={tripData.id} ownerUserId={tripOwnerUserId} agencyId={profile?.agencyId ?? null} routeSlug={routeSlug} tripAdminToken={tripAdminToken} adminLinkMutationMode={adminLinkMutationMode} ensureSensitiveAccess={ensureSensitiveAccess} />
   <HotelSection loading={sectionsLoading.hotels} tripData={tripData} onSaveHotel={handleSaveHotel} onDeleteHotel={handleDeleteHotel} />
   <ItinerarySection
     loading={sectionsLoading.itineraries}
     tripData={tripData}
     itineraryRecords={tripItineraryRecords}
-    tripId={tripData.id}
-    ownerUserId={tripOwnerUserId}
-    agencyId={profile?.agencyId ?? null}
-    ensureSensitiveAccess={ensureSensitiveAccess}
-    onUpdateItinerary={handleUpdateItinerary}
-    onGenerateSimple={() => handleGenerateItinerary("simple")}
-    onGenerateComplete={() => handleGenerateItinerary("complete_pdf")}
-    onSaveUploadedItinerary={handleSaveUploadedItinerary}
-    onDeleteItinerary={handleDeleteItinerary}
-  />
-  <DocumentsSection loading={sectionsLoading.documents} tripData={tripData} onAddDocument={handleAddDocument} onDeleteDocument={handleDeleteDocument} tripId={tripData.id} ownerUserId={tripOwnerUserId} agencyId={profile?.agencyId ?? null} ensureSensitiveAccess={ensureSensitiveAccess} />
+      tripId={tripData.id}
+      ownerUserId={tripOwnerUserId}
+      agencyId={profile?.agencyId ?? null}
+      routeSlug={routeSlug}
+      tripAdminToken={tripAdminToken}
+      adminLinkMutationMode={adminLinkMutationMode}
+      ensureSensitiveAccess={ensureSensitiveAccess}
+      onUpdateItinerary={handleUpdateItinerary}
+      onGenerateSimple={() => handleGenerateItinerary("simple")}
+      onGenerateComplete={() => handleGenerateItinerary("complete_pdf")}
+      onSaveUploadedItinerary={handleSaveUploadedItinerary}
+      onDeleteItinerary={handleDeleteItinerary}
+    />
+  <DocumentsSection loading={sectionsLoading.documents} tripData={tripData} onAddDocument={handleAddDocument} onDeleteDocument={handleDeleteDocument} tripId={tripData.id} ownerUserId={tripOwnerUserId} agencyId={profile?.agencyId ?? null} routeSlug={routeSlug} tripAdminToken={tripAdminToken} adminLinkMutationMode={adminLinkMutationMode} ensureSensitiveAccess={ensureSensitiveAccess} />
   <ConciergeSection tripData={tripData} onOpenCredits={() => setCreditsOpen(true)} />
           <OfflineSection tripData={tripData} />
           <QuickInfoSection tripData={tripData} />
