@@ -1,46 +1,12 @@
-export interface OfflineTripPackageItem {
-  id: string
-  name: string
-  type: "summary" | "flight" | "hotel" | "document" | "itinerary" | "quick_info"
-  sizeLabel: string
-  saved: boolean
-}
-
-export interface OfflineTripPackage {
-  tripId: string
-  tripSlug?: string | null
-  tripName: string
-  savedAt: string
-  warning: string
-  snapshot: Record<string, unknown>
-  items: OfflineTripPackageItem[]
-}
+import {
+  buildLegacyOfflineItems,
+  getOfflineWarningMessage as getIndexedDbOfflineWarningMessage,
+  replaceTripOfflinePackage,
+} from "@/lib/offline/offline-package-manager"
+import type { OfflineTripPackage, OfflineTripPackageItem } from "@/lib/offline/types"
 
 const OFFLINE_STORAGE_KEY = "vuei_offline_trips"
-const OFFLINE_WARNING = "Voce esta vendo uma versao salva offline. Algumas informacoes podem estar desatualizadas."
-
-function safeStringifySize(value: unknown) {
-  const json = JSON.stringify(value ?? {})
-  const bytes = new Blob([json]).size
-  const sizeMb = bytes / (1024 * 1024)
-  return sizeMb >= 0.1 ? `${sizeMb.toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`
-}
-
-function buildOfflineItems(tripData: any): OfflineTripPackageItem[] {
-  const hotels = Array.isArray(tripData?.hotels) ? tripData.hotels : tripData?.hotel ? [tripData.hotel] : []
-  const flights = Array.isArray(tripData?.flights) ? tripData.flights : []
-  const documents = Array.isArray(tripData?.documents) ? tripData.documents : []
-  const itinerary = Array.isArray(tripData?.itinerary) ? tripData.itinerary : []
-
-  return [
-    { id: "summary", name: "Resumo da viagem", type: "summary", sizeLabel: safeStringifySize({ destination: tripData?.destination, dates: tripData?.dates, travelers: tripData?.travelers }), saved: true },
-    { id: "flight", name: "Passagens extraidas", type: "flight", sizeLabel: safeStringifySize(flights), saved: flights.length > 0 },
-    { id: "hotel", name: "Hospedagem", type: "hotel", sizeLabel: safeStringifySize(hotels), saved: hotels.length > 0 },
-    { id: "itinerary", name: "Roteiro", type: "itinerary", sizeLabel: safeStringifySize(itinerary), saved: itinerary.length > 0 },
-    { id: "quick_info", name: "Informacoes rapidas", type: "quick_info", sizeLabel: safeStringifySize(tripData?.quickInfo), saved: Boolean(tripData?.quickInfo) },
-    { id: "document", name: "Documentos cacheados", type: "document", sizeLabel: safeStringifySize(documents), saved: documents.length > 0 },
-  ]
-}
+const OFFLINE_WARNING = getIndexedDbOfflineWarningMessage()
 
 function readPackages() {
   if (typeof window === "undefined") return [] as OfflineTripPackage[]
@@ -76,12 +42,15 @@ export function saveTripOfflinePackage(tripData: any) {
       itinerary: tripData?.itinerary,
       quickInfo: tripData?.quickInfo,
     },
-    items: buildOfflineItems(tripData),
+    items: buildLegacyOfflineItems(tripData),
   }
 
   const packages = readPackages()
   const nextPackages = [nextPackage, ...packages.filter((item) => item.tripId !== nextPackage.tripId)]
   writePackages(nextPackages)
+  void replaceTripOfflinePackage({ tripData, status: "legacy_snapshot" }).catch((error) => {
+    console.error("[OFFLINE] snapshot mirror error", error)
+  })
   return nextPackage
 }
 
