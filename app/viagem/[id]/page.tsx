@@ -2739,8 +2739,11 @@ function DocumentsSection({
   const { showToast } = useToast()
 
   const documents = Array.isArray(tripData.documents) ? tripData.documents : []
-  const publicDocs = documents.filter((d: any) => !d.private)
-  const privateDocs = documents.filter((d: any) => d.private)
+  const isPrivateDocument = (document: any) =>
+    document?.private === true || document?.isPrivate === true || document?.visibility === "private"
+
+  const publicDocs = documents.filter((d: any) => !isPrivateDocument(d))
+  const privateDocs = documents.filter((d: any) => isPrivateDocument(d))
 
   const getDocIcon = (type: string) => {
     switch (type) {
@@ -2760,7 +2763,7 @@ function DocumentsSection({
   return (
     <section id="documents" className="py-12 px-4">
       <div className="max-w-6xl mx-auto">
-        <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="flex items-center justify-between mb-6">
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35 }} className="flex items-center justify-between gap-3 mb-6">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#004aad] to-[#5de0e6] flex items-center justify-center">
               <FileText className="w-5 h-5 text-white" />
@@ -2793,18 +2796,17 @@ function DocumentsSection({
             Nenhum documento adicionado.
           </div>
         ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
           {publicDocs.map((doc: any, i: number) => (
             <motion.div
               key={doc.id}
-              initial={{ opacity: 0, scale: 0.95 }}
-              whileInView={{ opacity: 1, scale: 1 }}
-              viewport={{ once: true }}
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
               transition={{ delay: i * 0.05 }}
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               onClick={() => setViewingDoc(doc)}
-              className="cursor-pointer p-4 rounded-xl bg-white/[0.02] border border-white/[0.06] hover:border-[#5de0e6]/30 transition-all duration-300 text-left"
+              className="cursor-pointer p-4 rounded-xl bg-white/[0.02] border border-white/[0.06] hover:border-[#5de0e6]/30 transition-all duration-300 text-left min-h-[112px]"
               role="button"
               tabIndex={0}
               onKeyDown={(event) => {
@@ -2829,7 +2831,7 @@ function DocumentsSection({
                   </button>
                 ) : null}
               </div>
-              <p className="text-sm text-white font-medium mt-2 truncate">{doc.name}</p>
+              <p className="text-sm text-white font-medium mt-2 break-words">{doc.name}</p>
               <p className="text-xs text-white/40 mt-1">Compartilhavel</p>
             </motion.div>
           ))}
@@ -2837,7 +2839,7 @@ function DocumentsSection({
         )}
 
         {isAdmin && privateDocs.length > 0 && (
-          <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="p-5 rounded-2xl bg-gradient-to-br from-white/[0.02] to-transparent border border-white/[0.06]">
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35 }} className="p-5 rounded-2xl bg-gradient-to-br from-white/[0.02] to-transparent border border-white/[0.06]">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-lg bg-[#004aad]/30 flex items-center justify-center">
@@ -2865,7 +2867,7 @@ function DocumentsSection({
             <AnimatePresence>
               {unlocked && (
                 <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.3 }} className="overflow-hidden">
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-4 border-t border-white/[0.06]">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pt-4 border-t border-white/[0.06]">
                     {privateDocs.map((doc: any, i: number) => (
                       <motion.div
                         key={doc.id}
@@ -2873,7 +2875,7 @@ function DocumentsSection({
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: i * 0.1 }}
                         onClick={() => setViewingDoc(doc)}
-                        className="cursor-pointer p-3 rounded-xl bg-[#004aad]/10 border border-[#004aad]/30 hover:border-[#5de0e6]/50 transition-all duration-300 text-left"
+                        className="cursor-pointer p-3 rounded-xl bg-[#004aad]/10 border border-[#004aad]/30 hover:border-[#5de0e6]/50 transition-all duration-300 text-left min-h-[104px]"
                         role="button"
                         tabIndex={0}
                         onKeyDown={(event) => {
@@ -2899,7 +2901,7 @@ function DocumentsSection({
                             <Trash2 className="h-4 w-4" />
                           </button>
                         </div>
-                        <p className="text-sm text-white font-medium mt-2 truncate">{doc.name}</p>
+                        <p className="text-sm text-white font-medium mt-2 break-words">{doc.name}</p>
                       </motion.div>
                     ))}
                   </div>
@@ -3084,6 +3086,23 @@ function PinModal({
 function ViewDocumentModal({ open, onClose, document }: { open: boolean; onClose: () => void; document: any }) {
   if (!document) return null
 
+  const openDocumentOnDevice = async () => {
+    const pendingWindow = typeof window !== "undefined" ? window.open("", "_blank", "noopener,noreferrer") : null
+    const urlResult = document.filePath ? await getSignedDocumentUrl(document.filePath) : { data: document.fileUrl, error: null }
+
+    if (!urlResult.data) {
+      pendingWindow?.close()
+      return
+    }
+
+    if (pendingWindow) {
+      pendingWindow.location.href = urlResult.data
+      return
+    }
+
+    window.location.href = urlResult.data
+  }
+
   const getDocIcon = (type: string) => {
     switch (type) {
       case "passport": return "🛂"
@@ -3110,12 +3129,7 @@ function ViewDocumentModal({ open, onClose, document }: { open: boolean; onClose
         </div>
 
         <div className="flex gap-3 mt-6">
-          <Button className="flex-1 bg-gradient-to-r from-[#5de0e6] to-[#004aad] hover:opacity-90 text-white border-0" onClick={async () => {
-            const urlResult = document.filePath ? await getSignedDocumentUrl(document.filePath) : { data: document.fileUrl, error: null }
-            if (urlResult.data) {
-              window.open(urlResult.data, "_blank", "noopener,noreferrer")
-            }
-          }}>
+          <Button className="flex-1 bg-gradient-to-r from-[#5de0e6] to-[#004aad] hover:opacity-90 text-white border-0" onClick={() => void openDocumentOnDevice()}>
             <Download className="w-4 h-4 mr-2" />
             Baixar
           </Button>
