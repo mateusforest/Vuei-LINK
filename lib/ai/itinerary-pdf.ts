@@ -240,27 +240,6 @@ function renderPeriodCard(title: string, activities: GeneratedItineraryActivity[
   `
 }
 
-function renderTimeline(day: GeneratedItineraryDay) {
-  return day.activities
-    .map(
-      (activity) => `
-        <div class="timeline-item">
-          <div class="timeline-dot"></div>
-          <div class="timeline-content">
-            <div class="timeline-meta">
-              <span class="timeline-badge">${safeText(activity.time, periodLabel(activity.period))}</span>
-              <span class="timeline-period">${periodLabel(activity.period)}</span>
-            </div>
-            <h4>${safeText(activity.title)}</h4>
-            <p class="timeline-location">${safeText(activity.location, "Local a confirmar")}</p>
-            ${activity.description ? `<p class="timeline-description">${safeText(activity.description, "")}</p>` : ""}
-          </div>
-        </div>
-      `,
-    )
-    .join("")
-}
-
 function renderExperiences(days: GeneratedItineraryDay[]) {
   const cards = days.flatMap((day) =>
     day.activities
@@ -403,11 +382,13 @@ function renderHtml(input: TripPdfInput, assets: { heroImage: string | null; age
       <style>
         @page { size: A4; margin: 0; }
         * { box-sizing: border-box; }
+        html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         body { margin: 0; font-family: Arial, Helvetica, sans-serif; color: ${TEXT}; background: #ffffff; }
         main { width: 100%; }
         section { page-break-after: always; }
         section:last-child { page-break-after: auto; }
-        .page { padding: 54px 56px; }
+        p, li, strong, span, h1, h2, h3, h4, div { overflow-wrap: anywhere; word-break: break-word; }
+        .page { padding: 40px 42px; }
         .cover { min-height: 1122px; position: relative; color: #fff; background: ${DARK}; overflow: hidden; }
         .cover::before { content: ""; position: absolute; inset: 0; background-image: ${assets.heroImage ? `url('${assets.heroImage}')` : `linear-gradient(135deg, ${PRIMARY}, ${SECONDARY})`}; background-size: cover; background-position: center; transform: scale(1.04); }
         .cover::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(15,23,42,0.42), rgba(15,23,42,0.78) 55%, rgba(15,23,42,0.9)); }
@@ -425,74 +406,64 @@ function renderHtml(input: TripPdfInput, assets: { heroImage: string | null; age
         .cover-meta span { background: rgba(255,255,255,0.12); border-radius: 999px; padding: 9px 14px; font-size: 14px; }
         .cover-summary { font-size: 20px; line-height: 1.6; color: rgba(255,255,255,0.84); margin: 0; }
         .cover-line { margin-top: auto; width: 92px; height: 4px; border-radius: 999px; background: ${SECONDARY}; }
-        .section-head { margin-bottom: 34px; }
-        .section-head .eyebrow-dark { color: ${MUTED}; font-size: 12px; letter-spacing: 0.22em; text-transform: uppercase; margin-bottom: 10px; }
-        .section-head h2 { font-size: 38px; margin: 0; color: ${DARK}; }
-        .section-head p { margin: 12px 0 0; color: ${MUTED}; line-height: 1.7; max-width: 620px; }
-        .summary-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 28px; }
-        .summary-card { border: 1px solid ${BORDER}; border-radius: 22px; padding: 22px; background: #fff; min-height: 112px; }
+        .section-head { margin-bottom: 24px; page-break-inside: avoid; }
+        .section-head .eyebrow-dark { display: inline-flex; align-items: center; margin-bottom: 10px; padding: 8px 14px; border-radius: 999px; background: rgba(31,143,214,0.1); color: ${PRIMARY}; font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; font-weight: 700; }
+        .section-head h2 { display: inline-block; width: 100%; font-size: 34px; margin: 0; color: #fff; background: linear-gradient(90deg, ${PRIMARY}, ${SECONDARY}); border-radius: 22px; padding: 16px 22px; }
+        .section-head p { margin: 14px 4px 0; color: ${MUTED}; line-height: 1.65; max-width: 640px; }
+        .summary-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 20px; }
+        .summary-card { border: 1px solid ${BORDER}; border-radius: 20px; padding: 18px; background: #fff; min-height: 100px; }
         .summary-card span { display: block; color: ${MUTED}; font-size: 12px; text-transform: uppercase; letter-spacing: 0.12em; margin-bottom: 10px; }
         .summary-card strong { font-size: 17px; line-height: 1.5; color: ${DARK}; }
-        .summary-panels { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 18px; margin-top: 26px; }
-        .panel { border-radius: 24px; padding: 24px; border: 1px solid ${BORDER}; background: ${SOFT}; }
+        .summary-panels { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 16px; margin-top: 20px; }
+        .panel { border-radius: 22px; padding: 20px; border: 1px solid ${BORDER}; background: ${SOFT}; page-break-inside: avoid; }
         .panel h3 { margin: 0 0 12px; font-size: 20px; color: ${DARK}; }
         .panel p, .panel li { color: ${TEXT}; line-height: 1.7; }
         .panel ul { padding-left: 18px; margin: 0; }
         .duration-pill { display: inline-flex; align-items: center; justify-content: center; padding: 12px 22px; border-radius: 999px; background: rgba(55,198,224,0.14); color: ${PRIMARY}; font-weight: 700; margin-top: 8px; }
-        .day-card { border: 1px solid ${BORDER}; border-radius: 28px; background: #fff; padding: 28px; margin-bottom: 22px; page-break-inside: avoid; }
-        .day-header { display: grid; grid-template-columns: 94px 1fr; gap: 22px; align-items: start; margin-bottom: 24px; padding-bottom: 22px; border-bottom: 1px solid ${BORDER}; }
+        .day-card { border: 1px solid ${BORDER}; border-radius: 26px; background: #fff; padding: 20px; margin-bottom: 16px; page-break-inside: auto; break-inside: auto; }
+        .day-card:first-child { margin-top: 0; }
+        .day-header { display: grid; grid-template-columns: 88px 1fr; gap: 18px; align-items: start; margin-bottom: 18px; padding: 18px; border-radius: 22px; background: linear-gradient(90deg, ${PRIMARY}, ${SECONDARY}); page-break-inside: avoid; break-inside: avoid; }
         .day-badge { width: 94px; border-radius: 24px; background: ${PRIMARY}; color: #fff; padding: 16px 12px; text-align: center; }
         .day-badge span { display: block; font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; opacity: 0.86; }
         .day-badge strong { display: block; font-size: 32px; margin-top: 6px; }
-        .day-header h3 { margin: 0 0 6px; font-size: 28px; color: ${DARK}; }
-        .day-date { color: ${MUTED}; margin-bottom: 12px; }
-        .day-summary { color: ${TEXT}; line-height: 1.8; }
-        .period-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px; }
-        .period-card { background: #f8fbfe; border: 1px solid ${BORDER}; border-radius: 22px; padding: 18px; min-height: 220px; }
-        .period-title { font-size: 14px; text-transform: uppercase; letter-spacing: 0.16em; color: ${PRIMARY}; margin-bottom: 14px; font-weight: 700; }
+        .day-header h3 { margin: 0 0 6px; font-size: 28px; color: #fff; }
+        .day-date { color: rgba(255,255,255,0.86); margin-bottom: 10px; font-weight: 600; }
+        .day-summary { color: rgba(255,255,255,0.96); line-height: 1.75; }
+        .period-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 14px; page-break-inside: auto; break-inside: auto; }
+        .period-card { background: #f8fbfe; border: 1px solid ${BORDER}; border-radius: 20px; padding: 16px; min-height: 0; page-break-inside: avoid; break-inside: avoid; }
+        .period-title { font-size: 13px; text-transform: uppercase; letter-spacing: 0.16em; color: #fff; margin: -16px -16px 14px; font-weight: 700; background: ${PRIMARY}; padding: 12px 16px; border-radius: 20px 20px 14px 14px; }
         .period-empty { color: ${MUTED}; font-size: 14px; line-height: 1.6; }
-        .period-item { padding: 0 0 14px; margin-bottom: 14px; border-bottom: 1px solid rgba(31,143,214,0.12); }
+        .period-item { padding: 0 0 12px; margin-bottom: 12px; border-bottom: 1px solid rgba(31,143,214,0.12); page-break-inside: avoid; break-inside: avoid; }
         .period-item:last-child { margin-bottom: 0; padding-bottom: 0; border-bottom: 0; }
         .period-item-head { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 7px; align-items: center; }
         .period-time { color: ${PRIMARY}; font-size: 12px; font-weight: 700; }
         .period-type { color: ${MUTED}; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; }
         .period-name { color: ${DARK}; font-size: 16px; font-weight: 700; margin-bottom: 4px; }
         .period-location, .period-description { color: ${TEXT}; font-size: 13px; line-height: 1.6; }
-        .timeline { margin-top: 8px; padding-top: 18px; border-top: 1px solid ${BORDER}; }
-        .timeline-item { display: grid; grid-template-columns: 18px 1fr; gap: 16px; }
-        .timeline-dot { width: 12px; height: 12px; border-radius: 50%; background: ${SECONDARY}; margin-top: 8px; box-shadow: 0 0 0 5px rgba(55,198,224,0.15); }
-        .timeline-content { border-bottom: 1px solid ${BORDER}; padding-bottom: 18px; margin-bottom: 18px; }
-        .timeline-item:last-child .timeline-content { border-bottom: 0; margin-bottom: 0; padding-bottom: 0; }
-        .timeline-meta { display: flex; gap: 10px; align-items: center; margin-bottom: 8px; }
-        .timeline-badge { background: rgba(31,143,214,0.1); color: ${PRIMARY}; border-radius: 999px; padding: 5px 10px; font-size: 12px; font-weight: 700; }
-        .timeline-period { color: ${MUTED}; font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; }
-        .timeline-content h4 { margin: 0 0 4px; font-size: 19px; color: ${DARK}; }
-        .timeline-location { color: ${MUTED}; margin: 0 0 8px; font-size: 13px; }
-        .timeline-description { color: ${TEXT}; margin: 0; line-height: 1.7; }
-        .day-bottom { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 18px; }
-        .note-box { border-radius: 20px; padding: 18px; background: #f8fbfe; border: 1px solid ${BORDER}; }
+        .day-bottom { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 14px; page-break-inside: avoid; break-inside: avoid; }
+        .note-box { border-radius: 18px; padding: 16px; background: #f8fbfe; border: 1px solid ${BORDER}; }
         .note-box strong { display: block; margin-bottom: 8px; font-size: 14px; color: ${DARK}; }
         .note-box p { margin: 0; line-height: 1.7; color: ${TEXT}; }
-        .hotel-card { display: grid; grid-template-columns: 260px 1fr; border: 1px solid ${BORDER}; border-radius: 28px; overflow: hidden; background: #fff; margin-bottom: 18px; page-break-inside: avoid; }
-        .hotel-image { min-height: 300px; background: linear-gradient(135deg, ${PRIMARY}, ${SECONDARY}); background-size: cover; background-position: center; }
-        .hotel-content { padding: 28px; }
+        .hotel-card { display: grid; grid-template-columns: 220px 1fr; border: 1px solid ${BORDER}; border-radius: 24px; overflow: hidden; background: #fff; margin-bottom: 16px; page-break-inside: avoid; break-inside: avoid; }
+        .hotel-image { min-height: 240px; background: linear-gradient(135deg, ${PRIMARY}, ${SECONDARY}); background-size: cover; background-position: center; }
+        .hotel-content { padding: 22px; }
         .hotel-content h3 { margin: 0 0 8px; font-size: 30px; color: ${DARK}; }
-        .hotel-address { color: ${MUTED}; margin: 0 0 18px; }
-        .hotel-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 18px; }
+        .hotel-address { color: ${MUTED}; margin: 0 0 16px; }
+        .hotel-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 16px; }
         .hotel-grid div { padding: 14px; border-radius: 18px; background: ${SOFT}; }
         .hotel-grid span { display: block; color: ${MUTED}; font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; margin-bottom: 6px; }
         .hotel-grid strong { color: ${DARK}; font-size: 14px; line-height: 1.5; }
         .hotel-notes { padding: 16px; border-radius: 18px; background: rgba(55,198,224,0.12); line-height: 1.7; }
-        .experience-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
-        .experience-card { border: 1px solid ${BORDER}; border-radius: 24px; background: #fff; overflow: hidden; page-break-inside: avoid; }
+        .experience-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+        .experience-card { border: 1px solid ${BORDER}; border-radius: 22px; background: #fff; overflow: hidden; page-break-inside: avoid; break-inside: avoid; }
         .experience-card::before { content: ""; display: block; height: 6px; background: linear-gradient(90deg, ${PRIMARY}, ${SECONDARY}); }
-        .experience-card { padding: 22px; }
+        .experience-card { padding: 18px; }
         .experience-chip { display: inline-flex; padding: 6px 12px; border-radius: 999px; background: rgba(31,143,214,0.1); color: ${PRIMARY}; font-size: 12px; font-weight: 700; margin-bottom: 12px; }
         .experience-card h3 { margin: 0 0 8px; font-size: 22px; color: ${DARK}; }
         .experience-meta { color: ${MUTED}; margin: 0 0 10px; font-size: 13px; }
         .experience-description { color: ${TEXT}; line-height: 1.7; margin: 0; }
-        .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
-        .info-card { border: 1px solid ${BORDER}; border-radius: 24px; padding: 22px; background: #fff; page-break-inside: avoid; }
+        .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+        .info-card { border: 1px solid ${BORDER}; border-radius: 22px; padding: 18px; background: #fff; page-break-inside: avoid; break-inside: avoid; }
         .info-card h3 { margin: 0 0 12px; font-size: 21px; color: ${DARK}; }
         .info-card ul { padding-left: 18px; margin: 0; }
         .info-card li { line-height: 1.8; color: ${TEXT}; margin-bottom: 4px; }
@@ -590,7 +561,6 @@ function renderHtml(input: TripPdfInput, assets: { heroImage: string | null; age
                     ${renderPeriodCard("Tarde", periods.afternoon)}
                     ${renderPeriodCard("Noite", periods.evening.length > 0 ? periods.evening : periods.flexible)}
                   </div>
-                  <div class="timeline">${renderTimeline(day)}</div>
                   <div class="day-bottom">
                     <div class="note-box">
                       <strong>Dicas e notas uteis</strong>
