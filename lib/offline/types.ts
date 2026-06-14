@@ -26,6 +26,16 @@ export interface OfflineTripPayload {
   itineraries: unknown[]
   documents: unknown[]
   quickInfo: Record<string, unknown> | null
+  offlineMeta?: {
+    sizeLimitBytes: number
+    savedDocumentIds: string[]
+    savedImageIds: string[]
+    failures: Array<{
+      assetId: string
+      assetType: "document" | "image"
+      reason: string
+    }>
+  } | null
 }
 
 export interface OfflineStoredTripPackage {
@@ -68,4 +78,16 @@ export interface OfflineTripStats {
   documentCount: number
   imageCount: number
   savedAt: string | null
+}
+
+export interface OfflinePackagePersistenceResult {
+  packageRecord: OfflineStoredTripPackage
+  savedDocumentIds: string[]
+  savedImageIds: string[]
+  failures: Array<{
+    assetId: string
+    assetType: "document" | "image"
+    reason: string
+  }>
+  limitReached: boolean
 }

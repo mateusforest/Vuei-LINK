@@ -1,5 +1,6 @@
 "use client"
 
+import { downloadBlobForOffline } from "@/lib/offline/blob-download"
 import {
   deleteOfflineRecord,
   deleteOfflineRecordsByIndex,
@@ -17,21 +18,30 @@ import type {
   OfflineStoredTripPackage,
   OfflineTripPackage,
   OfflineTripPackageItem,
+  OfflinePackagePersistenceResult,
   OfflineTripPackageStatus,
   OfflineTripPayload,
   OfflineTripStats,
 } from "@/lib/offline/types"
+import { getSignedDocumentUrl } from "@/lib/repositories/documents-repository"
 
 const LEGACY_OFFLINE_STORAGE_KEY = "vuei_offline_trips"
 const LEGACY_MIGRATION_SESSION_KEY = "vuei_offline_legacy_migration_v1"
 const OFFLINE_PACKAGE_VERSION = 1
 const OFFLINE_WARNING = "Voce esta vendo uma versao salva offline. Algumas informacoes podem estar desatualizadas."
+export const OFFLINE_PACKAGE_SIZE_LIMIT_BYTES = 50 * 1024 * 1024
 
 let legacyMigrationPromise: Promise<{ migrated: number; skipped: number }> | null = null
 
 export interface SaveOfflineTripPackageInput {
   tripData: any
   status?: OfflineTripPackageStatus
+}
+
+export interface PersistOfflineTripPackageInput {
+  tripData: any
+  allowPrivateDocuments?: boolean
+  sizeLimitBytes?: number
 }
 
 function computeBytes(value: unknown) {
@@ -87,6 +97,7 @@ function sanitizeTripPayload(tripData: any): OfflineTripPayload {
     itineraries,
     documents,
     quickInfo: tripData?.quickInfo ?? null,
+    offlineMeta: null,
   }
 }
 
@@ -100,22 +111,28 @@ function getPackageIdentity(payload: OfflineTripPayload) {
   }
 }
 
-function buildStoredPackage(payload: OfflineTripPayload, status: OfflineTripPackageStatus): OfflineStoredTripPackage {
+function buildStoredPackage(
+  payload: OfflineTripPayload,
+  status: OfflineTripPackageStatus,
+  overrides?: Partial<Pick<OfflineStoredTripPackage, "savedAt" | "totalSizeBytes" | "documentCount" | "imageCount" | "lastValidatedAt">>,
+): OfflineStoredTripPackage {
   const { tripId, slug, destination, country } = getPackageIdentity(payload)
   const documents = Array.isArray(payload.documents) ? payload.documents : []
+  const savedAt = overrides?.savedAt ?? new Date().toISOString()
+  const lastValidatedAt = overrides?.lastValidatedAt ?? savedAt
 
   return {
     tripId,
     slug,
-    savedAt: new Date().toISOString(),
+    savedAt,
     version: OFFLINE_PACKAGE_VERSION,
     status,
     destination,
     country,
-    totalSizeBytes: computeBytes(payload),
-    documentCount: documents.length,
-    imageCount: 0,
-    lastValidatedAt: new Date().toISOString(),
+    totalSizeBytes: overrides?.totalSizeBytes ?? computeBytes(payload),
+    documentCount: overrides?.documentCount ?? documents.length,
+    imageCount: overrides?.imageCount ?? 0,
+    lastValidatedAt,
     payload,
   }
 }
@@ -197,6 +214,186 @@ async function deleteOfflinePackageByTripId(tripId: string) {
   await deleteOfflineRecordsByIndex(IMAGE_BLOBS_STORE, "tripId", tripId)
 }
 
+function isPrivateDocument(document: any) {
+  return document?.private === true || document?.isPrivate === true || document?.is_private === true || document?.visibility === "private"
+}
+
+function filterPermittedDocuments(documents: any[], allowPrivateDocuments: boolean) {
+  if (allowPrivateDocuments) return documents
+  return documents.filter((document) => !isPrivateDocument(document) && document?.visibility !== "agency_only")
+}
+
+async function resolveOfflineDocumentUrl(document: any) {
+  if (typeof document?.fileUrl === "string" && document.fileUrl) return document.fileUrl
+  if (typeof document?.file_url === "string" && document.file_url) return document.file_url
+
+  const filePath =
+    typeof document?.filePath === "string"
+      ? document.filePath
+      : typeof document?.file_path === "string"
+        ? document.file_path
+        : null
+
+  if (!filePath) {
+    throw new Error("Documento sem URL ou caminho de arquivo.")
+  }
+
+  const signedUrlResult = await getSignedDocumentUrl(filePath)
+  if (signedUrlResult.error || !signedUrlResult.data) {
+    throw new Error(signedUrlResult.error || "Nao foi possivel gerar a URL do documento offline.")
+  }
+
+  return signedUrlResult.data
+}
+
+function normalizeAssetError(error: unknown) {
+  if (error instanceof Error && error.message) return error.message
+  return "Falha ao salvar ativo offline."
+}
+
+function collectOfflineImages(tripData: any) {
+  const assets: Array<{ imageId: string; url: string }> = []
+
+  if (typeof tripData?.heroImage === "string" && tripData.heroImage) {
+    assets.push({
+      imageId: `hero:${tripData?.id ?? "trip"}`,
+      url: tripData.heroImage,
+    })
+  }
+
+  const brandingLogoUrl =
+    typeof tripData?.agencyBranding?.logoUrl === "string"
+      ? tripData.agencyBranding.logoUrl
+      : typeof tripData?.agencyBranding?.linkLogoUrl === "string"
+        ? tripData.agencyBranding.linkLogoUrl
+        : null
+
+  if (brandingLogoUrl) {
+    assets.push({
+      imageId: `branding:${tripData?.id ?? "trip"}`,
+      url: brandingLogoUrl,
+    })
+  }
+
+  return assets.filter((asset, index, list) => list.findIndex((entry) => entry.url === asset.url) === index)
+}
+
+export async function persistOfflineTripPackage(input: PersistOfflineTripPackageInput): Promise<OfflinePackagePersistenceResult> {
+  const sizeLimitBytes = input.sizeLimitBytes ?? OFFLINE_PACKAGE_SIZE_LIMIT_BYTES
+  const basePayload = sanitizeTripPayload(input.tripData)
+  const permittedDocuments = filterPermittedDocuments(Array.isArray(input.tripData?.documents) ? input.tripData.documents : [], input.allowPrivateDocuments === true)
+  const payload: OfflineTripPayload = {
+    ...basePayload,
+    documents: permittedDocuments.map((document: any) => ({
+      id: document?.id ?? null,
+      tripId: document?.tripId ?? document?.trip_id ?? basePayload.trip.id ?? null,
+      name: document?.name ?? null,
+      type: document?.type ?? null,
+      mimeType: document?.mimeType ?? document?.mime_type ?? null,
+      size: document?.size ?? document?.size_bytes ?? null,
+      visibility: document?.visibility ?? null,
+      isPrivate: document?.isPrivate ?? document?.is_private ?? document?.private ?? null,
+      createdAt: document?.createdAt ?? document?.created_at ?? null,
+      updatedAt: document?.updatedAt ?? document?.updated_at ?? null,
+      filePath: document?.filePath ?? document?.file_path ?? null,
+      fileUrl: document?.fileUrl ?? document?.file_url ?? null,
+    })),
+  }
+  const { tripId } = getPackageIdentity(payload)
+  const savedAt = new Date().toISOString()
+  const savedDocumentIds: string[] = []
+  const savedImageIds: string[] = []
+  const failures: OfflinePackagePersistenceResult["failures"] = []
+  let totalSizeBytes = computeBytes(payload)
+  let limitReached = false
+
+  await deleteOfflinePackageByTripId(tripId)
+
+  for (const document of permittedDocuments) {
+    const documentId = typeof document?.id === "string" ? document.id : null
+    if (!documentId) {
+      failures.push({ assetId: "document:unknown", assetType: "document", reason: "Documento sem identificador." })
+      continue
+    }
+
+    try {
+      const documentUrl = await resolveOfflineDocumentUrl(document)
+      const downloaded = await downloadBlobForOffline(documentUrl)
+
+      if (totalSizeBytes + downloaded.sizeBytes > sizeLimitBytes) {
+        limitReached = true
+        failures.push({ assetId: documentId, assetType: "document", reason: "Limite offline de 50 MB excedido." })
+        continue
+      }
+
+      await saveOfflineDocumentBlob({
+        documentId,
+        tripId,
+        mimeType: downloaded.mimeType,
+        fileName: document?.name ?? null,
+        blob: downloaded.blob,
+        sizeBytes: downloaded.sizeBytes,
+        savedAt,
+      })
+
+      totalSizeBytes += downloaded.sizeBytes
+      savedDocumentIds.push(documentId)
+    } catch (error) {
+      failures.push({ assetId: documentId, assetType: "document", reason: normalizeAssetError(error) })
+    }
+  }
+
+  for (const asset of collectOfflineImages(input.tripData)) {
+    try {
+      const downloaded = await downloadBlobForOffline(asset.url)
+
+      if (totalSizeBytes + downloaded.sizeBytes > sizeLimitBytes) {
+        limitReached = true
+        failures.push({ assetId: asset.imageId, assetType: "image", reason: "Limite offline de 50 MB excedido." })
+        continue
+      }
+
+      await saveOfflineImageBlob({
+        imageId: asset.imageId,
+        tripId,
+        blob: downloaded.blob,
+        sizeBytes: downloaded.sizeBytes,
+        savedAt,
+      })
+
+      totalSizeBytes += downloaded.sizeBytes
+      savedImageIds.push(asset.imageId)
+    } catch (error) {
+      failures.push({ assetId: asset.imageId, assetType: "image", reason: normalizeAssetError(error) })
+    }
+  }
+
+  payload.offlineMeta = {
+    sizeLimitBytes,
+    savedDocumentIds,
+    savedImageIds,
+    failures,
+  }
+
+  const packageRecord = buildStoredPackage(payload, failures.length > 0 ? "partial" : "ready", {
+    savedAt,
+    lastValidatedAt: savedAt,
+    totalSizeBytes,
+    documentCount: savedDocumentIds.length,
+    imageCount: savedImageIds.length,
+  })
+
+  await putOfflineRecord(TRIP_PACKAGES_STORE, packageRecord)
+
+  return {
+    packageRecord,
+    savedDocumentIds,
+    savedImageIds,
+    failures,
+    limitReached,
+  }
+}
+
 export async function saveTripOfflinePackage(input: SaveOfflineTripPackageInput) {
   const payload = sanitizeTripPayload(input.tripData)
   const storedPackage = buildStoredPackage(payload, input.status ?? "ready")
@@ -252,37 +449,24 @@ export async function getTripOfflineStats(tripIdOrSlug?: string): Promise<Offlin
       }
     }
 
-    const documentBlobs = await getOfflineRecordsByIndex(DOCUMENT_BLOBS_STORE, "tripId", existingPackage.tripId)
-    const imageBlobs = await getOfflineRecordsByIndex(IMAGE_BLOBS_STORE, "tripId", existingPackage.tripId)
-
     return {
       tripId: existingPackage.tripId,
       packageCount: 1,
-      totalSizeBytes:
-        existingPackage.totalSizeBytes +
-        documentBlobs.reduce((total, item) => total + item.sizeBytes, 0) +
-        imageBlobs.reduce((total, item) => total + item.sizeBytes, 0),
-      documentCount: documentBlobs.length || existingPackage.documentCount,
-      imageCount: imageBlobs.length || existingPackage.imageCount,
+      totalSizeBytes: existingPackage.totalSizeBytes,
+      documentCount: existingPackage.documentCount,
+      imageCount: existingPackage.imageCount,
       savedAt: existingPackage.savedAt,
     }
   }
 
-  const [packages, documentBlobs, imageBlobs] = await Promise.all([
-    getAllOfflineRecords(TRIP_PACKAGES_STORE),
-    getAllOfflineRecords(DOCUMENT_BLOBS_STORE),
-    getAllOfflineRecords(IMAGE_BLOBS_STORE),
-  ])
+  const packages = await getAllOfflineRecords(TRIP_PACKAGES_STORE)
 
   return {
     tripId: null,
     packageCount: packages.length,
-    totalSizeBytes:
-      packages.reduce((total, item) => total + item.totalSizeBytes, 0) +
-      documentBlobs.reduce((total, item) => total + item.sizeBytes, 0) +
-      imageBlobs.reduce((total, item) => total + item.sizeBytes, 0),
-    documentCount: documentBlobs.length,
-    imageCount: imageBlobs.length,
+    totalSizeBytes: packages.reduce((total, item) => total + item.totalSizeBytes, 0),
+    documentCount: packages.reduce((total, item) => total + item.documentCount, 0),
+    imageCount: packages.reduce((total, item) => total + item.imageCount, 0),
     savedAt: packages[0]?.savedAt ?? null,
   }
 }

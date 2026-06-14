@@ -4215,19 +4215,40 @@ function TripSecurityModal({
 }
 
 // Offline Section
-function OfflineSection({ tripData }: { tripData: any }) {
+function OfflineSection({
+  tripData,
+  isAdmin,
+  agencyBranding,
+}: {
+  tripData: any
+  isAdmin: boolean
+  agencyBranding: { name: string | null; logoUrl: string | null; isAgency: boolean }
+}) {
   const [downloading, setDownloading] = useState(false)
   const [downloaded, setDownloaded] = useState(false)
   const { showToast } = useToast()
 
-  const handleDownload = () => {
+  const handleDownload = async () => {
     setDownloading(true)
-    const offlinePackage = saveTripOfflinePackage(tripData)
-    setTimeout(() => {
-      setDownloading(false)
+    try {
+      const offlineResult = await saveTripOfflinePackage(
+        {
+          ...tripData,
+          agencyBranding,
+        },
+        {
+          allowPrivateDocuments: isAdmin,
+        },
+      )
+
       setDownloaded(true)
-      showToast(offlinePackage.warning, "info")
-    }, 600)
+      showToast(offlineResult.message, offlineResult.persisted.failures.length > 0 ? "info" : "success")
+    } catch (error) {
+      console.error("[OFFLINE] save failed", error)
+      showToast(error instanceof Error ? error.message : "Nao foi possivel salvar esta viagem offline.", "error")
+    } finally {
+      setDownloading(false)
+    }
   }
 
   return (
@@ -4259,7 +4280,7 @@ function OfflineSection({ tripData }: { tripData: any }) {
               </div>
             </div>
 
-            <Button onClick={handleDownload} disabled={downloading || downloaded} className={cn("px-6 py-6 rounded-xl transition-all duration-300", downloaded ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30" : "bg-gradient-to-r from-[#5de0e6] to-[#004aad] hover:opacity-90 text-white border-0")}>
+            <Button onClick={() => void handleDownload()} disabled={downloading || downloaded} className={cn("px-6 py-6 rounded-xl transition-all duration-300", downloaded ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30" : "bg-gradient-to-r from-[#5de0e6] to-[#004aad] hover:opacity-90 text-white border-0")}>
               {downloading ? (
                 <div className="flex items-center gap-2">
                   <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
@@ -5765,7 +5786,7 @@ export default function TripPage() {
     />
   <DocumentsSection loading={sectionsLoading.documents} tripData={tripData} onAddDocument={handleAddDocument} onDeleteDocument={handleDeleteDocument} tripId={tripData.id} ownerUserId={tripOwnerUserId} agencyId={profile?.agencyId ?? null} routeSlug={routeSlug} tripAdminToken={tripAdminToken} adminLinkMutationMode={adminLinkMutationMode} ensureSensitiveAccess={ensureSensitiveAccess} />
   <ConciergeSection tripData={tripData} onOpenCredits={() => setCreditsOpen(true)} />
-          <OfflineSection tripData={tripData} />
+          <OfflineSection tripData={tripData} isAdmin={isAdmin} agencyBranding={agencyBranding} />
           <QuickInfoSection tripData={tripData} />
           <TripFooter agencyBranding={agencyBranding} />
 
