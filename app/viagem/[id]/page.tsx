@@ -4218,10 +4218,12 @@ function TripSecurityModal({
 function OfflineSection({
   tripData,
   isAdmin,
+  sensitiveAccessGranted,
   agencyBranding,
 }: {
   tripData: any
   isAdmin: boolean
+  sensitiveAccessGranted: boolean
   agencyBranding: { name: string | null; logoUrl: string | null; isAgency: boolean }
 }) {
   const [downloading, setDownloading] = useState(false)
@@ -4237,7 +4239,7 @@ function OfflineSection({
           agencyBranding,
         },
         {
-          allowPrivateDocuments: isAdmin,
+          allowPrivateDocuments: isAdmin && sensitiveAccessGranted,
         },
       )
 
@@ -5786,7 +5788,7 @@ export default function TripPage() {
     />
   <DocumentsSection loading={sectionsLoading.documents} tripData={tripData} onAddDocument={handleAddDocument} onDeleteDocument={handleDeleteDocument} tripId={tripData.id} ownerUserId={tripOwnerUserId} agencyId={profile?.agencyId ?? null} routeSlug={routeSlug} tripAdminToken={tripAdminToken} adminLinkMutationMode={adminLinkMutationMode} ensureSensitiveAccess={ensureSensitiveAccess} />
   <ConciergeSection tripData={tripData} onOpenCredits={() => setCreditsOpen(true)} />
-          <OfflineSection tripData={tripData} isAdmin={isAdmin} agencyBranding={agencyBranding} />
+          <OfflineSection tripData={tripData} isAdmin={isAdmin} sensitiveAccessGranted={sensitiveAccessGranted} agencyBranding={agencyBranding} />
           <QuickInfoSection tripData={tripData} />
           <TripFooter agencyBranding={agencyBranding} />
 

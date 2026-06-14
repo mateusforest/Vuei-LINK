@@ -14,6 +14,10 @@ export interface OfflineTripPackage {
   tripName: string
   savedAt: string
   warning: string
+  status?: OfflineTripPackageStatus
+  totalSizeBytes?: number
+  documentCount?: number
+  imageCount?: number
   snapshot: Record<string, unknown>
   items: OfflineTripPackageItem[]
 }

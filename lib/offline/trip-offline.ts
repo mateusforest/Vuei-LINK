@@ -31,6 +31,10 @@ function buildLegacyPackage(tripData: any, overrides?: Partial<OfflineTripPackag
     tripName: tripData?.destination || tripData?.title || "Viagem",
     savedAt: overrides?.savedAt ?? new Date().toISOString(),
     warning: overrides?.warning ?? OFFLINE_WARNING,
+    status: overrides?.status,
+    totalSizeBytes: overrides?.totalSizeBytes,
+    documentCount: overrides?.documentCount,
+    imageCount: overrides?.imageCount,
     snapshot: {
       destination: tripData?.destination,
       country: tripData?.country,
@@ -64,10 +68,7 @@ function toLegacyItemsFromPersistence(tripData: any, result: OfflinePackagePersi
 }
 
 export async function saveTripOfflinePackage(tripData: any, options?: { allowPrivateDocuments?: boolean }) {
-  const savedAt = new Date().toISOString()
-  const legacyPackage = buildLegacyPackage(tripData, { savedAt })
   const packages = readPackages()
-  writePackages([legacyPackage, ...packages.filter((item) => item.tripId !== legacyPackage.tripId)])
 
   let persisted: OfflinePackagePersistenceResult | null = null
 
@@ -77,7 +78,6 @@ export async function saveTripOfflinePackage(tripData: any, options?: { allowPri
       allowPrivateDocuments: options?.allowPrivateDocuments === true,
     })
   } catch (error) {
-    writePackages(packages)
     console.error("[OFFLINE] package persistence error", error)
     throw error
   }
@@ -91,9 +91,20 @@ export async function saveTripOfflinePackage(tripData: any, options?: { allowPri
       : OFFLINE_WARNING
 
   const nextPackage: OfflineTripPackage = {
-    ...legacyPackage,
+    ...buildLegacyPackage(tripData, {
+      savedAt: persisted.packageRecord.savedAt,
+      warning,
+      status: persisted.packageRecord.status,
+      totalSizeBytes: persisted.packageRecord.totalSizeBytes,
+      documentCount: persisted.packageRecord.documentCount,
+      imageCount: persisted.packageRecord.imageCount,
+    }),
     savedAt: persisted.packageRecord.savedAt,
     warning,
+    status: persisted.packageRecord.status,
+    totalSizeBytes: persisted.packageRecord.totalSizeBytes,
+    documentCount: persisted.packageRecord.documentCount,
+    imageCount: persisted.packageRecord.imageCount,
     items: toLegacyItemsFromPersistence(tripData, persisted),
   }
 

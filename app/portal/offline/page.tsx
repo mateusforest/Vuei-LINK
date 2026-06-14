@@ -23,6 +23,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { getOfflineWarningMessage, listOfflineTripPackages, type OfflineTripPackageItem } from "@/lib/offline/trip-offline"
+import type { OfflineTripPackageStatus } from "@/lib/offline/types"
 
 const fadeInUp = {
   initial: { opacity: 0, y: 20 },
@@ -68,12 +69,33 @@ function getTotalSize(items: OfflineTripPackageItem[]) {
   return totalKb >= 1024 ? `${(totalKb / 1024).toFixed(1)} MB` : `${Math.round(totalKb)} KB`
 }
 
+function formatBytes(bytes?: number | null) {
+  if (!bytes || bytes <= 0) return "0 KB"
+  const sizeMb = bytes / (1024 * 1024)
+  if (sizeMb >= 0.1) return `${sizeMb.toFixed(1)} MB`
+  return `${Math.max(1, Math.round(bytes / 1024))} KB`
+}
+
+function getOfflinePackageStatusMeta(status?: OfflineTripPackageStatus) {
+  switch (status) {
+    case "ready":
+      return { label: "Disponivel offline", badgeClass: "bg-green-500/20 text-green-400 border-0" }
+    case "partial":
+      return { label: "Parcial", badgeClass: "bg-amber-500/20 text-amber-300 border-0" }
+    case "legacy_snapshot":
+      return { label: "Snapshot salvo", badgeClass: "bg-sky-500/20 text-sky-300 border-0" }
+    default:
+      return { label: "Pendente", badgeClass: "bg-amber-500/20 text-amber-300 border-0" }
+  }
+}
+
 export default function OfflinePage() {
   const packages = useMemo(() => listOfflineTripPackages(), [])
   const latestPackage = packages[0] ?? null
   const savedItems = latestPackage?.items.filter((item) => item.saved) ?? []
-  const totalSize = getTotalSize(savedItems)
-  const storageUsage = latestPackage ? Math.min((savedItems.length / 6) * 100, 100) : 0
+  const statusMeta = getOfflinePackageStatusMeta(latestPackage ? latestPackage.status ?? "legacy_snapshot" : undefined)
+  const totalSize = latestPackage?.totalSizeBytes ? formatBytes(latestPackage.totalSizeBytes) : getTotalSize(savedItems)
+  const storageUsage = latestPackage?.totalSizeBytes ? Math.min((latestPackage.totalSizeBytes / (50 * 1024 * 1024)) * 100, 100) : 0
 
   return (
     <motion.div initial="initial" animate="animate" variants={staggerContainer} className="space-y-6 max-w-4xl mx-auto">
@@ -82,9 +104,9 @@ export default function OfflinePage() {
           <h1 className="text-2xl font-bold">Modo Offline</h1>
           <p className="text-sm text-muted-foreground">Acesse o ultimo pacote salvo da sua viagem sem internet</p>
         </div>
-        <Badge className={latestPackage ? "bg-green-500/20 text-green-400 border-0" : "bg-amber-500/20 text-amber-300 border-0"}>
+        <Badge className={statusMeta.badgeClass}>
           {latestPackage ? <CheckCircle2 size={14} className="mr-1" /> : <AlertCircle size={14} className="mr-1" />}
-          {latestPackage ? "Disponivel" : "Pendente"}
+          {statusMeta.label}
         </Badge>
       </motion.div>
 
@@ -120,6 +142,11 @@ export default function OfflinePage() {
           <div className="mt-4 rounded-2xl border border-amber-500/20 bg-amber-500/10 p-4 text-sm text-amber-200">
             {latestPackage?.warning || getOfflineWarningMessage()}
           </div>
+          {(latestPackage ? latestPackage.status ?? "legacy_snapshot" : null) === "legacy_snapshot" ? (
+            <div className="mt-3 text-xs text-muted-foreground">
+              Este snapshot local nao garante que todos os documentos tenham sido baixados para uso offline.
+            </div>
+          ) : null}
         </Card>
       </motion.div>
 

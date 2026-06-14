@@ -48,6 +48,10 @@ function computeBytes(value: unknown) {
   return new Blob([JSON.stringify(value ?? null)]).size
 }
 
+function computeFinalPackageSize(payload: OfflineTripPayload, persistedBlobBytes: number) {
+  return computeBytes(payload) + persistedBlobBytes
+}
+
 function formatOfflineSizeLabel(bytes: number) {
   const sizeMb = bytes / (1024 * 1024)
   if (sizeMb >= 0.1) return `${sizeMb.toFixed(1)} MB`
@@ -214,6 +218,28 @@ async function deleteOfflinePackageByTripId(tripId: string) {
   await deleteOfflineRecordsByIndex(IMAGE_BLOBS_STORE, "tripId", tripId)
 }
 
+async function deleteObsoleteTripBlobs(params: { tripId: string; documentIds: string[]; imageIds: string[] }) {
+  const [documentBlobs, imageBlobs] = await Promise.all([
+    getOfflineRecordsByIndex(DOCUMENT_BLOBS_STORE, "tripId", params.tripId),
+    getOfflineRecordsByIndex(IMAGE_BLOBS_STORE, "tripId", params.tripId),
+  ])
+
+  const validDocumentIds = new Set(params.documentIds)
+  const validImageIds = new Set(params.imageIds)
+
+  for (const documentBlob of documentBlobs) {
+    if (!validDocumentIds.has(documentBlob.documentId)) {
+      await deleteOfflineRecord(DOCUMENT_BLOBS_STORE, documentBlob.documentId)
+    }
+  }
+
+  for (const imageBlob of imageBlobs) {
+    if (!validImageIds.has(imageBlob.imageId)) {
+      await deleteOfflineRecord(IMAGE_BLOBS_STORE, imageBlob.imageId)
+    }
+  }
+}
+
 function isPrivateDocument(document: any) {
   return document?.private === true || document?.isPrivate === true || document?.is_private === true || document?.visibility === "private"
 }
@@ -304,10 +330,8 @@ export async function persistOfflineTripPackage(input: PersistOfflineTripPackage
   const savedDocumentIds: string[] = []
   const savedImageIds: string[] = []
   const failures: OfflinePackagePersistenceResult["failures"] = []
-  let totalSizeBytes = computeBytes(payload)
+  let persistedBlobBytes = 0
   let limitReached = false
-
-  await deleteOfflinePackageByTripId(tripId)
 
   for (const document of permittedDocuments) {
     const documentId = typeof document?.id === "string" ? document.id : null
@@ -319,8 +343,19 @@ export async function persistOfflineTripPackage(input: PersistOfflineTripPackage
     try {
       const documentUrl = await resolveOfflineDocumentUrl(document)
       const downloaded = await downloadBlobForOffline(documentUrl)
+      const nextSavedDocumentIds = [...savedDocumentIds, documentId]
+      const predictedPayload: OfflineTripPayload = {
+        ...payload,
+        offlineMeta: {
+          sizeLimitBytes,
+          savedDocumentIds: nextSavedDocumentIds,
+          savedImageIds,
+          failures,
+        },
+      }
+      const predictedTotalSize = computeFinalPackageSize(predictedPayload, persistedBlobBytes + downloaded.sizeBytes)
 
-      if (totalSizeBytes + downloaded.sizeBytes > sizeLimitBytes) {
+      if (predictedTotalSize > sizeLimitBytes) {
         limitReached = true
         failures.push({ assetId: documentId, assetType: "document", reason: "Limite offline de 50 MB excedido." })
         continue
@@ -336,7 +371,7 @@ export async function persistOfflineTripPackage(input: PersistOfflineTripPackage
         savedAt,
       })
 
-      totalSizeBytes += downloaded.sizeBytes
+      persistedBlobBytes += downloaded.sizeBytes
       savedDocumentIds.push(documentId)
     } catch (error) {
       failures.push({ assetId: documentId, assetType: "document", reason: normalizeAssetError(error) })
@@ -346,8 +381,19 @@ export async function persistOfflineTripPackage(input: PersistOfflineTripPackage
   for (const asset of collectOfflineImages(input.tripData)) {
     try {
       const downloaded = await downloadBlobForOffline(asset.url)
+      const nextSavedImageIds = [...savedImageIds, asset.imageId]
+      const predictedPayload: OfflineTripPayload = {
+        ...payload,
+        offlineMeta: {
+          sizeLimitBytes,
+          savedDocumentIds,
+          savedImageIds: nextSavedImageIds,
+          failures,
+        },
+      }
+      const predictedTotalSize = computeFinalPackageSize(predictedPayload, persistedBlobBytes + downloaded.sizeBytes)
 
-      if (totalSizeBytes + downloaded.sizeBytes > sizeLimitBytes) {
+      if (predictedTotalSize > sizeLimitBytes) {
         limitReached = true
         failures.push({ assetId: asset.imageId, assetType: "image", reason: "Limite offline de 50 MB excedido." })
         continue
@@ -361,7 +407,7 @@ export async function persistOfflineTripPackage(input: PersistOfflineTripPackage
         savedAt,
       })
 
-      totalSizeBytes += downloaded.sizeBytes
+      persistedBlobBytes += downloaded.sizeBytes
       savedImageIds.push(asset.imageId)
     } catch (error) {
       failures.push({ assetId: asset.imageId, assetType: "image", reason: normalizeAssetError(error) })
@@ -374,6 +420,7 @@ export async function persistOfflineTripPackage(input: PersistOfflineTripPackage
     savedImageIds,
     failures,
   }
+  const totalSizeBytes = computeFinalPackageSize(payload, persistedBlobBytes)
 
   const packageRecord = buildStoredPackage(payload, failures.length > 0 ? "partial" : "ready", {
     savedAt,
@@ -384,6 +431,11 @@ export async function persistOfflineTripPackage(input: PersistOfflineTripPackage
   })
 
   await putOfflineRecord(TRIP_PACKAGES_STORE, packageRecord)
+  await deleteObsoleteTripBlobs({
+    tripId,
+    documentIds: savedDocumentIds,
+    imageIds: savedImageIds,
+  })
 
   return {
     packageRecord,
