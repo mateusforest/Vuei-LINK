@@ -17,10 +17,13 @@ import { listConversationsByTrip, listMessages } from "@/lib/repositories/ai-rep
 import { validateDocumentFile } from "@/lib/files/file-validation"
 import { getDestinationCoverImage, getDestinationMetadata } from "@/lib/trip-destination"
 import { getOfflineWarningMessage, saveTripOfflinePackage } from "@/lib/offline/trip-offline"
+import { loadTripOfflinePackage } from "@/lib/offline/offline-package-manager"
+import { isOfflineModeActive } from "@/lib/offline/offline-mode"
 import { useAuth } from "@/contexts/auth-context"
 import { buildAdminTripUrl, buildPublicTripUrl, isAdminLinkMode } from "@/lib/security/link-tokens"
 import type { TripFlightRecord } from "@/types/flight"
 import type { TripItineraryRecord, TripItineraryContent } from "@/types"
+import type { OfflineStoredTripPackage, OfflineTripPackageStatus } from "@/lib/offline/types"
 import {
   authenticateTripLinkBiometric,
   disableTripLinkBiometric,
@@ -675,6 +678,72 @@ function buildTripDataFromStoredTrip(storedTrip: any) {
   })
 }
 
+function isOfflineRecoverableError(error: unknown) {
+  const message = error instanceof Error ? error.message.toLowerCase() : String(error ?? "").toLowerCase()
+  return (
+    message.includes("network") ||
+    message.includes("fetch") ||
+    message.includes("failed to fetch") ||
+    message.includes("offline") ||
+    message.includes("timeout") ||
+    message.includes("load failed")
+  )
+}
+
+function normalizeOfflinePackageStatus(status?: OfflineTripPackageStatus | null) {
+  return status ?? "legacy_snapshot"
+}
+
+function filterOfflineDocumentsForAudience(documents: any[], audience: "public" | "admin") {
+  if (audience === "admin") return documents
+  return documents.filter((document: any) => !(document?.private === true || document?.isPrivate === true || document?.visibility === "private" || document?.visibility === "agency_only"))
+}
+
+function buildTripDataFromOfflinePackage(pkg: OfflineStoredTripPackage, audience: "public" | "admin") {
+  const payload = pkg.payload ?? {
+    trip: {},
+    travelers: [],
+    hotels: [],
+    flights: [],
+    itineraries: [],
+    documents: [],
+    quickInfo: null,
+  }
+  const trip = (payload.trip ?? {}) as Record<string, any>
+  const branding = trip.branding && typeof trip.branding === "object" ? trip.branding : null
+  const documents = filterOfflineDocumentsForAudience(Array.isArray(payload.documents) ? payload.documents : [], audience)
+
+  return {
+    tripData: buildTripDataFromStoredTrip({
+      id: trip.id ?? pkg.tripId,
+      slug: trip.slug ?? pkg.slug ?? pkg.tripId,
+      title: trip.title ?? trip.destination ?? "Viagem",
+      destination: trip.destination ?? pkg.destination ?? "Viagem",
+      country: trip.country ?? pkg.country ?? undefined,
+      city: trip.city ?? undefined,
+      startDate: trip.startDate ?? undefined,
+      endDate: trip.endDate ?? undefined,
+      status: trip.status ?? "upcoming",
+      coverImage: trip.coverImage ?? undefined,
+      travelers: Array.isArray(payload.travelers) ? payload.travelers : [],
+      travelersCount: Array.isArray(payload.travelers) ? payload.travelers.length : 0,
+      hotels: Array.isArray(payload.hotels) ? payload.hotels : [],
+      hotel: Array.isArray(payload.hotels) ? payload.hotels[0] ?? null : null,
+      flights: Array.isArray(payload.flights) ? payload.flights : [],
+      itinerary: Array.isArray(payload.itineraries) ? payload.itineraries : [],
+      documents,
+      adminLink: buildAdminTripUrl(typeof trip.slug === "string" ? trip.slug : pkg.slug ?? pkg.tripId),
+      shareLink: buildPublicTripUrl(typeof trip.slug === "string" ? trip.slug : pkg.slug ?? pkg.tripId),
+    }),
+    agencyBranding: {
+      name: typeof branding?.name === "string" ? branding.name : null,
+      logoUrl: typeof branding?.logoUrl === "string" ? branding.logoUrl : typeof branding?.linkLogoUrl === "string" ? branding.linkLogoUrl : null,
+      isAgency: Boolean(branding?.isAgency),
+    },
+    status: normalizeOfflinePackageStatus(pkg.status),
+  }
+}
+
 function resolveProtectedWriteError(error?: string | null) {
   const normalized = (error ?? "").toLowerCase()
 
@@ -879,7 +948,7 @@ function TripHero({ tripData, onEditTrip }: { tripData: any; onEditTrip: () => v
   const { scrollYProgress } = useScroll({ target: ref, offset: ["start start", "end start"] })
   const y = useTransform(scrollYProgress, [0, 1], ["0%", "30%"])
   const opacity = useTransform(scrollYProgress, [0, 0.5], [1, 0])
-  const { isAdmin } = useContext(PermissionContext)
+  const { canWrite } = useContext(PermissionContext)
   const travelersCount = Array.isArray(tripData?.travelers) ? tripData.travelers.length : 0
   const WeatherIcon = tripData?.weather?.icon || Cloud
 
@@ -907,7 +976,7 @@ function TripHero({ tripData, onEditTrip }: { tripData: any; onEditTrip: () => v
                   <span className="text-xl text-white/60">{tripData.country}</span>
                 </div>
               </div>
-              {isAdmin && (
+              {canWrite && (
                 <button 
                   onClick={onEditTrip}
                   className="mt-4 p-3 rounded-xl bg-white/10 hover:bg-white/20 border border-white/10 transition-all"
@@ -1111,7 +1180,7 @@ function FlightCard({
   onDelete: () => void
 }) {
   const [expanded, setExpanded] = useState(false)
-  const { isAdmin } = useContext(PermissionContext)
+  const { isAdmin, canWrite } = useContext(PermissionContext)
   const statusCopy = getFlightStatusCopy(flight)
 
   return (
@@ -1224,13 +1293,13 @@ function FlightCard({
                       Original
                     </Button>
                   )}
-                  {isAdmin && (
+                  {canWrite && (
                     <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); onEdit() }} className="text-white/60 hover:bg-white/10">
                       <Edit3 className="w-4 h-4 mr-2" />
                       Editar
                     </Button>
                   )}
-                  {isAdmin && (
+                  {canWrite && (
                     <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); void onDelete() }} className="text-red-300 hover:bg-red-500/10">
                       <Trash2 className="w-4 h-4 mr-2" />
                       Excluir
@@ -1487,6 +1556,7 @@ function FlightDetailsModal({
 function FlightsSection({
   tripData,
   loading,
+  offlineReadOnly,
   onUpdateFlight,
   onAddFlight,
   onDeleteFlight,
@@ -1501,6 +1571,7 @@ function FlightsSection({
 }: {
   tripData: any
   loading: boolean
+  offlineReadOnly: boolean
   onUpdateFlight: (id: string, data: any) => Promise<void>
   onAddFlight: (data: any) => void
   onDeleteFlight: (flightId: string) => Promise<void>
@@ -1517,7 +1588,7 @@ function FlightsSection({
   const [viewingQR, setViewingQR] = useState<any>(null)
   const [selectedFlight, setSelectedFlight] = useState<any>(null)
   const [addingFlight, setAddingFlight] = useState(false)
-  const { isAdmin } = useContext(PermissionContext)
+  const { isAdmin, canWrite } = useContext(PermissionContext)
   const { showToast } = useToast()
   const flights = Array.isArray(tripData.flights) ? tripData.flights : []
   const ticketDocuments = Array.isArray(tripData.documents) ? tripData.documents.filter((document: any) => document.type === "ticket" && !flights.some((flight: any) => flight.document?.id === document.id)) : []
@@ -1528,6 +1599,11 @@ function FlightsSection({
   }
 
   const handleOpenTicketDocument = async (document: any) => {
+    if (offlineReadOnly) {
+      showToast("Indisponivel offline.", "info")
+      return
+    }
+
     const resolvedUrl = document.fileUrl
       ? { data: document.fileUrl, error: null }
       : document.filePath
@@ -1555,7 +1631,7 @@ function FlightsSection({
               <p className="text-sm text-white/40">{flights.length > 0 ? `${flights.length} voo(s) salvo(s)` : `${ticketDocuments.length} passagem(ns) anexada(s)`}</p>
             </div>
           </div>
-          {isAdmin && (
+          {canWrite && (
             <Button size="sm" variant="ghost" className="text-[#5de0e6] hover:bg-[#5de0e6]/10" onClick={() => setAddingFlight(true)}>
               <Plus className="w-4 h-4 mr-2" />
               Anexar
@@ -1601,7 +1677,7 @@ function FlightsSection({
                   <ExternalLink className="mr-2 h-4 w-4" />
                   Ver passagem original
                 </Button>
-                {isAdmin ? (
+                {canWrite ? (
                   <Button size="sm" variant="ghost" className="text-red-300 hover:bg-red-500/10" onClick={() => void onDeleteDocument(document.id)}>
                     <Trash2 className="mr-2 h-4 w-4" />
                     Excluir
@@ -1844,7 +1920,7 @@ function HotelSection({
 }) {
   const [editing, setEditing] = useState(false)
   const [selectedHotel, setSelectedHotel] = useState<any>(null)
-  const { isAdmin } = useContext(PermissionContext)
+  const { isAdmin, canWrite } = useContext(PermissionContext)
   const hotels = Array.isArray(tripData.hotels) ? tripData.hotels : tripData.hotel ? [tripData.hotel] : []
 
   return (
@@ -1860,7 +1936,7 @@ function HotelSection({
               <p className="text-sm text-white/40">{hotels.length > 0 ? `${hotels.length} hospedagem(ns) cadastrada(s)` : "Nenhuma hospedagem cadastrada"}</p>
             </div>
           </div>
-          {isAdmin && (
+          {canWrite && (
             <Button
               size="sm"
               variant="ghost"
@@ -1925,7 +2001,7 @@ function HotelSection({
 
                   <div className="flex items-center justify-between pt-4 border-t border-white/[0.06]">
                     <span className="text-sm text-white/40">{hotel.confirmationCode || "Reserva nao informada"}</span>
-                    {isAdmin && (
+                    {canWrite && (
                       <div className="flex items-center gap-2">
                         <Button
                           size="sm"
@@ -2213,6 +2289,7 @@ function UploadExistingItineraryModal({
 function ItinerarySection({
   tripData,
   loading,
+  offlineReadOnly,
   itineraryRecords,
   tripId,
   ownerUserId,
@@ -2229,6 +2306,7 @@ function ItinerarySection({
 }: {
   tripData: any
   loading: boolean
+  offlineReadOnly: boolean
   itineraryRecords: TripItineraryRecord[]
   tripId: string
   ownerUserId: string | null
@@ -2248,7 +2326,7 @@ function ItinerarySection({
   const [addingItem, setAddingItem] = useState(false)
   const [uploadOpen, setUploadOpen] = useState(false)
   const [busyAction, setBusyAction] = useState<"simple" | "complete" | null>(null)
-  const { isAdmin } = useContext(PermissionContext)
+  const { isAdmin, canWrite } = useContext(PermissionContext)
   const { showToast } = useToast()
   const itinerary = Array.isArray(tripData.itinerary) ? tripData.itinerary : []
   const activeItinerary = itinerary.find((d: any) => d.day === activeDay)
@@ -2303,6 +2381,10 @@ function ItinerarySection({
   }
 
   const handleGenerate = async (mode: "simple" | "complete") => {
+    if (offlineReadOnly) {
+      showToast("Indisponivel offline.", "info")
+      return
+    }
     if (!ensureSensitiveAccess()) return
     setBusyAction(mode)
 
@@ -2318,6 +2400,11 @@ function ItinerarySection({
   }
 
   const handleOpenItineraryDocument = async (record: TripItineraryRecord) => {
+    if (offlineReadOnly) {
+      showToast("Indisponivel offline.", "info")
+      return
+    }
+
     const document = Array.isArray(tripData.documents) ? tripData.documents.find((entry: any) => entry.id === record.documentId) : null
     if (!document && !record.pdfUrl) {
       showToast("Documento do roteiro nao encontrado.", "error")
@@ -2356,7 +2443,7 @@ function ItinerarySection({
             </div>
           </div>
 
-          {isAdmin ? (
+          {canWrite ? (
             <div className="flex flex-wrap gap-2">
               <Button size="sm" variant="ghost" className="text-[#5de0e6] hover:bg-[#5de0e6]/10" onClick={() => void handleGenerate("simple")} disabled={busyAction !== null}>
                 <Sparkles className="w-4 h-4 mr-2" />
@@ -2488,11 +2575,11 @@ function ItinerarySection({
                             </div>
 
                             <div
-                              onClick={() => isAdmin && setEditingItem(item)}
+                              onClick={() => canWrite && setEditingItem(item)}
                               className={cn(
                                 "p-4 rounded-xl transition-all duration-300",
                                 item.highlight ? "bg-gradient-to-br from-[#5de0e6]/10 to-[#004aad]/10 border border-[#5de0e6]/20" : "bg-white/[0.02] border border-white/[0.06] hover:border-white/10",
-                                isAdmin && "cursor-pointer",
+                                canWrite && "cursor-pointer",
                               )}
                             >
                               <div className="flex items-start justify-between">
@@ -2502,7 +2589,7 @@ function ItinerarySection({
                                   {item.location ? <p className="mt-2 text-sm text-white/50">{item.location}</p> : null}
                                   {item.description ? <p className="mt-2 text-sm text-white/60">{item.description}</p> : null}
                                 </div>
-                                {isAdmin ? <Edit3 className="w-4 h-4 text-white/30 opacity-0 group-hover:opacity-100 transition-opacity" /> : <ChevronRight className="w-4 h-4 text-white/30" />}
+                                {canWrite ? <Edit3 className="w-4 h-4 text-white/30 opacity-0 group-hover:opacity-100 transition-opacity" /> : <ChevronRight className="w-4 h-4 text-white/30" />}
                               </div>
                             </div>
                           </motion.div>
@@ -2555,7 +2642,7 @@ function ItinerarySection({
                       Abrir
                     </Button>
                   ) : null}
-                  {isAdmin ? (
+                  {canWrite ? (
                     <Button size="sm" variant="ghost" className="text-red-300 hover:bg-red-500/10" onClick={() => void onDeleteItinerary(record)}>
                       <Trash2 className="mr-2 h-4 w-4" />
                       Excluir
@@ -2812,6 +2899,7 @@ function AddItineraryItemModal({ open, onClose, day, onSave }: { open: boolean; 
 function DocumentsSection({
   tripData,
   loading,
+  offlineReadOnly,
   onAddDocument,
   onDeleteDocument,
   tripId,
@@ -2824,6 +2912,7 @@ function DocumentsSection({
 }: {
   tripData: any
   loading: boolean
+  offlineReadOnly: boolean
   onAddDocument: (data: any) => void
   onDeleteDocument: (documentId: string) => Promise<void>
   tripId: string
@@ -2839,7 +2928,7 @@ function DocumentsSection({
   const [addingDoc, setAddingDoc] = useState(false)
   const [viewingDoc, setViewingDoc] = useState<any>(null)
   const [pinModal, setPinModal] = useState(false)
-  const { isAdmin } = useContext(PermissionContext)
+  const { isAdmin, canWrite } = useContext(PermissionContext)
   const { showToast } = useToast()
 
   const documents = Array.isArray(tripData.documents) ? tripData.documents : []
@@ -2891,7 +2980,7 @@ function DocumentsSection({
               <p className="text-sm text-white/40">{documents.length} arquivos</p>
             </div>
           </div>
-          {isAdmin && (
+          {canWrite && (
             <Button size="sm" variant="ghost" className="text-[#5de0e6] hover:bg-[#5de0e6]/10" onClick={() => setAddingDoc(true)}>
               <Upload className="w-4 h-4 mr-2" />
               Adicionar
@@ -2936,7 +3025,7 @@ function DocumentsSection({
             >
               <div className="flex items-start justify-between gap-3">
                 <span className="text-2xl">{getDocIcon(doc.type)}</span>
-                {isAdmin ? (
+                {canWrite ? (
                   <button
                     type="button"
                     className="rounded-lg p-1 text-white/40 hover:bg-red-500/10 hover:text-red-300"
@@ -3008,6 +3097,7 @@ function DocumentsSection({
                             <span className="text-xl">{getDocIcon(doc.type)}</span>
                             <Shield className="w-3 h-3 text-[#5de0e6]" />
                           </div>
+                          {canWrite ? (
                           <button
                             type="button"
                             className="rounded-lg p-1 text-white/40 hover:bg-red-500/10 hover:text-red-300"
@@ -3018,6 +3108,7 @@ function DocumentsSection({
                           >
                             <Trash2 className="h-4 w-4" />
                           </button>
+                          ) : null}
                         </div>
                         <p className="text-sm text-white font-medium mt-2 break-words">{doc.name}</p>
                       </motion.div>
@@ -3047,7 +3138,7 @@ function DocumentsSection({
           showToast("Documentos desbloqueados!", "success")
         }}
       />
-      <ViewDocumentModal open={!!viewingDoc} onClose={() => setViewingDoc(null)} document={viewingDoc} />
+      <ViewDocumentModal open={!!viewingDoc} onClose={() => setViewingDoc(null)} document={viewingDoc} offlineReadOnly={offlineReadOnly} />
       <AddDocumentModal open={addingDoc} onClose={() => setAddingDoc(false)} tripId={tripId} ownerUserId={ownerUserId} agencyId={agencyId} tripSlug={routeSlug} adminToken={tripAdminToken} adminProxyMode={adminLinkMutationMode} ensureSensitiveAccess={ensureSensitiveAccess} onSave={(data) => { onAddDocument(data); showToast("Documento adicionado!", "success"); setAddingDoc(false) }} />
     </section>
   )
@@ -3201,10 +3292,14 @@ function PinModal({
 }
 
 // View Document Modal
-function ViewDocumentModal({ open, onClose, document }: { open: boolean; onClose: () => void; document: any }) {
+function ViewDocumentModal({ open, onClose, document, offlineReadOnly = false }: { open: boolean; onClose: () => void; document: any; offlineReadOnly?: boolean }) {
   if (!document) return null
 
   const openDocumentOnDevice = async () => {
+    if (offlineReadOnly) {
+      return
+    }
+
     const pendingWindow = typeof window !== "undefined" ? window.open("", "_blank", "noopener,noreferrer") : null
     const urlResult = document.filePath ? await getSignedDocumentUrl(document.filePath) : { data: document.fileUrl, error: null }
 
@@ -3242,14 +3337,14 @@ function ViewDocumentModal({ open, onClose, document }: { open: boolean; onClose
         <div className="mt-8 p-4 rounded-xl bg-white/[0.03] border border-white/[0.06]">
           <p className="text-xs text-white/40">Preview do documento</p>
           <div className="mt-4 h-48 bg-white/[0.02] rounded-xl flex items-center justify-center">
-            <p className="text-white/20 text-sm">Visualizacao do PDF/Imagem</p>
+            <p className="text-white/20 text-sm">{offlineReadOnly ? "Documento listado, mas ainda indisponivel offline" : "Visualizacao do PDF/Imagem"}</p>
           </div>
         </div>
 
         <div className="flex gap-3 mt-6">
-          <Button className="flex-1 bg-gradient-to-r from-[#5de0e6] to-[#004aad] hover:opacity-90 text-white border-0" onClick={() => void openDocumentOnDevice()}>
+          <Button className="flex-1 bg-gradient-to-r from-[#5de0e6] to-[#004aad] hover:opacity-90 text-white border-0 disabled:opacity-50" onClick={() => void openDocumentOnDevice()} disabled={offlineReadOnly}>
             <Download className="w-4 h-4 mr-2" />
-            Baixar
+            {offlineReadOnly ? "Indisponivel offline" : "Baixar"}
           </Button>
           <Button variant="ghost" className="text-white/60 hover:bg-white/10">
             <Share2 className="w-4 h-4" />
@@ -3423,7 +3518,7 @@ function AddDocumentModal({ open, onClose, onSave, tripId, ownerUserId, agencyId
 }
 
 // Concierge Section
-function ConciergeSection({ tripData, onOpenCredits }: { tripData: any; onOpenCredits: () => void }) {
+function ConciergeSection({ tripData, onOpenCredits, offlineReadOnly = false }: { tripData: any; onOpenCredits: () => void; offlineReadOnly?: boolean }) {
   const [open, setOpen] = useState(false)
   const [message, setMessage] = useState("")
   const [messages, setMessages] = useState([
@@ -3431,7 +3526,7 @@ function ConciergeSection({ tripData, onOpenCredits }: { tripData: any; onOpenCr
   ])
   const [typing, setTyping] = useState(false)
   const [conversationId, setConversationId] = useState<string | null>(null)
-  const { isAdmin } = useContext(PermissionContext)
+  const { isAdmin, canWrite } = useContext(PermissionContext)
   const { user, profile } = useAuth()
   const { showToast } = useToast()
   const hasFlights = Array.isArray(tripData.flights) && tripData.flights.length > 0
@@ -3446,6 +3541,7 @@ function ConciergeSection({ tripData, onOpenCredits }: { tripData: any; onOpenCr
   }, [tripData.destination])
 
   useEffect(() => {
+    if (offlineReadOnly) return
     if (!shouldUseSupabase() || !tripData?.id) return
     if (!isAdmin && !user?.id) return
 
@@ -3481,7 +3577,7 @@ function ConciergeSection({ tripData, onOpenCredits }: { tripData: any; onOpenCr
     return () => {
       active = false
     }
-  }, [isAdmin, tripData?.id, user?.id])
+  }, [isAdmin, tripData?.id, user?.id, offlineReadOnly])
 
   const suggestions = [
     "Mostrar hospedagem",
@@ -3546,6 +3642,10 @@ function ConciergeSection({ tripData, onOpenCredits }: { tripData: any; onOpenCr
   }
 
   const handleSend = async () => {
+    if (offlineReadOnly) {
+      showToast("Indisponivel offline.", "info")
+      return
+    }
     if (!message.trim()) return
 
     const userMessage = message
@@ -3598,6 +3698,11 @@ function ConciergeSection({ tripData, onOpenCredits }: { tripData: any; onOpenCr
         </motion.div>
 
         <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="rounded-2xl bg-white/[0.02] backdrop-blur-xl border border-white/[0.06] overflow-hidden">
+          {offlineReadOnly ? (
+            <div className="border-b border-white/[0.06] bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+              Indisponivel offline.
+            </div>
+          ) : null}
           <div className="h-80 overflow-y-auto p-4 space-y-4">
             {messages.map((msg, i) => (
               <motion.div key={i} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className={cn("flex", msg.role === "user" ? "justify-end" : "justify-start")}>
@@ -3646,9 +3751,10 @@ function ConciergeSection({ tripData, onOpenCredits }: { tripData: any; onOpenCr
                 onChange={(e) => setMessage(e.target.value)}
                 onKeyPress={(e) => e.key === "Enter" && handleSend()}
                 placeholder="Pergunte sobre sua viagem..."
+                disabled={offlineReadOnly}
                 className="flex-1 px-4 py-3 rounded-xl bg-white/[0.05] border border-white/[0.08] text-white placeholder:text-white/30 focus:outline-none focus:border-[#5de0e6]/50 transition-colors"
               />
-              <Button onClick={handleSend} className="bg-gradient-to-r from-[#5de0e6] to-[#004aad] hover:opacity-90 text-white border-0">
+              <Button onClick={handleSend} disabled={offlineReadOnly} className="bg-gradient-to-r from-[#5de0e6] to-[#004aad] hover:opacity-90 text-white border-0 disabled:opacity-50">
                 <Send className="w-4 h-4" />
               </Button>
             </div>
@@ -3809,7 +3915,7 @@ function TravelersModal({
   travelers: { name: string; avatar?: string; role: string }[]
   onUpdateTravelers: (travelers: { name: string; avatar?: string; role: string }[]) => void
 }) {
-  const { isAdmin } = useContext(PermissionContext)
+  const { canWrite } = useContext(PermissionContext)
   const { showToast } = useToast()
   const [editingIndex, setEditingIndex] = useState<number | null>(null)
   const [form, setForm] = useState({ name: "", role: "acompanhante" })
@@ -3825,7 +3931,7 @@ function TravelersModal({
   }
 
   const handleSave = () => {
-    if (!isAdmin) return
+    if (!canWrite) return
     if (!form.name.trim()) return
 
     if (editingIndex === null) {
@@ -3840,14 +3946,14 @@ function TravelersModal({
   }
 
   const handleRemove = (index: number) => {
-    if (!isAdmin) return
+    if (!canWrite) return
     onUpdateTravelers(travelers.filter((_, travelerIndex) => travelerIndex !== index))
     showToast("Viajante removido.", "success")
     if (editingIndex === index) resetForm()
   }
 
   const handleSetPrimary = (index: number) => {
-    if (!isAdmin) return
+    if (!canWrite) return
     onUpdateTravelers(travelers.map((traveler, travelerIndex) => ({
       ...traveler,
       role: travelerIndex === index ? "principal" : traveler.role === "principal" ? "acompanhante" : traveler.role
@@ -3867,7 +3973,7 @@ function TravelersModal({
                   <p className="text-xs text-white/40">{traveler.role === "principal" ? "Responsavel principal" : "Viajante"}</p>
                 </div>
                 <div className="flex gap-2">
-                  {isAdmin && (
+                  {canWrite && (
                     <>
                       <button onClick={() => startEditing(index)} className="rounded-xl bg-white/[0.05] p-2 text-white/60 transition-colors hover:bg-white/10 hover:text-white">
                         <Pencil className="h-4 w-4" />
@@ -3879,7 +3985,7 @@ function TravelersModal({
                   )}
                 </div>
               </div>
-              {isAdmin && traveler.role !== "principal" && (
+              {canWrite && traveler.role !== "principal" && (
                 <button onClick={() => handleSetPrimary(index)} className="mt-3 text-xs font-medium text-[#5de0e6]">
                   Definir como responsavel principal
                 </button>
@@ -3888,7 +3994,7 @@ function TravelersModal({
           ))}
         </div>
 
-        {isAdmin ? (
+        {canWrite ? (
           <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4">
             <p className="mb-4 text-sm font-medium text-white">{editingIndex === null ? "Adicionar viajante" : "Editar viajante"}</p>
             <div className="space-y-3">
@@ -3938,7 +4044,7 @@ function TripSettingsModal({
   tripData: any
   onSave: (data: { privacy: string; permissions: string; status: string; preferences: string }) => void
 }) {
-  const { isAdmin } = useContext(PermissionContext)
+  const { canWrite } = useContext(PermissionContext)
   const [form, setForm] = useState({
     preferences: "Roteiro premium com foco em experiencias culturais e gastronomia.",
     privacy: "privado",
@@ -3959,8 +4065,8 @@ function TripSettingsModal({
           <Label className="text-white/60">Preferencias da viagem</Label>
           <textarea
             value={form.preferences}
-            onChange={(e) => isAdmin && setForm((prev) => ({ ...prev, preferences: e.target.value }))}
-            disabled={!isAdmin}
+            onChange={(e) => canWrite && setForm((prev) => ({ ...prev, preferences: e.target.value }))}
+            disabled={!canWrite}
             className="mt-2 min-h-[110px] w-full rounded-2xl border border-white/10 bg-white/[0.03] p-4 text-sm text-white outline-none"
           />
         </div>
@@ -3971,8 +4077,8 @@ function TripSettingsModal({
               {["privado", "compartilhavel"].map((privacy) => (
                 <button
                   key={privacy}
-                  onClick={() => isAdmin && setForm((prev) => ({ ...prev, privacy }))}
-                  disabled={!isAdmin}
+                  onClick={() => canWrite && setForm((prev) => ({ ...prev, privacy }))}
+                  disabled={!canWrite}
                   className={cn(
                     "rounded-xl border px-3 py-2 text-left text-sm transition-colors",
                     form.privacy === privacy ? "border-[#5de0e6]/40 bg-[#5de0e6]/10 text-[#5de0e6]" : "border-white/10 bg-white/[0.03] text-white/60"
@@ -3989,8 +4095,8 @@ function TripSettingsModal({
               {["edicao_restrita", "colaborativa"].map((permission) => (
                 <button
                   key={permission}
-                  onClick={() => isAdmin && setForm((prev) => ({ ...prev, permissions: permission }))}
-                  disabled={!isAdmin}
+                  onClick={() => canWrite && setForm((prev) => ({ ...prev, permissions: permission }))}
+                  disabled={!canWrite}
                   className={cn(
                     "rounded-xl border px-3 py-2 text-left text-sm transition-colors",
                     form.permissions === permission ? "border-[#5de0e6]/40 bg-[#5de0e6]/10 text-[#5de0e6]" : "border-white/10 bg-white/[0.03] text-white/60"
@@ -4008,8 +4114,8 @@ function TripSettingsModal({
             {["upcoming", "ongoing", "completed"].map((status) => (
               <button
                 key={status}
-                onClick={() => isAdmin && setForm((prev) => ({ ...prev, status }))}
-                disabled={!isAdmin}
+                onClick={() => canWrite && setForm((prev) => ({ ...prev, status }))}
+                disabled={!canWrite}
                 className={cn(
                   "rounded-xl border px-3 py-2 text-sm transition-colors",
                   form.status === status ? "border-[#5de0e6]/40 bg-[#5de0e6]/10 text-[#5de0e6]" : "border-white/10 bg-white/[0.03] text-white/60"
@@ -4020,7 +4126,7 @@ function TripSettingsModal({
             ))}
           </div>
         </div>
-        {isAdmin ? (
+        {canWrite ? (
           <Button className="w-full bg-gradient-to-r from-[#5de0e6] to-[#004aad] text-white" onClick={() => onSave(form)}>
             Salvar configuracoes
           </Button>
@@ -4302,6 +4408,25 @@ function OfflineSection({
             </Button>
           </div>
         </motion.div>
+      </div>
+    </section>
+  )
+}
+
+function OfflineModeBanner({ status }: { status: OfflineTripPackageStatus }) {
+  const message =
+    status === "partial"
+      ? "Modo offline ativo. Algumas funcionalidades estao indisponiveis e alguns arquivos podem nao estar disponiveis offline."
+      : status === "legacy_snapshot"
+        ? "Modo offline ativo. Esta e uma versao salva anterior. Arquivos podem nao estar disponiveis offline."
+        : "Modo offline ativo. Algumas funcionalidades estao indisponiveis."
+
+  return (
+    <section className="px-4 pt-24">
+      <div className="mx-auto max-w-6xl">
+        <div className="rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+          {message}
+        </div>
       </div>
     </section>
   )
@@ -4730,6 +4855,8 @@ export default function TripPage() {
   const [securityModalOpen, setSecurityModalOpen] = useState(false)
   const [quickAccessGateRequired, setQuickAccessGateRequired] = useState(false)
   const [adminLinkMutationMode, setAdminLinkMutationMode] = useState(false)
+  const [offlineModeEnabled, setOfflineModeEnabled] = useState(false)
+  const [offlinePackageStatus, setOfflinePackageStatus] = useState<OfflineTripPackageStatus | null>(null)
   const [agencyBranding, setAgencyBranding] = useState<{ name: string | null; logoUrl: string | null; isAgency: boolean }>({ name: null, logoUrl: null, isAgency: false })
   const [sectionsLoading, setSectionsLoading] = useState({
     flights: true,
@@ -4764,6 +4891,8 @@ export default function TripPage() {
     setCanWrite(false)
     setTripAdminToken(adminToken)
     setAdminLinkMutationMode(false)
+    setOfflineModeEnabled(false)
+    setOfflinePackageStatus(null)
     setTripItineraryRecords([])
     setSectionsLoading({
       flights: true,
@@ -4789,6 +4918,45 @@ export default function TripPage() {
         routeMode,
         isMobileViewport,
       })
+
+      const loadOfflinePackage = async (reason: "offline" | "network") => {
+        const offlinePackage = await loadTripOfflinePackage(routeSlug)
+        if (!offlinePackage) return false
+        if (loadRequestRef.current !== requestId) return true
+
+        const audience = isAdminRoute ? "admin" : "public"
+        const offlineTrip = buildTripDataFromOfflinePackage(offlinePackage, audience)
+        setOfflineModeEnabled(true)
+        setOfflinePackageStatus(offlineTrip.status)
+        setTripOwnerUserId(null)
+        setTripAdminToken(null)
+        setAdminLinkMutationMode(false)
+        setQuickAccessGateRequired(false)
+        setSensitiveAccessGranted(false)
+        setCanWrite(false)
+        setIsAdmin(isAdminRoute)
+        setTripItineraryRecords([])
+        setAgencyBranding(offlineTrip.agencyBranding)
+        setTripData(offlineTrip.tripData)
+        setSectionsLoading({
+          flights: false,
+          hotels: false,
+          itineraries: false,
+          documents: false,
+        })
+        setIsLoadingTrip(false)
+        tripPerf.end({ tripId: offlinePackage.tripId, mode: "offline", reason })
+        return true
+      }
+
+      if (isOfflineModeActive()) {
+        const offlineLoaded = await loadOfflinePackage("offline")
+        if (!offlineLoaded) {
+          setLoadError("Esta viagem nao foi salva para uso offline neste dispositivo.")
+          setIsLoadingTrip(false)
+        }
+        return
+      }
 
       try {
         const repositoryTrip = adminToken
@@ -4994,6 +5162,12 @@ export default function TripPage() {
           return
         }
         if (useSupabase) {
+          if (repositoryTrip.error && isOfflineRecoverableError(new Error(repositoryTrip.error))) {
+            const offlineLoaded = await loadOfflinePackage("network")
+            if (offlineLoaded) {
+              return
+            }
+          }
           const message = repositoryTrip.error || "Viagem nao encontrada ou link expirado."
           console.error("[TRIP] erro ao carregar link", message)
           setLoadError("Viagem nao encontrada ou link expirado.")
@@ -5003,6 +5177,12 @@ export default function TripPage() {
       } catch (error) {
         const message = error instanceof Error ? error.message : "Falha ao carregar viagem."
         console.error("[TRIP] erro ao carregar link", message)
+        if (useSupabase && isOfflineRecoverableError(error)) {
+          const offlineLoaded = await loadOfflinePackage("network")
+          if (offlineLoaded) {
+            return
+          }
+        }
         if (useSupabase) {
           setLoadError("Viagem nao encontrada ou link expirado.")
           setIsLoadingTrip(false)
@@ -5050,6 +5230,12 @@ export default function TripPage() {
 
   const showToast = (message: string, type: "success" | "error" | "info" = "success") => {
     setToast({ message, type })
+  }
+
+  const blockOfflineMutation = () => {
+    if (!offlineModeEnabled) return false
+    showToast("Indisponivel offline.", "info")
+    return true
   }
 
   const callTripAdminApi = async <T,>(payload: Record<string, unknown>) => {
@@ -5150,6 +5336,7 @@ export default function TripPage() {
   }
 
   const handleUpdateTrip = (data: any) => {
+    if (blockOfflineMutation()) return
     requireSensitiveAccess(() => {
       setTripData(prev => ({
         ...prev,
@@ -5163,6 +5350,7 @@ export default function TripPage() {
   }
 
   const handleUpdateFlight = async (id: string, data: any) => {
+    if (blockOfflineMutation()) return
     if (!ensureSensitiveAccess()) return
     const result = adminLinkMutationMode
       ? await callTripAdminApi<{ flight?: TripFlightRecord }>({
@@ -5221,6 +5409,7 @@ export default function TripPage() {
   }
 
   const handleAddFlight = (data: any) => {
+    if (blockOfflineMutation()) return
     if (!ensureSensitiveAccess()) return
 
     const upsertById = (items: any[], item: any) => {
@@ -5243,6 +5432,7 @@ export default function TripPage() {
   }
 
   const handleSaveHotel = async (data: any) => {
+    if (blockOfflineMutation()) return
     console.log(data?.id ? "[HOTEL] update started" : "[HOTEL] create started")
 
     if (!tripData.id) {
@@ -5320,6 +5510,7 @@ export default function TripPage() {
   }
 
   const handleDeleteHotel = async (hotelId: string) => {
+    if (blockOfflineMutation()) return
     console.log("[HOTEL] delete started")
 
     if (!sensitiveAccessGranted) {
@@ -5358,6 +5549,7 @@ export default function TripPage() {
   }
 
   const handleUpdateItinerary = async (data: any) => {
+    if (blockOfflineMutation()) return
     const normalizedDays = Array.isArray(data) ? data : []
     setTripData((prev) => ({ ...prev, itinerary: normalizedDays }))
 
@@ -5406,6 +5598,7 @@ export default function TripPage() {
   }
 
   const handleGenerateItinerary = async (mode: "simple" | "complete_pdf") => {
+    if (blockOfflineMutation()) return
     if (!ensureSensitiveAccess()) return
 
     const label = mode === "simple" ? "roteiro simples" : "roteiro completo"
@@ -5455,6 +5648,7 @@ export default function TripPage() {
   }
 
   const handleSaveUploadedItinerary = (payload: { itinerary: TripItineraryRecord; document: any }) => {
+    if (blockOfflineMutation()) return
     syncTripItineraryRecord(payload.itinerary)
     setTripData((prev) => ({
       ...prev,
@@ -5464,6 +5658,7 @@ export default function TripPage() {
   }
 
   const handleDeleteItinerary = async (record: TripItineraryRecord) => {
+    if (blockOfflineMutation()) return
     if (!sensitiveAccessGranted) {
       requireSensitiveAccess(() => { void handleDeleteItinerary(record) })
       return
@@ -5538,6 +5733,7 @@ export default function TripPage() {
   }
 
   const handleAddDocument = (data: any) => {
+    if (blockOfflineMutation()) return
     requireSensitiveAccess(() => {
       setTripData(prev => ({
         ...prev,
@@ -5547,6 +5743,7 @@ export default function TripPage() {
   }
 
   const handleDeleteFlight = async (flightId: string) => {
+    if (blockOfflineMutation()) return
     if (!sensitiveAccessGranted) {
       requireSensitiveAccess(() => { void handleDeleteFlight(flightId) })
       return
@@ -5614,6 +5811,7 @@ export default function TripPage() {
   }
 
   const handleDeleteDocument = async (documentId: string) => {
+    if (blockOfflineMutation()) return
     if (!sensitiveAccessGranted) {
       requireSensitiveAccess(() => { void handleDeleteDocument(documentId) })
       return
@@ -5682,12 +5880,14 @@ export default function TripPage() {
   }
 
   const handleUpdateTravelers = (travelers: { name: string; avatar?: string; role: string }[]) => {
+    if (blockOfflineMutation()) return
     requireSensitiveAccess(() => {
       setTripData(prev => ({ ...prev, travelers }))
     })
   }
 
   const handleSaveTripSettings = (data: { privacy: string; permissions: string; status: string; preferences: string }) => {
+    if (blockOfflineMutation()) return
     requireSensitiveAccess(() => {
       setTripData(prev => ({ ...prev, status: data.status, tripPreferences: data }))
       setTripSettingsOpen(false)
@@ -5765,29 +5965,31 @@ export default function TripPage() {
           <FloatingParticles />
 
           <TripHeader tripData={tripData} agencyBranding={agencyBranding} onOpenShare={() => setShareOpen(true)} onOpenMenu={() => setMenuOpen(true)} />
+          {offlineModeEnabled && offlinePackageStatus ? <OfflineModeBanner status={offlinePackageStatus} /> : null}
           <TripHero tripData={tripData} onEditTrip={() => setEditTripOpen(true)} />
           <QuickAccessCards tripData={tripData} onNavigate={handleNavigate} />
-  <FlightsSection loading={sectionsLoading.flights} tripData={tripData} onUpdateFlight={handleUpdateFlight} onAddFlight={handleAddFlight} onDeleteFlight={handleDeleteFlight} onDeleteDocument={handleDeleteDocument} tripId={tripData.id} ownerUserId={tripOwnerUserId} agencyId={profile?.agencyId ?? null} routeSlug={routeSlug} tripAdminToken={tripAdminToken} adminLinkMutationMode={adminLinkMutationMode} ensureSensitiveAccess={ensureSensitiveAccess} />
-  <HotelSection loading={sectionsLoading.hotels} tripData={tripData} onSaveHotel={handleSaveHotel} onDeleteHotel={handleDeleteHotel} />
-  <ItinerarySection
-    loading={sectionsLoading.itineraries}
-    tripData={tripData}
-    itineraryRecords={tripItineraryRecords}
-      tripId={tripData.id}
-      ownerUserId={tripOwnerUserId}
-      agencyId={profile?.agencyId ?? null}
-      routeSlug={routeSlug}
-      tripAdminToken={tripAdminToken}
-      adminLinkMutationMode={adminLinkMutationMode}
-      ensureSensitiveAccess={ensureSensitiveAccess}
-      onUpdateItinerary={handleUpdateItinerary}
-      onGenerateSimple={() => handleGenerateItinerary("simple")}
-      onGenerateComplete={() => handleGenerateItinerary("complete_pdf")}
-      onSaveUploadedItinerary={handleSaveUploadedItinerary}
-      onDeleteItinerary={handleDeleteItinerary}
-    />
-  <DocumentsSection loading={sectionsLoading.documents} tripData={tripData} onAddDocument={handleAddDocument} onDeleteDocument={handleDeleteDocument} tripId={tripData.id} ownerUserId={tripOwnerUserId} agencyId={profile?.agencyId ?? null} routeSlug={routeSlug} tripAdminToken={tripAdminToken} adminLinkMutationMode={adminLinkMutationMode} ensureSensitiveAccess={ensureSensitiveAccess} />
-  <ConciergeSection tripData={tripData} onOpenCredits={() => setCreditsOpen(true)} />
+          <FlightsSection loading={sectionsLoading.flights} tripData={tripData} onUpdateFlight={handleUpdateFlight} onAddFlight={handleAddFlight} onDeleteFlight={handleDeleteFlight} onDeleteDocument={handleDeleteDocument} tripId={tripData.id} ownerUserId={tripOwnerUserId} agencyId={profile?.agencyId ?? null} routeSlug={routeSlug} tripAdminToken={tripAdminToken} adminLinkMutationMode={adminLinkMutationMode} ensureSensitiveAccess={ensureSensitiveAccess} offlineReadOnly={offlineModeEnabled} />
+          <HotelSection loading={sectionsLoading.hotels} tripData={tripData} onSaveHotel={handleSaveHotel} onDeleteHotel={handleDeleteHotel} />
+          <ItinerarySection
+            loading={sectionsLoading.itineraries}
+            tripData={tripData}
+            itineraryRecords={tripItineraryRecords}
+            offlineReadOnly={offlineModeEnabled}
+            tripId={tripData.id}
+            ownerUserId={tripOwnerUserId}
+            agencyId={profile?.agencyId ?? null}
+            routeSlug={routeSlug}
+            tripAdminToken={tripAdminToken}
+            adminLinkMutationMode={adminLinkMutationMode}
+            ensureSensitiveAccess={ensureSensitiveAccess}
+            onUpdateItinerary={handleUpdateItinerary}
+            onGenerateSimple={() => handleGenerateItinerary("simple")}
+            onGenerateComplete={() => handleGenerateItinerary("complete_pdf")}
+            onSaveUploadedItinerary={handleSaveUploadedItinerary}
+            onDeleteItinerary={handleDeleteItinerary}
+          />
+          <DocumentsSection loading={sectionsLoading.documents} tripData={tripData} onAddDocument={handleAddDocument} onDeleteDocument={handleDeleteDocument} tripId={tripData.id} ownerUserId={tripOwnerUserId} agencyId={profile?.agencyId ?? null} routeSlug={routeSlug} tripAdminToken={tripAdminToken} adminLinkMutationMode={adminLinkMutationMode} ensureSensitiveAccess={ensureSensitiveAccess} offlineReadOnly={offlineModeEnabled} />
+          <ConciergeSection tripData={tripData} onOpenCredits={() => setCreditsOpen(true)} offlineReadOnly={offlineModeEnabled} />
           <OfflineSection tripData={tripData} isAdmin={isAdmin} sensitiveAccessGranted={sensitiveAccessGranted} agencyBranding={agencyBranding} />
           <QuickInfoSection tripData={tripData} />
           <TripFooter agencyBranding={agencyBranding} />
