@@ -1,5 +1,5 @@
 const SHELL_CACHE_PREFIX = "vuei-shell"
-const SHELL_CACHE_VERSION = "20260614a"
+const SHELL_CACHE_VERSION = "20260614b"
 const CACHE_NAME = `${SHELL_CACHE_PREFIX}-${SHELL_CACHE_VERSION}`
 const SHELL_FALLBACK_URL = "/"
 const SHELL_URLS = [
@@ -13,10 +13,45 @@ const SHELL_URLS = [
   "/android-chrome-512x512-20260611b.png",
 ]
 
+function createTripOfflineFallbackResponse() {
+  return new Response(
+    `<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Vuei Offline</title>
+    <style>
+      body{margin:0;background:#000;color:#fff;font-family:ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+      main{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
+      .card{max-width:420px;border:1px solid rgba(255,255,255,.06);background:rgba(255,255,255,.02);border-radius:24px;padding:28px;text-align:center}
+      h1{font-size:22px;margin:0 0 12px}
+      p{margin:0;color:rgba(255,255,255,.62);line-height:1.5}
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="card">
+        <h1>Esta viagem nao foi salva para uso offline neste dispositivo.</h1>
+        <p>Abra este link com internet e toque em Salvar Offline para preparar o acesso sem conexao.</p>
+      </div>
+    </main>
+  </body>
+</html>`,
+    {
+      headers: {
+        "Content-Type": "text/html; charset=utf-8",
+        "Cache-Control": "no-store",
+      },
+    },
+  )
+}
+
 self.addEventListener("install", (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => cache.addAll(SHELL_URLS)).catch(() => undefined),
   )
+  void self.skipWaiting()
 })
 
 self.addEventListener("activate", (event) => {
@@ -29,6 +64,7 @@ self.addEventListener("activate", (event) => {
       ),
     ),
   )
+  void self.clients.claim()
 })
 
 self.addEventListener("fetch", (event) => {
@@ -68,9 +104,11 @@ self.addEventListener("fetch", (event) => {
             if (cachedShell) {
               return cachedShell
             }
+
+            return Response.error()
           }
 
-          return Response.error()
+          return createTripOfflineFallbackResponse()
         }),
     )
     return

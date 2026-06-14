@@ -16,7 +16,7 @@ import { deleteTripItinerary, listTripItineraries, requestAiItineraryGeneration,
 import { listConversationsByTrip, listMessages } from "@/lib/repositories/ai-repository"
 import { validateDocumentFile } from "@/lib/files/file-validation"
 import { getDestinationCoverImage, getDestinationMetadata } from "@/lib/trip-destination"
-import { getOfflineWarningMessage, saveTripOfflinePackage } from "@/lib/offline/trip-offline"
+import { getOfflineWarningMessage, prepareTripRoutesForOffline, saveTripOfflinePackage } from "@/lib/offline/trip-offline"
 import { getOfflineDocumentBlob, getOfflineImageBlob, loadTripOfflinePackage } from "@/lib/offline/offline-package-manager"
 import { isOfflineModeActive } from "@/lib/offline/offline-mode"
 import { useAuth } from "@/contexts/auth-context"
@@ -4520,11 +4520,15 @@ function OfflineSection({
   isAdmin,
   sensitiveAccessGranted,
   agencyBranding,
+  routeSlug,
+  currentPathname,
 }: {
   tripData: any
   isAdmin: boolean
   sensitiveAccessGranted: boolean
   agencyBranding: { name: string | null; logoUrl: string | null; isAgency: boolean }
+  routeSlug: string
+  currentPathname: string
 }) {
   const [downloading, setDownloading] = useState(false)
   const [downloaded, setDownloaded] = useState(false)
@@ -4543,9 +4547,24 @@ function OfflineSection({
           allowPrivateDocuments: isAdmin && sensitiveAccessGranted,
         },
       )
+      const routePreparation = await prepareTripRoutesForOffline({
+        slug: routeSlug,
+        currentPathname,
+        includeAdminRoute: isAdmin,
+      })
 
       setDownloaded(true)
-      showToast(offlineResult.message, offlineResult.persisted.failures.length > 0 ? "info" : "success")
+      const routePreparationIncomplete =
+        routePreparation.preparedPaths.length === 0 ||
+        !routePreparation.registrationActive ||
+        !routePreparation.controllerReady
+
+      showToast(
+        routePreparationIncomplete
+          ? "Offline preparado. Feche e abra novamente o link uma vez online para concluir a instalacao offline."
+          : offlineResult.message,
+        routePreparationIncomplete || offlineResult.persisted.failures.length > 0 ? "info" : "success",
+      )
     } catch (error) {
       console.error("[OFFLINE] save failed", error)
       showToast(error instanceof Error ? error.message : "Nao foi possivel salvar esta viagem offline.", "error")
@@ -6261,7 +6280,7 @@ export default function TripPage() {
           />
           <DocumentsSection loading={sectionsLoading.documents} tripData={tripData} onAddDocument={handleAddDocument} onDeleteDocument={handleDeleteDocument} tripId={tripData.id} ownerUserId={tripOwnerUserId} agencyId={profile?.agencyId ?? null} routeSlug={routeSlug} tripAdminToken={tripAdminToken} adminLinkMutationMode={adminLinkMutationMode} ensureSensitiveAccess={ensureSensitiveAccess} offlineReadOnly={offlineModeEnabled} offlineDocumentContext={offlineDocumentContext} />
           <ConciergeSection tripData={tripData} onOpenCredits={() => setCreditsOpen(true)} offlineReadOnly={offlineModeEnabled} />
-          <OfflineSection tripData={tripData} isAdmin={isAdmin} sensitiveAccessGranted={sensitiveAccessGranted} agencyBranding={agencyBranding} />
+          <OfflineSection tripData={tripData} isAdmin={isAdmin} sensitiveAccessGranted={sensitiveAccessGranted} agencyBranding={agencyBranding} routeSlug={routeSlug} currentPathname={pathname || `/viagem/${routeSlug}`} />
           <QuickInfoSection tripData={tripData} />
           <TripFooter agencyBranding={agencyBranding} />
 

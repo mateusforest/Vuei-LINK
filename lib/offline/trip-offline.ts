@@ -7,6 +7,9 @@ import type { OfflinePackagePersistenceResult, OfflineTripPackage, OfflineTripPa
 
 const OFFLINE_STORAGE_KEY = "vuei_offline_trips"
 const OFFLINE_WARNING = getIndexedDbOfflineWarningMessage()
+const OFFLINE_SHELL_CACHE_PREFIX = "vuei-shell"
+const OFFLINE_SHELL_CACHE_VERSION = "20260614b"
+const OFFLINE_SHELL_CACHE_NAME = `${OFFLINE_SHELL_CACHE_PREFIX}-${OFFLINE_SHELL_CACHE_VERSION}`
 
 function readPackages() {
   if (typeof window === "undefined") return [] as OfflineTripPackage[]
@@ -133,6 +136,75 @@ export async function saveTripOfflinePackage(tripData: any, options?: { allowPri
           ? "Viagem salva offline com restricoes. Alguns arquivos nao entraram por limite de 50 MB."
           : "Viagem salva offline com restricoes. Alguns arquivos nao puderam ser baixados."
         : "Viagem salva offline neste dispositivo.",
+  }
+}
+
+export async function prepareTripRoutesForOffline(input: {
+  slug: string
+  currentPathname: string
+  includeAdminRoute?: boolean
+}) {
+  const preparedPaths: string[] = []
+  const skippedPaths: string[] = []
+
+  if (typeof window === "undefined" || typeof caches === "undefined" || !("serviceWorker" in navigator)) {
+    return {
+      preparedPaths,
+      skippedPaths: [input.currentPathname],
+      controllerReady: false,
+      registrationActive: false,
+    }
+  }
+
+  let registration: ServiceWorkerRegistration | null = null
+
+  try {
+    registration = await navigator.serviceWorker.ready
+  } catch (error) {
+    console.error("[OFFLINE] service worker ready error", error)
+  }
+
+  const registrationActive = Boolean(registration?.active)
+  const controllerReady = Boolean(navigator.serviceWorker.controller)
+  const cache = await caches.open(OFFLINE_SHELL_CACHE_NAME)
+  const paths = new Set<string>([
+    input.currentPathname,
+    `/v/${input.slug}`,
+    `/viagem/${input.slug}`,
+  ])
+
+  if (input.includeAdminRoute || input.currentPathname.endsWith("/admin")) {
+    paths.add(`/viagem/${input.slug}/admin`)
+  }
+
+  for (const path of paths) {
+    try {
+      const response = await fetch(path, {
+        credentials: "same-origin",
+        cache: "reload",
+        headers: {
+          Accept: "text/html",
+        },
+      })
+
+      if (!response.ok) {
+        skippedPaths.push(path)
+        continue
+      }
+
+      await cache.put(path, response.clone())
+      preparedPaths.push(path)
+    } catch (error) {
+      console.error("[OFFLINE] route prepare error", path, error)
+      skippedPaths.push(path)
+    }
+  }
+
+  return {
+    preparedPaths,
+    skippedPaths,
+    controllerReady,
+    registrationActive,
   }
 }
 
