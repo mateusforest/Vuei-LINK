@@ -3,7 +3,7 @@ import {
   getOfflineWarningMessage as getIndexedDbOfflineWarningMessage,
   persistOfflineTripPackage,
 } from "@/lib/offline/offline-package-manager"
-import type { OfflinePackagePersistenceResult, OfflineTripPackage, OfflineTripPackageItem } from "@/lib/offline/types"
+import type { OfflinePackagePersistenceResult, OfflineTripPackage, OfflineTripPackageAudience, OfflineTripPackageItem } from "@/lib/offline/types"
 
 const OFFLINE_STORAGE_KEY = "vuei_offline_trips"
 const OFFLINE_WARNING = getIndexedDbOfflineWarningMessage()
@@ -31,6 +31,7 @@ function buildLegacyPackage(tripData: any, overrides?: Partial<OfflineTripPackag
     tripName: tripData?.destination || tripData?.title || "Viagem",
     savedAt: overrides?.savedAt ?? new Date().toISOString(),
     warning: overrides?.warning ?? OFFLINE_WARNING,
+    audience: overrides?.audience ?? "public",
     status: overrides?.status,
     totalSizeBytes: overrides?.totalSizeBytes,
     documentCount: overrides?.documentCount,
@@ -67,14 +68,16 @@ function toLegacyItemsFromPersistence(tripData: any, result: OfflinePackagePersi
   })
 }
 
-export async function saveTripOfflinePackage(tripData: any, options?: { allowPrivateDocuments?: boolean }) {
+export async function saveTripOfflinePackage(tripData: any, options?: { allowPrivateDocuments?: boolean; audience?: OfflineTripPackageAudience }) {
   const packages = readPackages()
+  const audience = options?.audience ?? "public"
 
   let persisted: OfflinePackagePersistenceResult | null = null
 
   try {
     persisted = await persistOfflineTripPackage({
       tripData,
+      audience,
       allowPrivateDocuments: options?.allowPrivateDocuments === true,
     })
   } catch (error) {
@@ -94,6 +97,7 @@ export async function saveTripOfflinePackage(tripData: any, options?: { allowPri
     ...buildLegacyPackage(tripData, {
       savedAt: persisted.packageRecord.savedAt,
       warning,
+      audience: persisted.packageRecord.audience,
       status: persisted.packageRecord.status,
       totalSizeBytes: persisted.packageRecord.totalSizeBytes,
       documentCount: persisted.packageRecord.documentCount,
@@ -108,7 +112,10 @@ export async function saveTripOfflinePackage(tripData: any, options?: { allowPri
     items: toLegacyItemsFromPersistence(tripData, persisted),
   }
 
-  writePackages([nextPackage, ...packages.filter((item) => item.tripId !== nextPackage.tripId)])
+  writePackages([
+    nextPackage,
+    ...packages.filter((item) => !(item.tripId === nextPackage.tripId && (item.audience ?? "public") === nextPackage.audience)),
+  ])
 
   return {
     legacyPackage: nextPackage,

@@ -9,12 +9,14 @@ import {
   getOfflineRecord,
   getOfflineRecordsByIndex,
   IMAGE_BLOBS_STORE,
+  LEGACY_TRIP_PACKAGES_STORE,
   putOfflineRecord,
   TRIP_PACKAGES_STORE,
 } from "@/lib/offline/indexeddb"
 import type {
   OfflineDocumentBlobRecord,
   OfflineImageBlobRecord,
+  OfflineTripPackageAudience,
   OfflineStoredTripPackage,
   OfflineTripPackage,
   OfflineTripPackageItem,
@@ -27,21 +29,34 @@ import { getSignedDocumentUrl } from "@/lib/repositories/documents-repository"
 
 const LEGACY_OFFLINE_STORAGE_KEY = "vuei_offline_trips"
 const LEGACY_MIGRATION_SESSION_KEY = "vuei_offline_legacy_migration_v1"
-const OFFLINE_PACKAGE_VERSION = 1
+const OFFLINE_PACKAGE_VERSION = 2
 const OFFLINE_WARNING = "Voce esta vendo uma versao salva offline. Algumas informacoes podem estar desatualizadas."
 export const OFFLINE_PACKAGE_SIZE_LIMIT_BYTES = 50 * 1024 * 1024
 
 let legacyMigrationPromise: Promise<{ migrated: number; skipped: number }> | null = null
 
+const PUBLIC_OFFLINE_AUDIENCE = "public" as const
+const ADMIN_OFFLINE_AUDIENCE = "admin" as const
+const RESTRICTED_PUBLIC_OFFLINE_AUDIENCE = "restricted_public" as const
+
+type OfflinePackageReadAudience = typeof PUBLIC_OFFLINE_AUDIENCE | typeof ADMIN_OFFLINE_AUDIENCE
+
 export interface SaveOfflineTripPackageInput {
   tripData: any
+  audience?: OfflineTripPackageAudience
   status?: OfflineTripPackageStatus
 }
 
 export interface PersistOfflineTripPackageInput {
   tripData: any
+  audience?: OfflineTripPackageAudience
   allowPrivateDocuments?: boolean
   sizeLimitBytes?: number
+}
+
+interface LoadOfflineTripPackageInput {
+  tripIdOrSlug: string
+  audience: OfflinePackageReadAudience
 }
 
 function computeBytes(value: unknown) {
@@ -115,29 +130,81 @@ function getPackageIdentity(payload: OfflineTripPayload) {
   }
 }
 
+function isPrivateOfflineDocument(document: any) {
+  return document?.private === true || document?.isPrivate === true || document?.is_private === true || document?.visibility === "private"
+}
+
+function sanitizePayloadForAudience(payload: OfflineTripPayload, audience: OfflineTripPackageAudience): OfflineTripPayload {
+  if (audience === ADMIN_OFFLINE_AUDIENCE) {
+    return payload
+  }
+
+  const documents = Array.isArray(payload.documents)
+    ? payload.documents.filter((document: any) => !isPrivateOfflineDocument(document) && document?.visibility !== "agency_only")
+    : []
+
+  return {
+    ...payload,
+    documents,
+  }
+}
+
+function normalizeOfflineAudience(audience?: OfflineTripPackageAudience | null): OfflineTripPackageAudience {
+  if (audience === ADMIN_OFFLINE_AUDIENCE || audience === RESTRICTED_PUBLIC_OFFLINE_AUDIENCE || audience === PUBLIC_OFFLINE_AUDIENCE) {
+    return audience
+  }
+
+  return PUBLIC_OFFLINE_AUDIENCE
+}
+
+function buildPackageKey(tripId: string, audience: OfflineTripPackageAudience) {
+  return `${audience}:${tripId}`
+}
+
+function getAudienceReadOrder(audience: OfflinePackageReadAudience) {
+  return audience === ADMIN_OFFLINE_AUDIENCE
+    ? [ADMIN_OFFLINE_AUDIENCE, RESTRICTED_PUBLIC_OFFLINE_AUDIENCE, PUBLIC_OFFLINE_AUDIENCE]
+    : [PUBLIC_OFFLINE_AUDIENCE]
+}
+
+function sortPackagesForAudience(packages: OfflineStoredTripPackage[], audience: OfflinePackageReadAudience) {
+  const order = getAudienceReadOrder(audience)
+
+  return [...packages].sort((left, right) => {
+    const audienceDelta = order.indexOf(normalizeOfflineAudience(left.audience)) - order.indexOf(normalizeOfflineAudience(right.audience))
+    if (audienceDelta !== 0) return audienceDelta
+    return right.savedAt.localeCompare(left.savedAt)
+  })
+}
+
 function buildStoredPackage(
   payload: OfflineTripPayload,
+  audience: OfflineTripPackageAudience,
   status: OfflineTripPackageStatus,
   overrides?: Partial<Pick<OfflineStoredTripPackage, "savedAt" | "totalSizeBytes" | "documentCount" | "imageCount" | "lastValidatedAt">>,
 ): OfflineStoredTripPackage {
-  const { tripId, slug, destination, country } = getPackageIdentity(payload)
-  const documents = Array.isArray(payload.documents) ? payload.documents : []
+  const normalizedAudience = normalizeOfflineAudience(audience)
+  const normalizedPayload = sanitizePayloadForAudience(payload, normalizedAudience)
+  const { tripId, slug, destination, country } = getPackageIdentity(normalizedPayload)
+  const documents = Array.isArray(normalizedPayload.documents) ? normalizedPayload.documents : []
   const savedAt = overrides?.savedAt ?? new Date().toISOString()
   const lastValidatedAt = overrides?.lastValidatedAt ?? savedAt
 
   return {
+    packageKey: buildPackageKey(tripId, normalizedAudience),
     tripId,
     slug,
+    audience: normalizedAudience,
     savedAt,
     version: OFFLINE_PACKAGE_VERSION,
     status,
     destination,
     country,
-    totalSizeBytes: overrides?.totalSizeBytes ?? computeBytes(payload),
+    totalSizeBytes: overrides?.totalSizeBytes ?? computeBytes(normalizedPayload),
     documentCount: overrides?.documentCount ?? documents.length,
     imageCount: overrides?.imageCount ?? 0,
     lastValidatedAt,
-    payload,
+    payload: normalizedPayload,
   }
 }
 
@@ -201,7 +268,7 @@ function mapLegacyPackageToPayload(legacyPackage: OfflineTripPackage): OfflineTr
 
 function buildLegacyStoredPackage(legacyPackage: OfflineTripPackage) {
   const payload = mapLegacyPackageToPayload(legacyPackage)
-  const storedPackage = buildStoredPackage(payload, "legacy_snapshot")
+  const storedPackage = buildStoredPackage(payload, normalizeOfflineAudience(legacyPackage.audience), "legacy_snapshot")
 
   return {
     ...storedPackage,
@@ -212,10 +279,64 @@ function buildLegacyStoredPackage(legacyPackage: OfflineTripPackage) {
   }
 }
 
-async function deleteOfflinePackageByTripId(tripId: string) {
-  await deleteOfflineRecord(TRIP_PACKAGES_STORE, tripId)
-  await deleteOfflineRecordsByIndex(DOCUMENT_BLOBS_STORE, "tripId", tripId)
-  await deleteOfflineRecordsByIndex(IMAGE_BLOBS_STORE, "tripId", tripId)
+function normalizeLegacyIndexedDbPackage(legacyPackage: Partial<OfflineStoredTripPackage> & { tripId: string; slug: string | null }) {
+  const payload = (legacyPackage.payload ?? {
+    trip: {
+      id: legacyPackage.tripId,
+      slug: legacyPackage.slug ?? null,
+    },
+    travelers: [],
+    hotels: [],
+    flights: [],
+    itineraries: [],
+    documents: [],
+    quickInfo: null,
+    offlineMeta: null,
+  }) as OfflineTripPayload
+
+  const documents = Array.isArray(payload.documents) ? payload.documents : []
+
+  return buildStoredPackage(
+    payload,
+    normalizeOfflineAudience(legacyPackage.audience),
+    (legacyPackage.status as OfflineTripPackageStatus | undefined) ?? "legacy_snapshot",
+    {
+      savedAt: legacyPackage.savedAt ?? new Date().toISOString(),
+      lastValidatedAt: legacyPackage.lastValidatedAt ?? legacyPackage.savedAt ?? new Date().toISOString(),
+      totalSizeBytes: legacyPackage.totalSizeBytes ?? computeBytes(payload),
+      documentCount: legacyPackage.documentCount ?? documents.length,
+      imageCount: legacyPackage.imageCount ?? 0,
+    },
+  )
+}
+
+async function listStoredPackagesByTripId(tripId: string) {
+  return getOfflineRecordsByIndex(TRIP_PACKAGES_STORE, "tripId", tripId)
+}
+
+async function listLegacyIndexedDbPackagesByTripIdOrSlug(tripIdOrSlug: string) {
+  const legacyById = await getOfflineRecord(LEGACY_TRIP_PACKAGES_STORE, tripIdOrSlug)
+  if (legacyById) {
+    return [normalizeLegacyIndexedDbPackage(legacyById)]
+  }
+
+  const legacyBySlug = await getOfflineRecordsByIndex(LEGACY_TRIP_PACKAGES_STORE, "slug", tripIdOrSlug)
+  return legacyBySlug.map((legacyPackage) => normalizeLegacyIndexedDbPackage(legacyPackage))
+}
+
+async function deleteOfflinePackageByTripId(tripId: string, audience?: OfflineTripPackageAudience) {
+  if (audience) {
+    await deleteOfflineRecord(TRIP_PACKAGES_STORE, buildPackageKey(tripId, normalizeOfflineAudience(audience)))
+  } else {
+    const packages = await listStoredPackagesByTripId(tripId)
+    await Promise.all(packages.map((offlinePackage) => deleteOfflineRecord(TRIP_PACKAGES_STORE, offlinePackage.packageKey)))
+  }
+
+  const remainingPackages = await listStoredPackagesByTripId(tripId)
+  if (remainingPackages.length === 0) {
+    await deleteOfflineRecordsByIndex(DOCUMENT_BLOBS_STORE, "tripId", tripId)
+    await deleteOfflineRecordsByIndex(IMAGE_BLOBS_STORE, "tripId", tripId)
+  }
 }
 
 async function deleteObsoleteTripBlobs(params: { tripId: string; documentIds: string[]; imageIds: string[] }) {
@@ -240,13 +361,9 @@ async function deleteObsoleteTripBlobs(params: { tripId: string; documentIds: st
   }
 }
 
-function isPrivateDocument(document: any) {
-  return document?.private === true || document?.isPrivate === true || document?.is_private === true || document?.visibility === "private"
-}
-
 function filterPermittedDocuments(documents: any[], allowPrivateDocuments: boolean) {
   if (allowPrivateDocuments) return documents
-  return documents.filter((document) => !isPrivateDocument(document) && document?.visibility !== "agency_only")
+  return documents.filter((document) => !isPrivateOfflineDocument(document) && document?.visibility !== "agency_only")
 }
 
 async function resolveOfflineDocumentUrl(document: any) {
@@ -306,6 +423,7 @@ function collectOfflineImages(tripData: any) {
 
 export async function persistOfflineTripPackage(input: PersistOfflineTripPackageInput): Promise<OfflinePackagePersistenceResult> {
   const sizeLimitBytes = input.sizeLimitBytes ?? OFFLINE_PACKAGE_SIZE_LIMIT_BYTES
+  const audience = normalizeOfflineAudience(input.audience)
   const basePayload = sanitizeTripPayload(input.tripData)
   const permittedDocuments = filterPermittedDocuments(Array.isArray(input.tripData?.documents) ? input.tripData.documents : [], input.allowPrivateDocuments === true)
   const payload: OfflineTripPayload = {
@@ -422,7 +540,7 @@ export async function persistOfflineTripPackage(input: PersistOfflineTripPackage
   }
   const totalSizeBytes = computeFinalPackageSize(payload, persistedBlobBytes)
 
-  const packageRecord = buildStoredPackage(payload, failures.length > 0 ? "partial" : "ready", {
+  const packageRecord = buildStoredPackage(payload, audience, failures.length > 0 ? "partial" : "ready", {
     savedAt,
     lastValidatedAt: savedAt,
     totalSizeBytes,
@@ -448,7 +566,7 @@ export async function persistOfflineTripPackage(input: PersistOfflineTripPackage
 
 export async function saveTripOfflinePackage(input: SaveOfflineTripPackageInput) {
   const payload = sanitizeTripPayload(input.tripData)
-  const storedPackage = buildStoredPackage(payload, input.status ?? "ready")
+  const storedPackage = buildStoredPackage(payload, normalizeOfflineAudience(input.audience), input.status ?? "ready")
   await putOfflineRecord(TRIP_PACKAGES_STORE, storedPackage)
   return storedPackage
 }
@@ -456,24 +574,40 @@ export async function saveTripOfflinePackage(input: SaveOfflineTripPackageInput)
 export async function replaceTripOfflinePackage(input: SaveOfflineTripPackageInput) {
   const payload = sanitizeTripPayload(input.tripData)
   const { tripId } = getPackageIdentity(payload)
-  await deleteOfflinePackageByTripId(tripId)
-  const storedPackage = buildStoredPackage(payload, input.status ?? "ready")
+  const audience = normalizeOfflineAudience(input.audience)
+  await deleteOfflinePackageByTripId(tripId, audience)
+  const storedPackage = buildStoredPackage(payload, audience, input.status ?? "ready")
   await putOfflineRecord(TRIP_PACKAGES_STORE, storedPackage)
   return storedPackage
 }
 
-export async function loadTripOfflinePackage(tripIdOrSlug: string) {
-  const packageById = await getOfflineRecord(TRIP_PACKAGES_STORE, tripIdOrSlug)
-  if (packageById) return packageById
+export async function loadTripOfflinePackage(input: string | LoadOfflineTripPackageInput) {
+  const tripIdOrSlug = typeof input === "string" ? input : input.tripIdOrSlug
+  const audience = typeof input === "string" ? PUBLIC_OFFLINE_AUDIENCE : input.audience
+  const requestedAudiences = getAudienceReadOrder(audience)
 
-  const packagesBySlug = await getOfflineRecordsByIndex(TRIP_PACKAGES_STORE, "slug", tripIdOrSlug)
-  return packagesBySlug[0] ?? null
+  const packagesById = await Promise.all(
+    requestedAudiences.map((entryAudience) => getOfflineRecord(TRIP_PACKAGES_STORE, buildPackageKey(tripIdOrSlug, entryAudience))),
+  )
+  const firstPackageById = packagesById.find((offlinePackage): offlinePackage is OfflineStoredTripPackage => Boolean(offlinePackage))
+  if (firstPackageById) return firstPackageById
+
+  const packagesBySlug = sortPackagesForAudience(await getOfflineRecordsByIndex(TRIP_PACKAGES_STORE, "slug", tripIdOrSlug), audience)
+    .filter((offlinePackage) => requestedAudiences.includes(normalizeOfflineAudience(offlinePackage.audience)))
+  if (packagesBySlug[0]) return packagesBySlug[0]
+
+  const legacyPackages = sortPackagesForAudience(await listLegacyIndexedDbPackagesByTripIdOrSlug(tripIdOrSlug), audience)
+    .filter((offlinePackage) => requestedAudiences.includes(normalizeOfflineAudience(offlinePackage.audience)))
+  return legacyPackages[0] ?? null
 }
 
-export async function deleteTripOfflinePackage(tripIdOrSlug: string) {
-  const existingPackage = await loadTripOfflinePackage(tripIdOrSlug)
+export async function deleteTripOfflinePackage(tripIdOrSlug: string, audience?: OfflineTripPackageAudience) {
+  const existingPackage = await loadTripOfflinePackage({
+    tripIdOrSlug,
+    audience: audience === ADMIN_OFFLINE_AUDIENCE ? ADMIN_OFFLINE_AUDIENCE : PUBLIC_OFFLINE_AUDIENCE,
+  })
   if (!existingPackage) return false
-  await deleteOfflinePackageByTripId(existingPackage.tripId)
+  await deleteOfflinePackageByTripId(existingPackage.tripId, audience ?? existingPackage.audience)
   return true
 }
 
@@ -483,13 +617,13 @@ export async function listOfflinePackages() {
 }
 
 export async function isTripAvailableOffline(tripIdOrSlug: string) {
-  const existingPackage = await loadTripOfflinePackage(tripIdOrSlug)
+  const existingPackage = await loadTripOfflinePackage({ tripIdOrSlug, audience: PUBLIC_OFFLINE_AUDIENCE })
   return Boolean(existingPackage)
 }
 
 export async function getTripOfflineStats(tripIdOrSlug?: string): Promise<OfflineTripStats> {
   if (tripIdOrSlug) {
-    const existingPackage = await loadTripOfflinePackage(tripIdOrSlug)
+    const existingPackage = await loadTripOfflinePackage({ tripIdOrSlug, audience: PUBLIC_OFFLINE_AUDIENCE })
     if (!existingPackage) {
       return {
         tripId: null,
@@ -524,13 +658,14 @@ export async function getTripOfflineStats(tripIdOrSlug?: string): Promise<Offlin
 }
 
 export async function clearOrphanBlobs() {
-  const [packages, documentBlobs, imageBlobs] = await Promise.all([
+  const [packages, legacyPackages, documentBlobs, imageBlobs] = await Promise.all([
     getAllOfflineRecords(TRIP_PACKAGES_STORE),
+    getAllOfflineRecords(LEGACY_TRIP_PACKAGES_STORE),
     getAllOfflineRecords(DOCUMENT_BLOBS_STORE),
     getAllOfflineRecords(IMAGE_BLOBS_STORE),
   ])
 
-  const validTripIds = new Set(packages.map((item) => item.tripId))
+  const validTripIds = new Set([...packages.map((item) => item.tripId), ...legacyPackages.map((item) => item.tripId)])
   let deletedDocuments = 0
   let deletedImages = 0
 
@@ -580,7 +715,7 @@ export async function migrateLegacyOfflineSnapshot() {
       continue
     }
 
-    const existingPackage = await loadTripOfflinePackage(legacyPackage.tripId)
+    const existingPackage = await loadTripOfflinePackage({ tripIdOrSlug: legacyPackage.tripId, audience: PUBLIC_OFFLINE_AUDIENCE })
     if (existingPackage) {
       skipped += 1
       continue

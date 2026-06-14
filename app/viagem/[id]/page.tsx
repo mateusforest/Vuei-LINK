@@ -23,7 +23,7 @@ import { useAuth } from "@/contexts/auth-context"
 import { buildAdminTripUrl, buildPublicTripUrl, isAdminLinkMode } from "@/lib/security/link-tokens"
 import type { TripFlightRecord } from "@/types/flight"
 import type { TripItineraryRecord, TripItineraryContent } from "@/types"
-import type { OfflineStoredTripPackage, OfflineTripPackageStatus } from "@/lib/offline/types"
+import type { OfflineStoredTripPackage, OfflineTripPackageAudience, OfflineTripPackageStatus } from "@/lib/offline/types"
 import {
   authenticateTripLinkBiometric,
   disableTripLinkBiometric,
@@ -678,20 +678,60 @@ function buildTripDataFromStoredTrip(storedTrip: any) {
   })
 }
 
-function isOfflineRecoverableError(error: unknown) {
+function isOfflineRecoverableError(error: unknown, options?: { status?: number | null }) {
+  if (typeof navigator !== "undefined" && navigator.onLine === false) {
+    return true
+  }
+
+  if (typeof options?.status === "number" && options.status >= 400) {
+    return false
+  }
+
   const message = error instanceof Error ? error.message.toLowerCase() : String(error ?? "").toLowerCase()
-  return (
-    message.includes("network") ||
-    message.includes("fetch") ||
-    message.includes("failed to fetch") ||
-    message.includes("offline") ||
-    message.includes("timeout") ||
-    message.includes("load failed")
-  )
+  const name = error instanceof Error ? error.name : ""
+  const hasForbiddenMarker =
+    message.includes("row-level security") ||
+    message.includes("permission denied") ||
+    message.includes("unauthorized") ||
+    message.includes("forbidden") ||
+    message.includes("not found") ||
+    message.includes("supabase admin config is missing") ||
+    message.includes("env") ||
+    message.includes("service role") ||
+    message.includes("jwt")
+
+  if (hasForbiddenMarker) {
+    return false
+  }
+
+  if (error instanceof TypeError) {
+    return (
+      message.includes("failed to fetch") ||
+      message.includes("network") ||
+      message.includes("load failed") ||
+      message.includes("network request failed")
+    )
+  }
+
+  if (name === "AbortError") {
+    return false
+  }
+
+  return message.includes("failed to fetch") || message.includes("network request failed") || message.includes("load failed")
 }
 
 function normalizeOfflinePackageStatus(status?: OfflineTripPackageStatus | null) {
   return status ?? "legacy_snapshot"
+}
+
+function getOfflineSaveAudience(params: { isAdmin: boolean; sensitiveAccessGranted: boolean }): OfflineTripPackageAudience {
+  if (!params.isAdmin) return "public"
+  if (params.sensitiveAccessGranted) return "admin"
+  return "restricted_public"
+}
+
+function getOfflineReadAudience(isAdminRoute: boolean) {
+  return isAdminRoute ? "admin" : "public"
 }
 
 function filterOfflineDocumentsForAudience(documents: any[], audience: "public" | "admin") {
@@ -4345,6 +4385,7 @@ function OfflineSection({
           agencyBranding,
         },
         {
+          audience: getOfflineSaveAudience({ isAdmin, sensitiveAccessGranted }),
           allowPrivateDocuments: isAdmin && sensitiveAccessGranted,
         },
       )
@@ -4920,11 +4961,14 @@ export default function TripPage() {
       })
 
       const loadOfflinePackage = async (reason: "offline" | "network") => {
-        const offlinePackage = await loadTripOfflinePackage(routeSlug)
+        const offlinePackage = await loadTripOfflinePackage({
+          tripIdOrSlug: routeSlug,
+          audience: getOfflineReadAudience(isAdminRoute),
+        })
         if (!offlinePackage) return false
         if (loadRequestRef.current !== requestId) return true
 
-        const audience = isAdminRoute ? "admin" : "public"
+        const audience = getOfflineReadAudience(isAdminRoute)
         const offlineTrip = buildTripDataFromOfflinePackage(offlinePackage, audience)
         setOfflineModeEnabled(true)
         setOfflinePackageStatus(offlineTrip.status)
@@ -5078,6 +5122,20 @@ export default function TripPage() {
                 : { source: "error" as const, data: [] as any[], error: hotelsSettled.reason instanceof Error ? hotelsSettled.reason.message : "Falha ao buscar hospedagens." }
             const agencyResult = agencySettled.status === "fulfilled" ? agencySettled.value : null
             const resolvedDocuments = Array.isArray(documentsResult.data) ? documentsResult.data : []
+            const sectionErrors = [
+              documentsResult.error,
+              flightsResult.error,
+              itinerariesResult.error,
+              hotelsResult.error,
+              agencySettled.status === "rejected" ? agencySettled.reason instanceof Error ? agencySettled.reason.message : "Falha ao buscar branding da agencia." : null,
+            ].filter((value): value is string => Boolean(value))
+
+            if (typeof navigator !== "undefined" && navigator.onLine === false && sectionErrors.some((error) => isOfflineRecoverableError(error))) {
+              const offlineLoaded = await loadOfflinePackage("network")
+              if (offlineLoaded) {
+                return
+              }
+            }
 
             logTripDocumentsDev("query_result", {
               routeSlug,

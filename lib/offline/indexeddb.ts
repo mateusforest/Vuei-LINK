@@ -7,13 +7,15 @@ import type {
 } from "@/lib/offline/types"
 
 export const OFFLINE_DB_NAME = "vuei-offline"
-export const OFFLINE_DB_VERSION = 1
-export const TRIP_PACKAGES_STORE = "trip_packages"
+export const OFFLINE_DB_VERSION = 2
+export const LEGACY_TRIP_PACKAGES_STORE = "trip_packages"
+export const TRIP_PACKAGES_STORE = "trip_packages_v2"
 export const DOCUMENT_BLOBS_STORE = "document_blobs"
 export const IMAGE_BLOBS_STORE = "image_blobs"
 
 type OfflineStoreMap = {
   [TRIP_PACKAGES_STORE]: OfflineStoredTripPackage
+  [LEGACY_TRIP_PACKAGES_STORE]: Partial<OfflineStoredTripPackage> & { tripId: string; slug: string | null }
   [DOCUMENT_BLOBS_STORE]: OfflineDocumentBlobRecord
   [IMAGE_BLOBS_STORE]: OfflineImageBlobRecord
 }
@@ -49,8 +51,10 @@ export function openOfflineDatabase() {
         const database = request.result
 
         if (!database.objectStoreNames.contains(TRIP_PACKAGES_STORE)) {
-          const packagesStore = database.createObjectStore(TRIP_PACKAGES_STORE, { keyPath: "tripId" })
+          const packagesStore = database.createObjectStore(TRIP_PACKAGES_STORE, { keyPath: "packageKey" })
+          packagesStore.createIndex("tripId", "tripId", { unique: false })
           packagesStore.createIndex("slug", "slug", { unique: false })
+          packagesStore.createIndex("audience", "audience", { unique: false })
           packagesStore.createIndex("savedAt", "savedAt", { unique: false })
         }
 

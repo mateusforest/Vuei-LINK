@@ -1,4 +1,5 @@
 export type OfflineTripPackageStatus = "ready" | "partial" | "legacy_snapshot"
+export type OfflineTripPackageAudience = "public" | "restricted_public" | "admin"
 
 export interface OfflineTripPackageItem {
   id: string
@@ -14,6 +15,7 @@ export interface OfflineTripPackage {
   tripName: string
   savedAt: string
   warning: string
+  audience?: OfflineTripPackageAudience
   status?: OfflineTripPackageStatus
   totalSizeBytes?: number
   documentCount?: number
@@ -43,8 +45,10 @@ export interface OfflineTripPayload {
 }
 
 export interface OfflineStoredTripPackage {
+  packageKey: string
   tripId: string
   slug: string | null
+  audience: OfflineTripPackageAudience
   savedAt: string
   version: number
   status: OfflineTripPackageStatus
