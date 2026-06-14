@@ -17,7 +17,7 @@ import { listConversationsByTrip, listMessages } from "@/lib/repositories/ai-rep
 import { validateDocumentFile } from "@/lib/files/file-validation"
 import { getDestinationCoverImage, getDestinationMetadata } from "@/lib/trip-destination"
 import { getOfflineWarningMessage, saveTripOfflinePackage } from "@/lib/offline/trip-offline"
-import { getOfflineDocumentBlob, loadTripOfflinePackage } from "@/lib/offline/offline-package-manager"
+import { getOfflineDocumentBlob, getOfflineImageBlob, loadTripOfflinePackage } from "@/lib/offline/offline-package-manager"
 import { isOfflineModeActive } from "@/lib/offline/offline-mode"
 import { useAuth } from "@/contexts/auth-context"
 import { buildAdminTripUrl, buildPublicTripUrl, isAdminLinkMode } from "@/lib/security/link-tokens"
@@ -803,6 +803,12 @@ function registerOfflineObjectUrl(
   window.setTimeout(() => {
     URL.revokeObjectURL(objectUrl)
   }, 60_000)
+}
+
+function revokeOfflineObjectUrls(urls: string[]) {
+  for (const url of urls) {
+    URL.revokeObjectURL(url)
+  }
 }
 
 async function openOfflineDocumentFromPackage(params: {
@@ -5056,11 +5062,21 @@ export default function TripPage() {
   })
   const pendingSensitiveActionRef = useRef<(() => void) | null>(null)
   const loadRequestRef = useRef(0)
+  const offlineImageUrlsRef = useRef<string[]>([])
 
   const handleCloseSensitiveAccessModal = () => {
     setSecurityModalOpen(false)
     pendingSensitiveActionRef.current = null
   }
+
+  useEffect(() => {
+    return () => {
+      if (offlineImageUrlsRef.current.length > 0) {
+        revokeOfflineObjectUrls(offlineImageUrlsRef.current)
+        offlineImageUrlsRef.current = []
+      }
+    }
+  }, [])
 
   useEffect(() => {
     setSensitiveAccessGranted(false)
@@ -5084,6 +5100,10 @@ export default function TripPage() {
     setOfflineModeEnabled(false)
     setOfflinePackageStatus(null)
     setOfflineDocumentContext(null)
+    if (offlineImageUrlsRef.current.length > 0) {
+      revokeOfflineObjectUrls(offlineImageUrlsRef.current)
+      offlineImageUrlsRef.current = []
+    }
     setTripItineraryRecords([])
     setSectionsLoading({
       flights: true,
@@ -5120,12 +5140,48 @@ export default function TripPage() {
 
         const audience = getOfflineReadAudience(isAdminRoute)
         const offlineTrip = buildTripDataFromOfflinePackage(offlinePackage, audience)
+        const packageKey = offlinePackage.packageKey ?? offlinePackage.payload?.offlineMeta?.packageKey ?? null
+        const [heroImageBlob, brandingImageBlob] = await Promise.all([
+          getOfflineImageBlob(`hero:${offlinePackage.tripId}`, {
+            tripId: offlinePackage.tripId,
+            packageKey,
+            audience,
+          }),
+          getOfflineImageBlob(`branding:${offlinePackage.tripId}`, {
+            tripId: offlinePackage.tripId,
+            packageKey,
+            audience,
+          }),
+        ])
+        const nextTripData = { ...offlineTrip.tripData }
+        const nextAgencyBranding = { ...offlineTrip.agencyBranding }
+        const nextOfflineImageUrls: string[] = []
+
+        if (heroImageBlob?.blob) {
+          const heroObjectUrl = URL.createObjectURL(heroImageBlob.blob)
+          nextOfflineImageUrls.push(heroObjectUrl)
+          nextTripData.heroImage = heroObjectUrl
+        }
+
+        if (brandingImageBlob?.blob) {
+          const brandingObjectUrl = URL.createObjectURL(brandingImageBlob.blob)
+          nextOfflineImageUrls.push(brandingObjectUrl)
+          nextAgencyBranding.logoUrl = brandingObjectUrl
+        } else if (nextAgencyBranding.isAgency) {
+          nextAgencyBranding.logoUrl = null
+        }
+
+        if (offlineImageUrlsRef.current.length > 0) {
+          revokeOfflineObjectUrls(offlineImageUrlsRef.current)
+        }
+        offlineImageUrlsRef.current = nextOfflineImageUrls
+
         setOfflineModeEnabled(true)
         setOfflinePackageStatus(offlineTrip.status)
         setOfflineDocumentContext({
           tripId: offlinePackage.tripId,
           audience,
-          packageKey: offlinePackage.packageKey ?? offlinePackage.payload?.offlineMeta?.packageKey ?? null,
+          packageKey,
           packageStatus: offlineTrip.status,
         })
         setTripOwnerUserId(null)
@@ -5136,8 +5192,8 @@ export default function TripPage() {
         setCanWrite(false)
         setIsAdmin(isAdminRoute)
         setTripItineraryRecords([])
-        setAgencyBranding(offlineTrip.agencyBranding)
-        setTripData(offlineTrip.tripData)
+        setAgencyBranding(nextAgencyBranding)
+        setTripData(nextTripData)
         setSectionsLoading({
           flights: false,
           hotels: false,
