@@ -740,6 +740,33 @@ function filterOfflineDocumentsForAudience(documents: any[], audience: "public" 
   return documents.filter((document: any) => !(document?.private === true || document?.isPrivate === true || document?.visibility === "private" || document?.visibility === "agency_only"))
 }
 
+function isOfflineTripItineraryRecord(value: unknown): value is TripItineraryRecord {
+  return Boolean(
+    value &&
+      typeof value === "object" &&
+      typeof (value as TripItineraryRecord).id === "string" &&
+      typeof (value as TripItineraryRecord).mode === "string" &&
+      typeof (value as TripItineraryRecord).status === "string",
+  )
+}
+
+function resolveOfflineItineraryState(payloadItineraries: unknown[]) {
+  if (payloadItineraries.every(isOfflineTripItineraryRecord)) {
+    const itineraryRecords = payloadItineraries as TripItineraryRecord[]
+    const simpleRecord = resolveSimpleTripItinerary(itineraryRecords)
+
+    return {
+      itineraryRecords,
+      itineraryDays: simpleRecord?.content ? mapItineraryContentToLegacyDays(simpleRecord.content) : [],
+    }
+  }
+
+  return {
+    itineraryRecords: [] as TripItineraryRecord[],
+    itineraryDays: payloadItineraries,
+  }
+}
+
 function buildTripDataFromOfflinePackage(pkg: OfflineStoredTripPackage, audience: "public" | "admin") {
   const payload = pkg.payload ?? {
     trip: {},
@@ -753,6 +780,8 @@ function buildTripDataFromOfflinePackage(pkg: OfflineStoredTripPackage, audience
   const trip = (payload.trip ?? {}) as Record<string, any>
   const branding = trip.branding && typeof trip.branding === "object" ? trip.branding : null
   const documents = filterOfflineDocumentsForAudience(Array.isArray(payload.documents) ? payload.documents : [], audience)
+  const itineraryPayload = Array.isArray(payload.itineraries) ? payload.itineraries : []
+  const offlineItineraryState = resolveOfflineItineraryState(itineraryPayload)
 
   return {
     tripData: buildTripDataFromStoredTrip({
@@ -771,11 +800,12 @@ function buildTripDataFromOfflinePackage(pkg: OfflineStoredTripPackage, audience
       hotels: Array.isArray(payload.hotels) ? payload.hotels : [],
       hotel: Array.isArray(payload.hotels) ? payload.hotels[0] ?? null : null,
       flights: Array.isArray(payload.flights) ? payload.flights : [],
-      itinerary: Array.isArray(payload.itineraries) ? payload.itineraries : [],
+      itinerary: offlineItineraryState.itineraryDays,
       documents,
       adminLink: buildAdminTripUrl(typeof trip.slug === "string" ? trip.slug : pkg.slug ?? pkg.tripId),
       shareLink: buildPublicTripUrl(typeof trip.slug === "string" ? trip.slug : pkg.slug ?? pkg.tripId),
     }),
+    itineraryRecords: offlineItineraryState.itineraryRecords,
     agencyBranding: {
       name: typeof branding?.name === "string" ? branding.name : null,
       logoUrl: typeof branding?.logoUrl === "string" ? branding.logoUrl : typeof branding?.linkLogoUrl === "string" ? branding.linkLogoUrl : null,
@@ -3044,6 +3074,7 @@ function DocumentsSection({
   tripAdminToken,
   adminLinkMutationMode,
   ensureSensitiveAccess,
+  onSensitiveAccessGranted,
 }: {
   tripData: any
   loading: boolean
@@ -3058,6 +3089,7 @@ function DocumentsSection({
   tripAdminToken: string | null
   adminLinkMutationMode: boolean
   ensureSensitiveAccess: () => boolean
+  onSensitiveAccessGranted: () => void
 }) {
   const [showPrivate, setShowPrivate] = useState(false)
   const [unlocked, setUnlocked] = useState(false)
@@ -3270,6 +3302,7 @@ function DocumentsSection({
         tripId={tripId}
         onSuccess={() => {
           setUnlocked(true)
+          onSensitiveAccessGranted()
           setPinModal(false)
           showToast("Documentos desbloqueados!", "success")
         }}
@@ -4518,6 +4551,7 @@ function TripSecurityModal({
 // Offline Section
 function OfflineSection({
   tripData,
+  tripItineraryRecords,
   isAdmin,
   sensitiveAccessGranted,
   agencyBranding,
@@ -4525,6 +4559,7 @@ function OfflineSection({
   currentPathname,
 }: {
   tripData: any
+  tripItineraryRecords: TripItineraryRecord[]
   isAdmin: boolean
   sensitiveAccessGranted: boolean
   agencyBranding: { name: string | null; logoUrl: string | null; isAgency: boolean }
@@ -4543,6 +4578,7 @@ function OfflineSection({
           ...tripData,
           slug: routeSlug,
           agencyBranding,
+          itineraryRecords: tripItineraryRecords,
         },
         {
           audience: getOfflineSaveAudience({ isAdmin, sensitiveAccessGranted }),
@@ -5230,7 +5266,7 @@ export default function TripPage() {
           setSensitiveAccessGranted(false)
           setCanWrite(false)
           setIsAdmin(isAdminRoute)
-          setTripItineraryRecords([])
+          setTripItineraryRecords(offlineTrip.itineraryRecords)
           setAgencyBranding(nextAgencyBranding)
           setTripData(nextTripData)
           setSectionsLoading({
@@ -6356,9 +6392,9 @@ export default function TripPage() {
             onSaveUploadedItinerary={handleSaveUploadedItinerary}
             onDeleteItinerary={handleDeleteItinerary}
           />
-          <DocumentsSection loading={sectionsLoading.documents} tripData={tripData} onAddDocument={handleAddDocument} onDeleteDocument={handleDeleteDocument} tripId={tripData.id} ownerUserId={tripOwnerUserId} agencyId={profile?.agencyId ?? null} routeSlug={routeSlug} tripAdminToken={tripAdminToken} adminLinkMutationMode={adminLinkMutationMode} ensureSensitiveAccess={ensureSensitiveAccess} offlineReadOnly={offlineModeEnabled} offlineDocumentContext={offlineDocumentContext} />
+          <DocumentsSection loading={sectionsLoading.documents} tripData={tripData} onAddDocument={handleAddDocument} onDeleteDocument={handleDeleteDocument} tripId={tripData.id} ownerUserId={tripOwnerUserId} agencyId={profile?.agencyId ?? null} routeSlug={routeSlug} tripAdminToken={tripAdminToken} adminLinkMutationMode={adminLinkMutationMode} ensureSensitiveAccess={ensureSensitiveAccess} onSensitiveAccessGranted={() => setSensitiveAccessGranted(true)} offlineReadOnly={offlineModeEnabled} offlineDocumentContext={offlineDocumentContext} />
           <ConciergeSection tripData={tripData} onOpenCredits={() => setCreditsOpen(true)} offlineReadOnly={offlineModeEnabled} />
-          <OfflineSection tripData={tripData} isAdmin={isAdmin} sensitiveAccessGranted={sensitiveAccessGranted} agencyBranding={agencyBranding} routeSlug={routeSlug} currentPathname={pathname || `/viagem/${routeSlug}`} />
+          <OfflineSection tripData={tripData} tripItineraryRecords={tripItineraryRecords} isAdmin={isAdmin} sensitiveAccessGranted={sensitiveAccessGranted} agencyBranding={agencyBranding} routeSlug={routeSlug} currentPathname={pathname || `/viagem/${routeSlug}`} />
           <QuickInfoSection tripData={tripData} />
           <TripFooter agencyBranding={agencyBranding} />
 

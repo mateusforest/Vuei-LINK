@@ -113,7 +113,11 @@ function sanitizeTripPayload(tripData: any): OfflineTripPayload {
   const travelers = Array.isArray(tripData?.travelers) ? tripData.travelers : []
   const hotels = Array.isArray(tripData?.hotels) ? tripData.hotels : tripData?.hotel ? [tripData.hotel] : []
   const flights = Array.isArray(tripData?.flights) ? tripData.flights : []
-  const itineraries = Array.isArray(tripData?.itinerary) ? tripData.itinerary : []
+  const itineraries = Array.isArray(tripData?.itineraryRecords)
+    ? tripData.itineraryRecords
+    : Array.isArray(tripData?.itinerary)
+      ? tripData.itinerary
+      : []
   const documents = Array.isArray(tripData?.documents)
     ? tripData.documents.map((document: any) => ({
         id: document?.id ?? null,
@@ -176,10 +180,24 @@ function sanitizePayloadForAudience(payload: OfflineTripPayload, audience: Offli
   const documents = Array.isArray(payload.documents)
     ? payload.documents.filter((document: any) => !isPrivateOfflineDocument(document) && document?.visibility !== "agency_only")
     : []
+  const permittedDocumentIds = new Set(
+    documents
+      .map((document: any) => (typeof document?.id === "string" ? document.id : null))
+      .filter((documentId): documentId is string => Boolean(documentId)),
+  )
+  const itineraries = Array.isArray(payload.itineraries)
+    ? payload.itineraries.filter((record: any) => {
+        if (!record || typeof record !== "object") return true
+        if (record.mode === "simple") return true
+        if (typeof record.documentId !== "string" || !record.documentId) return true
+        return permittedDocumentIds.has(record.documentId)
+      })
+    : []
 
   return {
     ...payload,
     documents,
+    itineraries,
   }
 }
 
@@ -201,6 +219,14 @@ function buildDocumentBlobKey(packageKey: string, documentId: string) {
 
 function buildImageBlobKey(packageKey: string, imageId: string) {
   return `${packageKey}:image:${imageId}`
+}
+
+async function getExistingDocumentBlobRecord(packageKey: string, documentId: string) {
+  return getOfflineRecord(DOCUMENT_BLOBS_STORE, buildDocumentBlobKey(packageKey, documentId))
+}
+
+async function getExistingImageBlobRecord(packageKey: string, imageId: string) {
+  return getOfflineRecord(IMAGE_BLOBS_STORE, buildImageBlobKey(packageKey, imageId))
 }
 
 function getAudienceReadOrder(audience: OfflinePackageReadAudience) {
@@ -530,6 +556,13 @@ export async function persistOfflineTripPackage(input: PersistOfflineTripPackage
     }
 
     try {
+      const existingRecord = await getExistingDocumentBlobRecord(packageKey, documentId)
+      if (existingRecord?.blob) {
+        persistedBlobBytes += existingRecord.sizeBytes ?? existingRecord.blob.size ?? 0
+        savedDocumentIds.push(documentId)
+        continue
+      }
+
       const documentUrl = await resolveOfflineDocumentUrl(document)
       const downloaded = await downloadBlobForOffline(documentUrl)
       const nextSavedDocumentIds = [...savedDocumentIds, documentId]
@@ -574,6 +607,13 @@ export async function persistOfflineTripPackage(input: PersistOfflineTripPackage
 
   for (const asset of collectOfflineImages(input.tripData)) {
     try {
+      const existingRecord = await getExistingImageBlobRecord(packageKey, asset.imageId)
+      if (existingRecord?.blob) {
+        persistedBlobBytes += existingRecord.sizeBytes ?? existingRecord.blob.size ?? 0
+        savedImageIds.push(asset.imageId)
+        continue
+      }
+
       const downloaded = await downloadBlobForOffline(asset.url)
       const nextSavedImageIds = [...savedImageIds, asset.imageId]
       const predictedPayload: OfflineTripPayload = {

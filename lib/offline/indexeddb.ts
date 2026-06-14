@@ -14,6 +14,7 @@ export const LEGACY_DOCUMENT_BLOBS_STORE = "document_blobs"
 export const DOCUMENT_BLOBS_STORE = "document_blobs_v2"
 export const LEGACY_IMAGE_BLOBS_STORE = "image_blobs"
 export const IMAGE_BLOBS_STORE = "image_blobs_v2"
+const OFFLINE_DB_OPEN_TIMEOUT_MS = 5000
 
 type OfflineStoreMap = {
   [TRIP_PACKAGES_STORE]: OfflineStoredTripPackage
@@ -50,6 +51,28 @@ export function openOfflineDatabase() {
   if (!openPromise) {
     openPromise = new Promise((resolve, reject) => {
       const request = window.indexedDB.open(OFFLINE_DB_NAME, OFFLINE_DB_VERSION)
+      let settled = false
+      const finishSuccess = (database: IDBDatabase) => {
+        if (settled) return
+        settled = true
+        window.clearTimeout(timeoutId)
+        currentDatabase = database
+        resolve(database)
+      }
+      const finishError = (error: Error) => {
+        if (settled) return
+        settled = true
+        window.clearTimeout(timeoutId)
+        openPromise = null
+        if (currentDatabase) {
+          currentDatabase.close()
+          currentDatabase = null
+        }
+        reject(error)
+      }
+      const timeoutId = window.setTimeout(() => {
+        finishError(new Error("A abertura do armazenamento offline demorou demais neste dispositivo."))
+      }, OFFLINE_DB_OPEN_TIMEOUT_MS)
 
       request.onupgradeneeded = () => {
         const database = request.result
@@ -109,16 +132,13 @@ export function openOfflineDatabase() {
           openPromise = null
         }
 
-        currentDatabase = database
-        resolve(database)
+        finishSuccess(database)
       }
       request.onerror = () => {
-        openPromise = null
-        reject(request.error ?? new Error("Nao foi possivel abrir o banco offline."))
+        finishError(request.error ?? new Error("Nao foi possivel abrir o banco offline."))
       }
       request.onblocked = () => {
-        openPromise = null
-        reject(new Error("O banco offline esta bloqueado por outra aba ativa."))
+        finishError(new Error("O banco offline esta bloqueado por outra aba ativa."))
       }
     })
   }
