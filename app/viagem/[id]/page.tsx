@@ -17,7 +17,7 @@ import { listConversationsByTrip, listMessages } from "@/lib/repositories/ai-rep
 import { validateDocumentFile } from "@/lib/files/file-validation"
 import { getDestinationCoverImage, getDestinationMetadata } from "@/lib/trip-destination"
 import { getOfflineWarningMessage, saveTripOfflinePackage } from "@/lib/offline/trip-offline"
-import { loadTripOfflinePackage } from "@/lib/offline/offline-package-manager"
+import { getOfflineDocumentBlob, loadTripOfflinePackage } from "@/lib/offline/offline-package-manager"
 import { isOfflineModeActive } from "@/lib/offline/offline-mode"
 import { useAuth } from "@/contexts/auth-context"
 import { buildAdminTripUrl, buildPublicTripUrl, isAdminLinkMode } from "@/lib/security/link-tokens"
@@ -782,6 +782,69 @@ function buildTripDataFromOfflinePackage(pkg: OfflineStoredTripPackage, audience
     },
     status: normalizeOfflinePackageStatus(pkg.status),
   }
+}
+
+type OfflineDocumentContext = {
+  tripId: string
+  audience: "public" | "admin"
+  packageKey: string | null
+  packageStatus: OfflineTripPackageStatus
+}
+
+function registerOfflineObjectUrl(
+  objectUrl: string,
+  registerCleanup?: ((url: string | null) => void) | null,
+) {
+  if (registerCleanup) {
+    registerCleanup(objectUrl)
+    return
+  }
+
+  window.setTimeout(() => {
+    URL.revokeObjectURL(objectUrl)
+  }, 60_000)
+}
+
+async function openOfflineDocumentFromPackage(params: {
+  document: any
+  context: OfflineDocumentContext | null
+  onUnavailable: (message: string) => void
+  registerCleanup?: ((url: string | null) => void) | null
+}) {
+  const { document, context, onUnavailable, registerCleanup } = params
+
+  if (!context || !document?.id) {
+    onUnavailable("Este arquivo nao esta disponivel offline.")
+    return false
+  }
+
+  if (context.packageStatus === "legacy_snapshot") {
+    onUnavailable("Este arquivo nao esta disponivel offline.")
+    return false
+  }
+
+  const blobRecord = await getOfflineDocumentBlob(document.id, {
+    tripId: context.tripId,
+    packageKey: context.packageKey,
+    audience: context.audience,
+  })
+
+  if (!blobRecord?.blob) {
+    onUnavailable("Este arquivo nao esta disponivel offline.")
+    return false
+  }
+
+  const pendingWindow = typeof window !== "undefined" ? window.open("", "_blank", "noopener,noreferrer") : null
+  const objectUrl = URL.createObjectURL(blobRecord.blob)
+  registerOfflineObjectUrl(objectUrl, registerCleanup)
+
+  if (pendingWindow) {
+    pendingWindow.location.href = objectUrl
+    return true
+  }
+
+  window.open(objectUrl, "_blank", "noopener,noreferrer")
+  return true
 }
 
 function resolveProtectedWriteError(error?: string | null) {
@@ -1597,6 +1660,7 @@ function FlightsSection({
   tripData,
   loading,
   offlineReadOnly,
+  offlineDocumentContext,
   onUpdateFlight,
   onAddFlight,
   onDeleteFlight,
@@ -1612,6 +1676,7 @@ function FlightsSection({
   tripData: any
   loading: boolean
   offlineReadOnly: boolean
+  offlineDocumentContext: OfflineDocumentContext | null
   onUpdateFlight: (id: string, data: any) => Promise<void>
   onAddFlight: (data: any) => void
   onDeleteFlight: (flightId: string) => Promise<void>
@@ -1640,7 +1705,11 @@ function FlightsSection({
 
   const handleOpenTicketDocument = async (document: any) => {
     if (offlineReadOnly) {
-      showToast("Indisponivel offline.", "info")
+      await openOfflineDocumentFromPackage({
+        document,
+        context: offlineDocumentContext,
+        onUnavailable: (message) => showToast(message, "info"),
+      })
       return
     }
 
@@ -2330,6 +2399,7 @@ function ItinerarySection({
   tripData,
   loading,
   offlineReadOnly,
+  offlineDocumentContext,
   itineraryRecords,
   tripId,
   ownerUserId,
@@ -2347,6 +2417,7 @@ function ItinerarySection({
   tripData: any
   loading: boolean
   offlineReadOnly: boolean
+  offlineDocumentContext: OfflineDocumentContext | null
   itineraryRecords: TripItineraryRecord[]
   tripId: string
   ownerUserId: string | null
@@ -2440,12 +2511,17 @@ function ItinerarySection({
   }
 
   const handleOpenItineraryDocument = async (record: TripItineraryRecord) => {
+    const document = Array.isArray(tripData.documents) ? tripData.documents.find((entry: any) => entry.id === record.documentId) : null
+
     if (offlineReadOnly) {
-      showToast("Indisponivel offline.", "info")
+      await openOfflineDocumentFromPackage({
+        document,
+        context: offlineDocumentContext,
+        onUnavailable: (message) => showToast(message, "info"),
+      })
       return
     }
 
-    const document = Array.isArray(tripData.documents) ? tripData.documents.find((entry: any) => entry.id === record.documentId) : null
     if (!document && !record.pdfUrl) {
       showToast("Documento do roteiro nao encontrado.", "error")
       return
@@ -2940,6 +3016,7 @@ function DocumentsSection({
   tripData,
   loading,
   offlineReadOnly,
+  offlineDocumentContext,
   onAddDocument,
   onDeleteDocument,
   tripId,
@@ -2953,6 +3030,7 @@ function DocumentsSection({
   tripData: any
   loading: boolean
   offlineReadOnly: boolean
+  offlineDocumentContext: OfflineDocumentContext | null
   onAddDocument: (data: any) => void
   onDeleteDocument: (documentId: string) => Promise<void>
   tripId: string
@@ -3178,7 +3256,7 @@ function DocumentsSection({
           showToast("Documentos desbloqueados!", "success")
         }}
       />
-      <ViewDocumentModal open={!!viewingDoc} onClose={() => setViewingDoc(null)} document={viewingDoc} offlineReadOnly={offlineReadOnly} />
+      <ViewDocumentModal open={!!viewingDoc} onClose={() => setViewingDoc(null)} document={viewingDoc} offlineReadOnly={offlineReadOnly} offlineDocumentContext={offlineDocumentContext} />
       <AddDocumentModal open={addingDoc} onClose={() => setAddingDoc(false)} tripId={tripId} ownerUserId={ownerUserId} agencyId={agencyId} tripSlug={routeSlug} adminToken={tripAdminToken} adminProxyMode={adminLinkMutationMode} ensureSensitiveAccess={ensureSensitiveAccess} onSave={(data) => { onAddDocument(data); showToast("Documento adicionado!", "success"); setAddingDoc(false) }} />
     </section>
   )
@@ -3332,11 +3410,61 @@ function PinModal({
 }
 
 // View Document Modal
-function ViewDocumentModal({ open, onClose, document, offlineReadOnly = false }: { open: boolean; onClose: () => void; document: any; offlineReadOnly?: boolean }) {
+function ViewDocumentModal({
+  open,
+  onClose,
+  document,
+  offlineReadOnly = false,
+  offlineDocumentContext = null,
+}: {
+  open: boolean
+  onClose: () => void
+  document: any
+  offlineReadOnly?: boolean
+  offlineDocumentContext?: OfflineDocumentContext | null
+}) {
+  const [offlineMessage, setOfflineMessage] = useState("")
+  const objectUrlRef = useRef<string | null>(null)
+
+  useEffect(() => {
+    if (open) {
+      setOfflineMessage("")
+      return
+    }
+
+    if (objectUrlRef.current) {
+      URL.revokeObjectURL(objectUrlRef.current)
+      objectUrlRef.current = null
+    }
+    setOfflineMessage("")
+  }, [open])
+
+  useEffect(() => {
+    return () => {
+      if (objectUrlRef.current) {
+        URL.revokeObjectURL(objectUrlRef.current)
+        objectUrlRef.current = null
+      }
+    }
+  }, [])
+
   if (!document) return null
 
   const openDocumentOnDevice = async () => {
+    setOfflineMessage("")
+
     if (offlineReadOnly) {
+      await openOfflineDocumentFromPackage({
+        document,
+        context: offlineDocumentContext,
+        onUnavailable: (message) => setOfflineMessage(message),
+        registerCleanup: (objectUrl) => {
+          if (objectUrlRef.current) {
+            URL.revokeObjectURL(objectUrlRef.current)
+          }
+          objectUrlRef.current = objectUrl
+        },
+      })
       return
     }
 
@@ -3377,14 +3505,22 @@ function ViewDocumentModal({ open, onClose, document, offlineReadOnly = false }:
         <div className="mt-8 p-4 rounded-xl bg-white/[0.03] border border-white/[0.06]">
           <p className="text-xs text-white/40">Preview do documento</p>
           <div className="mt-4 h-48 bg-white/[0.02] rounded-xl flex items-center justify-center">
-            <p className="text-white/20 text-sm">{offlineReadOnly ? "Documento listado, mas ainda indisponivel offline" : "Visualizacao do PDF/Imagem"}</p>
+            <p className="text-white/20 text-sm">
+              {offlineReadOnly
+                ? offlineDocumentContext?.packageStatus === "legacy_snapshot"
+                  ? "Arquivos nao sao garantidos neste snapshot salvo."
+                  : offlineMessage || "Arquivo salvo localmente quando disponivel."
+                : "Visualizacao do PDF/Imagem"}
+            </p>
           </div>
         </div>
 
+        {offlineReadOnly && offlineMessage ? <p className="mt-3 text-sm text-amber-200">{offlineMessage}</p> : null}
+
         <div className="flex gap-3 mt-6">
-          <Button className="flex-1 bg-gradient-to-r from-[#5de0e6] to-[#004aad] hover:opacity-90 text-white border-0 disabled:opacity-50" onClick={() => void openDocumentOnDevice()} disabled={offlineReadOnly}>
+          <Button className="flex-1 bg-gradient-to-r from-[#5de0e6] to-[#004aad] hover:opacity-90 text-white border-0 disabled:opacity-50" onClick={() => void openDocumentOnDevice()}>
             <Download className="w-4 h-4 mr-2" />
-            {offlineReadOnly ? "Indisponivel offline" : "Baixar"}
+            {offlineReadOnly ? "Abrir offline" : "Baixar"}
           </Button>
           <Button variant="ghost" className="text-white/60 hover:bg-white/10">
             <Share2 className="w-4 h-4" />
@@ -4898,6 +5034,7 @@ export default function TripPage() {
   const [adminLinkMutationMode, setAdminLinkMutationMode] = useState(false)
   const [offlineModeEnabled, setOfflineModeEnabled] = useState(false)
   const [offlinePackageStatus, setOfflinePackageStatus] = useState<OfflineTripPackageStatus | null>(null)
+  const [offlineDocumentContext, setOfflineDocumentContext] = useState<OfflineDocumentContext | null>(null)
   const [agencyBranding, setAgencyBranding] = useState<{ name: string | null; logoUrl: string | null; isAgency: boolean }>({ name: null, logoUrl: null, isAgency: false })
   const [sectionsLoading, setSectionsLoading] = useState({
     flights: true,
@@ -4934,6 +5071,7 @@ export default function TripPage() {
     setAdminLinkMutationMode(false)
     setOfflineModeEnabled(false)
     setOfflinePackageStatus(null)
+    setOfflineDocumentContext(null)
     setTripItineraryRecords([])
     setSectionsLoading({
       flights: true,
@@ -4972,6 +5110,12 @@ export default function TripPage() {
         const offlineTrip = buildTripDataFromOfflinePackage(offlinePackage, audience)
         setOfflineModeEnabled(true)
         setOfflinePackageStatus(offlineTrip.status)
+        setOfflineDocumentContext({
+          tripId: offlinePackage.tripId,
+          audience,
+          packageKey: offlinePackage.packageKey ?? offlinePackage.payload?.offlineMeta?.packageKey ?? null,
+          packageStatus: offlineTrip.status,
+        })
         setTripOwnerUserId(null)
         setTripAdminToken(null)
         setAdminLinkMutationMode(false)
@@ -6026,13 +6170,14 @@ export default function TripPage() {
           {offlineModeEnabled && offlinePackageStatus ? <OfflineModeBanner status={offlinePackageStatus} /> : null}
           <TripHero tripData={tripData} onEditTrip={() => setEditTripOpen(true)} />
           <QuickAccessCards tripData={tripData} onNavigate={handleNavigate} />
-          <FlightsSection loading={sectionsLoading.flights} tripData={tripData} onUpdateFlight={handleUpdateFlight} onAddFlight={handleAddFlight} onDeleteFlight={handleDeleteFlight} onDeleteDocument={handleDeleteDocument} tripId={tripData.id} ownerUserId={tripOwnerUserId} agencyId={profile?.agencyId ?? null} routeSlug={routeSlug} tripAdminToken={tripAdminToken} adminLinkMutationMode={adminLinkMutationMode} ensureSensitiveAccess={ensureSensitiveAccess} offlineReadOnly={offlineModeEnabled} />
+          <FlightsSection loading={sectionsLoading.flights} tripData={tripData} onUpdateFlight={handleUpdateFlight} onAddFlight={handleAddFlight} onDeleteFlight={handleDeleteFlight} onDeleteDocument={handleDeleteDocument} tripId={tripData.id} ownerUserId={tripOwnerUserId} agencyId={profile?.agencyId ?? null} routeSlug={routeSlug} tripAdminToken={tripAdminToken} adminLinkMutationMode={adminLinkMutationMode} ensureSensitiveAccess={ensureSensitiveAccess} offlineReadOnly={offlineModeEnabled} offlineDocumentContext={offlineDocumentContext} />
           <HotelSection loading={sectionsLoading.hotels} tripData={tripData} onSaveHotel={handleSaveHotel} onDeleteHotel={handleDeleteHotel} />
           <ItinerarySection
             loading={sectionsLoading.itineraries}
             tripData={tripData}
             itineraryRecords={tripItineraryRecords}
             offlineReadOnly={offlineModeEnabled}
+            offlineDocumentContext={offlineDocumentContext}
             tripId={tripData.id}
             ownerUserId={tripOwnerUserId}
             agencyId={profile?.agencyId ?? null}
@@ -6046,7 +6191,7 @@ export default function TripPage() {
             onSaveUploadedItinerary={handleSaveUploadedItinerary}
             onDeleteItinerary={handleDeleteItinerary}
           />
-          <DocumentsSection loading={sectionsLoading.documents} tripData={tripData} onAddDocument={handleAddDocument} onDeleteDocument={handleDeleteDocument} tripId={tripData.id} ownerUserId={tripOwnerUserId} agencyId={profile?.agencyId ?? null} routeSlug={routeSlug} tripAdminToken={tripAdminToken} adminLinkMutationMode={adminLinkMutationMode} ensureSensitiveAccess={ensureSensitiveAccess} offlineReadOnly={offlineModeEnabled} />
+          <DocumentsSection loading={sectionsLoading.documents} tripData={tripData} onAddDocument={handleAddDocument} onDeleteDocument={handleDeleteDocument} tripId={tripData.id} ownerUserId={tripOwnerUserId} agencyId={profile?.agencyId ?? null} routeSlug={routeSlug} tripAdminToken={tripAdminToken} adminLinkMutationMode={adminLinkMutationMode} ensureSensitiveAccess={ensureSensitiveAccess} offlineReadOnly={offlineModeEnabled} offlineDocumentContext={offlineDocumentContext} />
           <ConciergeSection tripData={tripData} onOpenCredits={() => setCreditsOpen(true)} offlineReadOnly={offlineModeEnabled} />
           <OfflineSection tripData={tripData} isAdmin={isAdmin} sensitiveAccessGranted={sensitiveAccessGranted} agencyBranding={agencyBranding} />
           <QuickInfoSection tripData={tripData} />
