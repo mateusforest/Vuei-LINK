@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo } from "react"
+import { useEffect, useState } from "react"
 import { motion } from "framer-motion"
 import {
   AlertCircle,
@@ -22,8 +22,9 @@ import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
+import { listOfflinePackages } from "@/lib/offline/offline-package-manager"
 import { getOfflineWarningMessage, listOfflineTripPackages, type OfflineTripPackageItem } from "@/lib/offline/trip-offline"
-import type { OfflineTripPackageStatus } from "@/lib/offline/types"
+import type { OfflineStoredTripPackage, OfflineTripPackageStatus } from "@/lib/offline/types"
 
 const fadeInUp = {
   initial: { opacity: 0, y: 20 },
@@ -89,8 +90,106 @@ function getOfflinePackageStatusMeta(status?: OfflineTripPackageStatus) {
   }
 }
 
+function computeBytes(value: unknown) {
+  return new Blob([JSON.stringify(value ?? null)]).size
+}
+
+function formatSizeLabel(value: unknown) {
+  const bytes = computeBytes(value)
+  const sizeMb = bytes / (1024 * 1024)
+  if (sizeMb >= 0.1) return `${sizeMb.toFixed(1)} MB`
+  return `${Math.max(1, Math.round(bytes / 1024))} KB`
+}
+
+function mapStoredPackageItems(pkg: OfflineStoredTripPackage): OfflineTripPackageItem[] {
+  const payload = pkg.payload ?? {
+    trip: {},
+    travelers: [],
+    hotels: [],
+    flights: [],
+    itineraries: [],
+    documents: [],
+    quickInfo: null,
+    offlineMeta: null,
+  }
+  const savedDocumentIds = Array.isArray(payload.offlineMeta?.savedDocumentIds) ? payload.offlineMeta.savedDocumentIds : []
+
+  return [
+    { id: "summary", name: "Resumo da viagem", type: "summary", sizeLabel: formatSizeLabel(payload.trip), saved: true },
+    { id: "flight", name: "Passagens extraidas", type: "flight", sizeLabel: formatSizeLabel(payload.flights), saved: Array.isArray(payload.flights) && payload.flights.length > 0 },
+    { id: "hotel", name: "Hospedagem", type: "hotel", sizeLabel: formatSizeLabel(payload.hotels), saved: Array.isArray(payload.hotels) && payload.hotels.length > 0 },
+    { id: "itinerary", name: "Roteiro", type: "itinerary", sizeLabel: formatSizeLabel(payload.itineraries), saved: Array.isArray(payload.itineraries) && payload.itineraries.length > 0 },
+    { id: "quick_info", name: "Informacoes rapidas", type: "quick_info", sizeLabel: formatSizeLabel(payload.quickInfo), saved: Boolean(payload.quickInfo) },
+    { id: "document", name: "Documentos offline", type: "document", sizeLabel: formatSizeLabel(savedDocumentIds), saved: savedDocumentIds.length > 0 },
+  ]
+}
+
+function mapStoredPackageWarning(pkg: OfflineStoredTripPackage) {
+  if (pkg.status === "legacy_snapshot") {
+    return getOfflineWarningMessage()
+  }
+
+  const failures = Array.isArray(pkg.payload?.offlineMeta?.failures) ? pkg.payload.offlineMeta.failures : []
+  if (failures.length > 0) {
+    return "Pacote offline salvo parcialmente. Alguns arquivos podem nao estar disponiveis offline."
+  }
+
+  return getOfflineWarningMessage()
+}
+
+function mapStoredPackageToView(pkg: OfflineStoredTripPackage) {
+  const trip = pkg.payload?.trip ?? {}
+
+  return {
+    tripId: pkg.tripId,
+    tripSlug: pkg.slug,
+    tripName:
+      (typeof trip.title === "string" && trip.title) ||
+      (typeof trip.destination === "string" && trip.destination) ||
+      pkg.destination ||
+      "Viagem",
+    savedAt: pkg.savedAt,
+    warning: mapStoredPackageWarning(pkg),
+    audience: pkg.audience,
+    status: pkg.status,
+    totalSizeBytes: pkg.totalSizeBytes,
+    documentCount: pkg.documentCount,
+    imageCount: pkg.imageCount,
+    snapshot: {},
+    items: mapStoredPackageItems(pkg),
+  }
+}
+
 export default function OfflinePage() {
-  const packages = useMemo(() => listOfflineTripPackages(), [])
+  const [packages, setPackages] = useState<any[]>([])
+
+  useEffect(() => {
+    let active = true
+
+    const loadPackages = async () => {
+      try {
+        const indexedDbPackages = await listOfflinePackages()
+        if (!active) return
+
+        if (indexedDbPackages.length > 0) {
+          setPackages(indexedDbPackages.map(mapStoredPackageToView))
+          return
+        }
+      } catch (error) {
+        console.error("[OFFLINE] portal package list error", error)
+      }
+
+      if (!active) return
+      setPackages(listOfflineTripPackages())
+    }
+
+    void loadPackages()
+
+    return () => {
+      active = false
+    }
+  }, [])
+
   const latestPackage = packages[0] ?? null
   const savedItems = latestPackage?.items.filter((item) => item.saved) ?? []
   const statusMeta = getOfflinePackageStatusMeta(latestPackage ? latestPackage.status ?? "legacy_snapshot" : undefined)

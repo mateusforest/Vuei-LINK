@@ -1,8 +1,9 @@
 const SHELL_CACHE_PREFIX = "vuei-shell"
 const SHELL_CACHE_VERSION = "20260613a"
 const CACHE_NAME = `${SHELL_CACHE_PREFIX}-${SHELL_CACHE_VERSION}`
+const SHELL_FALLBACK_URL = "/"
 const SHELL_URLS = [
-  "/",
+  SHELL_FALLBACK_URL,
   "/manifest.webmanifest?v=20260611b",
   "/favicon.ico",
   "/favicon-16x16.png",
@@ -40,6 +41,20 @@ self.addEventListener("fetch", (event) => {
   if (url.searchParams.has("adminToken")) return
   if (url.searchParams.has("token")) return
   if (url.searchParams.has("publicToken")) return
+
+  if (request.mode === "navigate") {
+    event.respondWith(
+      fetch(request).catch(async () => {
+        const cachedShell = await caches.match(SHELL_FALLBACK_URL)
+        if (cachedShell) {
+          return cachedShell
+        }
+
+        return Response.error()
+      }),
+    )
+    return
+  }
 
   const isStaticAsset =
     url.pathname.startsWith("/_next/") ||

@@ -24,14 +24,20 @@ function writePackages(packages: OfflineTripPackage[]) {
   window.localStorage.setItem(OFFLINE_STORAGE_KEY, JSON.stringify(packages))
 }
 
+function sanitizeLegacySnapshotDocuments(_documents: any[], _audience: OfflineTripPackageAudience) {
+  return [] as any[]
+}
+
 function buildLegacyPackage(tripData: any, overrides?: Partial<OfflineTripPackage>): OfflineTripPackage {
+  const audience = overrides?.audience ?? "public"
+
   return {
     tripId: tripData?.id || `trip-${Date.now()}`,
     tripSlug: tripData?.slug ?? null,
     tripName: tripData?.destination || tripData?.title || "Viagem",
     savedAt: overrides?.savedAt ?? new Date().toISOString(),
     warning: overrides?.warning ?? OFFLINE_WARNING,
-    audience: overrides?.audience ?? "public",
+    audience,
     status: overrides?.status,
     totalSizeBytes: overrides?.totalSizeBytes,
     documentCount: overrides?.documentCount,
@@ -43,7 +49,7 @@ function buildLegacyPackage(tripData: any, overrides?: Partial<OfflineTripPackag
       travelers: tripData?.travelers,
       flights: tripData?.flights,
       hotels: tripData?.hotels ?? (tripData?.hotel ? [tripData.hotel] : []),
-      documents: tripData?.documents,
+      documents: sanitizeLegacySnapshotDocuments(tripData?.documents ?? [], audience),
       itinerary: tripData?.itinerary,
       quickInfo: tripData?.quickInfo,
     },

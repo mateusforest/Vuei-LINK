@@ -810,8 +810,9 @@ async function openOfflineDocumentFromPackage(params: {
   context: OfflineDocumentContext | null
   onUnavailable: (message: string) => void
   registerCleanup?: ((url: string | null) => void) | null
+  getPreparedUrl?: (() => string | null) | null
 }) {
-  const { document, context, onUnavailable, registerCleanup } = params
+  const { document, context, onUnavailable, registerCleanup, getPreparedUrl } = params
 
   if (!context || !document?.id) {
     onUnavailable("Este arquivo nao esta disponivel offline.")
@@ -820,6 +821,17 @@ async function openOfflineDocumentFromPackage(params: {
 
   if (context.packageStatus === "legacy_snapshot") {
     onUnavailable("Este arquivo nao esta disponivel offline.")
+    return false
+  }
+
+  const preparedUrl = getPreparedUrl?.() ?? null
+  if (preparedUrl) {
+    const preparedWindow = window.open(preparedUrl, "_blank", "noopener,noreferrer")
+    if (preparedWindow) {
+      return true
+    }
+
+    onUnavailable("Nao foi possivel abrir automaticamente. Toque novamente para abrir o arquivo.")
     return false
   }
 
@@ -834,17 +846,16 @@ async function openOfflineDocumentFromPackage(params: {
     return false
   }
 
-  const pendingWindow = typeof window !== "undefined" ? window.open("", "_blank", "noopener,noreferrer") : null
   const objectUrl = URL.createObjectURL(blobRecord.blob)
   registerOfflineObjectUrl(objectUrl, registerCleanup)
 
-  if (pendingWindow) {
-    pendingWindow.location.href = objectUrl
+  const openedWindow = window.open(objectUrl, "_blank", "noopener,noreferrer")
+  if (openedWindow) {
     return true
   }
 
-  window.open(objectUrl, "_blank", "noopener,noreferrer")
-  return true
+  onUnavailable("Nao foi possivel abrir automaticamente. Toque novamente para abrir o arquivo.")
+  return false
 }
 
 function resolveProtectedWriteError(error?: string | null) {
@@ -3458,6 +3469,7 @@ function ViewDocumentModal({
         document,
         context: offlineDocumentContext,
         onUnavailable: (message) => setOfflineMessage(message),
+        getPreparedUrl: () => objectUrlRef.current,
         registerCleanup: (objectUrl) => {
           if (objectUrlRef.current) {
             URL.revokeObjectURL(objectUrlRef.current)
