@@ -1,5 +1,5 @@
 const SHELL_CACHE_PREFIX = "vuei-shell"
-const SHELL_CACHE_VERSION = "20260613a"
+const SHELL_CACHE_VERSION = "20260614a"
 const CACHE_NAME = `${SHELL_CACHE_PREFIX}-${SHELL_CACHE_VERSION}`
 const SHELL_FALLBACK_URL = "/"
 const SHELL_URLS = [
@@ -43,15 +43,35 @@ self.addEventListener("fetch", (event) => {
   if (url.searchParams.has("publicToken")) return
 
   if (request.mode === "navigate") {
-    event.respondWith(
-      fetch(request).catch(async () => {
-        const cachedShell = await caches.match(SHELL_FALLBACK_URL)
-        if (cachedShell) {
-          return cachedShell
-        }
+    const isTripRoute =
+      url.pathname.startsWith("/v/") ||
+      url.pathname.startsWith("/viagem/")
 
-        return Response.error()
-      }),
+    event.respondWith(
+      fetch(request)
+        .then(async (response) => {
+          if (response && response.ok) {
+            const responseClone = response.clone()
+            void caches.open(CACHE_NAME).then((cache) => cache.put(request, responseClone))
+          }
+
+          return response
+        })
+        .catch(async () => {
+          const cachedNavigation = await caches.match(request)
+          if (cachedNavigation) {
+            return cachedNavigation
+          }
+
+          if (!isTripRoute) {
+            const cachedShell = await caches.match(SHELL_FALLBACK_URL)
+            if (cachedShell) {
+              return cachedShell
+            }
+          }
+
+          return Response.error()
+        }),
     )
     return
   }
