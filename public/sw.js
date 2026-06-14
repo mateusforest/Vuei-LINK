@@ -88,13 +88,14 @@ self.addEventListener("fetch", (event) => {
         .then(async (response) => {
           if (response && response.ok) {
             const responseClone = response.clone()
-            void caches.open(CACHE_NAME).then((cache) => cache.put(request, responseClone))
+            void caches.open(CACHE_NAME).then((cache) => cache.put(url.pathname, responseClone))
           }
 
           return response
         })
         .catch(async () => {
-          const cachedNavigation = await caches.match(request)
+          const cache = await caches.open(CACHE_NAME)
+          const cachedNavigation = await cache.match(url.pathname)
           if (cachedNavigation) {
             return cachedNavigation
           }

@@ -11,6 +11,23 @@ const OFFLINE_SHELL_CACHE_PREFIX = "vuei-shell"
 const OFFLINE_SHELL_CACHE_VERSION = "20260614b"
 const OFFLINE_SHELL_CACHE_NAME = `${OFFLINE_SHELL_CACHE_PREFIX}-${OFFLINE_SHELL_CACHE_VERSION}`
 
+function isValidTripRouteHtml(path: string, response: Response, html: string) {
+  const normalizedHtml = html.toLowerCase()
+  const finalPathname = (() => {
+    try {
+      return new URL(response.url).pathname
+    } catch {
+      return path
+    }
+  })()
+
+  if (response.redirected || finalPathname !== path) {
+    return false
+  }
+
+  return normalizedHtml.includes("carregando viagem") && !normalizedHtml.includes("instale o vuei")
+}
+
 function readPackages() {
   if (typeof window === "undefined") return [] as OfflineTripPackage[]
 
@@ -188,6 +205,12 @@ export async function prepareTripRoutesForOffline(input: {
       })
 
       if (!response.ok) {
+        skippedPaths.push(path)
+        continue
+      }
+
+      const responseText = await response.clone().text()
+      if (!isValidTripRouteHtml(path, response, responseText)) {
         skippedPaths.push(path)
         continue
       }

@@ -5150,78 +5150,93 @@ export default function TripPage() {
       })
 
       const loadOfflinePackage = async (reason: "offline" | "network") => {
-        const offlinePackage = await loadTripOfflinePackage({
-          tripIdOrSlug: routeSlug,
-          audience: getOfflineReadAudience(isAdminRoute),
-        })
-        if (!offlinePackage) return false
-        if (loadRequestRef.current !== requestId) return true
+        try {
+          const offlinePackage = await loadTripOfflinePackage({
+            tripIdOrSlug: routeSlug,
+            audience: getOfflineReadAudience(isAdminRoute),
+          })
+          if (!offlinePackage) return false
+          if (loadRequestRef.current !== requestId) return true
 
-        const audience = getOfflineReadAudience(isAdminRoute)
-        const offlineTrip = buildTripDataFromOfflinePackage(offlinePackage, audience)
-        const packageKey = offlinePackage.packageKey ?? offlinePackage.payload?.offlineMeta?.packageKey ?? null
-        const [heroImageBlob, brandingImageBlob] = await Promise.all([
-          getOfflineImageBlob(`hero:${offlinePackage.tripId}`, {
+          const audience = getOfflineReadAudience(isAdminRoute)
+          const offlineTrip = buildTripDataFromOfflinePackage(offlinePackage, audience)
+          const packageKey = offlinePackage.packageKey ?? offlinePackage.payload?.offlineMeta?.packageKey ?? null
+          const [heroImageBlob, brandingImageBlob] = await Promise.all([
+            getOfflineImageBlob(`hero:${offlinePackage.tripId}`, {
+              tripId: offlinePackage.tripId,
+              packageKey,
+              audience,
+            }),
+            getOfflineImageBlob(`branding:${offlinePackage.tripId}`, {
+              tripId: offlinePackage.tripId,
+              packageKey,
+              audience,
+            }),
+          ])
+          const nextTripData = { ...offlineTrip.tripData }
+          const nextAgencyBranding = { ...offlineTrip.agencyBranding }
+          const nextOfflineImageUrls: string[] = []
+
+          if (heroImageBlob?.blob) {
+            const heroObjectUrl = URL.createObjectURL(heroImageBlob.blob)
+            nextOfflineImageUrls.push(heroObjectUrl)
+            nextTripData.heroImage = heroObjectUrl
+          }
+
+          if (brandingImageBlob?.blob) {
+            const brandingObjectUrl = URL.createObjectURL(brandingImageBlob.blob)
+            nextOfflineImageUrls.push(brandingObjectUrl)
+            nextAgencyBranding.logoUrl = brandingObjectUrl
+          } else if (nextAgencyBranding.isAgency) {
+            nextAgencyBranding.logoUrl = null
+          }
+
+          if (offlineImageUrlsRef.current.length > 0) {
+            revokeOfflineObjectUrls(offlineImageUrlsRef.current)
+          }
+          offlineImageUrlsRef.current = nextOfflineImageUrls
+
+          setOfflineModeEnabled(true)
+          setOfflinePackageStatus(offlineTrip.status)
+          setOfflineDocumentContext({
             tripId: offlinePackage.tripId,
-            packageKey,
             audience,
-          }),
-          getOfflineImageBlob(`branding:${offlinePackage.tripId}`, {
-            tripId: offlinePackage.tripId,
             packageKey,
-            audience,
-          }),
-        ])
-        const nextTripData = { ...offlineTrip.tripData }
-        const nextAgencyBranding = { ...offlineTrip.agencyBranding }
-        const nextOfflineImageUrls: string[] = []
-
-        if (heroImageBlob?.blob) {
-          const heroObjectUrl = URL.createObjectURL(heroImageBlob.blob)
-          nextOfflineImageUrls.push(heroObjectUrl)
-          nextTripData.heroImage = heroObjectUrl
+            packageStatus: offlineTrip.status,
+          })
+          setTripOwnerUserId(null)
+          setTripAdminToken(null)
+          setAdminLinkMutationMode(false)
+          setQuickAccessGateRequired(false)
+          setSensitiveAccessGranted(false)
+          setCanWrite(false)
+          setIsAdmin(isAdminRoute)
+          setTripItineraryRecords([])
+          setAgencyBranding(nextAgencyBranding)
+          setTripData(nextTripData)
+          setSectionsLoading({
+            flights: false,
+            hotels: false,
+            itineraries: false,
+            documents: false,
+          })
+          setIsLoadingTrip(false)
+          tripPerf.end({ tripId: offlinePackage.tripId, mode: "offline", reason })
+          return true
+        } catch (error) {
+          console.error("[TRIP] offline package load error", error)
+          if (loadRequestRef.current === requestId) {
+            setSectionsLoading({
+              flights: false,
+              hotels: false,
+              itineraries: false,
+              documents: false,
+            })
+            setLoadError("Nao foi possivel carregar esta viagem offline neste dispositivo.")
+            setIsLoadingTrip(false)
+          }
+          return false
         }
-
-        if (brandingImageBlob?.blob) {
-          const brandingObjectUrl = URL.createObjectURL(brandingImageBlob.blob)
-          nextOfflineImageUrls.push(brandingObjectUrl)
-          nextAgencyBranding.logoUrl = brandingObjectUrl
-        } else if (nextAgencyBranding.isAgency) {
-          nextAgencyBranding.logoUrl = null
-        }
-
-        if (offlineImageUrlsRef.current.length > 0) {
-          revokeOfflineObjectUrls(offlineImageUrlsRef.current)
-        }
-        offlineImageUrlsRef.current = nextOfflineImageUrls
-
-        setOfflineModeEnabled(true)
-        setOfflinePackageStatus(offlineTrip.status)
-        setOfflineDocumentContext({
-          tripId: offlinePackage.tripId,
-          audience,
-          packageKey,
-          packageStatus: offlineTrip.status,
-        })
-        setTripOwnerUserId(null)
-        setTripAdminToken(null)
-        setAdminLinkMutationMode(false)
-        setQuickAccessGateRequired(false)
-        setSensitiveAccessGranted(false)
-        setCanWrite(false)
-        setIsAdmin(isAdminRoute)
-        setTripItineraryRecords([])
-        setAgencyBranding(nextAgencyBranding)
-        setTripData(nextTripData)
-        setSectionsLoading({
-          flights: false,
-          hotels: false,
-          itineraries: false,
-          documents: false,
-        })
-        setIsLoadingTrip(false)
-        tripPerf.end({ tripId: offlinePackage.tripId, mode: "offline", reason })
-        return true
       }
 
       if (isOfflineModeActive()) {
@@ -5514,7 +5529,19 @@ export default function TripPage() {
       setIsLoadingTrip(false)
     }
 
-    void loadTrip()
+    void loadTrip().catch((error) => {
+      console.error("[TRIP] loadTrip unhandled error", error)
+      if (loadRequestRef.current === requestId) {
+        setSectionsLoading({
+          flights: false,
+          hotels: false,
+          itineraries: false,
+          documents: false,
+        })
+        setLoadError("Nao foi possivel carregar esta viagem offline neste dispositivo.")
+        setIsLoadingTrip(false)
+      }
+    })
   }, [params?.id, params?.slug, pathname, user?.id, authLoading])
 
   const showToast = (message: string, type: "success" | "error" | "info" = "success") => {
