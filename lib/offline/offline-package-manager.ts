@@ -81,9 +81,35 @@ function formatOfflineSizeLabel(bytes: number) {
   return `${Math.max(1, Math.round(bytes / 1024))} KB`
 }
 
+function extractSlugFromUrlCandidate(value?: string | null) {
+  if (!value) return null
+
+  try {
+    const url = new URL(value, typeof window !== "undefined" ? window.location.origin : "https://vuei.local")
+    const match = url.pathname.match(/^\/(?:v|viagem)\/([^/]+)/i)
+    return match?.[1] ?? null
+  } catch {
+    const match = value.match(/\/(?:v|viagem)\/([^/?#]+)/i)
+    return match?.[1] ?? null
+  }
+}
+
+function deriveOfflineSlug(tripData: any) {
+  if (typeof tripData?.slug === "string" && tripData.slug.trim()) {
+    return tripData.slug.trim()
+  }
+
+  return (
+    extractSlugFromUrlCandidate(tripData?.shareLink) ||
+    extractSlugFromUrlCandidate(tripData?.publicLink) ||
+    extractSlugFromUrlCandidate(tripData?.adminLink) ||
+    null
+  )
+}
+
 function sanitizeTripPayload(tripData: any): OfflineTripPayload {
   const tripId = typeof tripData?.id === "string" ? tripData.id : `trip-${Date.now()}`
-  const slug = typeof tripData?.slug === "string" ? tripData.slug : null
+  const slug = deriveOfflineSlug(tripData)
   const travelers = Array.isArray(tripData?.travelers) ? tripData.travelers : []
   const hotels = Array.isArray(tripData?.hotels) ? tripData.hotels : tripData?.hotel ? [tripData.hotel] : []
   const flights = Array.isArray(tripData?.flights) ? tripData.flights : []

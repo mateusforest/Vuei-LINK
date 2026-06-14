@@ -637,6 +637,7 @@ function buildTripDataFromStoredTrip(storedTrip: any) {
   return normalizeTripViewData({
     ...initialTripData,
     id: storedTrip.id || storedTrip.slug || initialTripData.id,
+    slug: storedTrip.slug || null,
     destination: city || storedTrip.title || "Minha Viagem",
     startDate: storedTrip.startDate || null,
     endDate: storedTrip.endDate || null,
@@ -4540,6 +4541,7 @@ function OfflineSection({
       const offlineResult = await saveTripOfflinePackage(
         {
           ...tripData,
+          slug: routeSlug,
           agencyBranding,
         },
         {
@@ -5083,6 +5085,11 @@ export default function TripPage() {
   const loadRequestRef = useRef(0)
   const offlineImageUrlsRef = useRef<string[]>([])
 
+  const logOfflineLookupDev = (stage: string, payload: Record<string, unknown>) => {
+    if (process.env.NODE_ENV !== "development") return
+    console.info("[OFFLINE LOOKUP]", stage, payload)
+  }
+
   const handleCloseSensitiveAccessModal = () => {
     setSecurityModalOpen(false)
     pendingSensitiveActionRef.current = null
@@ -5154,6 +5161,18 @@ export default function TripPage() {
           const offlinePackage = await loadTripOfflinePackage({
             tripIdOrSlug: routeSlug,
             audience: getOfflineReadAudience(isAdminRoute),
+          })
+          logOfflineLookupDev("package_lookup", {
+            reason,
+            routeSlug,
+            audience: getOfflineReadAudience(isAdminRoute),
+            found: Boolean(offlinePackage),
+            packageAudience: offlinePackage?.audience ?? null,
+            packageStatus: offlinePackage?.status ?? null,
+            packageKey: offlinePackage?.packageKey ?? null,
+            packageSlug: offlinePackage?.slug ?? null,
+            documentCount: offlinePackage?.documentCount ?? null,
+            imageCount: offlinePackage?.imageCount ?? null,
           })
           if (!offlinePackage) return false
           if (loadRequestRef.current !== requestId) return true
@@ -5249,11 +5268,43 @@ export default function TripPage() {
       }
 
       try {
-        const repositoryTrip = adminToken
-          ? await getTripByAdminToken(adminToken)
+        const repositoryTripPromise = adminToken
+          ? getTripByAdminToken(adminToken)
           : publicToken
-            ? await getTripByPublicToken(publicToken)
-            : await getTripBySlug(routeSlug)
+            ? getTripByPublicToken(publicToken)
+            : getTripBySlug(routeSlug)
+        const shouldAttemptOfflineTimeoutFallback = useSupabase && (isPublicRoute || isAdminRoute)
+        const lookupTimeoutMs = isMobileViewport ? 2200 : 3200
+        let repositoryTrip:
+          | Awaited<ReturnType<typeof getTripBySlug>>
+          | Awaited<ReturnType<typeof getTripByAdminToken>>
+          | Awaited<ReturnType<typeof getTripByPublicToken>>
+
+        if (shouldAttemptOfflineTimeoutFallback) {
+          const lookupRace = await Promise.race([
+            repositoryTripPromise.then((result) => ({ type: "result" as const, result })),
+            new Promise<{ type: "timeout" }>((resolve) => {
+              window.setTimeout(() => resolve({ type: "timeout" }), lookupTimeoutMs)
+            }),
+          ])
+
+          if (lookupRace.type === "timeout") {
+            logOfflineLookupDev("online_timeout", {
+              routeSlug,
+              routeMode,
+              lookupTimeoutMs,
+            })
+            const offlineLoaded = await loadOfflinePackage("network")
+            if (offlineLoaded) {
+              return
+            }
+            repositoryTrip = await repositoryTripPromise
+          } else {
+            repositoryTrip = lookupRace.result
+          }
+        } else {
+          repositoryTrip = await repositoryTripPromise
+        }
 
         if (repositoryTrip.data) {
           if (loadRequestRef.current !== requestId) return
