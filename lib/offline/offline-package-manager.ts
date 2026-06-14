@@ -9,6 +9,8 @@ import {
   getOfflineRecord,
   getOfflineRecordsByIndex,
   IMAGE_BLOBS_STORE,
+  LEGACY_DOCUMENT_BLOBS_STORE,
+  LEGACY_IMAGE_BLOBS_STORE,
   LEGACY_TRIP_PACKAGES_STORE,
   putOfflineRecord,
   TRIP_PACKAGES_STORE,
@@ -56,6 +58,12 @@ export interface PersistOfflineTripPackageInput {
 
 interface LoadOfflineTripPackageInput {
   tripIdOrSlug: string
+  audience: OfflinePackageReadAudience
+}
+
+interface GetOfflineBlobInput {
+  tripId: string
+  packageKey?: string | null
   audience: OfflinePackageReadAudience
 }
 
@@ -159,6 +167,14 @@ function normalizeOfflineAudience(audience?: OfflineTripPackageAudience | null):
 
 function buildPackageKey(tripId: string, audience: OfflineTripPackageAudience) {
   return `${audience}:${tripId}`
+}
+
+function buildDocumentBlobKey(packageKey: string, documentId: string) {
+  return `${packageKey}:document:${documentId}`
+}
+
+function buildImageBlobKey(packageKey: string, imageId: string) {
+  return `${packageKey}:image:${imageId}`
 }
 
 function getAudienceReadOrder(audience: OfflinePackageReadAudience) {
@@ -310,6 +326,34 @@ function normalizeLegacyIndexedDbPackage(legacyPackage: Partial<OfflineStoredTri
   )
 }
 
+function normalizeLegacyDocumentBlobRecord(legacyBlob: Partial<OfflineDocumentBlobRecord> & { documentId: string; tripId: string }) {
+  return {
+    blobKey: buildDocumentBlobKey(buildPackageKey(legacyBlob.tripId, PUBLIC_OFFLINE_AUDIENCE), legacyBlob.documentId),
+    documentId: legacyBlob.documentId,
+    tripId: legacyBlob.tripId,
+    packageKey: buildPackageKey(legacyBlob.tripId, PUBLIC_OFFLINE_AUDIENCE),
+    audience: PUBLIC_OFFLINE_AUDIENCE,
+    mimeType: legacyBlob.mimeType ?? null,
+    fileName: legacyBlob.fileName ?? null,
+    blob: legacyBlob.blob as Blob,
+    sizeBytes: legacyBlob.sizeBytes ?? 0,
+    savedAt: legacyBlob.savedAt ?? new Date().toISOString(),
+  } satisfies OfflineDocumentBlobRecord
+}
+
+function normalizeLegacyImageBlobRecord(legacyBlob: Partial<OfflineImageBlobRecord> & { imageId: string; tripId: string }) {
+  return {
+    blobKey: buildImageBlobKey(buildPackageKey(legacyBlob.tripId, PUBLIC_OFFLINE_AUDIENCE), legacyBlob.imageId),
+    imageId: legacyBlob.imageId,
+    tripId: legacyBlob.tripId,
+    packageKey: buildPackageKey(legacyBlob.tripId, PUBLIC_OFFLINE_AUDIENCE),
+    audience: PUBLIC_OFFLINE_AUDIENCE,
+    blob: legacyBlob.blob as Blob,
+    sizeBytes: legacyBlob.sizeBytes ?? 0,
+    savedAt: legacyBlob.savedAt ?? new Date().toISOString(),
+  } satisfies OfflineImageBlobRecord
+}
+
 async function listStoredPackagesByTripId(tripId: string) {
   return getOfflineRecordsByIndex(TRIP_PACKAGES_STORE, "tripId", tripId)
 }
@@ -339,10 +383,10 @@ async function deleteOfflinePackageByTripId(tripId: string, audience?: OfflineTr
   }
 }
 
-async function deleteObsoleteTripBlobs(params: { tripId: string; documentIds: string[]; imageIds: string[] }) {
+async function deleteObsoleteTripBlobs(params: { tripId: string; packageKey: string; documentIds: string[]; imageIds: string[] }) {
   const [documentBlobs, imageBlobs] = await Promise.all([
-    getOfflineRecordsByIndex(DOCUMENT_BLOBS_STORE, "tripId", params.tripId),
-    getOfflineRecordsByIndex(IMAGE_BLOBS_STORE, "tripId", params.tripId),
+    getOfflineRecordsByIndex(DOCUMENT_BLOBS_STORE, "packageKey", params.packageKey),
+    getOfflineRecordsByIndex(IMAGE_BLOBS_STORE, "packageKey", params.packageKey),
   ])
 
   const validDocumentIds = new Set(params.documentIds)
@@ -350,13 +394,13 @@ async function deleteObsoleteTripBlobs(params: { tripId: string; documentIds: st
 
   for (const documentBlob of documentBlobs) {
     if (!validDocumentIds.has(documentBlob.documentId)) {
-      await deleteOfflineRecord(DOCUMENT_BLOBS_STORE, documentBlob.documentId)
+      await deleteOfflineRecord(DOCUMENT_BLOBS_STORE, documentBlob.blobKey)
     }
   }
 
   for (const imageBlob of imageBlobs) {
     if (!validImageIds.has(imageBlob.imageId)) {
-      await deleteOfflineRecord(IMAGE_BLOBS_STORE, imageBlob.imageId)
+      await deleteOfflineRecord(IMAGE_BLOBS_STORE, imageBlob.blobKey)
     }
   }
 }
@@ -444,6 +488,7 @@ export async function persistOfflineTripPackage(input: PersistOfflineTripPackage
     })),
   }
   const { tripId } = getPackageIdentity(payload)
+  const packageKey = buildPackageKey(tripId, audience)
   const savedAt = new Date().toISOString()
   const savedDocumentIds: string[] = []
   const savedImageIds: string[] = []
@@ -465,6 +510,8 @@ export async function persistOfflineTripPackage(input: PersistOfflineTripPackage
       const predictedPayload: OfflineTripPayload = {
         ...payload,
         offlineMeta: {
+          packageKey,
+          audience,
           sizeLimitBytes,
           savedDocumentIds: nextSavedDocumentIds,
           savedImageIds,
@@ -480,8 +527,11 @@ export async function persistOfflineTripPackage(input: PersistOfflineTripPackage
       }
 
       await saveOfflineDocumentBlob({
+        blobKey: buildDocumentBlobKey(packageKey, documentId),
         documentId,
         tripId,
+        packageKey,
+        audience,
         mimeType: downloaded.mimeType,
         fileName: document?.name ?? null,
         blob: downloaded.blob,
@@ -503,6 +553,8 @@ export async function persistOfflineTripPackage(input: PersistOfflineTripPackage
       const predictedPayload: OfflineTripPayload = {
         ...payload,
         offlineMeta: {
+          packageKey,
+          audience,
           sizeLimitBytes,
           savedDocumentIds,
           savedImageIds: nextSavedImageIds,
@@ -518,8 +570,11 @@ export async function persistOfflineTripPackage(input: PersistOfflineTripPackage
       }
 
       await saveOfflineImageBlob({
+        blobKey: buildImageBlobKey(packageKey, asset.imageId),
         imageId: asset.imageId,
         tripId,
+        packageKey,
+        audience,
         blob: downloaded.blob,
         sizeBytes: downloaded.sizeBytes,
         savedAt,
@@ -533,6 +588,8 @@ export async function persistOfflineTripPackage(input: PersistOfflineTripPackage
   }
 
   payload.offlineMeta = {
+    packageKey,
+    audience,
     sizeLimitBytes,
     savedDocumentIds,
     savedImageIds,
@@ -551,6 +608,7 @@ export async function persistOfflineTripPackage(input: PersistOfflineTripPackage
   await putOfflineRecord(TRIP_PACKAGES_STORE, packageRecord)
   await deleteObsoleteTripBlobs({
     tripId,
+    packageKey,
     documentIds: savedDocumentIds,
     imageIds: savedImageIds,
   })
@@ -658,27 +716,44 @@ export async function getTripOfflineStats(tripIdOrSlug?: string): Promise<Offlin
 }
 
 export async function clearOrphanBlobs() {
-  const [packages, legacyPackages, documentBlobs, imageBlobs] = await Promise.all([
+  const [packages, legacyPackages, documentBlobs, legacyDocumentBlobs, imageBlobs, legacyImageBlobs] = await Promise.all([
     getAllOfflineRecords(TRIP_PACKAGES_STORE),
     getAllOfflineRecords(LEGACY_TRIP_PACKAGES_STORE),
     getAllOfflineRecords(DOCUMENT_BLOBS_STORE),
+    getAllOfflineRecords(LEGACY_DOCUMENT_BLOBS_STORE),
     getAllOfflineRecords(IMAGE_BLOBS_STORE),
+    getAllOfflineRecords(LEGACY_IMAGE_BLOBS_STORE),
   ])
 
   const validTripIds = new Set([...packages.map((item) => item.tripId), ...legacyPackages.map((item) => item.tripId)])
+  const validPackageKeys = new Set(packages.map((item) => item.packageKey))
   let deletedDocuments = 0
   let deletedImages = 0
 
   for (const documentBlob of documentBlobs) {
-    if (!validTripIds.has(documentBlob.tripId)) {
-      await deleteOfflineRecord(DOCUMENT_BLOBS_STORE, documentBlob.documentId)
+    if (!validTripIds.has(documentBlob.tripId) || !documentBlob.packageKey || !validPackageKeys.has(documentBlob.packageKey)) {
+      await deleteOfflineRecord(DOCUMENT_BLOBS_STORE, documentBlob.blobKey)
+      deletedDocuments += 1
+    }
+  }
+
+  for (const legacyDocumentBlob of legacyDocumentBlobs) {
+    if (!validTripIds.has(legacyDocumentBlob.tripId)) {
+      await deleteOfflineRecord(LEGACY_DOCUMENT_BLOBS_STORE, legacyDocumentBlob.documentId)
       deletedDocuments += 1
     }
   }
 
   for (const imageBlob of imageBlobs) {
-    if (!validTripIds.has(imageBlob.tripId)) {
-      await deleteOfflineRecord(IMAGE_BLOBS_STORE, imageBlob.imageId)
+    if (!validTripIds.has(imageBlob.tripId) || !imageBlob.packageKey || !validPackageKeys.has(imageBlob.packageKey)) {
+      await deleteOfflineRecord(IMAGE_BLOBS_STORE, imageBlob.blobKey)
+      deletedImages += 1
+    }
+  }
+
+  for (const legacyImageBlob of legacyImageBlobs) {
+    if (!validTripIds.has(legacyImageBlob.tripId)) {
+      await deleteOfflineRecord(LEGACY_IMAGE_BLOBS_STORE, legacyImageBlob.imageId)
       deletedImages += 1
     }
   }
@@ -746,11 +821,87 @@ export async function saveOfflineImageBlob(record: OfflineImageBlobRecord) {
 }
 
 export async function listOfflineDocumentBlobs(tripId: string) {
-  return getOfflineRecordsByIndex(DOCUMENT_BLOBS_STORE, "tripId", tripId)
+  const [blobs, legacyBlobs] = await Promise.all([
+    getOfflineRecordsByIndex(DOCUMENT_BLOBS_STORE, "tripId", tripId),
+    getOfflineRecordsByIndex(LEGACY_DOCUMENT_BLOBS_STORE, "tripId", tripId),
+  ])
+
+  return [
+    ...blobs,
+    ...legacyBlobs.map((blob) => normalizeLegacyDocumentBlobRecord(blob)),
+  ]
 }
 
 export async function listOfflineImageBlobs(tripId: string) {
-  return getOfflineRecordsByIndex(IMAGE_BLOBS_STORE, "tripId", tripId)
+  const [blobs, legacyBlobs] = await Promise.all([
+    getOfflineRecordsByIndex(IMAGE_BLOBS_STORE, "tripId", tripId),
+    getOfflineRecordsByIndex(LEGACY_IMAGE_BLOBS_STORE, "tripId", tripId),
+  ])
+
+  return [
+    ...blobs,
+    ...legacyBlobs.map((blob) => normalizeLegacyImageBlobRecord(blob)),
+  ]
+}
+
+export async function getOfflineDocumentBlob(documentId: string, input: GetOfflineBlobInput) {
+  const requestedAudiences = getAudienceReadOrder(input.audience)
+
+  if (input.packageKey) {
+    for (const entryAudience of requestedAudiences) {
+      const packageKey = entryAudience === normalizeOfflineAudience(input.audience) ? input.packageKey : buildPackageKey(input.tripId, entryAudience)
+      const blob = await getOfflineRecord(DOCUMENT_BLOBS_STORE, buildDocumentBlobKey(packageKey, documentId))
+      if (blob && blob.tripId === input.tripId && normalizeOfflineAudience(blob.audience) === entryAudience) {
+        return blob
+      }
+    }
+  } else {
+    for (const entryAudience of requestedAudiences) {
+      const blob = await getOfflineRecord(DOCUMENT_BLOBS_STORE, buildDocumentBlobKey(buildPackageKey(input.tripId, entryAudience), documentId))
+      if (blob && blob.tripId === input.tripId && normalizeOfflineAudience(blob.audience) === entryAudience) {
+        return blob
+      }
+    }
+  }
+
+  if (input.audience === PUBLIC_OFFLINE_AUDIENCE) {
+    const legacyBlob = await getOfflineRecord(LEGACY_DOCUMENT_BLOBS_STORE, documentId)
+    if (legacyBlob && legacyBlob.tripId === input.tripId) {
+      return normalizeLegacyDocumentBlobRecord(legacyBlob)
+    }
+  }
+
+  return null
+}
+
+export async function getOfflineImageBlob(imageId: string, input: GetOfflineBlobInput) {
+  const requestedAudiences = getAudienceReadOrder(input.audience)
+
+  if (input.packageKey) {
+    for (const entryAudience of requestedAudiences) {
+      const packageKey = entryAudience === normalizeOfflineAudience(input.audience) ? input.packageKey : buildPackageKey(input.tripId, entryAudience)
+      const blob = await getOfflineRecord(IMAGE_BLOBS_STORE, buildImageBlobKey(packageKey, imageId))
+      if (blob && blob.tripId === input.tripId && normalizeOfflineAudience(blob.audience) === entryAudience) {
+        return blob
+      }
+    }
+  } else {
+    for (const entryAudience of requestedAudiences) {
+      const blob = await getOfflineRecord(IMAGE_BLOBS_STORE, buildImageBlobKey(buildPackageKey(input.tripId, entryAudience), imageId))
+      if (blob && blob.tripId === input.tripId && normalizeOfflineAudience(blob.audience) === entryAudience) {
+        return blob
+      }
+    }
+  }
+
+  if (input.audience === PUBLIC_OFFLINE_AUDIENCE) {
+    const legacyBlob = await getOfflineRecord(LEGACY_IMAGE_BLOBS_STORE, imageId)
+    if (legacyBlob && legacyBlob.tripId === input.tripId) {
+      return normalizeLegacyImageBlobRecord(legacyBlob)
+    }
+  }
+
+  return null
 }
 
 export function buildLegacyOfflineItems(tripData: any): OfflineTripPackageItem[] {

@@ -33,6 +33,8 @@ export interface OfflineTripPayload {
   documents: unknown[]
   quickInfo: Record<string, unknown> | null
   offlineMeta?: {
+    packageKey?: string
+    audience?: OfflineTripPackageAudience
     sizeLimitBytes: number
     savedDocumentIds: string[]
     savedImageIds: string[]
@@ -62,8 +64,11 @@ export interface OfflineStoredTripPackage {
 }
 
 export interface OfflineDocumentBlobRecord {
+  blobKey: string
   documentId: string
   tripId: string
+  packageKey?: string
+  audience?: OfflineTripPackageAudience
   mimeType: string | null
   fileName: string | null
   blob: Blob
@@ -72,8 +77,11 @@ export interface OfflineDocumentBlobRecord {
 }
 
 export interface OfflineImageBlobRecord {
+  blobKey: string
   imageId: string
   tripId: string
+  packageKey?: string
+  audience?: OfflineTripPackageAudience
   blob: Blob
   sizeBytes: number
   savedAt: string

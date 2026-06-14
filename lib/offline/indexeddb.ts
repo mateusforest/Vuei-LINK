@@ -7,17 +7,21 @@ import type {
 } from "@/lib/offline/types"
 
 export const OFFLINE_DB_NAME = "vuei-offline"
-export const OFFLINE_DB_VERSION = 2
+export const OFFLINE_DB_VERSION = 3
 export const LEGACY_TRIP_PACKAGES_STORE = "trip_packages"
 export const TRIP_PACKAGES_STORE = "trip_packages_v2"
-export const DOCUMENT_BLOBS_STORE = "document_blobs"
-export const IMAGE_BLOBS_STORE = "image_blobs"
+export const LEGACY_DOCUMENT_BLOBS_STORE = "document_blobs"
+export const DOCUMENT_BLOBS_STORE = "document_blobs_v2"
+export const LEGACY_IMAGE_BLOBS_STORE = "image_blobs"
+export const IMAGE_BLOBS_STORE = "image_blobs_v2"
 
 type OfflineStoreMap = {
   [TRIP_PACKAGES_STORE]: OfflineStoredTripPackage
   [LEGACY_TRIP_PACKAGES_STORE]: Partial<OfflineStoredTripPackage> & { tripId: string; slug: string | null }
   [DOCUMENT_BLOBS_STORE]: OfflineDocumentBlobRecord
+  [LEGACY_DOCUMENT_BLOBS_STORE]: Partial<OfflineDocumentBlobRecord> & { documentId: string; tripId: string }
   [IMAGE_BLOBS_STORE]: OfflineImageBlobRecord
+  [LEGACY_IMAGE_BLOBS_STORE]: Partial<OfflineImageBlobRecord> & { imageId: string; tripId: string }
 }
 
 let openPromise: Promise<IDBDatabase> | null = null
@@ -50,6 +54,12 @@ export function openOfflineDatabase() {
       request.onupgradeneeded = () => {
         const database = request.result
 
+        if (!database.objectStoreNames.contains(LEGACY_TRIP_PACKAGES_STORE)) {
+          const legacyPackagesStore = database.createObjectStore(LEGACY_TRIP_PACKAGES_STORE, { keyPath: "tripId" })
+          legacyPackagesStore.createIndex("slug", "slug", { unique: false })
+          legacyPackagesStore.createIndex("savedAt", "savedAt", { unique: false })
+        }
+
         if (!database.objectStoreNames.contains(TRIP_PACKAGES_STORE)) {
           const packagesStore = database.createObjectStore(TRIP_PACKAGES_STORE, { keyPath: "packageKey" })
           packagesStore.createIndex("tripId", "tripId", { unique: false })
@@ -58,15 +68,33 @@ export function openOfflineDatabase() {
           packagesStore.createIndex("savedAt", "savedAt", { unique: false })
         }
 
+        if (!database.objectStoreNames.contains(LEGACY_DOCUMENT_BLOBS_STORE)) {
+          const legacyDocumentsStore = database.createObjectStore(LEGACY_DOCUMENT_BLOBS_STORE, { keyPath: "documentId" })
+          legacyDocumentsStore.createIndex("tripId", "tripId", { unique: false })
+          legacyDocumentsStore.createIndex("savedAt", "savedAt", { unique: false })
+        }
+
         if (!database.objectStoreNames.contains(DOCUMENT_BLOBS_STORE)) {
-          const documentsStore = database.createObjectStore(DOCUMENT_BLOBS_STORE, { keyPath: "documentId" })
+          const documentsStore = database.createObjectStore(DOCUMENT_BLOBS_STORE, { keyPath: "blobKey" })
+          documentsStore.createIndex("documentId", "documentId", { unique: false })
           documentsStore.createIndex("tripId", "tripId", { unique: false })
+          documentsStore.createIndex("packageKey", "packageKey", { unique: false })
+          documentsStore.createIndex("audience", "audience", { unique: false })
           documentsStore.createIndex("savedAt", "savedAt", { unique: false })
         }
 
+        if (!database.objectStoreNames.contains(LEGACY_IMAGE_BLOBS_STORE)) {
+          const legacyImagesStore = database.createObjectStore(LEGACY_IMAGE_BLOBS_STORE, { keyPath: "imageId" })
+          legacyImagesStore.createIndex("tripId", "tripId", { unique: false })
+          legacyImagesStore.createIndex("savedAt", "savedAt", { unique: false })
+        }
+
         if (!database.objectStoreNames.contains(IMAGE_BLOBS_STORE)) {
-          const imagesStore = database.createObjectStore(IMAGE_BLOBS_STORE, { keyPath: "imageId" })
+          const imagesStore = database.createObjectStore(IMAGE_BLOBS_STORE, { keyPath: "blobKey" })
+          imagesStore.createIndex("imageId", "imageId", { unique: false })
           imagesStore.createIndex("tripId", "tripId", { unique: false })
+          imagesStore.createIndex("packageKey", "packageKey", { unique: false })
+          imagesStore.createIndex("audience", "audience", { unique: false })
           imagesStore.createIndex("savedAt", "savedAt", { unique: false })
         }
       }
