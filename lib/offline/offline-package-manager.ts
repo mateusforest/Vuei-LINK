@@ -23,8 +23,11 @@ import type {
 } from "@/lib/offline/types"
 
 const LEGACY_OFFLINE_STORAGE_KEY = "vuei_offline_trips"
+const LEGACY_MIGRATION_SESSION_KEY = "vuei_offline_legacy_migration_v1"
 const OFFLINE_PACKAGE_VERSION = 1
 const OFFLINE_WARNING = "Voce esta vendo uma versao salva offline. Algumas informacoes podem estar desatualizadas."
+
+let legacyMigrationPromise: Promise<{ migrated: number; skipped: number }> | null = null
 
 export interface SaveOfflineTripPackageInput {
   tripData: any
@@ -126,6 +129,26 @@ function parseLegacyPackages() {
     return JSON.parse(raw) as OfflineTripPackage[]
   } catch {
     return []
+  }
+}
+
+function shouldSkipLegacyMigration() {
+  if (typeof window === "undefined") return false
+
+  try {
+    return window.sessionStorage.getItem(LEGACY_MIGRATION_SESSION_KEY) === "done"
+  } catch {
+    return false
+  }
+}
+
+function markLegacyMigrationAttempted() {
+  if (typeof window === "undefined") return
+
+  try {
+    window.sessionStorage.setItem(LEGACY_MIGRATION_SESSION_KEY, "done")
+  } catch {
+    // Mantem o app estavel mesmo sem sessionStorage.
   }
 }
 
@@ -296,9 +319,20 @@ export async function clearOrphanBlobs() {
 }
 
 export async function migrateLegacyOfflineSnapshot() {
+  if (legacyMigrationPromise) {
+    return legacyMigrationPromise
+  }
+
+  if (shouldSkipLegacyMigration()) {
+    return { migrated: 0, skipped: 0 }
+  }
+
+  legacyMigrationPromise = (async () => {
+    markLegacyMigrationAttempted()
+
   const legacyPackages = parseLegacyPackages()
   if (legacyPackages.length === 0) {
-    return { migrated: 0, skipped: 0 }
+      return { migrated: 0, skipped: 0 }
   }
 
   let migrated = 0
@@ -320,7 +354,14 @@ export async function migrateLegacyOfflineSnapshot() {
     migrated += 1
   }
 
-  return { migrated, skipped }
+    return { migrated, skipped }
+  })()
+
+  try {
+    return await legacyMigrationPromise
+  } finally {
+    legacyMigrationPromise = null
+  }
 }
 
 export async function saveOfflineDocumentBlob(record: OfflineDocumentBlobRecord) {

@@ -1,4 +1,6 @@
-const CACHE_NAME = "vuei-shell-v1"
+const SHELL_CACHE_PREFIX = "vuei-shell"
+const SHELL_CACHE_VERSION = "20260613a"
+const CACHE_NAME = `${SHELL_CACHE_PREFIX}-${SHELL_CACHE_VERSION}`
 const SHELL_URLS = [
   "/",
   "/manifest.webmanifest?v=20260611b",
@@ -14,16 +16,18 @@ self.addEventListener("install", (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => cache.addAll(SHELL_URLS)).catch(() => undefined),
   )
-  self.skipWaiting()
 })
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
-      Promise.all(keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))),
+      Promise.all(
+        keys
+          .filter((key) => key.startsWith(`${SHELL_CACHE_PREFIX}-`) && key !== CACHE_NAME)
+          .map((key) => caches.delete(key)),
+      ),
     ),
   )
-  self.clients.claim()
 })
 
 self.addEventListener("fetch", (event) => {
@@ -41,8 +45,7 @@ self.addEventListener("fetch", (event) => {
     url.pathname.startsWith("/_next/") ||
     request.destination === "script" ||
     request.destination === "style" ||
-    request.destination === "font" ||
-    request.destination === "image"
+    request.destination === "font"
 
   if (!isStaticAsset) return
 
@@ -58,7 +61,12 @@ self.addEventListener("fetch", (event) => {
         })
         .catch(() => cachedResponse)
 
-      return cachedResponse || networkPromise
+      if (cachedResponse) {
+        void networkPromise
+        return cachedResponse
+      }
+
+      return networkPromise
     }),
   )
 })

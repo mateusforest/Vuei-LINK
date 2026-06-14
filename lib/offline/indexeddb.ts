@@ -19,6 +19,7 @@ type OfflineStoreMap = {
 }
 
 let openPromise: Promise<IDBDatabase> | null = null
+let currentDatabase: IDBDatabase | null = null
 
 function isIndexedDbSupported() {
   return typeof window !== "undefined" && typeof window.indexedDB !== "undefined"
@@ -34,6 +35,10 @@ function requestToPromise<T>(request: IDBRequest<T>) {
 export function openOfflineDatabase() {
   if (!isIndexedDbSupported()) {
     return Promise.reject(new Error("IndexedDB nao esta disponivel neste dispositivo."))
+  }
+
+  if (currentDatabase) {
+    return Promise.resolve(currentDatabase)
   }
 
   if (!openPromise) {
@@ -62,9 +67,27 @@ export function openOfflineDatabase() {
         }
       }
 
-      request.onsuccess = () => resolve(request.result)
-      request.onerror = () => reject(request.error ?? new Error("Nao foi possivel abrir o banco offline."))
-      request.onblocked = () => reject(new Error("O banco offline esta bloqueado por outra aba ativa."))
+      request.onsuccess = () => {
+        const database = request.result
+        database.onversionchange = () => {
+          database.close()
+          if (currentDatabase === database) {
+            currentDatabase = null
+          }
+          openPromise = null
+        }
+
+        currentDatabase = database
+        resolve(database)
+      }
+      request.onerror = () => {
+        openPromise = null
+        reject(request.error ?? new Error("Nao foi possivel abrir o banco offline."))
+      }
+      request.onblocked = () => {
+        openPromise = null
+        reject(new Error("O banco offline esta bloqueado por outra aba ativa."))
+      }
     })
   }
 
