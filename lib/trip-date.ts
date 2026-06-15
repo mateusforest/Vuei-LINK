@@ -54,3 +54,21 @@ export function calculateTripDays(startDate?: string | null, endDate?: string | 
 
   return Math.floor((endUtc - startUtc) / (1000 * 60 * 60 * 24)) + 1
 }
+
+export function parseTripDateToDate(value?: string | null) {
+  if (!isValidTripDate(value)) return undefined
+
+  const parts = getUtcDateParts(value ?? "")
+  if (!parts) return undefined
+
+  return new Date(parts.year, parts.month - 1, parts.day, 12, 0, 0, 0)
+}
+
+export function formatDateFromDate(value?: Date | null) {
+  if (!value || Number.isNaN(value.getTime())) return ""
+
+  const year = value.getFullYear()
+  const month = String(value.getMonth() + 1).padStart(2, "0")
+  const day = String(value.getDate()).padStart(2, "0")
+  return `${year}-${month}-${day}`
+}

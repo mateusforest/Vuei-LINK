@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { useRouter } from "next/navigation"
 import { 
@@ -11,7 +11,6 @@ import {
   Users,
   Sparkles,
   Check,
-  Plane,
   Mountain,
   Palmtree,
   Building2,
@@ -36,7 +35,13 @@ import { createTrip as createTripInRepository } from "@/lib/repositories/trips-r
 import { shouldUseSupabase } from "@/lib/data-source"
 import { writePendingTrip } from "@/lib/pending-trip"
 import { PortalActionDialog } from "@/components/portal/portal-action-dialog"
-import { calculateTripDays, formatDateForInput, isValidTripDate } from "@/lib/trip-date"
+import { calculateTripDays, isValidTripDate } from "@/lib/trip-date"
+import {
+  resolveDestinationInput,
+  searchDestinationOptions,
+  type DestinationOption,
+} from "@/lib/destinations/catalog"
+import { TripDatePickerField } from "@/components/trip/trip-date-picker-field"
 
 const fadeInUp = {
   initial: { opacity: 0, y: 20 },
@@ -95,8 +100,9 @@ export default function CriarViagemPage() {
   const [copiedLink, setCopiedLink] = useState<string | null>(null)
   const [errorMessage, setErrorMessage] = useState("")
   const [showLimitDialog, setShowLimitDialog] = useState(false)
-  const startDateRef = useRef<HTMLInputElement | null>(null)
-  const endDateRef = useRef<HTMLInputElement | null>(null)
+  const [activeDateField, setActiveDateField] = useState<"start" | "end" | null>(null)
+  const [destinationMenuOpen, setDestinationMenuOpen] = useState(false)
+  const [selectedDestinationId, setSelectedDestinationId] = useState<string | null>(null)
 
   const totalSteps = 5
   const progress = (step / totalSteps) * 100
@@ -107,6 +113,11 @@ export default function CriarViagemPage() {
       setShowLimitDialog(true)
     }
   }, [blockedByFreePlan])
+
+  const destinationSuggestions = useMemo(
+    () => searchDestinationOptions(formData.destination, 5),
+    [formData.destination]
+  )
 
   const canProceed = () => {
     switch (step) {
@@ -125,12 +136,7 @@ export default function CriarViagemPage() {
   }
 
   const focusEndDate = () => {
-    const nextInput = endDateRef.current
-    if (!nextInput) return
-    nextInput.focus()
-    if (typeof nextInput.showPicker === "function") {
-      nextInput.showPicker()
-    }
+    setActiveDateField("end")
   }
 
   const handleStartDateChange = (value: string) => {
@@ -149,6 +155,7 @@ export default function CriarViagemPage() {
       endDate: current.endDate && current.endDate < value ? "" : current.endDate,
     }))
 
+    setActiveDateField(null)
     window.setTimeout(() => {
       focusEndDate()
     }, 0)
@@ -159,9 +166,22 @@ export default function CriarViagemPage() {
       ...current,
       endDate: isValidTripDate(value) ? value : "",
     }))
+    setActiveDateField(null)
   }
 
   const tripDays = calculateTripDays(formData.startDate, formData.endDate)
+
+  const handleDestinationInputChange = (value: string) => {
+    setFormData((current) => ({ ...current, destination: value }))
+    setSelectedDestinationId(null)
+    setDestinationMenuOpen(true)
+  }
+
+  const handleDestinationSelect = (option: DestinationOption) => {
+    setFormData((current) => ({ ...current, destination: option.label }))
+    setSelectedDestinationId(option.id)
+    setDestinationMenuOpen(false)
+  }
 
   const handleNext = () => {
     if (step < totalSteps) {
@@ -190,15 +210,19 @@ export default function CriarViagemPage() {
 
     try {
       let newTrip: Trip
+      const resolvedDestination = resolveDestinationInput(formData.destination, selectedDestinationId)
 
       if (shouldUseSupabase() && user) {
         const result = await Promise.race([
           createTripInRepository({
             title: formData.name,
-            destination: formData.destination,
+            destination: resolvedDestination.label,
+            city: resolvedDestination.city,
+            country: resolvedDestination.country,
             startDate: formData.startDate,
             endDate: formData.endDate,
             style: formData.style,
+            coverImage: resolvedDestination.coverImageUrl ?? undefined,
             status: "draft",
             visibility: "public",
             ownerType: "traveler",
@@ -224,7 +248,7 @@ export default function CriarViagemPage() {
       } else if (shouldUseSupabase() && !user) {
         writePendingTrip({
           title: formData.name,
-          destination: formData.destination,
+          destination: resolvedDestination.label,
           startDate: formData.startDate,
           endDate: formData.endDate,
           style: formData.style,
@@ -235,15 +259,16 @@ export default function CriarViagemPage() {
       } else {
         newTrip = addTrip({
           name: formData.name,
-          destination: formData.destination,
-          country: "",
-          city: "",
+          destination: resolvedDestination.label,
+          country: resolvedDestination.country ?? "",
+          city: resolvedDestination.city ?? "",
           startDate: formData.startDate,
           endDate: formData.endDate,
           style: formData.style,
           companions: formData.companions,
           passengersCount: companionTypes.find(c => c.id === formData.companions)?.count || 1,
-          status: "upcoming"
+          status: "upcoming",
+          coverImage: resolvedDestination.coverImageUrl,
         })
       }
       
@@ -339,10 +364,35 @@ export default function CriarViagemPage() {
                 <MapPin size={20} className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   value={formData.destination}
-                  onChange={(e) => setFormData({ ...formData, destination: e.target.value })}
+                  onChange={(e) => handleDestinationInputChange(e.target.value)}
+                  onFocus={() => setDestinationMenuOpen(true)}
+                  onBlur={() => {
+                    window.setTimeout(() => setDestinationMenuOpen(false), 120)
+                  }}
                   placeholder="Cidade, pais ou regiao"
                   className="h-14 text-lg rounded-xl bg-muted/30 border-border/50 pl-12"
                 />
+                {destinationMenuOpen && destinationSuggestions.length > 0 ? (
+                  <div className="absolute left-0 right-0 top-[calc(100%+0.5rem)] z-20 overflow-hidden rounded-2xl border border-border/50 bg-card/95 shadow-2xl backdrop-blur">
+                    {destinationSuggestions.map((option) => (
+                      <button
+                        key={option.id}
+                        type="button"
+                        className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/30"
+                        onMouseDown={(event) => event.preventDefault()}
+                        onClick={() => handleDestinationSelect(option)}
+                      >
+                        <div>
+                          <p className="font-medium">{option.label}</p>
+                          <p className="text-xs text-muted-foreground">{option.city} • {option.countryCode}</p>
+                        </div>
+                        <Badge variant="outline" className="border-border/50 bg-background/40">
+                          Canonico
+                        </Badge>
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
               </div>
               
               <div className="flex flex-wrap gap-2">
@@ -374,40 +424,25 @@ export default function CriarViagemPage() {
               
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <label className="text-sm font-medium flex items-center gap-2">
-                    <Plane size={14} className="text-primary" />
-                    Ida
-                  </label>
-                  <Input
-                    ref={startDateRef}
-                    type="date"
-                    value={formatDateForInput(formData.startDate)}
-                    onChange={(e) => handleStartDateChange(e.target.value)}
-                    onClick={(event) => {
-                      if (typeof event.currentTarget.showPicker === "function") {
-                        event.currentTarget.showPicker()
-                      }
-                    }}
+                  <TripDatePickerField
+                    label="Ida"
+                    value={formData.startDate}
+                    open={activeDateField === "start"}
+                    onOpenChange={(open) => setActiveDateField(open ? "start" : null)}
+                    onSelect={handleStartDateChange}
                     className="h-12 rounded-xl bg-muted/30 border-border/50"
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-medium flex items-center gap-2">
-                    <Plane size={14} className="text-primary rotate-180" />
-                    Volta
-                  </label>
-                  <Input
-                    ref={endDateRef}
-                    type="date"
-                    value={formatDateForInput(formData.endDate)}
-                    min={formData.startDate || undefined}
-                    onChange={(e) => handleEndDateChange(e.target.value)}
-                    onClick={(event) => {
-                      if (typeof event.currentTarget.showPicker === "function") {
-                        event.currentTarget.showPicker()
-                      }
-                    }}
+                  <TripDatePickerField
+                    label="Volta"
+                    value={formData.endDate}
+                    minValue={formData.startDate}
+                    open={activeDateField === "end"}
+                    onOpenChange={(open) => setActiveDateField(open ? "end" : null)}
+                    onSelect={handleEndDateChange}
                     className="h-12 rounded-xl bg-muted/30 border-border/50"
+                    iconClassName="rotate-180 text-primary"
                   />
                 </div>
               </div>

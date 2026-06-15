@@ -60,7 +60,7 @@ interface TripsContextType {
   loadingTrips: boolean
   credits: TripsContextCredits
   subscription: TravelerPlanSnapshot
-  addTrip: (trip: Omit<Trip, "id" | "slug" | "adminLink" | "shareLink" | "createdAt" | "coverImage">) => Trip
+  addTrip: (trip: Omit<Trip, "id" | "slug" | "adminLink" | "shareLink" | "createdAt" | "coverImage"> & { coverImage?: string | null }) => Trip
   syncTripFromBackend: (trip: CanonicalTrip) => Trip
   updateTrip: (id: string, data: Partial<Trip>) => void
   deleteTrip: (id: string) => Promise<{ success: boolean; error?: string | null }>
@@ -427,8 +427,10 @@ export function TripsProvider({ children }: { children: ReactNode }) {
     }
   }, [isLoaded, loading, user])
 
-  const addTrip = useCallback((tripData: Omit<Trip, "id" | "slug" | "adminLink" | "shareLink" | "createdAt" | "coverImage">) => {
-    const { city, country } = parseDestination(tripData.destination)
+  const addTrip = useCallback((tripData: Omit<Trip, "id" | "slug" | "adminLink" | "shareLink" | "createdAt" | "coverImage"> & { coverImage?: string | null }) => {
+    const parsedDestination = parseDestination(tripData.destination)
+    const city = tripData.city || parsedDestination.city
+    const country = tripData.country || parsedDestination.country
     const baseSlug = slugifyTripBase(tripData.name, tripData.destination)
     const slug = buildUniqueTripSlug(baseSlug, trips.map((trip) => trip.slug))
     const id = `trip-${Date.now()}`
@@ -440,7 +442,7 @@ export function TripsProvider({ children }: { children: ReactNode }) {
       city,
       country,
       passengersCount: getPassengersCount(tripData.companions),
-      coverImage: getImageForDestination(tripData.destination),
+      coverImage: tripData.coverImage || getImageForDestination(tripData.destination),
       adminLink: buildAdminTripUrl(slug),
       shareLink: buildPublicTripUrl(slug),
       createdAt: new Date().toISOString(),

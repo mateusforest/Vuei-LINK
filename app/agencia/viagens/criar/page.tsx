@@ -1,6 +1,6 @@
 "use client"
 
-import { Suspense, useState, useEffect, useRef } from "react"
+import { Suspense, useState, useEffect, useMemo } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
@@ -24,7 +24,13 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { useAgency, type AgencyTrip } from "@/contexts/agency-context"
-import { calculateTripDays, formatDateForInput, isValidTripDate } from "@/lib/trip-date"
+import { calculateTripDays, isValidTripDate } from "@/lib/trip-date"
+import {
+  resolveDestinationInput,
+  searchDestinationOptions,
+  type DestinationOption,
+} from "@/lib/destinations/catalog"
+import { TripDatePickerField } from "@/components/trip/trip-date-picker-field"
 
 const steps = [
   { id: 1, title: "Cliente", icon: User },
@@ -55,8 +61,9 @@ function CreateTripPageContent() {
   const [copiedAdmin, setCopiedAdmin] = useState(false)
   const [copiedShare, setCopiedShare] = useState(false)
   const [submitError, setSubmitError] = useState("")
-  const startDateRef = useRef<HTMLInputElement | null>(null)
-  const endDateRef = useRef<HTMLInputElement | null>(null)
+  const [activeDateField, setActiveDateField] = useState<"start" | "end" | null>(null)
+  const [destinationMenuOpen, setDestinationMenuOpen] = useState(false)
+  const [selectedDestinationId, setSelectedDestinationId] = useState<string | null>(null)
   
   const [formData, setFormData] = useState({
     clientId: clientIdParam || "",
@@ -84,23 +91,30 @@ function CreateTripPageContent() {
     }
   }, [clientIdParam, getClientById])
 
+  const destinationSuggestions = useMemo(
+    () => searchDestinationOptions(formData.destination, 5),
+    [formData.destination]
+  )
+
   const handleNext = async () => {
     if (currentStep < steps.length) {
       setCurrentStep(currentStep + 1)
     } else {
       setSubmitError("")
+      const resolvedDestination = resolveDestinationInput(formData.destination, selectedDestinationId)
       const newTrip = await addTrip({
         clientId: formData.clientId || `temp-${Date.now()}`,
         clientName: formData.clientName,
-        name: `Viagem para ${formData.destination}`,
-        destination: formData.destination,
-        country: formData.destination.split(",").pop()?.trim() || "",
-        city: formData.destination.split(",")[0]?.trim() || formData.destination,
+        name: `Viagem para ${resolvedDestination.label}`,
+        destination: resolvedDestination.label,
+        country: resolvedDestination.country ?? "",
+        city: resolvedDestination.city ?? resolvedDestination.label,
         startDate: formData.startDate,
         endDate: formData.endDate,
         style: formData.travelStyle,
         passengersCount: formData.passengersCount,
-        status: "upcoming"
+        status: "upcoming",
+        coverImage: resolvedDestination.coverImageUrl,
       })
       if (newTrip) {
         setCreatedTrip(newTrip)
@@ -145,12 +159,7 @@ function CreateTripPageContent() {
   }
 
   const focusEndDate = () => {
-    const nextInput = endDateRef.current
-    if (!nextInput) return
-    nextInput.focus()
-    if (typeof nextInput.showPicker === "function") {
-      nextInput.showPicker()
-    }
+    setActiveDateField("end")
   }
 
   const handleStartDateChange = (value: string) => {
@@ -169,6 +178,7 @@ function CreateTripPageContent() {
       endDate: current.endDate && current.endDate < value ? "" : current.endDate,
     }))
 
+    setActiveDateField(null)
     window.setTimeout(() => {
       focusEndDate()
     }, 0)
@@ -179,9 +189,22 @@ function CreateTripPageContent() {
       ...current,
       endDate: isValidTripDate(value) ? value : "",
     }))
+    setActiveDateField(null)
   }
 
   const tripDays = calculateTripDays(formData.startDate, formData.endDate)
+
+  const handleDestinationInputChange = (value: string) => {
+    setFormData((current) => ({ ...current, destination: value }))
+    setSelectedDestinationId(null)
+    setDestinationMenuOpen(true)
+  }
+
+  const handleDestinationSelect = (option: DestinationOption) => {
+    setFormData((current) => ({ ...current, destination: option.label }))
+    setSelectedDestinationId(option.id)
+    setDestinationMenuOpen(false)
+  }
 
   if (completed && createdTrip) {
     return (
@@ -465,12 +488,39 @@ function CreateTripPageContent() {
                 <h2 className="text-lg font-semibold text-foreground">Destino da Viagem</h2>
                 <div>
                   <Label className="text-muted-foreground">Cidade e pais</Label>
-                  <Input
-                    value={formData.destination}
-                    onChange={(e) => setFormData({ ...formData, destination: e.target.value })}
-                    placeholder="Ex: Paris, Franca"
-                    className="mt-1.5 border-white/10 bg-white/5"
-                  />
+                  <div className="relative">
+                    <Input
+                      value={formData.destination}
+                      onChange={(e) => handleDestinationInputChange(e.target.value)}
+                      onFocus={() => setDestinationMenuOpen(true)}
+                      onBlur={() => {
+                        window.setTimeout(() => setDestinationMenuOpen(false), 120)
+                      }}
+                      placeholder="Ex: Paris, Franca"
+                      className="mt-1.5 border-white/10 bg-white/5"
+                    />
+                    {destinationMenuOpen && destinationSuggestions.length > 0 ? (
+                      <div className="absolute left-0 right-0 top-[calc(100%+0.5rem)] z-20 overflow-hidden rounded-2xl border border-white/10 bg-card/95 shadow-2xl backdrop-blur">
+                        {destinationSuggestions.map((option) => (
+                          <button
+                            key={option.id}
+                            type="button"
+                            className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors hover:bg-white/5"
+                            onMouseDown={(event) => event.preventDefault()}
+                            onClick={() => handleDestinationSelect(option)}
+                          >
+                            <div>
+                              <p className="font-medium text-foreground">{option.label}</p>
+                              <p className="text-xs text-muted-foreground">{option.city} • {option.countryCode}</p>
+                            </div>
+                            <Badge variant="outline" className="border-white/10 bg-white/[0.03]">
+                              Canonico
+                            </Badge>
+                          </button>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
                 </div>
                 <div className="flex flex-wrap gap-2 pt-2">
                   {["Paris, Franca", "Tokyo, Japao", "Nova York, EUA", "Maldivas", "Dubai, Emirados", "Lisboa, Portugal", "Roma, Italia"].map((dest) => (
@@ -500,34 +550,26 @@ function CreateTripPageContent() {
                 <h2 className="text-lg font-semibold text-foreground">Datas da Viagem</h2>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <Label className="text-muted-foreground">Data de ida</Label>
-                    <Input
-                      ref={startDateRef}
-                      type="date"
-                      value={formatDateForInput(formData.startDate)}
-                      onChange={(e) => handleStartDateChange(e.target.value)}
-                      onClick={(event) => {
-                        if (typeof event.currentTarget.showPicker === "function") {
-                          event.currentTarget.showPicker()
-                        }
-                      }}
+                    <TripDatePickerField
+                      label="Data de ida"
+                      value={formData.startDate}
+                      open={activeDateField === "start"}
+                      onOpenChange={(open) => setActiveDateField(open ? "start" : null)}
+                      onSelect={handleStartDateChange}
                       className="mt-1.5 border-white/10 bg-white/5"
+                      labelClassName="text-muted-foreground"
                     />
                   </div>
                   <div>
-                    <Label className="text-muted-foreground">Data de volta</Label>
-                    <Input
-                      ref={endDateRef}
-                      type="date"
-                      value={formatDateForInput(formData.endDate)}
-                      min={formData.startDate || undefined}
-                      onChange={(e) => handleEndDateChange(e.target.value)}
-                      onClick={(event) => {
-                        if (typeof event.currentTarget.showPicker === "function") {
-                          event.currentTarget.showPicker()
-                        }
-                      }}
+                    <TripDatePickerField
+                      label="Data de volta"
+                      value={formData.endDate}
+                      minValue={formData.startDate}
+                      open={activeDateField === "end"}
+                      onOpenChange={(open) => setActiveDateField(open ? "end" : null)}
+                      onSelect={handleEndDateChange}
                       className="mt-1.5 border-white/10 bg-white/5"
+                      labelClassName="text-muted-foreground"
                     />
                   </div>
                 </div>

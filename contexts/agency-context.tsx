@@ -170,7 +170,7 @@ interface AgencyContextType {
   deleteClient: (id: string) => Promise<boolean>
   getClientById: (id: string) => Client | undefined
   trips: AgencyTrip[]
-  addTrip: (data: Omit<AgencyTrip, "id" | "slug" | "adminLink" | "shareLink" | "createdAt" | "coverImage">) => Promise<AgencyTrip | null>
+  addTrip: (data: Omit<AgencyTrip, "id" | "slug" | "adminLink" | "shareLink" | "createdAt" | "coverImage"> & { coverImage?: string | null }) => Promise<AgencyTrip | null>
   updateTrip: (id: string, data: Partial<AgencyTrip>) => Promise<AgencyTrip | null>
   deleteTrip: (id: string) => Promise<boolean>
   getTripById: (id: string) => AgencyTrip | undefined
@@ -1019,7 +1019,7 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
 
   const getClientById = useCallback((id: string) => clients.find((client) => client.id === id), [clients])
 
-  const addTrip = useCallback(async (data: Omit<AgencyTrip, "id" | "slug" | "adminLink" | "shareLink" | "createdAt" | "coverImage">) => {
+  const addTrip = useCallback(async (data: Omit<AgencyTrip, "id" | "slug" | "adminLink" | "shareLink" | "createdAt" | "coverImage"> & { coverImage?: string | null }) => {
     if (activeTripsCount >= subscription.definition.maxActiveTrips) {
       setWorkspaceError(null)
       setLimitDialog(getAgencyPlanLimitDialog(subscription.code, "trip_limit"))
@@ -1048,7 +1048,7 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
         ownerUserId: user?.id ?? null,
         agencyId,
         clientId: data.clientId || null,
-        coverImage: getImageForDestination(data.destination),
+        coverImage: data.coverImage || getImageForDestination(data.destination),
         visibility: "public",
       })
 
@@ -1072,7 +1072,9 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
       return mappedTrip
     }
 
-    const { city, country } = parseDestination(data.destination)
+    const parsedDestination = parseDestination(data.destination)
+    const city = data.city || parsedDestination.city
+    const country = data.country || parsedDestination.country
     const baseSlug = slugifyTripBase(data.name, data.destination)
     const slug = buildUniqueTripSlug(baseSlug, trips.map((trip) => trip.slug))
     const id = `agency-trip-${Date.now()}`
@@ -1083,7 +1085,7 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
       slug,
       city,
       country,
-      coverImage: getImageForDestination(data.destination),
+      coverImage: data.coverImage || getImageForDestination(data.destination),
       adminLink: buildAdminTripUrl(slug),
       shareLink: buildPublicTripUrl(slug),
       createdAt: new Date().toISOString(),
