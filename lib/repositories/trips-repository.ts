@@ -29,12 +29,47 @@ interface RepositoryTripResult {
   config?: ReturnType<typeof createSupabaseBrowserClientPlaceholder>
 }
 
+const CREATE_TRIP_ERROR_MESSAGE = "Nao foi possivel criar a viagem. Tente novamente."
+const MAX_TRIP_SLUG_ATTEMPTS = 5
+
 function isDeletedTripStatus(status?: string | null) {
   return status === "cancelled" || status === "deleted" || status === "archived"
 }
 
 function readStoredTrips() {
   return [...normalizeLegacyTrips(), ...normalizeLegacyAgencyTrips()]
+}
+
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+}
+
+function isMatchingTripSlug(slug: string, baseSlug: string) {
+  const matcher = new RegExp(`^${escapeRegExp(baseSlug)}(?:-\\d+)?$`)
+  return matcher.test(slug)
+}
+
+function isTripSlugConflict(error: { code?: string | null; message?: string | null; details?: string | null } | null | undefined) {
+  if (!error) return false
+
+  const diagnostic = [error.code, error.message, error.details].filter(Boolean).join(" ")
+  return error.code === "23505" && /trips_slug_key/i.test(diagnostic)
+}
+
+async function listExistingTripSlugs(
+  supabase: NonNullable<ReturnType<typeof createSupabaseBrowserClient>>,
+  baseSlug: string
+) {
+  const { data, error } = await supabase.from("trips").select("slug").like("slug", `${baseSlug}%`)
+
+  if (error) {
+    console.error("[TRIP] slug lookup error", error)
+    return []
+  }
+
+  return (data ?? [])
+    .map((row) => row.slug)
+    .filter((slug): slug is string => typeof slug === "string" && isMatchingTripSlug(slug, baseSlug))
 }
 
 function mapTripRowToTrip(row: Database["public"]["Tables"]["trips"]["Row"]): Trip {
@@ -203,10 +238,10 @@ function parseDestinationParts(destination?: string | null) {
   }
 }
 
-function buildTrip(payload: CreateTripPayload, existingTrips: Trip[]): Trip {
+function buildTrip(payload: CreateTripPayload, existingTrips: Trip[], slugOverride?: string): Trip {
   const now = new Date().toISOString()
   const baseSlug = slugifyTripBase(payload.title, payload.destination)
-  const slug = buildUniqueTripSlug(baseSlug, existingTrips.map((trip) => trip.slug))
+  const slug = slugOverride ?? buildUniqueTripSlug(baseSlug, existingTrips.map((trip) => trip.slug))
   const destinationParts = parseDestinationParts(payload.destination)
 
   return mapStoredTripToTrip({
@@ -412,7 +447,6 @@ export async function getTripByPublicToken(token: string) {
 
 export async function createTrip(payload: CreateTripPayload) {
   const currentTrips = readStoredTrips()
-  const trip = buildTrip(payload, currentTrips)
   const supabase = createSupabaseBrowserClient()
 
   console.log("[TRIP] create started")
@@ -436,62 +470,91 @@ export async function createTrip(payload: CreateTripPayload) {
         }
       }
 
-      const adminToken = trip.adminToken || generateSecureToken()
-      const publicToken = trip.publicToken || generateSecureToken()
-      const adminLink = buildAdminTripUrl(trip.slug)
-      const publicLink = buildPublicTripUrl(trip.slug)
-      const parsedDestination = parseDestinationParts(trip.destination)
-      const resolvedCoverImage =
-        trip.coverImage || getDestinationCoverImage(trip.destination, trip.city ?? parsedDestination.city, trip.country ?? parsedDestination.country)
+      const baseSlug = slugifyTripBase(payload.title, payload.destination)
+      const knownSlugs = new Set(currentTrips.map((storedTrip) => storedTrip.slug).filter(Boolean))
 
-      const insertPayload: Database["public"]["Tables"]["trips"]["Insert"] = {
-        title: trip.title,
-        slug: trip.slug,
-        destination: trip.destination,
-        country: trip.country ?? parsedDestination.country,
-        city: trip.city ?? parsedDestination.city,
-        start_date: trip.startDate,
-        end_date: trip.endDate,
-        status: trip.status ?? "draft",
-        style: trip.style,
-        owner_type: trip.ownerType,
-        owner_user_id: trip.ownerUserId,
-        agency_id: trip.agencyId,
-        client_id: trip.clientId,
-        admin_token: adminToken,
-        public_token: publicToken,
-        admin_link: adminLink,
-        public_link: publicLink,
-        cover_image: resolvedCoverImage,
-        visibility: trip.visibility ?? "public",
-        travelers_count: trip.travelersCount || 1,
-        permissions: trip.permissions ?? {},
-        credits_summary: {},
-        offline_enabled: trip.offlineEnabled,
-        source: "manual",
+      for (const slug of await listExistingTripSlugs(supabase, baseSlug)) {
+        knownSlugs.add(slug)
       }
-      console.log("[TRIP] payload", insertPayload)
 
-      const { data, error } = await supabase.from("trips").insert(insertPayload).select("*").single()
+      for (let attempt = 0; attempt < MAX_TRIP_SLUG_ATTEMPTS; attempt += 1) {
+        const candidateSlug = buildUniqueTripSlug(baseSlug, [...knownSlugs])
+        knownSlugs.add(candidateSlug)
 
-      if (!error && data) {
-        console.log("[TRIP] insert data", data)
-        console.log("[TRIP] viagem criada", data.id)
-        return {
-          source: "supabase" as const,
-          config: createSupabaseBrowserClientPlaceholder(),
-          data: mapTripRowToTrip(data),
-          error: null,
+        const trip = buildTrip(payload, currentTrips, candidateSlug)
+        const adminToken = trip.adminToken || generateSecureToken()
+        const publicToken = trip.publicToken || generateSecureToken()
+        const adminLink = buildAdminTripUrl(trip.slug)
+        const publicLink = buildPublicTripUrl(trip.slug)
+        const parsedDestination = parseDestinationParts(trip.destination)
+        const resolvedCoverImage =
+          trip.coverImage || getDestinationCoverImage(trip.destination, trip.city ?? parsedDestination.city, trip.country ?? parsedDestination.country)
+
+        const insertPayload: Database["public"]["Tables"]["trips"]["Insert"] = {
+          title: trip.title,
+          slug: trip.slug,
+          destination: trip.destination,
+          country: trip.country ?? parsedDestination.country,
+          city: trip.city ?? parsedDestination.city,
+          start_date: trip.startDate,
+          end_date: trip.endDate,
+          status: trip.status ?? "draft",
+          style: trip.style,
+          owner_type: trip.ownerType,
+          owner_user_id: trip.ownerUserId,
+          agency_id: trip.agencyId,
+          client_id: trip.clientId,
+          admin_token: adminToken,
+          public_token: publicToken,
+          admin_link: adminLink,
+          public_link: publicLink,
+          cover_image: resolvedCoverImage,
+          visibility: trip.visibility ?? "public",
+          travelers_count: trip.travelersCount || 1,
+          permissions: trip.permissions ?? {},
+          credits_summary: {},
+          offline_enabled: trip.offlineEnabled,
+          source: "manual",
+        }
+        console.log("[TRIP] payload", insertPayload)
+
+        const { data, error } = await supabase.from("trips").insert(insertPayload).select("*").single()
+
+        if (!error && data) {
+          console.log("[TRIP] insert data", data)
+          console.log("[TRIP] viagem criada", data.id)
+          return {
+            source: "supabase" as const,
+            config: createSupabaseBrowserClientPlaceholder(),
+            data: mapTripRowToTrip(data),
+            error: null,
+          }
+        }
+
+        if (error) {
+          console.error("[TRIP] insert error", error)
+
+          if (isTripSlugConflict(error) && attempt < MAX_TRIP_SLUG_ATTEMPTS - 1) {
+            for (const slug of await listExistingTripSlugs(supabase, baseSlug)) {
+              knownSlugs.add(slug)
+            }
+            continue
+          }
+
+          return {
+            source: "supabase" as const,
+            config: createSupabaseBrowserClientPlaceholder(),
+            data: null,
+            error: CREATE_TRIP_ERROR_MESSAGE,
+          }
         }
       }
-      if (error) {
-        console.error("[TRIP] insert error", error)
-        return {
-          source: "supabase" as const,
-          config: createSupabaseBrowserClientPlaceholder(),
-          data: null,
-          error: error.message,
-        }
+
+      return {
+        source: "supabase" as const,
+        config: createSupabaseBrowserClientPlaceholder(),
+        data: null,
+        error: CREATE_TRIP_ERROR_MESSAGE,
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : "Falha ao criar viagem."
@@ -500,7 +563,7 @@ export async function createTrip(payload: CreateTripPayload) {
         source: "supabase" as const,
         config: createSupabaseBrowserClientPlaceholder(),
         data: null,
-        error: message,
+        error: CREATE_TRIP_ERROR_MESSAGE,
       }
     }
   }
@@ -510,10 +573,11 @@ export async function createTrip(payload: CreateTripPayload) {
       source: "supabase-placeholder" as const,
       config: createSupabaseBrowserClientPlaceholder(),
       data: null,
-      error: "Supabase browser client indisponivel.",
+      error: CREATE_TRIP_ERROR_MESSAGE,
     }
   }
 
+  const trip = buildTrip(payload, currentTrips)
   writeLocalTrips([trip, ...currentTrips])
   console.log("[TRIP] viagem criada", trip.id)
   return { source: "local" as const, data: trip, error: null }
