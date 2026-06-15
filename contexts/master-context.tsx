@@ -31,6 +31,7 @@ interface Agency {
   createdAt: string
   tripsCount: number
   usersCount: number
+  clientsCount: number
   creditsBalance: number
   monthlyRevenue: number
 }
@@ -49,6 +50,17 @@ interface User {
   tripsCount: number
   createdAt: string
   lastActive: string
+}
+
+interface MasterClient {
+  id: string
+  name: string
+  email: string | null
+  agencyId?: string
+  agencyName?: string
+  creditsBalance: number
+  tripsCount: number
+  createdAt: string
 }
 
 interface MasterTrip {
@@ -181,6 +193,7 @@ interface MasterStats {
 interface MasterContextType {
   agencies: Agency[]
   users: User[]
+  clients: MasterClient[]
   trips: MasterTrip[]
   aiUsageLogs: AiUsageLog[]
   loadingState: boolean
@@ -234,6 +247,7 @@ interface MasterContextType {
 type MasterState = {
   agencies: Agency[]
   users: User[]
+  clients: MasterClient[]
   trips: MasterTrip[]
   conciergeRequests: ConciergeRequest[]
   aiUsageLogs: AiUsageLog[]
@@ -274,6 +288,7 @@ const INITIAL_SETTINGS: MasterSettings = {
 const INITIAL_STATE: MasterState = {
   agencies: [],
   users: [],
+  clients: [],
   trips: [],
   conciergeRequests: [],
   aiUsageLogs: [],
@@ -387,6 +402,12 @@ function buildMasterState(data: {
     return accumulator
   }, new Map())
 
+  const tripsByClient = tripsData.reduce<Map<string, number>>((accumulator, trip) => {
+    if (!trip.clientId) return accumulator
+    accumulator.set(trip.clientId, (accumulator.get(trip.clientId) ?? 0) + 1)
+    return accumulator
+  }, new Map())
+
   const agencies: Agency[] = agenciesData.map((agency) => {
     const ownerProfile = agency.ownerUserId ? profileMap.get(agency.ownerUserId) : null
     const members = membersByAgency.get(agency.id) ?? []
@@ -403,10 +424,27 @@ function buildMasterState(data: {
       createdAt: agency.createdAt,
       tripsCount: tripsByAgency.get(agency.id) ?? 0,
       usersCount: members.filter((member) => member.status === "active").length || (agency.ownerUserId ? 1 : 0),
+      clientsCount: clients.filter((client) => client.agencyId === agency.id).length,
       creditsBalance: agency.creditsBalance ?? 0,
       monthlyRevenue: 0,
     }
   })
+
+  const masterClients: MasterClient[] = clients
+    .map((client) => {
+      const linkedAgency = client.agencyId ? agencyMap.get(client.agencyId) : null
+      return {
+        id: client.id,
+        name: client.name,
+        email: client.email,
+        agencyId: client.agencyId ?? undefined,
+        agencyName: linkedAgency?.name,
+        creditsBalance: client.creditsBalance ?? 0,
+        tripsCount: tripsByClient.get(client.id) ?? 0,
+        createdAt: client.createdAt,
+      }
+    })
+    .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())
 
   const users: User[] = profiles
     .map((profile) => {
@@ -552,6 +590,7 @@ function buildMasterState(data: {
   return {
     agencies,
     users,
+    clients: masterClients,
     trips,
     conciergeRequests,
     aiUsageLogs,
@@ -926,6 +965,7 @@ export function MasterProvider({ children }: { children: ReactNode }) {
       value={{
         agencies: state.agencies,
         users: state.users,
+        clients: state.clients,
         trips: state.trips,
         aiUsageLogs: state.aiUsageLogs,
         loadingState,

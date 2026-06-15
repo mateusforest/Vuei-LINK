@@ -30,6 +30,8 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { useAgency, type Client } from "@/contexts/agency-context"
 
+const ACTIVE_CLIENT_TRIP_STATUSES = new Set(["draft", "upcoming", "ongoing"])
+
 const containerVariants = {
   hidden: { opacity: 0 },
   visible: { opacity: 1, transition: { staggerChildren: 0.05 } },
@@ -254,8 +256,11 @@ export default function ClientsPage() {
     return matchesSearch && matchesFilter
   })
 
+  const getActiveTripsByClient = (clientId: string) =>
+    getTripsByClient(clientId).filter((trip) => ACTIVE_CLIENT_TRIP_STATUSES.has(trip.status))
+
   const getClientStatus = (clientId: string) => {
-    const clientTrips = getTripsByClient(clientId)
+    const clientTrips = getActiveTripsByClient(clientId)
     const upcomingTrip = clientTrips.find(t => t.status === "upcoming")
     const ongoingTrip = clientTrips.find(t => t.status === "ongoing")
     
@@ -284,7 +289,7 @@ export default function ClientsPage() {
   }
 
   const handleDeleteClient = async (id: string) => {
-    const linkedTrips = getTripsByClient(id)
+    const linkedTrips = getActiveTripsByClient(id)
     if (linkedTrips.length > 0) {
       window.alert("Este cliente possui viagens vinculadas e nao pode ser excluido agora.")
       return
@@ -390,7 +395,7 @@ export default function ClientsPage() {
         >
           {filteredClients.map((client) => {
             const { status, trip } = getClientStatus(client.id)
-            const clientTrips = getTripsByClient(client.id)
+            const clientTrips = getActiveTripsByClient(client.id)
             
             return (
               <motion.div key={client.id} variants={itemVariants}>

@@ -28,7 +28,7 @@ function formatDate(dateStr: string) {
 function MasterAgenciasPageContent() {
   const searchParams = useSearchParams()
   const highlightId = searchParams.get("id")
-  const { agencies, stats, dataErrors } = useMaster()
+  const { agencies, clients, stats, dataErrors } = useMaster()
   const [searchQuery, setSearchQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
   const [showDetailsModal, setShowDetailsModal] = useState<string | null>(highlightId)
@@ -48,6 +48,9 @@ function MasterAgenciasPageContent() {
   )
 
   const selectedAgency = showDetailsModal ? agencies.find((agency) => agency.id === showDetailsModal) ?? null : null
+  const selectedAgencyClients = selectedAgency
+    ? clients.filter((client) => client.agencyId === selectedAgency.id)
+    : []
 
   const pageStats = [
     { label: "Total Agencias", value: stats.totalAgencies.toString(), icon: Building2 },
@@ -110,6 +113,10 @@ function MasterAgenciasPageContent() {
                     <p className="text-xs text-muted-foreground mb-1">Equipe</p>
                     <p className="text-sm font-medium">{selectedAgency.usersCount}</p>
                   </div>
+                  <div className="p-3 rounded-lg bg-white/5">
+                    <p className="text-xs text-muted-foreground mb-1">Clientes</p>
+                    <p className="text-sm font-medium">{selectedAgency.clientsCount}</p>
+                  </div>
                 </div>
 
                 <div className="space-y-3">
@@ -125,6 +132,26 @@ function MasterAgenciasPageContent() {
                     <Calendar className="h-4 w-4" />
                     {formatDate(selectedAgency.createdAt)}
                   </div>
+                </div>
+
+                <div className="mt-6 space-y-3">
+                  <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Clientes vinculados</p>
+                  {selectedAgencyClients.length === 0 ? (
+                    <div className="rounded-lg border border-white/10 bg-white/5 p-3 text-sm text-muted-foreground">
+                      Nenhum cliente vinculado a esta agencia.
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {selectedAgencyClients.slice(0, 6).map((client) => (
+                        <div key={client.id} className="rounded-lg border border-white/10 bg-white/5 p-3">
+                          <div className="text-sm font-medium text-foreground">{client.name}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {client.email || "Sem e-mail"} • {client.tripsCount} viagens
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </Card>
             </motion.div>

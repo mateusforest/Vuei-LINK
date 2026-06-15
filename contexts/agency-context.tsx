@@ -343,6 +343,7 @@ function buildCanonicalCredits(balance: number, history: AgencyCredits["history"
 const AGENCY_STORAGE_KEY = "vuei_agency"
 const AGENCY_WORKSPACE_CACHE_KEY = "vuei_agency_workspace_cache"
 type PersistedAgencyState = AgencyStorageState<AgencyTrip, AgencyDocument, ConciergeRequest, TeamMember, Activity, AgencyCredits>
+const ACTIVE_CLIENT_TRIP_STATUSES: TripStatus[] = ["draft", "upcoming", "ongoing"]
 
 const initialClients: Client[] = [
   { id: "client-1", name: "Maria Silva", email: "maria@email.com", phone: "(11) 99999-1234", status: "active", createdAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString() },
@@ -956,7 +957,9 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
   }, [isUsingRealData])
 
   const deleteClient = useCallback(async (id: string) => {
-    const linkedTrips = trips.filter((trip) => trip.clientId === id)
+    const linkedTrips = trips.filter(
+      (trip) => trip.clientId === id && ACTIVE_CLIENT_TRIP_STATUSES.includes(trip.status),
+    )
 
     if (linkedTrips.length > 0) {
       setWorkspaceError("Este cliente possui viagens vinculadas e nao pode ser excluido agora.")

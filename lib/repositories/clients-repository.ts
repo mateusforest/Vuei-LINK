@@ -7,6 +7,8 @@ import { mapLegacyClientToClient, type LegacyAgencyClient, type LegacyAgencyTrip
 import { mapAgencyTripToTrip } from "@/lib/mappers/trip-mappers"
 import { listTripsByAgency } from "@/lib/repositories/trips-repository"
 
+const ACTIVE_CLIENT_TRIP_STATUSES = ["draft", "upcoming", "ongoing"] as const
+
 export interface ClientWithTrips extends Client {
   trips: Trip[]
 }
@@ -300,6 +302,7 @@ export async function deleteClient(id: string) {
         .from("trips")
         .select("id, title, status")
         .eq("client_id", id)
+        .in("status", [...ACTIVE_CLIENT_TRIP_STATUSES])
         .limit(5)
 
       if (linkedTripsError) {

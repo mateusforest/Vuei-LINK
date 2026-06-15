@@ -1,34 +1,21 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { 
-  Sparkles, 
-  MapPin, 
-  Calendar, 
-  Users, 
+import {
+  Sparkles,
+  MapPin,
+  Calendar,
+  Users,
   DollarSign,
   Clock,
-  Plus,
   Wand2,
   FileText,
-  Copy,
-  Download,
-  Edit3,
-  Trash2,
-  Star,
-  Heart,
-  Utensils,
-  Camera,
-  Globe,
-  Sun,
-  Hotel,
-  Coffee,
-  ShoppingBag,
-  Music,
-  Moon,
+  ExternalLink,
+  Eye,
   Loader2,
-  Check
+  Check,
+  Trash2,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -46,167 +33,286 @@ import {
 } from "@/components/ui/select"
 import { useAgency } from "@/contexts/agency-context"
 import { shouldUseSupabase } from "@/lib/data-source"
+import type { Document, TripItineraryRecord } from "@/types"
+import { deleteTripItinerary, listTripItineraries, requestAiItineraryGeneration } from "@/lib/repositories/trip-itineraries-repository"
+import { getSignedDocumentUrl, listDocumentsByTrip } from "@/lib/repositories/documents-repository"
 
-const ITINERARIES_STORAGE_KEY = "vuei_agencia_roteiros_ia"
+type PreviewState = {
+  itinerary: TripItineraryRecord
+  tripName: string
+}
 
-const travelStyles = [
-  { id: "romantic", label: "Romantico", icon: Heart },
-  { id: "adventure", label: "Aventura", icon: Globe },
-  { id: "cultural", label: "Cultural", icon: Camera },
-  { id: "gastronomic", label: "Gastronomico", icon: Utensils },
-  { id: "relaxation", label: "Relaxamento", icon: Sun },
-  { id: "family", label: "Familia", icon: Users },
-  { id: "luxury", label: "Luxo", icon: Star },
-  { id: "budget", label: "Economico", icon: DollarSign }
-]
+function differenceInDaysInclusive(startDate?: string, endDate?: string) {
+  if (!startDate || !endDate) return null
+  const start = new Date(`${startDate}T00:00:00`)
+  const end = new Date(`${endDate}T00:00:00`)
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return null
+  const diff = end.getTime() - start.getTime()
+  return Math.max(Math.floor(diff / 86400000) + 1, 1)
+}
+
+function formatTripDuration(startDate?: string, endDate?: string) {
+  const totalDays = differenceInDaysInclusive(startDate, endDate)
+  if (!totalDays) return "Nao informado"
+  return `${totalDays} ${totalDays === 1 ? "dia" : "dias"}`
+}
+
+function formatTravelersLabel(count?: number) {
+  if (!count || count <= 0) return "Nao informado"
+  return `${count} ${count === 1 ? "viajante" : "viajantes"}`
+}
+
+function formatItineraryStatus(status: TripItineraryRecord["status"]) {
+  switch (status) {
+    case "completed":
+      return "Concluido"
+    case "generating":
+      return "Gerando"
+    case "failed":
+      return "Falhou"
+    case "uploaded":
+      return "Anexado"
+    default:
+      return "Rascunho"
+  }
+}
+
+function formatItineraryMode(mode: TripItineraryRecord["mode"]) {
+  switch (mode) {
+    case "complete_pdf":
+      return "Completo em PDF"
+    case "uploaded":
+      return "Arquivo anexado"
+    default:
+      return "Roteiro simples"
+  }
+}
 
 export default function RoteirosIAPage() {
-  const { credits, useCredits } = useAgency()
+  const { trips, credits } = useAgency()
   const isRealMode = shouldUseSupabase()
+  const [selectedTripId, setSelectedTripId] = useState("")
+  const [activeTab, setActiveTab] = useState("generate")
   const [isGenerating, setIsGenerating] = useState(false)
-  const [generatedItinerary, setGeneratedItinerary] = useState<any>(null)
-  const [selectedStyles, setSelectedStyles] = useState<string[]>([])
-  const [copied, setCopied] = useState(false)
-  const [savedItineraries, setSavedItineraries] = useState<any[]>([])
+  const [preview, setPreview] = useState<PreviewState | null>(null)
+  const [savedItineraries, setSavedItineraries] = useState<Array<TripItineraryRecord & { tripName: string }>>([])
+  const [tripDocuments, setTripDocuments] = useState<Record<string, Document[]>>({})
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [generatedMessage, setGeneratedMessage] = useState<string | null>(null)
   const [formData, setFormData] = useState({
     destination: "",
     duration: "",
     travelers: "",
     budget: "",
-    preferences: ""
+    style: "",
+    preferences: "",
   })
-  const safeItineraries = savedItineraries ?? []
+
+  const selectedTrip = useMemo(
+    () => trips.find((trip) => trip.id === selectedTripId) ?? null,
+    [selectedTripId, trips],
+  )
+
+  const hydrateTripFields = useCallback((tripId: string) => {
+    const trip = trips.find((entry) => entry.id === tripId)
+    if (!trip) {
+      setFormData({
+        destination: "",
+        duration: "",
+        travelers: "",
+        budget: "",
+        style: "",
+        preferences: "",
+      })
+      return
+    }
+
+    setFormData((current) => ({
+      ...current,
+      destination: trip.destination || [trip.city, trip.country].filter(Boolean).join(", "),
+      duration: formatTripDuration(trip.startDate, trip.endDate),
+      travelers: formatTravelersLabel(trip.passengersCount),
+      style: trip.style || "",
+      preferences: current.preferences,
+    }))
+  }, [trips])
+
+  const loadDocumentsForTrip = useCallback(async (tripId: string) => {
+    const result = await listDocumentsByTrip(tripId)
+    if (result.error) {
+      return
+    }
+
+    setTripDocuments((current) => ({
+      ...current,
+      [tripId]: result.data ?? [],
+    }))
+  }, [])
+
+  const loadSavedItineraries = useCallback(async () => {
+    if (!isRealMode) {
+      setSavedItineraries([])
+      return
+    }
+
+    const results = await Promise.all(
+      trips.map(async (trip) => {
+        const [itinerariesResult, documentsResult] = await Promise.all([
+          listTripItineraries(trip.id),
+          listDocumentsByTrip(trip.id),
+        ])
+
+        return {
+          trip,
+          itineraries: itinerariesResult.data ?? [],
+          itinerariesError: itinerariesResult.error,
+          documents: documentsResult.data ?? [],
+        }
+      }),
+    )
+
+    const nextDocuments: Record<string, Document[]> = {}
+    const nextSaved = results.flatMap(({ trip, itineraries, documents, itinerariesError }) => {
+      if (itinerariesError) {
+        setLoadError(itinerariesError)
+        return []
+      }
+
+      nextDocuments[trip.id] = documents
+      return itineraries.map((itinerary) => ({
+        ...itinerary,
+        tripName: trip.name,
+      }))
+    })
+
+    setTripDocuments((current) => ({
+      ...current,
+      ...nextDocuments,
+    }))
+    setSavedItineraries(
+      nextSaved.sort((left, right) => new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime()),
+    )
+  }, [isRealMode, trips])
 
   useEffect(() => {
-    if (typeof window === "undefined") return
-    if (isRealMode) return
+    if (!selectedTripId && trips.length > 0) {
+      setSelectedTripId(trips[0].id)
+      hydrateTripFields(trips[0].id)
+      return
+    }
 
-    const stored = window.localStorage.getItem(ITINERARIES_STORAGE_KEY)
-    if (!stored) return
+    if (selectedTripId) {
+      hydrateTripFields(selectedTripId)
+    }
+  }, [hydrateTripFields, selectedTripId, trips])
+
+  useEffect(() => {
+    void loadSavedItineraries()
+  }, [loadSavedItineraries])
+
+  const handleGenerate = async (mode: "simple" | "complete_pdf") => {
+    if (!selectedTrip) {
+      setLoadError("Selecione uma viagem antes de gerar o roteiro.")
+      return
+    }
+
+    if (!isRealMode) {
+      setLoadError("Ative o modo Supabase para gerar roteiros IA reais.")
+      return
+    }
+
+    setIsGenerating(true)
+    setLoadError(null)
+    setGeneratedMessage(null)
 
     try {
-      const parsed = JSON.parse(stored)
-      setSavedItineraries(Array.isArray(parsed) ? parsed : [])
-    } catch {
-      setSavedItineraries([])
+      const result = await requestAiItineraryGeneration({
+        tripId: selectedTrip.id,
+        mode,
+        tripSlug: selectedTrip.slug,
+      })
+
+      if (!result.data?.itinerary) {
+        setLoadError(result.error ?? "Nao foi possivel gerar o roteiro.")
+        return
+      }
+
+      setPreview({
+        itinerary: result.data.itinerary,
+        tripName: selectedTrip.name,
+      })
+      setGeneratedMessage(
+        mode === "complete_pdf"
+          ? "Roteiro completo gerado e salvo na viagem."
+          : "Roteiro simples gerado e salvo na viagem.",
+      )
+      setActiveTab("saved")
+
+      if (result.data.document) {
+        setTripDocuments((current) => ({
+          ...current,
+          [selectedTrip.id]: [result.data.document!, ...(current[selectedTrip.id] ?? [])],
+        }))
+      } else {
+        await loadDocumentsForTrip(selectedTrip.id)
+      }
+
+      await loadSavedItineraries()
+    } finally {
+      setIsGenerating(false)
     }
-  }, [isRealMode])
-
-  useEffect(() => {
-    if (typeof window === "undefined") return
-    if (isRealMode) return
-    window.localStorage.setItem(ITINERARIES_STORAGE_KEY, JSON.stringify(safeItineraries))
-  }, [isRealMode, safeItineraries])
-
-  const toggleStyle = (styleId: string) => {
-    setSelectedStyles(prev => 
-      prev.includes(styleId) 
-        ? prev.filter(s => s !== styleId)
-        : [...prev, styleId]
-    )
   }
 
-  const handleGenerate = async () => {
-    if (isRealMode) {
-      alert("Roteiros IA ainda nao persistem em dados reais nesta fase.")
+  const handleOpenSavedItinerary = async (itinerary: TripItineraryRecord & { tripName: string }) => {
+    setLoadError(null)
+    if (itinerary.mode === "simple" || !itinerary.documentId) {
+      setPreview({ itinerary, tripName: itinerary.tripName })
+      setActiveTab("generate")
       return
     }
 
-    if (credits.balance < 5) {
-      alert("Creditos insuficientes. Compre mais creditos para continuar.")
-      return
-    }
-    
-    setIsGenerating(true)
-    
-    await new Promise(resolve => setTimeout(resolve, 3000))
-    
-    const newItinerary = {
-      title: `${formData.destination} - ${formData.duration} dias`,
-      destination: formData.destination,
-      duration: formData.duration,
-      travelers: formData.travelers,
-      style: selectedStyles.map(s => travelStyles.find(t => t.id === s)?.label).join(", ") || "Misto",
-      days: [
-        {
-          day: 1,
-          title: "Chegada e Primeiro Contato",
-          activities: [
-            { time: "14:00", title: "Check-in no hotel", icon: "Hotel", description: "Acomodacao no centro historico" },
-            { time: "16:00", title: "Passeio de reconhecimento", icon: "MapPin", description: "Caminhada pelo bairro" },
-            { time: "19:00", title: "Jantar de boas-vindas", icon: "Utensils", description: "Restaurante tipico local" }
-          ]
-        },
-        {
-          day: 2,
-          title: "Exploracao Cultural",
-          activities: [
-            { time: "09:00", title: "Cafe da manha local", icon: "Coffee", description: "Experiencia gastronomica" },
-            { time: "10:30", title: "Visita ao museu principal", icon: "Camera", description: "Tour guiado de 2h" },
-            { time: "13:00", title: "Almoco em praca historica", icon: "Utensils", description: "Culinaria regional" },
-            { time: "15:00", title: "Tour a pe pelo centro", icon: "MapPin", description: "Principais pontos turisticos" },
-            { time: "20:00", title: "Show cultural", icon: "Music", description: "Apresentacao tipica" }
-          ]
-        },
-        {
-          day: 3,
-          title: "Aventura e Natureza",
-          activities: [
-            { time: "07:00", title: "Nascer do sol especial", icon: "Sun", description: "Mirante panoramico" },
-            { time: "09:00", title: "Trilha ecologica", icon: "Globe", description: "Caminhada de 3h" },
-            { time: "13:00", title: "Piquenique na natureza", icon: "Utensils", description: "Almoco ao ar livre" },
-            { time: "16:00", title: "Compras de artesanato", icon: "ShoppingBag", description: "Mercado local" },
-            { time: "19:00", title: "Jantar de despedida", icon: "Moon", description: "Restaurante com vista" }
-          ]
-        }
-      ]
-    }
-    
-    setGeneratedItinerary(newItinerary)
-    useCredits(5, "Roteiro IA", `Roteiro para ${formData.destination}`)
-    setIsGenerating(false)
-  }
+    const documents = tripDocuments[itinerary.tripId] ?? []
+    const matchingDocument = documents.find((document) => document.id === itinerary.documentId)
 
-  const handleSaveItinerary = () => {
-    if (isRealMode) {
-      alert("Salvar roteiros IA em modo real ainda nao esta integrado.")
+    if (!matchingDocument?.filePath) {
+      setLoadError("Documento do roteiro nao encontrado.")
       return
     }
 
-    if (generatedItinerary) {
-      setSavedItineraries((prev) => [
-        {
-          id: `itinerary-${Date.now()}`,
-        title: generatedItinerary.title,
-        destination: generatedItinerary.destination,
-        duration: generatedItinerary.duration,
-        style: generatedItinerary.style,
-          days: generatedItinerary.days,
-          usedCount: 0,
-        },
-        ...(prev ?? []),
-      ])
-      alert("Roteiro salvo com sucesso!")
+    const signedUrlResult = await getSignedDocumentUrl(matchingDocument.filePath)
+    if (!signedUrlResult.data) {
+      setLoadError(signedUrlResult.error ?? "Nao foi possivel abrir o arquivo do roteiro.")
+      return
+    }
+
+    window.open(signedUrlResult.data, "_blank", "noopener,noreferrer")
+  }
+
+  const handleDeleteSavedItinerary = async (itineraryId: string) => {
+    if (!confirm("Deseja remover este roteiro salvo?")) {
+      return
+    }
+
+    const result = await deleteTripItinerary(itineraryId)
+    if (!result.success) {
+      setLoadError(result.error ?? "Nao foi possivel remover o roteiro.")
+      return
+    }
+
+    setSavedItineraries((current) => current.filter((item) => item.id !== itineraryId))
+    if (preview?.itinerary.id === itineraryId) {
+      setPreview(null)
     }
   }
 
-  const handleCopy = () => {
-    if (generatedItinerary) {
-      navigator.clipboard.writeText(JSON.stringify(generatedItinerary, null, 2))
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
-    }
-  }
-
-  const iconMap: Record<string, any> = { Hotel, MapPin, Utensils, Coffee, Camera, Music, Sun, Globe, ShoppingBag, Moon }
+  const previewDays = preview?.itinerary.content?.days ?? []
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Roteiros IA</h1>
-          <p className="text-muted-foreground">Gere roteiros personalizados com inteligencia artificial</p>
+          <p className="text-muted-foreground">Selecione uma viagem e gere roteiros reais vinculados ao Supabase</p>
         </div>
         <Badge className="bg-primary/20 text-primary border-primary/30 w-fit">
           <Sparkles className="w-3 h-3 mr-1" />
@@ -214,15 +320,27 @@ export default function RoteirosIAPage() {
         </Badge>
       </div>
 
-      {isRealMode ? (
+      {loadError ? (
+        <Card className="bg-red-500/10 border-red-500/20">
+          <CardContent className="p-4 text-sm text-red-300">{loadError}</CardContent>
+        </Card>
+      ) : null}
+
+      {generatedMessage ? (
+        <Card className="bg-emerald-500/10 border-emerald-500/20">
+          <CardContent className="p-4 text-sm text-emerald-300">{generatedMessage}</CardContent>
+        </Card>
+      ) : null}
+
+      {!isRealMode ? (
         <Card className="bg-card border-border">
           <CardContent className="p-4 text-sm text-muted-foreground">
-            Roteiros IA ainda nao persistem em dados reais nesta fase. Esta area permanece apenas como rascunho visual.
+            Ative o Supabase neste ambiente para gerar e persistir roteiros reais da agencia.
           </CardContent>
         </Card>
       ) : null}
 
-      <Tabs defaultValue="generate" className="space-y-6">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
         <TabsList className="bg-card border border-border">
           <TabsTrigger value="generate" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
             <Wand2 className="w-4 h-4 mr-2" />
@@ -230,13 +348,12 @@ export default function RoteirosIAPage() {
           </TabsTrigger>
           <TabsTrigger value="saved" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
             <FileText className="w-4 h-4 mr-2" />
-            Salvos ({safeItineraries.length})
+            Salvos ({savedItineraries.length})
           </TabsTrigger>
         </TabsList>
 
         <TabsContent value="generate" className="space-y-6">
           <div className="grid lg:grid-cols-2 gap-6">
-            {/* Formulario */}
             <Card className="bg-card border-border">
               <CardHeader>
                 <CardTitle className="text-lg flex items-center gap-2">
@@ -246,15 +363,32 @@ export default function RoteirosIAPage() {
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="space-y-2">
+                  <Label>Viagem</Label>
+                  <Select
+                    value={selectedTripId}
+                    onValueChange={(value) => {
+                      setSelectedTripId(value)
+                      hydrateTripFields(value)
+                    }}
+                  >
+                    <SelectTrigger className="bg-background border-border">
+                      <SelectValue placeholder="Selecione uma viagem" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {trips.map((trip) => (
+                        <SelectItem key={trip.id} value={trip.id}>
+                          {trip.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
                   <Label>Destino</Label>
                   <div className="relative">
                     <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                    <Input 
-                      placeholder="Ex: Paris, Franca" 
-                      className="pl-10 bg-background border-border"
-                      value={formData.destination}
-                      onChange={(e) => setFormData({...formData, destination: e.target.value})}
-                    />
+                    <Input value={formData.destination} readOnly className="pl-10 bg-background border-border" />
                   </div>
                 </div>
 
@@ -263,101 +397,88 @@ export default function RoteirosIAPage() {
                     <Label>Duracao</Label>
                     <div className="relative">
                       <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                      <Input 
-                        placeholder="Ex: 7 dias" 
-                        className="pl-10 bg-background border-border"
-                        value={formData.duration}
-                        onChange={(e) => setFormData({...formData, duration: e.target.value})}
-                      />
+                      <Input value={formData.duration} readOnly className="pl-10 bg-background border-border" />
                     </div>
                   </div>
                   <div className="space-y-2">
                     <Label>Viajantes</Label>
                     <div className="relative">
                       <Users className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                      <Input 
-                        placeholder="Ex: 2 adultos" 
+                      <Input value={formData.travelers} readOnly className="pl-10 bg-background border-border" />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Estilo</Label>
+                    <Input value={formData.style || "Nao informado"} readOnly className="bg-background border-border" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Orcamento</Label>
+                    <div className="relative">
+                      <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Ex: R$ 15.000"
+                        value={formData.budget}
+                        onChange={(event) => setFormData((current) => ({ ...current, budget: event.target.value }))}
                         className="pl-10 bg-background border-border"
-                        value={formData.travelers}
-                        onChange={(e) => setFormData({...formData, travelers: e.target.value})}
                       />
                     </div>
                   </div>
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Orcamento Estimado</Label>
-                  <Select onValueChange={(value) => setFormData({...formData, budget: value})}>
-                    <SelectTrigger className="bg-background border-border">
-                      <SelectValue placeholder="Selecione o orcamento" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="economy">Economico (ate R$ 5.000/pessoa)</SelectItem>
-                      <SelectItem value="moderate">Moderado (R$ 5.000 - R$ 15.000/pessoa)</SelectItem>
-                      <SelectItem value="comfort">Confortavel (R$ 15.000 - R$ 30.000/pessoa)</SelectItem>
-                      <SelectItem value="luxury">Luxo (acima de R$ 30.000/pessoa)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-3">
-                  <Label>Estilo de Viagem</Label>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                    {travelStyles.map((style) => {
-                      const Icon = style.icon
-                      const isSelected = selectedStyles.includes(style.id)
-                      return (
-                        <button
-                          key={style.id}
-                          onClick={() => toggleStyle(style.id)}
-                          className={`p-3 rounded-lg border transition-all text-center ${
-                            isSelected 
-                              ? "bg-primary/20 border-primary text-primary" 
-                              : "bg-background border-border text-muted-foreground hover:border-primary/50"
-                          }`}
-                        >
-                          <Icon className="w-4 h-4 mx-auto mb-1" />
-                          <span className="text-xs">{style.label}</span>
-                        </button>
-                      )
-                    })}
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Preferencias Adicionais</Label>
-                  <Textarea 
-                    placeholder="Ex: Preferimos restaurantes com opcoes vegetarianas..."
-                    className="bg-background border-border min-h-[100px]"
+                  <Label>Preferencias</Label>
+                  <Textarea
                     value={formData.preferences}
-                    onChange={(e) => setFormData({...formData, preferences: e.target.value})}
+                    onChange={(event) => setFormData((current) => ({ ...current, preferences: event.target.value }))}
+                    placeholder="Adicione preferencias extras para a geracao do roteiro."
+                    className="bg-background border-border min-h-[100px]"
                   />
                 </div>
 
-                <Button 
-                  className="w-full bg-gradient-to-r from-primary to-cyan-400 hover:opacity-90 text-white"
-                  onClick={handleGenerate}
-                  disabled={isGenerating || !formData.destination || !formData.duration || credits.balance < 5}
-                >
-                  {isGenerating ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Gerando roteiro...
-                    </>
-                  ) : (
-                    <>
-                      <Wand2 className="w-4 h-4 mr-2" />
-                      Gerar Roteiro (5 creditos)
-                    </>
-                  )}
-                </Button>
-                {credits.balance < 5 && (
-                  <p className="text-xs text-red-400 text-center">Creditos insuficientes</p>
-                )}
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <Button
+                    className="bg-gradient-to-r from-primary to-cyan-400 hover:opacity-90 text-white"
+                    onClick={() => void handleGenerate("simple")}
+                    disabled={isGenerating || !selectedTripId || !isRealMode}
+                  >
+                    {isGenerating ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Gerando...
+                      </>
+                    ) : (
+                      <>
+                        <Wand2 className="w-4 h-4 mr-2" />
+                        Gerar roteiro simples
+                      </>
+                    )}
+                  </Button>
+
+                  <Button
+                    variant="outline"
+                    className="border-border"
+                    onClick={() => void handleGenerate("complete_pdf")}
+                    disabled={isGenerating || !selectedTripId || !isRealMode}
+                  >
+                    {isGenerating ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Gerando PDF...
+                      </>
+                    ) : (
+                      <>
+                        <FileText className="w-4 h-4 mr-2" />
+                        Gerar completo em PDF
+                      </>
+                    )}
+                  </Button>
+                </div>
               </CardContent>
             </Card>
 
-            {/* Preview */}
             <Card className="bg-card border-border">
               <CardHeader>
                 <CardTitle className="text-lg">Preview do Roteiro</CardTitle>
@@ -376,72 +497,69 @@ export default function RoteirosIAPage() {
                         <div className="w-16 h-16 rounded-full border-2 border-primary/30 border-t-primary animate-spin" />
                         <Sparkles className="w-6 h-6 text-primary absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
                       </div>
-                      <p className="text-muted-foreground mt-4">Criando roteiro personalizado...</p>
+                      <p className="text-muted-foreground mt-4">Gerando roteiro real da viagem...</p>
                     </motion.div>
-                  ) : generatedItinerary ? (
+                  ) : preview ? (
                     <motion.div
-                      key="result"
+                      key={preview.itinerary.id}
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
                       className="space-y-4"
                     >
                       <div className="flex items-center justify-between pb-4 border-b border-border">
                         <div>
-                          <h3 className="font-semibold text-foreground">{generatedItinerary.title}</h3>
-                          <p className="text-sm text-muted-foreground">{generatedItinerary.days.length} dias de atividades</p>
+                          <h3 className="font-semibold text-foreground">{preview.itinerary.title}</h3>
+                          <p className="text-sm text-muted-foreground">{preview.tripName}</p>
                         </div>
-                        <div className="flex gap-2">
-                          <Button size="sm" variant="outline" className="border-border" onClick={handleCopy}>
-                            {copied ? <Check className="w-4 h-4 text-green-400" /> : <Copy className="w-4 h-4" />}
-                          </Button>
-                          <Button size="sm" variant="outline" className="border-border">
-                            <Download className="w-4 h-4" />
-                          </Button>
-                        </div>
+                        <Badge variant="secondary" className="bg-muted text-muted-foreground">
+                          {formatItineraryMode(preview.itinerary.mode)}
+                        </Badge>
                       </div>
 
-                      <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2">
-                        {generatedItinerary.days.map((day: any, index: number) => (
-                          <div key={index} className="space-y-2">
-                            <div className="flex items-center gap-2">
-                              <span className="w-8 h-8 rounded-full bg-primary/20 text-primary text-sm font-medium flex items-center justify-center">
-                                {day.day}
-                              </span>
-                              <span className="font-medium text-foreground">{day.title}</span>
-                            </div>
-                            <div className="ml-4 pl-4 border-l border-border/50 space-y-2">
-                              {day.activities.map((activity: any, actIndex: number) => {
-                                const Icon = iconMap[activity.icon] || MapPin
-                                return (
-                                  <div key={actIndex} className="flex gap-3 py-2">
-                                    <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0">
-                                      <Icon className="w-4 h-4 text-muted-foreground" />
+                      {preview.itinerary.mode !== "simple" ? (
+                        <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4 text-sm text-muted-foreground">
+                          Este roteiro foi salvo como documento. Abra pela aba <strong>Salvos</strong>.
+                        </div>
+                      ) : previewDays.length === 0 ? (
+                        <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4 text-sm text-muted-foreground">
+                          Este roteiro ainda nao possui dias estruturados.
+                        </div>
+                      ) : (
+                        <div className="space-y-4 max-h-[420px] overflow-y-auto pr-2">
+                          {previewDays.map((day) => (
+                            <div key={day.id} className="space-y-2">
+                              <div className="flex items-center gap-2">
+                                <span className="w-8 h-8 rounded-full bg-primary/20 text-primary text-sm font-medium flex items-center justify-center">
+                                  {day.day}
+                                </span>
+                                <div>
+                                  <p className="font-medium text-foreground">{day.title}</p>
+                                  {day.summary ? <p className="text-xs text-muted-foreground">{day.summary}</p> : null}
+                                </div>
+                              </div>
+
+                              <div className="ml-4 pl-4 border-l border-border/50 space-y-2">
+                                {day.activities.map((activity) => (
+                                  <div key={activity.id} className="rounded-lg border border-white/5 bg-white/[0.02] p-3">
+                                    <div className="flex items-center gap-2">
+                                      <Clock className="w-3.5 h-3.5 text-primary" />
+                                      <span className="text-xs text-primary font-medium">{activity.time || "Horario livre"}</span>
+                                      <span className="text-sm font-medium text-foreground">{activity.title}</span>
                                     </div>
-                                    <div className="flex-1 min-w-0">
-                                      <div className="flex items-center gap-2">
-                                        <span className="text-xs text-primary font-medium">{activity.time}</span>
-                                        <span className="text-sm font-medium text-foreground">{activity.title}</span>
-                                      </div>
-                                      <p className="text-xs text-muted-foreground">{activity.description}</p>
-                                    </div>
+                                    {activity.location ? (
+                                      <p className="mt-1 text-xs text-muted-foreground">{activity.location}</p>
+                                    ) : null}
+                                    {activity.description ? (
+                                      <p className="mt-1 text-xs text-muted-foreground">{activity.description}</p>
+                                    ) : null}
                                   </div>
-                                )
-                              })}
+                                ))}
+                                {day.tips ? <p className="text-xs text-muted-foreground">Dicas: {day.tips}</p> : null}
+                              </div>
                             </div>
-                          </div>
-                        ))}
-                      </div>
-
-                      <div className="flex gap-2 pt-4 border-t border-border">
-                        <Button className="flex-1 bg-primary hover:bg-primary/90" onClick={handleSaveItinerary}>
-                          <Plus className="w-4 h-4 mr-2" />
-                          Salvar Roteiro
-                        </Button>
-                        <Button variant="outline" className="flex-1 border-border">
-                          <Edit3 className="w-4 h-4 mr-2" />
-                          Editar
-                        </Button>
-                      </div>
+                          ))}
+                        </div>
+                      )}
                     </motion.div>
                   ) : (
                     <motion.div
@@ -453,7 +571,7 @@ export default function RoteirosIAPage() {
                       <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4">
                         <Wand2 className="w-8 h-8 text-muted-foreground" />
                       </div>
-                      <p className="text-muted-foreground">Preencha os dados e clique em gerar</p>
+                      <p className="text-muted-foreground">Selecione uma viagem e gere um roteiro real</p>
                     </motion.div>
                   )}
                 </AnimatePresence>
@@ -463,56 +581,67 @@ export default function RoteirosIAPage() {
         </TabsContent>
 
         <TabsContent value="saved" className="space-y-4">
-          {safeItineraries.length === 0 ? (
+          {savedItineraries.length === 0 ? (
             <Card className="bg-card border-border">
               <CardContent className="p-12 text-center">
                 <FileText className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
                 <p className="text-muted-foreground">Nenhum roteiro salvo ainda</p>
-                <p className="text-sm text-muted-foreground/60">Gere seu primeiro roteiro com IA</p>
+                <p className="text-sm text-muted-foreground/60">Selecione uma viagem e gere seu primeiro roteiro real</p>
               </CardContent>
             </Card>
           ) : (
             <div className="grid gap-4">
-              {safeItineraries.map((itinerary) => (
+              {savedItineraries.map((itinerary) => (
                 <Card key={itinerary.id} className="bg-card border-border hover:border-primary/50 transition-colors">
                   <CardContent className="p-4">
-                    <div className="flex items-center justify-between">
+                    <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                       <div className="flex items-center gap-4">
                         <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-primary/20 to-cyan-500/20 flex items-center justify-center">
                           <FileText className="w-6 h-6 text-primary" />
                         </div>
                         <div>
                           <h3 className="font-semibold text-foreground">{itinerary.title}</h3>
-                          <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                          <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
                             <span className="flex items-center gap-1">
                               <MapPin className="w-3 h-3" />
-                              {itinerary.destination}
+                              {itinerary.tripName}
                             </span>
                             <span className="flex items-center gap-1">
                               <Clock className="w-3 h-3" />
-                              {itinerary.duration}
+                              {formatItineraryMode(itinerary.mode)}
                             </span>
                           </div>
                         </div>
                       </div>
-                      <div className="flex items-center gap-4">
-                        <Badge variant="secondary" className="bg-muted text-muted-foreground">
-                          {itinerary.style}
+
+                      <div className="flex flex-wrap items-center gap-3">
+                        <Badge
+                          variant="secondary"
+                          className={itinerary.status === "completed" ? "bg-emerald-500/10 text-emerald-300" : "bg-muted text-muted-foreground"}
+                        >
+                          {formatItineraryStatus(itinerary.status)}
                         </Badge>
-                        <p className="text-xs text-muted-foreground">
-                          Usado {itinerary.usedCount}x
-                        </p>
-                        <div className="flex gap-1">
-                          <Button size="icon" variant="ghost" className="h-8 w-8">
-                            <Copy className="w-4 h-4" />
-                          </Button>
-                          <Button size="icon" variant="ghost" className="h-8 w-8">
-                            <Edit3 className="w-4 h-4" />
-                          </Button>
-                          <Button size="icon" variant="ghost" className="h-8 w-8 text-red-400">
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </div>
+                        <Button size="sm" variant="outline" className="border-border" onClick={() => void handleOpenSavedItinerary(itinerary)}>
+                          {itinerary.mode === "simple" ? (
+                            <>
+                              <Eye className="w-4 h-4 mr-2" />
+                              Visualizar
+                            </>
+                          ) : (
+                            <>
+                              <ExternalLink className="w-4 h-4 mr-2" />
+                              Abrir
+                            </>
+                          )}
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-9 w-9 text-red-400"
+                          onClick={() => void handleDeleteSavedItinerary(itinerary.id)}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
                       </div>
                     </div>
                   </CardContent>

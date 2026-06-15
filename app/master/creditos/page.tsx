@@ -10,7 +10,6 @@ import {
   CreditCard,
   Users,
   Building2,
-  ArrowUpRight,
   Sparkles,
   Zap,
 } from "lucide-react"
@@ -24,9 +23,8 @@ import { useMaster } from "@/contexts/master-context"
 import { useAuth } from "@/contexts/auth-context"
 import { shouldUseSupabase } from "@/lib/data-source"
 import { getCreditBalance, getCreditsOverview, grantCredits, listAllCreditTransactions } from "@/lib/repositories/credits-repository"
-import { listAllClients } from "@/lib/repositories/clients-repository"
 import { formatMasterCreditTransactionDetail, formatMasterCreditTransactionLabel } from "@/lib/master/labels"
-import type { Client, CreditOwnerType, CreditTransaction } from "@/types"
+import type { CreditOwnerType, CreditTransaction } from "@/types"
 
 const fadeInUp = {
   initial: { opacity: 0, y: 20 },
@@ -45,6 +43,15 @@ const creditPackages = [
   { name: "Enterprise", credits: 200000, price: 1499, popular: false },
 ]
 
+type GrantTargetOption = {
+  id: string
+  ownerType: CreditOwnerType
+  name: string
+  description: string
+  balance: number
+  group: "agency" | "user" | "client"
+}
+
 function formatRelativeTime(dateString: string) {
   const diffMs = Date.now() - new Date(dateString).getTime()
   const diffMinutes = Math.max(Math.floor(diffMs / 60000), 0)
@@ -56,20 +63,11 @@ function formatRelativeTime(dateString: string) {
   return `${diffDays}d`
 }
 
-type GrantTargetOption = {
-  id: string
-  ownerType: CreditOwnerType
-  name: string
-  description: string
-  balance: number
-}
-
 export default function MasterCreditosPage() {
-  const { agencies, users } = useMaster()
+  const { agencies, users, clients } = useMaster()
   const { user } = useAuth()
   const isRealMode = shouldUseSupabase()
   const [transactions, setTransactions] = useState<CreditTransaction[]>([])
-  const [clients, setClients] = useState<Client[]>([])
   const [overview, setOverview] = useState({
     totalAvailable: 0,
     totalConsumed: 0,
@@ -80,7 +78,6 @@ export default function MasterCreditosPage() {
   const [grantOpen, setGrantOpen] = useState(false)
   const [grantSubmitting, setGrantSubmitting] = useState(false)
   const [grantError, setGrantError] = useState<string | null>(null)
-  const [grantSuccess, setGrantSuccess] = useState<string | null>(null)
   const [grantTargetId, setGrantTargetId] = useState("")
   const [grantAmount, setGrantAmount] = useState("100")
   const [grantReason, setGrantReason] = useState("")
@@ -93,26 +90,40 @@ export default function MasterCreditosPage() {
       name: agency.name,
       description: "Agencia",
       balance: balanceOverrides[`agency:${agency.id}`] ?? agency.creditsBalance,
+      group: "agency" as const,
     }))
 
-    const userTargets = users.map((profile) => ({
-      id: `profile:${profile.id}`,
-      ownerType: "profile" as const,
-      name: profile.name,
-      description: profile.email,
-      balance: balanceOverrides[`profile:${profile.id}`] ?? profile.creditsBalance,
-    }))
+    const userTargets = users
+      .filter((profile) => profile.type !== "agency")
+      .map((profile) => ({
+        id: `profile:${profile.id}`,
+        ownerType: "profile" as const,
+        name: profile.name,
+        description: profile.email,
+        balance: balanceOverrides[`profile:${profile.id}`] ?? profile.creditsBalance,
+        group: "user" as const,
+      }))
 
     const clientTargets = clients.map((client) => ({
       id: `client:${client.id}`,
       ownerType: "client" as const,
       name: client.name,
-      description: client.email || "Cliente da agencia",
-      balance: balanceOverrides[`client:${client.id}`] ?? client.creditsBalance ?? 0,
+      description: client.agencyName ? `Cliente de ${client.agencyName}` : "Cliente",
+      balance: balanceOverrides[`client:${client.id}`] ?? client.creditsBalance,
+      group: "client" as const,
     }))
 
     return [...agencyTargets, ...userTargets, ...clientTargets]
   }, [agencies, balanceOverrides, clients, users])
+
+  const groupedTargets = useMemo(
+    () => ({
+      agencies: grantTargets.filter((target) => target.group === "agency"),
+      users: grantTargets.filter((target) => target.group === "user"),
+      clients: grantTargets.filter((target) => target.group === "client"),
+    }),
+    [grantTargets],
+  )
 
   const selectedGrantTarget = useMemo(
     () => grantTargets.find((target) => target.id === grantTargetId) ?? null,
@@ -120,13 +131,12 @@ export default function MasterCreditosPage() {
   )
 
   const loadCredits = useCallback(async () => {
-    const [overviewResult, transactionsResult, clientsResult] = await Promise.all([
+    const [overviewResult, transactionsResult] = await Promise.all([
       getCreditsOverview(),
       listAllCreditTransactions(20),
-      listAllClients(),
     ])
 
-    setLoadError(overviewResult.error ?? transactionsResult.error ?? clientsResult.error ?? null)
+    setLoadError(overviewResult.error ?? transactionsResult.error ?? null)
     setOverview(
       overviewResult.data ?? {
         totalAvailable: 0,
@@ -136,25 +146,14 @@ export default function MasterCreditosPage() {
       },
     )
     setTransactions(transactionsResult.data ?? [])
-    setClients(clientsResult.data ?? [])
   }, [])
 
   useEffect(() => {
     if (!isRealMode) return
-
-    let mounted = true
-
-    void (async () => {
-      await loadCredits()
-      if (!mounted) return
-    })()
-
-    return () => {
-      mounted = false
-    }
+    void loadCredits()
   }, [isRealMode, loadCredits])
 
-  const topConsumers = useMemo(
+  const normalizedTopConsumers = useMemo(
     () =>
       [
         ...agencies.map((agency) => ({
@@ -162,15 +161,17 @@ export default function MasterCreditosPage() {
           type: "agency" as const,
           currentBalance: balanceOverrides[`agency:${agency.id}`] ?? agency.creditsBalance,
         })),
-        ...users.map((profile) => ({
-          name: profile.name,
-          type: "user" as const,
-          currentBalance: balanceOverrides[`profile:${profile.id}`] ?? profile.creditsBalance,
-        })),
+        ...users
+          .filter((profile) => profile.type !== "agency")
+          .map((profile) => ({
+            name: profile.name,
+            type: "user" as const,
+            currentBalance: balanceOverrides[`profile:${profile.id}`] ?? profile.creditsBalance,
+          })),
         ...clients.map((client) => ({
-          name: client.name,
+          name: client.agencyName ? `${client.name} • ${client.agencyName}` : client.name,
           type: "client" as const,
-          currentBalance: balanceOverrides[`client:${client.id}`] ?? client.creditsBalance ?? 0,
+          currentBalance: balanceOverrides[`client:${client.id}`] ?? client.creditsBalance,
         })),
       ]
         .sort((a, b) => b.currentBalance - a.currentBalance)
@@ -212,12 +213,10 @@ export default function MasterCreditosPage() {
     setGrantAmount("100")
     setGrantReason("")
     setGrantError(null)
-    setGrantSuccess(null)
   }
 
   const handleGrantCredits = async () => {
     setGrantError(null)
-    setGrantSuccess(null)
 
     if (!selectedGrantTarget) {
       setGrantError("Selecione quem vai receber os creditos.")
@@ -257,7 +256,8 @@ export default function MasterCreditosPage() {
         return
       }
 
-      const balanceResult = await getCreditBalance(selectedGrantTarget.ownerType, selectedGrantTarget.id.split(":")[1] ?? "")
+      const ownerId = selectedGrantTarget.id.split(":")[1] ?? ""
+      const balanceResult = await getCreditBalance(selectedGrantTarget.ownerType, ownerId)
       if (balanceResult.data) {
         setBalanceOverrides((current) => ({
           ...current,
@@ -266,7 +266,6 @@ export default function MasterCreditosPage() {
       }
 
       await loadCredits()
-      setGrantSuccess("Creditos enviados com sucesso.")
       setGrantOpen(false)
       resetGrantForm()
     } finally {
@@ -412,16 +411,16 @@ export default function MasterCreditosPage() {
           <Card className="border-white/5 bg-black/40 backdrop-blur-xl p-6">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-lg font-semibold text-foreground">Maior Saldo Atual</h2>
-              <span className="text-xs text-muted-foreground">profiles + agencies</span>
+              <span className="text-xs text-muted-foreground">agencias, usuarios e clientes</span>
             </div>
 
             <div className="space-y-4">
-              {topConsumers.length === 0 ? (
+              {normalizedTopConsumers.length === 0 ? (
                 <div className="rounded-xl border border-white/5 bg-white/[0.02] p-4 text-sm text-muted-foreground">
                   Nenhum saldo real disponivel ainda.
                 </div>
               ) : (
-                topConsumers.map((consumer, index) => {
+                normalizedTopConsumers.map((consumer, index) => {
                   const percentage = Math.round((consumer.currentBalance / availableBase) * 100)
                   return (
                     <div key={`${consumer.name}-${index}`} className="space-y-2">
@@ -430,8 +429,6 @@ export default function MasterCreditosPage() {
                           <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary/20 to-accent/10 border border-primary/20 flex items-center justify-center">
                             {consumer.type === "agency" ? (
                               <Building2 className="h-3.5 w-3.5 text-primary" />
-                            ) : consumer.type === "client" ? (
-                              <Users className="h-3.5 w-3.5 text-primary" />
                             ) : (
                               <Users className="h-3.5 w-3.5 text-primary" />
                             )}
@@ -484,15 +481,18 @@ export default function MasterCreditosPage() {
         </Card>
       </motion.div>
 
-      <Dialog open={grantOpen} onOpenChange={(open) => {
-        setGrantOpen(open)
-        if (!open) resetGrantForm()
-      }}>
+      <Dialog
+        open={grantOpen}
+        onOpenChange={(open) => {
+          setGrantOpen(open)
+          if (!open) resetGrantForm()
+        }}
+      >
         <DialogContent className="border-white/10 bg-card/95 backdrop-blur-xl">
           <DialogHeader>
             <DialogTitle>Enviar creditos</DialogTitle>
             <DialogDescription>
-              Conceda creditos manualmente para usuarios, agencias ou clientes.
+              Conceda creditos manualmente para agencias, usuarios individuais ou clientes.
             </DialogDescription>
           </DialogHeader>
 
@@ -505,11 +505,33 @@ export default function MasterCreditosPage() {
                 className="h-10 w-full rounded-md border border-white/10 bg-black/40 px-3 text-sm text-foreground"
               >
                 <option value="">Selecione uma entidade</option>
-                {grantTargets.map((target) => (
-                  <option key={target.id} value={target.id}>
-                    {target.name} • {target.description}
-                  </option>
-                ))}
+                {groupedTargets.agencies.length > 0 ? (
+                  <optgroup label="Agencias">
+                    {groupedTargets.agencies.map((target) => (
+                      <option key={target.id} value={target.id}>
+                        {target.name} • {target.description}
+                      </option>
+                    ))}
+                  </optgroup>
+                ) : null}
+                {groupedTargets.users.length > 0 ? (
+                  <optgroup label="Usuarios">
+                    {groupedTargets.users.map((target) => (
+                      <option key={target.id} value={target.id}>
+                        {target.name} • {target.description}
+                      </option>
+                    ))}
+                  </optgroup>
+                ) : null}
+                {groupedTargets.clients.length > 0 ? (
+                  <optgroup label="Clientes">
+                    {groupedTargets.clients.map((target) => (
+                      <option key={target.id} value={target.id}>
+                        {target.name} • {target.description}
+                      </option>
+                    ))}
+                  </optgroup>
+                ) : null}
               </select>
               {selectedGrantTarget ? (
                 <p className="text-xs text-muted-foreground">
@@ -542,9 +564,6 @@ export default function MasterCreditosPage() {
 
             {grantError ? (
               <div className="rounded-xl border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-300">{grantError}</div>
-            ) : null}
-            {grantSuccess ? (
-              <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-3 text-sm text-emerald-300">{grantSuccess}</div>
             ) : null}
           </div>
 
