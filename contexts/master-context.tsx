@@ -343,6 +343,21 @@ function resolveConciergePriority(createdAt: string, hasResponse: boolean): Conc
   return "low"
 }
 
+function isActiveMasterClient(status: "active" | "inactive" | "archived" | null | undefined) {
+  return status == null || status === "active"
+}
+
+function sanitizeMasterState(state: MasterState): MasterState {
+  return {
+    ...state,
+    clients: state.clients,
+    stats: {
+      ...state.stats,
+      totalClients: state.clients.length,
+    },
+  }
+}
+
 function buildMasterState(data: {
   profiles: Awaited<ReturnType<typeof listProfiles>>["data"]
   agencies: Awaited<ReturnType<typeof listAgencies>>["data"]
@@ -358,7 +373,7 @@ function buildMasterState(data: {
   const profiles = data.profiles ?? []
   const agenciesData = data.agencies ?? []
   const agencyMembers = data.agencyMembers ?? []
-  const clients = data.clients ?? []
+  const clients = (data.clients ?? []).filter((client) => isActiveMasterClient(client.status))
   const tripsData = data.trips ?? []
   const documents = data.documents ?? []
   const conversations = data.conversations ?? []
@@ -639,7 +654,7 @@ export function MasterProvider({ children }: { children: ReactNode }) {
           const raw = window.sessionStorage.getItem(MASTER_CACHE_KEY)
           if (raw) {
             const parsed = JSON.parse(raw) as { state: MasterState; notifications: Notification[]; dataErrors: typeof EMPTY_DATA_ERRORS }
-            setState(parsed.state)
+            setState(sanitizeMasterState(parsed.state))
             setNotifications(parsed.notifications)
             setDataErrors(parsed.dataErrors)
             setLoadingState(false)

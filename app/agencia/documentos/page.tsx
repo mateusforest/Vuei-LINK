@@ -84,6 +84,7 @@ export default function DocumentsPage() {
     tripId: "",
     isPrivate: false
   })
+  const activeClients = clients.filter((client) => client.status === "active")
 
   const filteredDocs = documents.filter((doc) => {
     const client = doc.clientId ? getClientById(doc.clientId) : null
@@ -496,7 +497,7 @@ export default function DocumentsPage() {
                 style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='rgba(255,255,255,0.4)'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center', backgroundSize: '16px' }}
               >
                 <option value="" className="bg-[#0a0a0a]">Selecionar cliente</option>
-                {clients.map(c => (
+                {activeClients.map(c => (
                   <option key={c.id} value={c.id} className="bg-[#0a0a0a]">{c.name}</option>
                 ))}
               </select>

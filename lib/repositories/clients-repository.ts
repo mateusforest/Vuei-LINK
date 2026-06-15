@@ -9,6 +9,10 @@ import { listTripsByAgency } from "@/lib/repositories/trips-repository"
 
 const ACTIVE_CLIENT_TRIP_STATUSES = ["draft", "upcoming", "ongoing"] as const
 
+function isClientActiveStatus(status: Client["status"] | Database["public"]["Tables"]["clients"]["Row"]["status"] | null | undefined) {
+  return status == null || status === "active"
+}
+
 export interface ClientWithTrips extends Client {
   trips: Trip[]
 }
@@ -34,7 +38,9 @@ function writeClientsState(state: AgencyLocalState) {
 }
 
 function getClients(agencyId: string | null) {
-  return (readClientsState().clients ?? []).map((client) => mapLegacyClientToClient(client, agencyId))
+  return (readClientsState().clients ?? [])
+    .map((client) => mapLegacyClientToClient(client, agencyId))
+    .filter((client) => isClientActiveStatus(client.status))
 }
 
 function mapClientRowToClient(row: Database["public"]["Tables"]["clients"]["Row"]): Client {
@@ -57,7 +63,12 @@ export async function listClients(agencyId: string) {
   if (shouldUseSupabase()) {
     const client = createSupabaseBrowserClient()
     if (client) {
-      const { data, error } = await client.from("clients").select("*").eq("agency_id", agencyId).order("created_at", { ascending: false })
+      const { data, error } = await client
+        .from("clients")
+        .select("*")
+        .eq("agency_id", agencyId)
+        .or("status.is.null,status.eq.active")
+        .order("created_at", { ascending: false })
       if (error) {
         console.error("[AUTH ERROR]", error.message)
         return {
@@ -91,7 +102,11 @@ export async function listAllClients() {
   if (shouldUseSupabase()) {
     const client = createSupabaseBrowserClient()
     if (client) {
-      const { data, error } = await client.from("clients").select("*").order("created_at", { ascending: false })
+      const { data, error } = await client
+        .from("clients")
+        .select("*")
+        .or("status.is.null,status.eq.active")
+        .order("created_at", { ascending: false })
       if (error) {
         console.error("[AUTH ERROR]", error.message)
         return {
@@ -398,7 +413,12 @@ export async function listClientsWithTrips(agencyId: string) {
     const client = createSupabaseBrowserClient()
     if (client) {
       const [{ data: clientsData, error: clientsError }, agencyTripsResult] = await Promise.all([
-        client.from("clients").select("*").eq("agency_id", agencyId).order("created_at", { ascending: false }),
+        client
+          .from("clients")
+          .select("*")
+          .eq("agency_id", agencyId)
+          .or("status.is.null,status.eq.active")
+          .order("created_at", { ascending: false }),
         listTripsByAgency(agencyId),
       ])
 

@@ -264,6 +264,10 @@ function parseDestination(destination: string): { city: string; country: string 
   return { city: destination, country: "" }
 }
 
+function isVisibleAgencyClient(client: Pick<Client, "status"> | null | undefined) {
+  return !client || client.status === "active"
+}
+
 function sanitizeFileName(name: string) {
   return name
     .normalize("NFD")
@@ -496,7 +500,7 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
 
       setAgency(parsed.agency)
       setAgencyId(parsed.agencyId)
-      setClients(parsed.clients)
+      setClients(parsed.clients.filter((client) => isVisibleAgencyClient(client)))
       setTrips(parsed.trips)
       setDocuments(parsed.documents)
       setConciergeRequests(parsed.conciergeRequests)
@@ -545,20 +549,24 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
     )
 
     if (stored.clients.length > 0) {
-      setClients(stored.clients.map((client) => {
-        const mapped = mapLegacyClientToClient(client)
-        return {
-          id: mapped.id,
-          name: mapped.name,
-          email: mapped.email || "",
-          phone: mapped.phone || "",
-          document: mapped.document || undefined,
-          notes: mapped.notes || undefined,
-          status: mapped.status === "inactive" ? "inactive" : "active",
-          createdAt: mapped.createdAt,
-          updatedAt: mapped.updatedAt,
-        }
-      }))
+      setClients(
+        stored.clients
+          .map((client) => {
+            const mapped = mapLegacyClientToClient(client)
+            return {
+              id: mapped.id,
+              name: mapped.name,
+              email: mapped.email || "",
+              phone: mapped.phone || "",
+              document: mapped.document || undefined,
+              notes: mapped.notes || undefined,
+              status: mapped.status === "inactive" ? "inactive" : mapped.status === "archived" ? "archived" : "active",
+              createdAt: mapped.createdAt,
+              updatedAt: mapped.updatedAt,
+            } satisfies Client
+          })
+          .filter((client) => isVisibleAgencyClient(client))
+      )
     }
 
     if (stored.trips.length > 0) {
@@ -685,17 +693,19 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
         listAgencyMembers(resolvedAgency.id),
       ])
 
-      const mappedClients: Client[] = (clientsResult.data ?? []).map((client) => ({
-        id: client.id,
-        name: client.name,
-        email: client.email ?? "",
-        phone: client.phone ?? "",
-        document: client.document ?? undefined,
-        notes: client.notes ?? undefined,
-        status: client.status === "inactive" || client.status === "archived" ? client.status : "active",
-        createdAt: client.createdAt,
-        updatedAt: client.updatedAt,
-      }))
+      const mappedClients: Client[] = (clientsResult.data ?? [])
+        .map((client) => ({
+          id: client.id,
+          name: client.name,
+          email: client.email ?? "",
+          phone: client.phone ?? "",
+          document: client.document ?? undefined,
+          notes: client.notes ?? undefined,
+          status: client.status === "inactive" || client.status === "archived" ? client.status : "active",
+          createdAt: client.createdAt,
+          updatedAt: client.updatedAt,
+        }))
+        .filter((client) => isVisibleAgencyClient(client))
 
       const tripClientNameMap = new Map(mappedClients.map((client) => [client.id, client.name]))
       const canonicalTrips = tripsResult.data ?? []
