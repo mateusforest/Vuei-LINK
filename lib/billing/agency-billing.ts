@@ -1,10 +1,37 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 import type { Database } from "@/lib/supabase/types"
-import type { AgencyBillingStatusSummary, AgencyCommercialPlanCode, AgencySubscriptionStatus } from "@/types"
+import type { AgencyBillingStatusSummary, AgencyCommercialPlanCode, AgencySubscriptionStatus, CreditTransaction } from "@/types"
 import { AGENCY_PLAN_DEFINITIONS, normalizeAgencyCommercialPlanCode } from "@/lib/billing/agency-plans"
 
 type SupabaseDbClient = SupabaseClient<Database>
 type AgencySubscriptionRow = Database["public"]["Tables"]["agency_subscriptions"]["Row"]
+
+export function resolveAgencyAvailableCredits(params: {
+  persistedBalance: number | null | undefined
+  planMonthlyCredits: number
+  transactions?: Array<Pick<CreditTransaction, "amount"> | { amount: number | null }>
+}) {
+  const persistedBalance = Math.max(params.persistedBalance ?? 0, 0)
+  const transactions = params.transactions ?? []
+
+  if (persistedBalance > 0) {
+    return persistedBalance
+  }
+
+  if (transactions.length === 0) {
+    return params.planMonthlyCredits
+  }
+
+  const additionalCredits = transactions.reduce((sum, transaction) => {
+    return transaction.amount && transaction.amount > 0 ? sum + transaction.amount : sum
+  }, 0)
+
+  const consumedCredits = transactions.reduce((sum, transaction) => {
+    return transaction.amount && transaction.amount < 0 ? sum + Math.abs(transaction.amount) : sum
+  }, 0)
+
+  return Math.max(params.planMonthlyCredits + additionalCredits - consumedCredits, 0)
+}
 
 function buildAgencyBillingStatus(
   agencyId: string | null,

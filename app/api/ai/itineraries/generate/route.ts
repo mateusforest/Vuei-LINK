@@ -11,6 +11,7 @@ import { getDestinationCoverImage, getDestinationMetadata } from "@/lib/trip-des
 import type { Document } from "@/types/document"
 import type { TripItineraryRecord, TripItineraryContent } from "@/types/itinerary"
 import { consumeTravelerCredits, getTravelerCreditBalance } from "@/lib/billing/traveler-billing"
+import { getAgencyBillingStatusForClient, resolveAgencyAvailableCredits } from "@/lib/billing/agency-billing"
 
 export const runtime = "nodejs"
 export const maxDuration = 60
@@ -179,12 +180,36 @@ async function getCreditsBalance(
   }
 
   if (ownerType === "agency") {
-    const { data, error } = await client.from("agencies").select("credits_balance").eq("id", ownerId).maybeSingle()
-    return { balance: data?.credits_balance ?? 0, error: error?.message ?? null, currentPlan: "premium" as const }
+    const [billingStatusResult, balanceResult, transactionsResult] = await Promise.all([
+      getAgencyBillingStatusForClient(client, ownerId),
+      client.from("agencies").select("credits_balance").eq("id", ownerId).maybeSingle(),
+      (client.from("credit_transactions" as any) as any)
+        .select("amount")
+        .eq("owner_type", "agency")
+        .eq("agency_id", ownerId),
+    ])
+
+    const firstError = billingStatusResult.error || balanceResult.error?.message || transactionsResult.error?.message || null
+    if (firstError) {
+      return { balance: 0, error: firstError, currentPlan: "free" as const }
+    }
+
+    const agencyBalanceRow = balanceResult.data as { credits_balance?: number | null } | null
+
+    return {
+      balance: resolveAgencyAvailableCredits({
+        persistedBalance: agencyBalanceRow?.credits_balance ?? 0,
+        planMonthlyCredits: billingStatusResult.data?.monthlyCredits ?? 0,
+        transactions: transactionsResult.data ?? [],
+      }),
+      error: null,
+      currentPlan: billingStatusResult.data?.planCode ?? "free",
+    }
   }
 
   const { data, error } = await client.from("profiles").select("credits_balance").eq("id", ownerId).maybeSingle()
-  return { balance: data?.credits_balance ?? 0, error: error?.message ?? null, currentPlan: "free" as const }
+  const profileBalanceRow = data as { credits_balance?: number | null } | null
+  return { balance: profileBalanceRow?.credits_balance ?? 0, error: error?.message ?? null, currentPlan: "free" as const }
 }
 
 function buildTravelerName(params: { trip: TripRow; ownerProfile: ProfileRow | null; client: ClientRow | null }) {

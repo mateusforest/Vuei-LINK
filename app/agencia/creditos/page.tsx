@@ -1,6 +1,5 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { motion } from "framer-motion"
 import { Coins, TrendingUp, Clock, Crown, ChevronRight, Gift } from "lucide-react"
@@ -9,9 +8,6 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { useAgency } from "@/contexts/agency-context"
-import { shouldUseSupabase } from "@/lib/data-source"
-import { getCreditBalance, listCreditTransactions } from "@/lib/repositories/credits-repository"
-import type { CreditTransaction } from "@/types"
 
 const fadeInUp = {
   initial: { opacity: 0, y: 20 },
@@ -20,54 +16,11 @@ const fadeInUp = {
 }
 
 export default function AgencyCreditsPage() {
-  const { agencyId, credits, subscription } = useAgency()
-  const isRealMode = shouldUseSupabase()
-  const [realBalance, setRealBalance] = useState<number | null>(null)
-  const [realHistory, setRealHistory] = useState<CreditTransaction[]>([])
-  const [loadError, setLoadError] = useState<string | null>(null)
+  const { credits, subscription } = useAgency()
 
-  useEffect(() => {
-    if (!isRealMode || !agencyId) return
-
-    let mounted = true
-
-    const loadCredits = async () => {
-      const [balanceResult, historyResult] = await Promise.all([
-        getCreditBalance("agency", agencyId),
-        listCreditTransactions("agency", agencyId),
-      ])
-
-      if (!mounted) return
-
-      setLoadError(balanceResult.error ?? historyResult.error ?? null)
-      setRealBalance(balanceResult.data?.balance ?? 0)
-      setRealHistory(historyResult.data ?? [])
-    }
-
-    void loadCredits()
-
-    return () => {
-      mounted = false
-    }
-  }, [agencyId, isRealMode])
-
-  const effectiveBalance = isRealMode ? (realBalance ?? 0) : credits.balance
-  const effectiveHistory = useMemo(
-    () =>
-      isRealMode
-        ? realHistory.map((transaction) => ({
-            action: transaction.reason || transaction.type,
-            amount: transaction.amount,
-            date: transaction.createdAt,
-            source: transaction.source || "Supabase",
-          }))
-        : credits.history,
-    [credits.history, isRealMode, realHistory],
-  )
-
-  const grantedCredits = effectiveHistory.reduce((sum, item) => (item.amount > 0 ? sum + item.amount : sum), 0)
-  const usedCredits = effectiveHistory.reduce((sum, item) => (item.amount < 0 ? sum + Math.abs(item.amount) : sum), 0)
-  const usageBase = Math.max(grantedCredits, effectiveBalance + usedCredits, subscription.definition.monthlyCredits, 1)
+  const grantedCredits = credits.history.reduce((sum, item) => (item.amount > 0 ? sum + item.amount : sum), 0)
+  const usedCredits = credits.history.reduce((sum, item) => (item.amount < 0 ? sum + Math.abs(item.amount) : sum), 0)
+  const usageBase = Math.max(grantedCredits, credits.balance + usedCredits, subscription.definition.monthlyCredits, 1)
   const usagePercentage = (usedCredits / usageBase) * 100
 
   const formatDate = (dateStr: string) => {
@@ -104,7 +57,7 @@ export default function AgencyCreditsPage() {
                 Saldo disponivel
               </div>
               <div className="flex items-baseline gap-3">
-                <span className="text-5xl font-bold vuei-gradient-text">{effectiveBalance}</span>
+                <span className="text-5xl font-bold vuei-gradient-text">{credits.balance}</span>
                 <span className="text-muted-foreground">creditos</span>
               </div>
               <div className="space-y-1 text-sm text-muted-foreground">
@@ -125,20 +78,12 @@ export default function AgencyCreditsPage() {
               </div>
               <Progress value={usagePercentage} className="h-2 w-full lg:w-52" />
               <p className="text-xs text-muted-foreground">
-                Sem compra real nesta etapa. O plano da agencia prepara a arquitetura para futura integracao Stripe.
+                O saldo considera os creditos mensais do plano atual mais creditos adicionais, menos o consumo real registrado.
               </p>
             </div>
           </div>
         </Card>
       </motion.div>
-
-      {loadError ? (
-        <motion.div {...fadeInUp}>
-          <Card className="border-red-500/20 bg-red-500/10 p-4 text-sm text-red-300">
-            {loadError}
-          </Card>
-        </motion.div>
-      ) : null}
 
       <motion.div {...fadeInUp}>
         <Card className="border-amber-500/20 bg-gradient-to-r from-amber-500/10 to-amber-600/10 p-6">
@@ -146,7 +91,7 @@ export default function AgencyCreditsPage() {
             <div>
               <h2 className="text-lg font-semibold">Planos, limites e pacotes extras</h2>
               <p className="text-sm text-muted-foreground">
-                Compare Start, Pro e Business, veja a capacidade operacional e os pacotes de creditos extras.
+                Compare Free, Start, Pro e Business e acompanhe a capacidade operacional da sua agencia.
               </p>
             </div>
             <Button asChild className="rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 text-black font-semibold">
@@ -164,10 +109,10 @@ export default function AgencyCreditsPage() {
           <h2 className="font-semibold">Historico de consumo</h2>
         </div>
         <Card className="divide-y divide-border/50 border-border/50 bg-card/50 vuei-glass">
-          {effectiveHistory.length === 0 ? (
+          {credits.history.length === 0 ? (
             <div className="p-4 text-sm text-muted-foreground">Nenhum consumo de creditos registrado ainda.</div>
           ) : (
-            effectiveHistory.slice(0, 8).map((item, index) => (
+            credits.history.slice(0, 8).map((item, index) => (
               <div key={`${item.action}-${index}`} className="flex items-center gap-4 p-4">
                 <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${item.amount > 0 ? "bg-green-500/20" : "bg-muted/50"}`}>
                   <Clock size={16} className={item.amount > 0 ? "text-green-400" : "text-muted-foreground"} />

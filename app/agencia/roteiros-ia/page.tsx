@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
+import Link from "next/link"
 import { motion, AnimatePresence } from "framer-motion"
 import {
   Sparkles,
@@ -36,6 +37,7 @@ import { shouldUseSupabase } from "@/lib/data-source"
 import type { Document, TripItineraryRecord } from "@/types"
 import { deleteTripItinerary, listTripItineraries, requestAiItineraryGeneration } from "@/lib/repositories/trip-itineraries-repository"
 import { getSignedDocumentUrl, listDocumentsByTrip } from "@/lib/repositories/documents-repository"
+import { getAiCreditCost } from "@/lib/ai/credit-costs"
 
 type PreviewState = {
   itinerary: TripItineraryRecord
@@ -99,6 +101,7 @@ export default function RoteirosIAPage() {
   const [tripDocuments, setTripDocuments] = useState<Record<string, Document[]>>({})
   const [loadError, setLoadError] = useState<string | null>(null)
   const [generatedMessage, setGeneratedMessage] = useState<string | null>(null)
+  const [insufficientCreditsNotice, setInsufficientCreditsNotice] = useState(false)
   const [formData, setFormData] = useState({
     destination: "",
     duration: "",
@@ -210,6 +213,11 @@ export default function RoteirosIAPage() {
     void loadSavedItineraries()
   }, [loadSavedItineraries])
 
+  const showInsufficientCredits = useCallback(() => {
+    setLoadError(null)
+    setInsufficientCreditsNotice(true)
+  }, [])
+
   const handleGenerate = async (mode: "simple" | "complete_pdf") => {
     if (!selectedTrip) {
       setLoadError("Selecione uma viagem antes de gerar o roteiro.")
@@ -221,9 +229,19 @@ export default function RoteirosIAPage() {
       return
     }
 
+    const creditCost = mode === "simple"
+      ? getAiCreditCost("itinerary_generation_simple")
+      : getAiCreditCost("itinerary_generation_complete")
+
+    if (credits.balance < creditCost) {
+      showInsufficientCredits()
+      return
+    }
+
     setIsGenerating(true)
     setLoadError(null)
     setGeneratedMessage(null)
+    setInsufficientCreditsNotice(false)
 
     try {
       const result = await requestAiItineraryGeneration({
@@ -233,6 +251,12 @@ export default function RoteirosIAPage() {
       })
 
       if (!result.data?.itinerary) {
+        const normalizedError = (result.error ?? "").toLowerCase()
+        if (normalizedError.includes("premium") || normalizedError.includes("saldo insuficiente")) {
+          showInsufficientCredits()
+          return
+        }
+
         setLoadError(result.error ?? "Nao foi possivel gerar o roteiro.")
         return
       }
@@ -323,6 +347,22 @@ export default function RoteirosIAPage() {
       {loadError ? (
         <Card className="bg-red-500/10 border-red-500/20">
           <CardContent className="p-4 text-sm text-red-300">{loadError}</CardContent>
+        </Card>
+      ) : null}
+
+      {insufficientCreditsNotice ? (
+        <Card className="border-amber-500/20 bg-amber-500/10">
+          <CardContent className="flex flex-col gap-4 p-4">
+            <div>
+              <p className="text-sm font-semibold text-amber-200">Creditos insuficientes</p>
+              <p className="mt-1 text-sm text-amber-100/80">
+                Voce nao possui creditos suficientes para gerar este roteiro. Veja os planos e pacotes de creditos da agencia.
+              </p>
+            </div>
+            <Button asChild className="w-full sm:w-fit bg-gradient-to-r from-primary to-accent text-white">
+              <Link href="/agencia/planos">Ver planos</Link>
+            </Button>
+          </CardContent>
         </Card>
       ) : null}
 

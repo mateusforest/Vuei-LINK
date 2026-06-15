@@ -18,6 +18,7 @@ import { mapCreditHistoryToTransactions, mapLegacyCreditsToCreditBalance } from 
 import { buildAdminTripUrl, buildPublicTripUrl } from "@/lib/security/link-tokens"
 import { useAuth } from "@/contexts/auth-context"
 import { shouldUseSupabase } from "@/lib/data-source"
+import { listCreditTransactions } from "@/lib/repositories/credits-repository"
 import { createClient as createClientRecord, deleteClient as deleteClientRecord, listClients, updateClient as updateClientRecord } from "@/lib/repositories/clients-repository"
 import { addAgencyMember as addAgencyMemberRecord, getAgencyById, getAgencyByOwner, listAgencyMembers, updateAgencyMember as updateAgencyMemberRecord } from "@/lib/repositories/agencies-repository"
 import {
@@ -45,6 +46,7 @@ import {
   isAgencyActiveTripStatus,
   resolveAgencyPlanSnapshot,
 } from "@/lib/billing/agency-plans"
+import { resolveAgencyAvailableCredits } from "@/lib/billing/agency-billing"
 import { getAgencyBillingStatus, setAgencyPlanSelection } from "@/lib/repositories/agency-billing-repository"
 
 export interface Client extends Pick<CanonicalClient, "id" | "name"> {
@@ -692,7 +694,10 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
         listDocuments({ agencyId: resolvedAgency.id }),
         listAgencyMembers(resolvedAgency.id),
       ])
-      const billingStatusResult = await getAgencyBillingStatus(resolvedAgency.id)
+      const [billingStatusResult, creditTransactionsResult] = await Promise.all([
+        getAgencyBillingStatus(resolvedAgency.id),
+        listCreditTransactions("agency", resolvedAgency.id),
+      ])
 
       const mappedClients: Client[] = (clientsResult.data ?? [])
         .map((client) => {
@@ -737,18 +742,27 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
         createdAt: member.createdAt,
       }))
 
-      const history =
-        resolvedAgency.creditsBalance > 0
-          ? [{ action: "Saldo da agencia", amount: resolvedAgency.creditsBalance, date: new Date().toISOString(), source: "Supabase" }]
-          : []
       const resolvedSubscription = resolveAgencyPlanSnapshot({
         agency: resolvedAgency,
         billingStatus: billingStatusResult.data ?? null,
       })
+      const resolvedCreditTransactions = creditTransactionsResult.data ?? []
+      const resolvedCreditsBalance = resolveAgencyAvailableCredits({
+        persistedBalance: resolvedAgency.creditsBalance,
+        planMonthlyCredits: resolvedSubscription.definition.monthlyCredits,
+        transactions: resolvedCreditTransactions,
+      })
+      const history = resolvedCreditTransactions.map((transaction) => ({
+        action: transaction.reason || transaction.type,
+        amount: transaction.amount,
+        date: transaction.createdAt,
+        source: transaction.source || "Supabase",
+      }))
 
       const primaryWorkspaceError =
         agencyResult.error ||
         billingStatusResult.error ||
+        creditTransactionsResult.error ||
         clientsResult.error ||
         tripsResult.error ||
         documentsResult.error ||
@@ -764,7 +778,7 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
       setDocuments(mappedDocuments)
       setTeamMembers(mappedTeamMembers)
       setActivities([])
-      setCredits(buildAgencyCredits(resolvedAgency.creditsBalance, resolvedSubscription.code, history))
+      setCredits(buildAgencyCredits(resolvedCreditsBalance, resolvedSubscription.code, history))
       setSubscription(resolvedSubscription)
 
       persistWorkspaceCache(workspaceKey, {
@@ -775,7 +789,7 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
         documents: mappedDocuments,
         conciergeRequests: [],
         teamMembers: mappedTeamMembers,
-        credits: buildAgencyCredits(resolvedAgency.creditsBalance, resolvedSubscription.code, history),
+        credits: buildAgencyCredits(resolvedCreditsBalance, resolvedSubscription.code, history),
         subscription: resolvedSubscription,
         workspaceError: primaryWorkspaceError,
       })
