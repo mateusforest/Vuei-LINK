@@ -324,6 +324,7 @@ export async function POST(request: Request) {
   }
 
   let actingUserId: string | null = null
+  let actingProfile: ProfileRow | null = null
   let accessResult: Awaited<ReturnType<typeof getAccessibleTrip>> | Awaited<ReturnType<typeof getTripByAdminAccess>>
 
   if (adminAccessRequested) {
@@ -343,6 +344,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: profileResult.error ?? "Perfil do usuario nao encontrado." }, { status: 403 })
     }
 
+    actingProfile = profileResult.data
     accessResult = await getAccessibleTrip(supabase, authData.user.id, tripId, profileResult.data)
     actingUserId = authData.user.id
   }
@@ -392,7 +394,7 @@ export async function POST(request: Request) {
     supabase.from("trip_flights").select("*").eq("trip_id", accessResult.trip.id).order("departure_at", { ascending: true, nullsFirst: false }),
     accessResult.trip.agency_id ? supabase.from("agencies").select("id, name, branding, logo_url, settings").eq("id", accessResult.trip.agency_id).maybeSingle() : Promise.resolve({ data: null, error: null }),
     accessResult.trip.client_id ? supabase.from("clients").select("id, name, email, phone").eq("id", accessResult.trip.client_id).maybeSingle() : Promise.resolve({ data: null, error: null }),
-    accessResult.trip.owner_user_id ? supabase.from("profiles").select("id, name, email, phone").eq("id", accessResult.trip.owner_user_id).maybeSingle() : Promise.resolve({ data: null, error: null }),
+    accessResult.trip.owner_user_id ? supabase.from("profiles").select("id, role, name, email, phone").eq("id", accessResult.trip.owner_user_id).maybeSingle() : Promise.resolve({ data: null, error: null }),
   ])
 
   const context = buildTripContext({
@@ -521,7 +523,7 @@ export async function POST(request: Request) {
       travelersLabel: `${accessResult.trip.travelers_count} pessoa(s)`,
       travelerName: buildTravelerName({
         trip: accessResult.trip,
-        ownerProfile: (profileResult.data?.id === accessResult.trip.owner_user_id ? profileResult.data : ownerProfileResult.data) as ProfileRow | null,
+        ownerProfile: (actingProfile?.id === accessResult.trip.owner_user_id ? actingProfile : ownerProfileResult.data) as ProfileRow | null,
         client: (clientResult.data as ClientRow | null) ?? null,
       }),
       tripSummary: aiResult.data.summary,
@@ -537,7 +539,12 @@ export async function POST(request: Request) {
           (typeof branding.linkLogoUrl === "string" && branding.linkLogoUrl) ||
           agencyResult.data?.logo_url ||
           null,
-        consultantName: profileResult.data?.role === "agency_owner" || profileResult.data?.role === "agency_member" ? profileResult.data?.name ?? null : null,
+        consultantName:
+          actingProfile?.role === "agency_owner" || actingProfile?.role === "agency_member"
+            ? actingProfile?.name ?? null
+            : ownerProfileResult.data?.role === "agency_owner" || ownerProfileResult.data?.role === "agency_member"
+              ? ownerProfileResult.data?.name ?? null
+              : null,
         contactEmail: typeof agencySettings.email === "string" ? agencySettings.email : null,
         contactPhone: typeof agencySettings.phone === "string" ? agencySettings.phone : null,
         website: typeof agencySettings.website === "string" ? agencySettings.website : null,

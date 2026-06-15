@@ -18,7 +18,7 @@ export function RouteGuard({
   const router = useRouter()
   const pathname = usePathname()
   const { user, profile, loading, initialized } = useAuth()
-  const resolvedRole = profile?.role ?? (typeof user?.user_metadata?.role === "string" ? (user.user_metadata.role as UserRole) : null)
+  const resolvedRole = profile?.role ?? null
   const resolvedProfile = resolvedRole ? { role: resolvedRole } : null
 
   useEffect(() => {

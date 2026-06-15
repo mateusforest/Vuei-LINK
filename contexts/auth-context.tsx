@@ -159,7 +159,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         if (!mounted || bootstrapRunRef.current !== currentRun) return
 
-        await syncAuthState(sessionResult.data.session ?? null, { deferProfile: true })
+        await syncAuthState(sessionResult.data.session ?? null)
       } catch (error) {
         const message = error instanceof Error ? error.message : "Falha ao inicializar sessao."
         console.error("[AUTH ERROR]", message)
@@ -185,12 +185,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } = supabase.auth.onAuthStateChange(async (_event, nextSession) => {
       if (!mounted) return
 
-      setSession(nextSession ?? null)
-      setUser(nextSession?.user ?? null)
-      setLoading(false)
-      setInitialized(true)
+      setLoading(true)
+      setInitialized(false)
 
-      void syncAuthState(nextSession ?? null)
+      try {
+        await syncAuthState(nextSession ?? null)
+      } finally {
+        if (!mounted) return
+        setLoading(false)
+        setInitialized(true)
+      }
     })
 
     return () => {

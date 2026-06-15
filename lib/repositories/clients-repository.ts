@@ -298,30 +298,69 @@ export async function deleteClient(id: string) {
   if (shouldUseSupabase()) {
     const client = createSupabaseBrowserClient()
     if (client) {
-      const { data: linkedTrips, error: linkedTripsError } = await client
+      const { data: activeLinkedTrips, error: activeLinkedTripsError } = await client
         .from("trips")
         .select("id, title, status")
         .eq("client_id", id)
         .in("status", [...ACTIVE_CLIENT_TRIP_STATUSES])
         .limit(5)
 
-      if (linkedTripsError) {
-        console.error("[AUTH ERROR]", linkedTripsError.message)
+      if (activeLinkedTripsError) {
+        console.error("[AUTH ERROR]", activeLinkedTripsError.message)
         return {
           source: "supabase" as const,
           config: createSupabaseBrowserClientPlaceholder(),
           success: false,
-          error: linkedTripsError.message,
+          error: activeLinkedTripsError.message,
         }
       }
 
-      if ((linkedTrips ?? []).length > 0) {
+      if ((activeLinkedTrips ?? []).length > 0) {
         return {
           source: "supabase" as const,
           config: createSupabaseBrowserClientPlaceholder(),
           success: false,
           error: "Este cliente possui viagens vinculadas e nao pode ser excluido agora.",
         }
+      }
+
+      const { data: historicalTrip, error: historicalTripError } = await client
+        .from("trips")
+        .select("id")
+        .eq("client_id", id)
+        .limit(1)
+        .maybeSingle()
+
+      if (historicalTripError) {
+        console.error("[AUTH ERROR]", historicalTripError.message)
+        return {
+          source: "supabase" as const,
+          config: createSupabaseBrowserClientPlaceholder(),
+          success: false,
+          error: historicalTripError.message,
+        }
+      }
+
+      if (historicalTrip?.id) {
+        const { error: archiveError } = await client
+          .from("clients")
+          .update({
+            status: "archived",
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", id)
+
+        if (archiveError) {
+          console.error("[AUTH ERROR]", archiveError.message)
+          return {
+            source: "supabase" as const,
+            config: createSupabaseBrowserClientPlaceholder(),
+            success: false,
+            error: archiveError.message,
+          }
+        }
+
+        return { source: "supabase" as const, config: createSupabaseBrowserClientPlaceholder(), success: true, error: null }
       }
 
       const { error } = await client.from("clients").delete().eq("id", id)

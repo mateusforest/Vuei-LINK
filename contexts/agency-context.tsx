@@ -45,7 +45,7 @@ export interface Client extends Pick<CanonicalClient, "id" | "name"> {
   phone: string
   document?: string
   notes?: string
-  status: "active" | "inactive"
+  status: "active" | "inactive" | "archived"
   createdAt: string
   updatedAt?: string
 }
@@ -684,7 +684,7 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
         phone: client.phone ?? "",
         document: client.document ?? undefined,
         notes: client.notes ?? undefined,
-        status: client.status === "inactive" ? "inactive" : "active",
+        status: client.status === "inactive" || client.status === "archived" ? client.status : "active",
         createdAt: client.createdAt,
         updatedAt: client.updatedAt,
       }))

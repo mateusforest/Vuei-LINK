@@ -249,7 +249,9 @@ export default function ClientsPage() {
   const [editClient, setEditClient] = useState<Client | null>(null)
   const [profileClient, setProfileClient] = useState<Client | null>(null)
 
+  const visibleClients = clients.filter((client) => client.status !== "archived")
   const filteredClients = clients.filter((client) => {
+    if (client.status === "archived") return false
     const matchesSearch = client.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
                          client.email.toLowerCase().includes(searchQuery.toLowerCase())
     const matchesFilter = filter === "all" || client.status === filter
@@ -325,7 +327,7 @@ export default function ClientsPage() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Clientes</h1>
-          <p className="mt-1 text-muted-foreground">{clients.length} clientes cadastrados</p>
+          <p className="mt-1 text-muted-foreground">{visibleClients.length} clientes cadastrados</p>
         </div>
         <Button 
           onClick={() => setNewClientOpen(true)}
