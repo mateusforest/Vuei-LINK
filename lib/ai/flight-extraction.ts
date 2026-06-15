@@ -221,7 +221,7 @@ export async function requestFlightExtraction({ documentName, mimeType, signedUr
         {
           role: "system",
           content:
-            "Voce extrai dados de passagens aereas sem inventar informacoes. Responda apenas com JSON valido. Marque is_ticket=false quando a imagem nao parecer uma passagem aerea real. Preencha campos ausentes com null. So retorne departure_at e arrival_at em RFC3339 com timezone quando a data e horario estiverem claramente visiveis; caso contrario, deixe null e use raw_departure_text/raw_arrival_text quando houver texto parcial.",
+            "Voce extrai dados de passagens aereas sem inventar informacoes. Responda apenas com JSON valido. Marque is_ticket=false quando a imagem nao parecer uma passagem aerea real. Preencha campos ausentes com null. So retorne departure_at e arrival_at em RFC3339 com timezone quando a data e horario estiverem claramente visiveis; caso contrario, deixe null e use raw_departure_text/raw_arrival_text quando houver texto parcial. Quando houver indicacao de portao de embarque, mesmo com variacoes como gate, boarding gate, portao, puerta ou puerta de embarque, preencha o campo gate exatamente com o valor visivel.",
         },
         {
           role: "user",
@@ -231,6 +231,7 @@ export async function requestFlightExtraction({ documentName, mimeType, signedUr
               text:
                 `Analise este arquivo chamado "${documentName}". Extraia apenas dados realmente visiveis na passagem aerea. ` +
                 "Se nao for uma passagem, explique brevemente em failure_reason. " +
+                "Se o portao de embarque aparecer com rotulos como gate, boarding gate, portao, embarque, puerta ou puerta de embarque, salve em gate. " +
                 "Nao invente companhia, localizador, aeroportos, horarios, passageiro, terminal, portao, assento, bagagem ou QR code.",
             },
             {

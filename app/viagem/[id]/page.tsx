@@ -428,7 +428,7 @@ function getFlightStatusCopy(flight: any) {
   if (flight.extractionStatus === "processing") {
     return {
       eyebrow: "Passagem anexada",
-      detail: "Analisando passagem...",
+      detail: "Extraindo dados da passagem...",
       tone: "pending" as const,
     }
   }
@@ -443,7 +443,7 @@ function getFlightStatusCopy(flight: any) {
 
   return {
     eyebrow: "Passagem anexada",
-    detail: "Extracao pendente",
+    detail: "Estamos extraindo as informacoes.",
     tone: "pending" as const,
   }
 }
@@ -861,12 +861,16 @@ async function openOfflineDocumentFromPackage(params: {
     return false
   }
 
+  const pendingWindow = typeof window !== "undefined" ? window.open("", "_blank", "noopener,noreferrer") : null
   const preparedUrl = getPreparedUrl?.() ?? null
   if (preparedUrl) {
-    const preparedWindow = window.open(preparedUrl, "_blank", "noopener,noreferrer")
-    if (preparedWindow) {
+    if (pendingWindow) {
+      pendingWindow.location.href = preparedUrl
       return true
     }
+
+    const preparedWindow = window.open(preparedUrl, "_blank", "noopener,noreferrer")
+    if (preparedWindow) return true
 
     onUnavailable("Nao foi possivel abrir automaticamente. Toque novamente para abrir o arquivo.")
     return false
@@ -879,12 +883,18 @@ async function openOfflineDocumentFromPackage(params: {
   })
 
   if (!blobRecord?.blob) {
+    pendingWindow?.close()
     onUnavailable("Este arquivo nao esta disponivel offline.")
     return false
   }
 
   const objectUrl = URL.createObjectURL(blobRecord.blob)
   registerOfflineObjectUrl(objectUrl, registerCleanup)
+
+  if (pendingWindow) {
+    pendingWindow.location.href = objectUrl
+    return true
+  }
 
   const openedWindow = window.open(objectUrl, "_blank", "noopener,noreferrer")
   if (openedWindow) {
@@ -910,6 +920,34 @@ function resolveProtectedWriteError(error?: string | null) {
   }
 
   return error || "Nao foi possivel concluir esta acao."
+}
+
+async function resolveCurrentDocumentUrl(document: any) {
+  if (document?.filePath) {
+    return getSignedDocumentUrl(document.filePath)
+  }
+
+  if (document?.fileUrl) {
+    return { data: document.fileUrl, error: null }
+  }
+
+  return { data: null, error: "Arquivo indisponivel para visualizacao." }
+}
+
+function openResolvedUrlOnDevice(url: string, onFailure?: () => void) {
+  const pendingWindow = typeof window !== "undefined" ? window.open("", "_blank", "noopener,noreferrer") : null
+  if (pendingWindow) {
+    pendingWindow.location.href = url
+    return true
+  }
+
+  const openedWindow = window.open(url, "_blank", "noopener,noreferrer")
+  if (openedWindow) {
+    return true
+  }
+
+  onFailure?.()
+  return false
 }
 
 function logTripDocumentsDev(stage: string, details?: Record<string, unknown>) {
@@ -1720,6 +1758,7 @@ function FlightsSection({
   tripAdminToken,
   adminLinkMutationMode,
   ensureSensitiveAccess,
+  onTrackExtraction,
 }: {
   tripData: any
   loading: boolean
@@ -1736,6 +1775,7 @@ function FlightsSection({
   tripAdminToken: string | null
   adminLinkMutationMode: boolean
   ensureSensitiveAccess: () => boolean
+  onTrackExtraction: (payload: { flightId: string; documentId: string }) => void
 }) {
   const [editingFlight, setEditingFlight] = useState<any>(null)
   const [viewingQR, setViewingQR] = useState<any>(null)
@@ -1761,18 +1801,16 @@ function FlightsSection({
       return
     }
 
-    const resolvedUrl = document.fileUrl
-      ? { data: document.fileUrl, error: null }
-      : document.filePath
-        ? await getSignedDocumentUrl(document.filePath)
-        : { data: null, error: "Arquivo indisponivel para visualizacao." }
+    const resolvedUrl = await resolveCurrentDocumentUrl(document)
 
     if (resolvedUrl.error || !resolvedUrl.data) {
       showToast(resolvedUrl.error || "Nao foi possivel abrir o anexo.", "error")
       return
     }
 
-    window.open(resolvedUrl.data, "_blank", "noopener,noreferrer")
+    if (!openResolvedUrlOnDevice(resolvedUrl.data, () => showToast("Nao foi possivel abrir o arquivo neste dispositivo.", "error"))) {
+      showToast("Nao foi possivel abrir o arquivo neste dispositivo.", "error")
+    }
   }
 
   return (
@@ -1827,7 +1865,7 @@ function FlightsSection({
           {ticketDocuments.map((document: any) => (
             <div key={document.id} className="rounded-3xl border border-white/[0.06] bg-white/[0.02] p-5">
               <p className="text-sm font-medium text-white">{document.name}</p>
-              <p className="mt-2 text-xs text-white/40">Passagem anexada, extracao pendente</p>
+              <p className="mt-2 text-xs text-white/40">Passagem anexada. Estamos extraindo as informacoes.</p>
               <p className="mt-1 text-xs text-white/30">{document.mimeType || "Nao informado"}</p>
               <div className="mt-4 flex flex-wrap gap-2">
                 <Button size="sm" variant="outline" className="border-white/10 text-white/70" onClick={() => void handleOpenTicketDocument(document)}>
@@ -1860,9 +1898,10 @@ function FlightsSection({
         adminToken={tripAdminToken}
         adminProxyMode={adminLinkMutationMode}
         ensureSensitiveAccess={ensureSensitiveAccess}
+        onTrackExtraction={onTrackExtraction}
         onSave={(data) => {
           onAddFlight(data)
-          showToast("Passagem anexada. A analise automatica sera iniciada no backend.", "info")
+          showToast("Passagem anexada. Estamos extraindo as informacoes.", "info")
           setAddingFlight(false)
         }}
       />
@@ -1871,7 +1910,7 @@ function FlightsSection({
 }
 
 // Add Flight Modal
-function AddFlightModal({ open, onClose, onSave, tripId, ownerUserId, agencyId, tripSlug, adminToken, adminProxyMode, ensureSensitiveAccess }: { open: boolean; onClose: () => void; onSave: (data: any) => void; tripId: string; ownerUserId: string | null; agencyId: string | null; tripSlug: string; adminToken: string | null; adminProxyMode: boolean; ensureSensitiveAccess: () => boolean }) {
+function AddFlightModal({ open, onClose, onSave, tripId, ownerUserId, agencyId, tripSlug, adminToken, adminProxyMode, ensureSensitiveAccess, onTrackExtraction }: { open: boolean; onClose: () => void; onSave: (data: any) => void; tripId: string; ownerUserId: string | null; agencyId: string | null; tripSlug: string; adminToken: string | null; adminProxyMode: boolean; ensureSensitiveAccess: () => boolean; onTrackExtraction: (payload: { flightId: string; documentId: string }) => void }) {
   const [uploading, setUploading] = useState(false)
   const [fileName, setFileName] = useState("")
   const [error, setError] = useState("")
@@ -1988,6 +2027,10 @@ function AddFlightModal({ open, onClose, onSave, tripId, ownerUserId, agencyId, 
           [savedTicket.document],
         ),
       })
+      onTrackExtraction({
+        flightId: savedTicket.flight.id,
+        documentId: savedTicket.document.id,
+      })
 
       void requestTripFlightExtraction({
         tripId,
@@ -2054,7 +2097,7 @@ function AddFlightModal({ open, onClose, onSave, tripId, ownerUserId, agencyId, 
         </label>
 
         <div className="rounded-xl border border-white/[0.08] bg-white/[0.03] p-4">
-          <p className="text-sm text-white/70">A passagem sera salva imediatamente e aparecera no link com o estado honesto: extracao pendente.</p>
+          <p className="text-sm text-white/70">A passagem sera salva imediatamente. Algumas informacoes podem aparecer em instantes.</p>
         </div>
 
         {error && <p className="text-sm text-red-300">{error}</p>}
@@ -2575,20 +2618,20 @@ function ItinerarySection({
       return
     }
 
-    const resolvedUrl = document?.fileUrl
-      ? { data: document.fileUrl, error: null }
-      : document?.filePath
-        ? await getSignedDocumentUrl(document.filePath)
-        : record.pdfUrl
-          ? await getSignedDocumentUrl(record.pdfUrl)
-          : { data: null, error: "Arquivo indisponivel para visualizacao." }
+    const resolvedUrl = document
+      ? await resolveCurrentDocumentUrl(document)
+      : record.pdfUrl
+        ? await getSignedDocumentUrl(record.pdfUrl)
+        : { data: null, error: "Arquivo indisponivel para visualizacao." }
 
     if (resolvedUrl.error || !resolvedUrl.data) {
       showToast(resolvedUrl.error || "Nao foi possivel abrir o roteiro.", "error")
       return
     }
 
-    window.open(resolvedUrl.data, "_blank", "noopener,noreferrer")
+    if (!openResolvedUrlOnDevice(resolvedUrl.data, () => showToast("Nao foi possivel abrir o roteiro neste dispositivo.", "error"))) {
+      showToast("Nao foi possivel abrir o roteiro neste dispositivo.", "error")
+    }
   }
 
   return (
@@ -3520,20 +3563,15 @@ function ViewDocumentModal({
       return
     }
 
-    const pendingWindow = typeof window !== "undefined" ? window.open("", "_blank", "noopener,noreferrer") : null
-    const urlResult = document.filePath ? await getSignedDocumentUrl(document.filePath) : { data: document.fileUrl, error: null }
+    const urlResult = await resolveCurrentDocumentUrl(document)
 
     if (!urlResult.data) {
-      pendingWindow?.close()
       return
     }
 
-    if (pendingWindow) {
-      pendingWindow.location.href = urlResult.data
-      return
+    if (!openResolvedUrlOnDevice(urlResult.data, () => setOfflineMessage("Nao foi possivel abrir o arquivo neste dispositivo."))) {
+      setOfflineMessage("Nao foi possivel abrir o arquivo neste dispositivo.")
     }
-
-    window.location.href = urlResult.data
   }
 
   const getDocIcon = (type: string) => {
@@ -5120,6 +5158,7 @@ export default function TripPage() {
   const pendingSensitiveActionRef = useRef<(() => void) | null>(null)
   const loadRequestRef = useRef(0)
   const offlineImageUrlsRef = useRef<string[]>([])
+  const flightPollingTimersRef = useRef<Map<string, ReturnType<typeof window.setTimeout>>>(new Map())
 
   const logOfflineLookupDev = (stage: string, payload: Record<string, unknown>) => {
     if (process.env.NODE_ENV !== "development") return
@@ -5133,6 +5172,10 @@ export default function TripPage() {
 
   useEffect(() => {
     return () => {
+      for (const timer of flightPollingTimersRef.current.values()) {
+        window.clearTimeout(timer)
+      }
+      flightPollingTimersRef.current.clear()
       if (offlineImageUrlsRef.current.length > 0) {
         revokeOfflineObjectUrls(offlineImageUrlsRef.current)
         offlineImageUrlsRef.current = []
@@ -5811,10 +5854,7 @@ export default function TripPage() {
     }))
   }
 
-  const handleAddFlight = (data: any) => {
-    if (blockOfflineMutation()) return
-    if (!ensureSensitiveAccess()) return
-
+  const mergeFlightPayloadIntoTripData = (data: any) => {
     const upsertById = (items: any[], item: any) => {
       const index = items.findIndex((entry) => entry?.id === item?.id)
       if (index === -1) return [...items, item]
@@ -5832,6 +5872,92 @@ export default function TripPage() {
       documents: data.document ? upsertById(prev.documents, { ...data.document, private: data.document.private ?? false }) : prev.documents,
       flights: data.flight ? upsertById(prev.flights, data.flight) : prev.flights,
     }))
+  }
+
+  const handleAddFlight = (data: any) => {
+    if (blockOfflineMutation()) return
+    if (!ensureSensitiveAccess()) return
+    mergeFlightPayloadIntoTripData(data)
+  }
+
+  const startFlightExtractionPolling = (payload: { flightId: string; documentId: string }) => {
+    if (!shouldUseSupabase() || offlineModeEnabled || !tripData.id) {
+      return
+    }
+
+    const pollingKey = `${payload.flightId}:${payload.documentId}`
+    const existingTimer = flightPollingTimersRef.current.get(pollingKey)
+    if (existingTimer) {
+      window.clearTimeout(existingTimer)
+      flightPollingTimersRef.current.delete(pollingKey)
+    }
+
+    let attempts = 0
+    const maxAttempts = 8
+
+    const poll = async () => {
+      attempts += 1
+
+      let latestDocuments: any[] = []
+      let latestFlightRecord: TripFlightRecord | null = null
+      let pollingErrored = false
+
+      if (adminLinkMutationMode) {
+        const adminResponse = await fetch(`/api/trip-admin?tripId=${encodeURIComponent(tripData.id)}&tripSlug=${encodeURIComponent(routeSlug)}${tripAdminToken ? `&adminToken=${encodeURIComponent(tripAdminToken)}` : ""}`)
+        const adminData = await adminResponse.json().catch(() => null)
+
+        if (!adminResponse.ok) {
+          pollingErrored = true
+        } else {
+          latestDocuments = Array.isArray(adminData?.documents) ? adminData.documents : []
+          latestFlightRecord = (Array.isArray(adminData?.flights) ? adminData?.flights : []).find((entry) => entry.id === payload.flightId) ?? null
+        }
+      } else {
+        const [flightsResult, documentsResult] = await Promise.all([
+          isAdmin ? listTripFlights(tripData.id) : listPublicTripFlights(tripData.id),
+          isAdmin ? listDocumentsByTrip(tripData.id) : listPublicTripDocuments(tripData.id),
+        ])
+
+        if (flightsResult.error || documentsResult.error) {
+          pollingErrored = true
+        } else {
+          latestDocuments = Array.isArray(documentsResult.data) ? documentsResult.data : []
+          latestFlightRecord = (Array.isArray(flightsResult.data) ? flightsResult.data : []).find((entry) => entry.id === payload.flightId) ?? null
+        }
+      }
+
+      if (!pollingErrored) {
+        const latestDocument = latestDocuments.find((entry: any) => entry.id === payload.documentId) ?? null
+
+        if (latestFlightRecord || latestDocument) {
+          mergeFlightPayloadIntoTripData({
+            document: latestDocument,
+            flight: latestFlightRecord ? mapFlightRecordToView(latestFlightRecord, latestDocuments) : null,
+          })
+        }
+
+        const extractionStatus = latestFlightRecord?.extractionStatus ?? null
+        if (extractionStatus === "completed" || extractionStatus === "manual" || extractionStatus === "failed") {
+          flightPollingTimersRef.current.delete(pollingKey)
+          if (extractionStatus === "failed") {
+            showToast("Nao foi possivel identificar esta passagem.", "info")
+          }
+          return
+        }
+      }
+
+      if (attempts >= maxAttempts) {
+        flightPollingTimersRef.current.delete(pollingKey)
+        return
+      }
+
+      const nextTimer = window.setTimeout(() => {
+        void poll()
+      }, 2500)
+      flightPollingTimersRef.current.set(pollingKey, nextTimer)
+    }
+
+    void poll()
   }
 
   const handleSaveHotel = async (data: any) => {
@@ -6371,7 +6497,7 @@ export default function TripPage() {
           {offlineModeEnabled && offlinePackageStatus ? <OfflineModeBanner status={offlinePackageStatus} /> : null}
           <TripHero tripData={tripData} onEditTrip={() => setEditTripOpen(true)} />
           <QuickAccessCards tripData={tripData} onNavigate={handleNavigate} />
-          <FlightsSection loading={sectionsLoading.flights} tripData={tripData} onUpdateFlight={handleUpdateFlight} onAddFlight={handleAddFlight} onDeleteFlight={handleDeleteFlight} onDeleteDocument={handleDeleteDocument} tripId={tripData.id} ownerUserId={tripOwnerUserId} agencyId={profile?.agencyId ?? null} routeSlug={routeSlug} tripAdminToken={tripAdminToken} adminLinkMutationMode={adminLinkMutationMode} ensureSensitiveAccess={ensureSensitiveAccess} offlineReadOnly={offlineModeEnabled} offlineDocumentContext={offlineDocumentContext} />
+          <FlightsSection loading={sectionsLoading.flights} tripData={tripData} onUpdateFlight={handleUpdateFlight} onAddFlight={handleAddFlight} onDeleteFlight={handleDeleteFlight} onDeleteDocument={handleDeleteDocument} tripId={tripData.id} ownerUserId={tripOwnerUserId} agencyId={profile?.agencyId ?? null} routeSlug={routeSlug} tripAdminToken={tripAdminToken} adminLinkMutationMode={adminLinkMutationMode} ensureSensitiveAccess={ensureSensitiveAccess} onTrackExtraction={startFlightExtractionPolling} offlineReadOnly={offlineModeEnabled} offlineDocumentContext={offlineDocumentContext} />
           <HotelSection loading={sectionsLoading.hotels} tripData={tripData} onSaveHotel={handleSaveHotel} onDeleteHotel={handleDeleteHotel} />
           <ItinerarySection
             loading={sectionsLoading.itineraries}
