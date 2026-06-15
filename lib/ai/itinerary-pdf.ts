@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises"
 import path from "node:path"
 import type { GeneratedItineraryContent, GeneratedItineraryDay, GeneratedItineraryActivity } from "@/lib/ai/itinerary-generation"
+
 type ChromiumRuntime = typeof import("@sparticuz/chromium")["default"]
 type PuppeteerRuntime = typeof import("puppeteer-core")["default"]
 
@@ -141,19 +142,6 @@ function groupActivitiesByPeriod(day: GeneratedItineraryDay) {
   }
 }
 
-function periodLabel(period: "morning" | "afternoon" | "evening" | "flexible") {
-  switch (period) {
-    case "morning":
-      return "Manha"
-    case "afternoon":
-      return "Tarde"
-    case "evening":
-      return "Noite"
-    default:
-      return "Flexivel"
-  }
-}
-
 function activityTypeLabel(type: GeneratedItineraryActivity["type"]) {
   switch (type) {
     case "food":
@@ -253,18 +241,20 @@ function renderExperiences(days: GeneratedItineraryDay[]) {
   )
 
   if (cards.length === 0) {
-    return `<div class="empty-card">Nenhuma experiencia adicional foi cadastrada alem do roteiro dia a dia.</div>`
+    return `<div class="empty-card compact-empty">Nenhuma experiencia adicional foi cadastrada alem do roteiro dia a dia.</div>`
   }
 
+  const gridClass = cards.length >= 6 ? "experience-grid experience-grid-3" : "experience-grid"
+
   return `
-    <div class="experience-grid">
+    <div class="${gridClass}">
       ${cards
         .map(
           ({ day, date, activity }) => `
             <article class="experience-card">
-              <div class="experience-chip">Dia ${day}${date ? ` • ${safeText(date, "")}` : ""}</div>
+              <div class="experience-chip">Dia ${day}${date ? ` &bull; ${safeText(date, "")}` : ""}</div>
               <h3>${safeText(activity.title)}</h3>
-              <p class="experience-meta">${activityTypeLabel(activity.type)}${activity.location ? ` • ${safeText(activity.location, "")}` : ""}</p>
+              <p class="experience-meta">${activityTypeLabel(activity.type)}${activity.location ? ` &bull; ${safeText(activity.location, "")}` : ""}</p>
               ${activity.description ? `<p class="experience-description">${safeText(activity.description, "")}</p>` : ""}
             </article>
           `,
@@ -276,7 +266,7 @@ function renderExperiences(days: GeneratedItineraryDay[]) {
 
 function renderImportantInfo(input: TripPdfInput) {
   const documentItems = input.documents.length
-    ? input.documents.map((document) => `<li><strong>${safeText(document.name)}</strong> • ${safeText(document.type)}</li>`).join("")
+    ? input.documents.map((document) => `<li><strong>${safeText(document.name)}</strong> &bull; ${safeText(document.type)}</li>`).join("")
     : `<li>Nenhum documento adicional cadastrado.</li>`
 
   const baggageInfo = input.flights.map((flight) => flight.baggageInfo).filter((value): value is string => Boolean(value && value.trim()))
@@ -316,28 +306,32 @@ function renderImportantInfo(input: TripPdfInput) {
 
 function renderHotels(input: TripPdfInput) {
   if (input.hotels.length === 0) {
-    return `<div class="empty-card">Nenhuma hospedagem real cadastrada para esta viagem.</div>`
+    return `<div class="empty-card compact-empty">Nenhuma hospedagem cadastrada.</div>`
   }
 
-  return input.hotels
-    .map(
-      (hotel) => `
-        <article class="hotel-card">
-          <div class="hotel-image"></div>
-          <div class="hotel-content">
-            <h3>${safeText(hotel.name, "Hospedagem")}</h3>
-            <p class="hotel-address">${safeText(hotel.address, "Endereco nao informado")}</p>
-            <div class="hotel-grid">
-              <div><span>Check-in</span><strong>${formatDate(hotel.checkIn)}</strong></div>
-              <div><span>Check-out</span><strong>${formatDate(hotel.checkOut)}</strong></div>
-              <div><span>Confirmacao</span><strong>${safeText(hotel.confirmationCode, "Nao informada")}</strong></div>
-            </div>
-            ${hotel.notes ? `<div class="hotel-notes">${safeText(hotel.notes, "")}</div>` : ""}
-          </div>
-        </article>
-      `,
-    )
-    .join("")
+  return `
+    <div class="hotel-list">
+      ${input.hotels
+        .map(
+          (hotel) => `
+            <article class="hotel-card">
+              <div class="hotel-image"></div>
+              <div class="hotel-content">
+                <h3>${safeText(hotel.name, "Hospedagem")}</h3>
+                <p class="hotel-address">${safeText(hotel.address, "Endereco nao informado")}</p>
+                <div class="hotel-grid">
+                  <div><span>Check-in</span><strong>${formatDate(hotel.checkIn)}</strong></div>
+                  <div><span>Check-out</span><strong>${formatDate(hotel.checkOut)}</strong></div>
+                  <div><span>Confirmacao</span><strong>${safeText(hotel.confirmationCode, "Nao informada")}</strong></div>
+                </div>
+                ${hotel.notes ? `<div class="hotel-notes">${safeText(hotel.notes, "")}</div>` : ""}
+              </div>
+            </article>
+          `,
+        )
+        .join("")}
+    </div>
+  `
 }
 
 function renderSummaryCards(input: TripPdfInput) {
@@ -371,6 +365,25 @@ function renderSummaryCards(input: TripPdfInput) {
   `
 }
 
+function renderCompactSubsection(params: {
+  eyebrow: string
+  title: string
+  description?: string
+  content: string
+  muted?: boolean
+}) {
+  return `
+    <div class="subsection${params.muted ? " subsection-muted" : ""}">
+      <div class="subsection-head">
+        <div class="eyebrow-dark">${escapeHtml(params.eyebrow)}</div>
+        <h2>${escapeHtml(params.title)}</h2>
+        ${params.description ? `<p>${escapeHtml(params.description)}</p>` : ""}
+      </div>
+      ${params.content}
+    </div>
+  `
+}
+
 function renderHtml(input: TripPdfInput, assets: { heroImage: string | null; agencyLogo: string | null }) {
   const isAgency = input.branding.isAgency === true && Boolean(input.branding.agencyName)
   const travelWindow = `${formatDate(input.startDate)} - ${formatDate(input.endDate)}`
@@ -385,10 +398,11 @@ function renderHtml(input: TripPdfInput, assets: { heroImage: string | null; age
         html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         body { margin: 0; font-family: Arial, Helvetica, sans-serif; color: ${TEXT}; background: #ffffff; }
         main { width: 100%; }
-        section { page-break-after: always; }
-        section:last-child { page-break-after: auto; }
+        section.page-break { page-break-after: always; break-after: page; }
+        section.page-break:last-child { page-break-after: auto; break-after: auto; }
         p, li, strong, span, h1, h2, h3, h4, div { overflow-wrap: anywhere; word-break: break-word; }
         .page { padding: 40px 42px; }
+        .flow-page { padding-bottom: 34px; }
         .cover { min-height: 1122px; position: relative; color: #fff; background: ${DARK}; overflow: hidden; }
         .cover::before { content: ""; position: absolute; inset: 0; background-image: ${assets.heroImage ? `url('${assets.heroImage}')` : `linear-gradient(135deg, ${PRIMARY}, ${SECONDARY})`}; background-size: cover; background-position: center; transform: scale(1.04); }
         .cover::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(15,23,42,0.42), rgba(15,23,42,0.78) 55%, rgba(15,23,42,0.9)); }
@@ -406,90 +420,100 @@ function renderHtml(input: TripPdfInput, assets: { heroImage: string | null; age
         .cover-meta span { background: rgba(255,255,255,0.12); border-radius: 999px; padding: 9px 14px; font-size: 14px; }
         .cover-summary { font-size: 20px; line-height: 1.6; color: rgba(255,255,255,0.84); margin: 0; }
         .cover-line { margin-top: auto; width: 92px; height: 4px; border-radius: 999px; background: ${SECONDARY}; }
-        .section-head { margin-bottom: 24px; page-break-inside: avoid; }
-        .section-head .eyebrow-dark { display: inline-flex; align-items: center; margin-bottom: 10px; padding: 8px 14px; border-radius: 999px; background: rgba(31,143,214,0.1); color: ${PRIMARY}; font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; font-weight: 700; }
+        .section-head { margin-bottom: 24px; break-inside: avoid; page-break-inside: avoid; }
+        .section-head .eyebrow-dark, .subsection-head .eyebrow-dark { display: inline-flex; align-items: center; margin-bottom: 10px; padding: 8px 14px; border-radius: 999px; background: rgba(31,143,214,0.1); color: ${PRIMARY}; font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; font-weight: 700; }
         .section-head h2 { display: inline-block; width: 100%; font-size: 34px; margin: 0; color: #fff; background: linear-gradient(90deg, ${PRIMARY}, ${SECONDARY}); border-radius: 22px; padding: 16px 22px; }
         .section-head p { margin: 14px 4px 0; color: ${MUTED}; line-height: 1.65; max-width: 640px; }
+        .subsection { margin-top: 28px; break-inside: auto; page-break-inside: auto; }
+        .subsection:first-of-type { margin-top: 0; }
+        .subsection-head { margin-bottom: 18px; break-inside: avoid; page-break-inside: avoid; }
+        .subsection-head h2 { display: inline-block; width: 100%; font-size: 26px; margin: 0; color: #fff; background: linear-gradient(90deg, ${PRIMARY}, ${SECONDARY}); border-radius: 20px; padding: 14px 20px; }
+        .subsection-head p { margin: 12px 4px 0; color: ${MUTED}; line-height: 1.65; max-width: 640px; }
+        .subsection-muted .subsection-head h2 { background: linear-gradient(90deg, rgba(31,143,214,0.94), rgba(55,198,224,0.86)); }
         .summary-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 20px; }
-        .summary-card { border: 1px solid ${BORDER}; border-radius: 20px; padding: 18px; background: #fff; min-height: 100px; }
+        .summary-card { border: 1px solid ${BORDER}; border-radius: 20px; padding: 18px; background: #fff; min-height: 100px; break-inside: avoid; page-break-inside: avoid; }
         .summary-card span { display: block; color: ${MUTED}; font-size: 12px; text-transform: uppercase; letter-spacing: 0.12em; margin-bottom: 10px; }
         .summary-card strong { font-size: 17px; line-height: 1.5; color: ${DARK}; }
         .summary-panels { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 16px; margin-top: 20px; }
-        .panel { border-radius: 22px; padding: 20px; border: 1px solid ${BORDER}; background: ${SOFT}; page-break-inside: avoid; }
+        .panel { border-radius: 22px; padding: 20px; border: 1px solid ${BORDER}; background: ${SOFT}; break-inside: avoid; page-break-inside: avoid; }
         .panel h3 { margin: 0 0 12px; font-size: 20px; color: ${DARK}; }
         .panel p, .panel li { color: ${TEXT}; line-height: 1.7; }
         .panel ul { padding-left: 18px; margin: 0; }
         .duration-pill { display: inline-flex; align-items: center; justify-content: center; padding: 12px 22px; border-radius: 999px; background: rgba(55,198,224,0.14); color: ${PRIMARY}; font-weight: 700; margin-top: 8px; }
-        .day-card { border: 1px solid ${BORDER}; border-radius: 26px; background: #fff; padding: 20px; margin-bottom: 16px; page-break-inside: auto; break-inside: auto; }
-        .day-card:first-child { margin-top: 0; }
-        .day-header { display: grid; grid-template-columns: 88px 1fr; gap: 18px; align-items: start; margin-bottom: 18px; padding: 18px; border-radius: 22px; background: linear-gradient(90deg, ${PRIMARY}, ${SECONDARY}); page-break-inside: avoid; break-inside: avoid; }
-        .day-badge { width: 94px; border-radius: 24px; background: ${PRIMARY}; color: #fff; padding: 16px 12px; text-align: center; }
+        .days-flow { display: block; }
+        .day-card { border: 1px solid ${BORDER}; border-radius: 26px; background: #fff; padding: 18px; margin-bottom: 14px; break-inside: avoid; page-break-inside: avoid; }
+        .day-card:last-child { margin-bottom: 0; }
+        .day-header { display: grid; grid-template-columns: 82px 1fr; gap: 16px; align-items: start; margin-bottom: 16px; padding: 16px; border-radius: 22px; background: linear-gradient(90deg, ${PRIMARY}, ${SECONDARY}); break-inside: avoid; page-break-inside: avoid; }
+        .day-badge { width: 82px; border-radius: 22px; background: ${PRIMARY}; color: #fff; padding: 14px 10px; text-align: center; }
         .day-badge span { display: block; font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; opacity: 0.86; }
-        .day-badge strong { display: block; font-size: 32px; margin-top: 6px; }
-        .day-header h3 { margin: 0 0 6px; font-size: 28px; color: #fff; }
+        .day-badge strong { display: block; font-size: 30px; margin-top: 6px; }
+        .day-header h3 { margin: 0 0 6px; font-size: 26px; color: #fff; }
         .day-date { color: rgba(255,255,255,0.86); margin-bottom: 10px; font-weight: 600; }
-        .day-summary { color: rgba(255,255,255,0.96); line-height: 1.75; }
-        .period-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 14px; page-break-inside: auto; break-inside: auto; }
-        .period-card { background: #f8fbfe; border: 1px solid ${BORDER}; border-radius: 20px; padding: 16px; min-height: 0; page-break-inside: avoid; break-inside: avoid; }
-        .period-title { font-size: 13px; text-transform: uppercase; letter-spacing: 0.16em; color: #fff; margin: -16px -16px 14px; font-weight: 700; background: ${PRIMARY}; padding: 12px 16px; border-radius: 20px 20px 14px 14px; }
-        .period-empty { color: ${MUTED}; font-size: 14px; line-height: 1.6; }
-        .period-item { padding: 0 0 12px; margin-bottom: 12px; border-bottom: 1px solid rgba(31,143,214,0.12); page-break-inside: avoid; break-inside: avoid; }
+        .day-summary { color: rgba(255,255,255,0.96); line-height: 1.72; }
+        .period-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 12px; }
+        .period-card { background: #f8fbfe; border: 1px solid ${BORDER}; border-radius: 20px; padding: 14px; min-height: 0; break-inside: avoid; page-break-inside: avoid; }
+        .period-title { font-size: 13px; text-transform: uppercase; letter-spacing: 0.16em; color: #fff; margin: -14px -14px 12px; font-weight: 700; background: ${PRIMARY}; padding: 11px 14px; border-radius: 20px 20px 14px 14px; }
+        .period-empty { color: ${MUTED}; font-size: 14px; line-height: 1.6; margin: 0; }
+        .period-item { padding: 0 0 10px; margin-bottom: 10px; border-bottom: 1px solid rgba(31,143,214,0.12); break-inside: avoid; page-break-inside: avoid; }
         .period-item:last-child { margin-bottom: 0; padding-bottom: 0; border-bottom: 0; }
         .period-item-head { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 7px; align-items: center; }
         .period-time { color: ${PRIMARY}; font-size: 12px; font-weight: 700; }
         .period-type { color: ${MUTED}; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; }
         .period-name { color: ${DARK}; font-size: 16px; font-weight: 700; margin-bottom: 4px; }
-        .period-location, .period-description { color: ${TEXT}; font-size: 13px; line-height: 1.6; }
-        .day-bottom { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 14px; page-break-inside: avoid; break-inside: avoid; }
-        .note-box { border-radius: 18px; padding: 16px; background: #f8fbfe; border: 1px solid ${BORDER}; }
+        .period-location, .period-description { color: ${TEXT}; font-size: 13px; line-height: 1.58; }
+        .day-bottom { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; break-inside: avoid; page-break-inside: avoid; }
+        .note-box { border-radius: 18px; padding: 14px; background: #f8fbfe; border: 1px solid ${BORDER}; min-height: 0; }
         .note-box strong { display: block; margin-bottom: 8px; font-size: 14px; color: ${DARK}; }
-        .note-box p { margin: 0; line-height: 1.7; color: ${TEXT}; }
-        .hotel-card { display: grid; grid-template-columns: 220px 1fr; border: 1px solid ${BORDER}; border-radius: 24px; overflow: hidden; background: #fff; margin-bottom: 16px; page-break-inside: avoid; break-inside: avoid; }
-        .hotel-image { min-height: 240px; background: linear-gradient(135deg, ${PRIMARY}, ${SECONDARY}); background-size: cover; background-position: center; }
-        .hotel-content { padding: 22px; }
-        .hotel-content h3 { margin: 0 0 8px; font-size: 30px; color: ${DARK}; }
-        .hotel-address { color: ${MUTED}; margin: 0 0 16px; }
-        .hotel-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 16px; }
+        .note-box p { margin: 0; line-height: 1.68; color: ${TEXT}; }
+        .hotel-list { display: grid; gap: 14px; }
+        .hotel-card { display: grid; grid-template-columns: 200px 1fr; border: 1px solid ${BORDER}; border-radius: 24px; overflow: hidden; background: #fff; break-inside: avoid; page-break-inside: avoid; }
+        .hotel-image { min-height: 220px; background: linear-gradient(135deg, ${PRIMARY}, ${SECONDARY}); background-size: cover; background-position: center; }
+        .hotel-content { padding: 20px; }
+        .hotel-content h3 { margin: 0 0 8px; font-size: 28px; color: ${DARK}; }
+        .hotel-address { color: ${MUTED}; margin: 0 0 14px; }
+        .hotel-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 14px; }
         .hotel-grid div { padding: 14px; border-radius: 18px; background: ${SOFT}; }
         .hotel-grid span { display: block; color: ${MUTED}; font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; margin-bottom: 6px; }
         .hotel-grid strong { color: ${DARK}; font-size: 14px; line-height: 1.5; }
         .hotel-notes { padding: 16px; border-radius: 18px; background: rgba(55,198,224,0.12); line-height: 1.7; }
-        .experience-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-        .experience-card { border: 1px solid ${BORDER}; border-radius: 22px; background: #fff; overflow: hidden; page-break-inside: avoid; break-inside: avoid; }
+        .experience-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+        .experience-grid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+        .experience-card { border: 1px solid ${BORDER}; border-radius: 22px; background: #fff; overflow: hidden; break-inside: avoid; page-break-inside: avoid; }
         .experience-card::before { content: ""; display: block; height: 6px; background: linear-gradient(90deg, ${PRIMARY}, ${SECONDARY}); }
         .experience-card { padding: 18px; }
         .experience-chip { display: inline-flex; padding: 6px 12px; border-radius: 999px; background: rgba(31,143,214,0.1); color: ${PRIMARY}; font-size: 12px; font-weight: 700; margin-bottom: 12px; }
-        .experience-card h3 { margin: 0 0 8px; font-size: 22px; color: ${DARK}; }
+        .experience-card h3 { margin: 0 0 8px; font-size: 20px; color: ${DARK}; }
         .experience-meta { color: ${MUTED}; margin: 0 0 10px; font-size: 13px; }
-        .experience-description { color: ${TEXT}; line-height: 1.7; margin: 0; }
-        .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-        .info-card { border: 1px solid ${BORDER}; border-radius: 22px; padding: 18px; background: #fff; page-break-inside: avoid; break-inside: avoid; }
-        .info-card h3 { margin: 0 0 12px; font-size: 21px; color: ${DARK}; }
+        .experience-description { color: ${TEXT}; line-height: 1.65; margin: 0; }
+        .info-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+        .info-card { border: 1px solid ${BORDER}; border-radius: 22px; padding: 18px; background: #fff; break-inside: avoid; page-break-inside: avoid; }
+        .info-card h3 { margin: 0 0 12px; font-size: 19px; color: ${DARK}; }
         .info-card ul { padding-left: 18px; margin: 0; }
-        .info-card li { line-height: 1.8; color: ${TEXT}; margin-bottom: 4px; }
-        .empty-card { border: 1px dashed ${BORDER}; border-radius: 24px; padding: 24px; color: ${MUTED}; background: #fbfdff; }
+        .info-card li { line-height: 1.75; color: ${TEXT}; margin-bottom: 4px; }
+        .empty-card { border: 1px dashed ${BORDER}; border-radius: 24px; padding: 24px; color: ${MUTED}; background: #fbfdff; break-inside: avoid; page-break-inside: avoid; }
+        .compact-empty { padding: 18px 20px; min-height: 0; }
         .footer-page { background: ${DARK}; color: #fff; min-height: 1122px; }
-        .footer-main { display: flex; flex-direction: column; justify-content: space-between; min-height: 1014px; }
-        .footer-hero { text-align: center; padding-top: 120px; }
+        .footer-main { display: flex; flex-direction: column; justify-content: center; align-items: center; min-height: 1014px; text-align: center; }
+        .footer-stack { width: 100%; max-width: 720px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 26px; }
         .footer-hero h2 { margin: 0 0 14px; font-size: 48px; }
         .footer-hero p { margin: 0 auto; max-width: 620px; color: rgba(255,255,255,0.74); line-height: 1.8; }
-        .footer-card { border-radius: 28px; background: rgba(255,255,255,0.08); padding: 28px; margin: 56px 0; }
-        .footer-card-row { display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+        .footer-card { width: 100%; border-radius: 28px; background: rgba(255,255,255,0.08); padding: 28px; }
+        .footer-card-row { display: flex; align-items: center; justify-content: space-between; gap: 20px; text-align: left; }
         .footer-brand { display: flex; align-items: center; gap: 18px; }
         .footer-brand img { width: 70px; height: 70px; object-fit: contain; background: rgba(255,255,255,0.96); border-radius: 20px; padding: 8px; }
         .footer-brand-badge { width: 70px; height: 70px; border-radius: 50%; background: ${PRIMARY}; display: flex; align-items: center; justify-content: center; font-size: 28px; font-weight: 700; }
         .footer-brand h3 { margin: 0 0 5px; font-size: 24px; }
         .footer-brand p { margin: 0; color: rgba(255,255,255,0.68); }
-        .footer-links { display: flex; gap: 12px; flex-wrap: wrap; }
+        .footer-links { display: flex; gap: 12px; flex-wrap: wrap; justify-content: flex-end; }
         .footer-link { padding: 11px 15px; border-radius: 999px; background: rgba(255,255,255,0.08); color: #fff; font-size: 13px; }
-        .footer-bottom { border-top: 1px solid rgba(255,255,255,0.12); padding-top: 20px; display: flex; justify-content: space-between; align-items: center; color: rgba(255,255,255,0.58); font-size: 13px; }
+        .footer-bottom { width: 100%; border-top: 1px solid rgba(255,255,255,0.12); padding-top: 18px; display: flex; justify-content: space-between; align-items: center; color: rgba(255,255,255,0.58); font-size: 13px; }
         .powered { display: flex; align-items: center; gap: 8px; }
         .vuei-wordmark { font-weight: 800; letter-spacing: -0.04em; background: linear-gradient(90deg, ${SECONDARY}, #1f8fd6 55%, #1556c4); -webkit-background-clip: text; color: transparent; }
       </style>
     </head>
     <body>
       <main>
-        <section class="cover">
+        <section class="cover page-break">
           <div class="cover-inner">
             <div class="cover-top">
               ${isAgency ? `
@@ -517,7 +541,7 @@ function renderHtml(input: TripPdfInput, assets: { heroImage: string | null; age
           </div>
         </section>
 
-        <section class="page">
+        <section class="page page-break">
           <div class="section-head">
             <div class="eyebrow-dark">Visao Geral</div>
             <h2>Resumo da Viagem</h2>
@@ -537,79 +561,78 @@ function renderHtml(input: TripPdfInput, assets: { heroImage: string | null; age
           </div>
         </section>
 
-        <section class="page" style="background:#f7fafc;">
+        <section class="page flow-page page-break" style="background:#f7fafc;">
           <div class="section-head" style="text-align:center;">
             <div class="eyebrow-dark">Programacao Completa</div>
             <h2>Dia a Dia</h2>
             <p>Cada dia segue a estrutura do template oficial, agora preenchida com o contexto real da viagem e as sugestoes geradas pela IA.</p>
           </div>
-          ${input.content.days
-            .map((day) => {
-              const periods = groupActivitiesByPeriod(day)
-              return `
-                <article class="day-card">
-                  <div class="day-header">
-                    <div class="day-badge"><span>Dia</span><strong>${day.day}</strong></div>
-                    <div>
-                      <h3>${safeText(day.title)}</h3>
-                      <div class="day-date">${safeText(day.date, "Data a confirmar")}</div>
-                      <div class="day-summary">${safeText(day.summary, "Sem resumo adicional para este dia.")}</div>
+          <div class="days-flow">
+            ${input.content.days
+              .map((day) => {
+                const periods = groupActivitiesByPeriod(day)
+                return `
+                  <article class="day-card">
+                    <div class="day-header">
+                      <div class="day-badge"><span>Dia</span><strong>${day.day}</strong></div>
+                      <div>
+                        <h3>${safeText(day.title)}</h3>
+                        <div class="day-date">${safeText(day.date, "Data a confirmar")}</div>
+                        <div class="day-summary">${safeText(day.summary, "Sem resumo adicional para este dia.")}</div>
+                      </div>
                     </div>
-                  </div>
-                  <div class="period-grid">
-                    ${renderPeriodCard("Manha", periods.morning)}
-                    ${renderPeriodCard("Tarde", periods.afternoon)}
-                    ${renderPeriodCard("Noite", periods.evening.length > 0 ? periods.evening : periods.flexible)}
-                  </div>
-                  <div class="day-bottom">
-                    <div class="note-box">
-                      <strong>Dicas e notas uteis</strong>
-                      <p>${safeText(day.tips, "Sem dicas adicionais para este dia.")}</p>
+                    <div class="period-grid">
+                      ${renderPeriodCard("Manha", periods.morning)}
+                      ${renderPeriodCard("Tarde", periods.afternoon)}
+                      ${renderPeriodCard("Noite", periods.evening.length > 0 ? periods.evening : periods.flexible)}
                     </div>
-                    <div class="note-box">
-                      <strong>Observacoes importantes</strong>
-                      <p>${safeText(day.important, "Nenhuma observacao critica registrada para este dia.")}</p>
+                    <div class="day-bottom">
+                      <div class="note-box">
+                        <strong>Dicas e notas uteis</strong>
+                        <p>${safeText(day.tips, "Sem dicas adicionais para este dia.")}</p>
+                      </div>
+                      <div class="note-box">
+                        <strong>Observacoes importantes</strong>
+                        <p>${safeText(day.important, "Nenhuma observacao critica registrada para este dia.")}</p>
+                      </div>
                     </div>
-                  </div>
-                </article>
-              `
-            })
-            .join("")}
+                  </article>
+                `
+              })
+              .join("")}
+          </div>
         </section>
 
-        <section class="page">
-          <div class="section-head">
-            <div class="eyebrow-dark">Onde Voce Vai Ficar</div>
-            <h2>Hospedagem</h2>
-          </div>
-          ${renderHotels(input)}
-        </section>
+        <section class="page flow-page page-break">
+          ${renderCompactSubsection({
+            eyebrow: "Onde Voce Vai Ficar",
+            title: "Hospedagem",
+            content: renderHotels(input),
+          })}
 
-        <section class="page" style="background:#f7fafc;">
-          <div class="section-head" style="text-align:center;">
-            <div class="eyebrow-dark">Momentos Especiais</div>
-            <h2>Experiencias e Passeios</h2>
-            <p>Recortes de experiencias, gastronomia e deslocamentos derivados do roteiro completo.</p>
-          </div>
-          ${renderExperiences(input.content.days)}
-        </section>
+          ${renderCompactSubsection({
+            eyebrow: "Momentos Especiais",
+            title: "Experiencias e Passeios",
+            description: "Recortes de experiencias, gastronomia e deslocamentos derivados do roteiro completo.",
+            content: renderExperiences(input.content.days),
+            muted: true,
+          })}
 
-        <section class="page">
-          <div class="section-head" style="text-align:center;">
-            <div class="eyebrow-dark">Prepare-se</div>
-            <h2>Informacoes Importantes</h2>
-            <p>Somente informacoes reais cadastradas ou estados honestos quando algo ainda nao estiver disponivel.</p>
-          </div>
-          ${renderImportantInfo(input)}
+          ${renderCompactSubsection({
+            eyebrow: "Prepare-se",
+            title: "Informacoes Importantes",
+            description: "Somente informacoes reais cadastradas ou estados honestos quando algo ainda nao estiver disponivel.",
+            content: renderImportantInfo(input),
+          })}
         </section>
 
         <section class="footer-page">
           <div class="page footer-main">
-            <div class="footer-hero">
-              <h2>Boa viagem!</h2>
-              <p>Esperamos que esta experiencia seja inesquecivel. Este roteiro foi preparado para facilitar seu acesso aos principais detalhes da viagem.</p>
-            </div>
-            <div>
+            <div class="footer-stack">
+              <div class="footer-hero">
+                <h2>Boa viagem!</h2>
+                <p>Esperamos que esta experiencia seja inesquecivel. Este roteiro foi preparado para facilitar seu acesso aos principais detalhes da viagem.</p>
+              </div>
               <div class="footer-card">
                 <div class="footer-card-row">
                   <div class="footer-brand">
