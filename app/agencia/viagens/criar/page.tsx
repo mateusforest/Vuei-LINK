@@ -24,6 +24,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { useAgency, type AgencyTrip } from "@/contexts/agency-context"
+import { calculateTripDays, formatDateForInput, isValidTripDate } from "@/lib/trip-date"
 
 const steps = [
   { id: 1, title: "Cliente", icon: User },
@@ -131,7 +132,12 @@ function CreateTripPageContent() {
     switch (currentStep) {
       case 1: return formData.clientName.length > 0
       case 2: return formData.destination.length > 0
-      case 3: return Boolean(formData.startDate && formData.endDate && formData.endDate >= formData.startDate)
+      case 3:
+        return Boolean(
+          isValidTripDate(formData.startDate) &&
+          isValidTripDate(formData.endDate) &&
+          formData.endDate >= formData.startDate
+        )
       case 4: return formData.passengersCount > 0
       case 5: return formData.travelStyle.length > 0
       default: return true
@@ -148,6 +154,15 @@ function CreateTripPageContent() {
   }
 
   const handleStartDateChange = (value: string) => {
+    if (!isValidTripDate(value)) {
+      setFormData((current) => ({
+        ...current,
+        startDate: "",
+        endDate: current.endDate,
+      }))
+      return
+    }
+
     setFormData((current) => ({
       ...current,
       startDate: value,
@@ -158,6 +173,15 @@ function CreateTripPageContent() {
       focusEndDate()
     }, 0)
   }
+
+  const handleEndDateChange = (value: string) => {
+    setFormData((current) => ({
+      ...current,
+      endDate: isValidTripDate(value) ? value : "",
+    }))
+  }
+
+  const tripDays = calculateTripDays(formData.startDate, formData.endDate)
 
   if (completed && createdTrip) {
     return (
@@ -480,8 +504,13 @@ function CreateTripPageContent() {
                     <Input
                       ref={startDateRef}
                       type="date"
-                      value={formData.startDate}
+                      value={formatDateForInput(formData.startDate)}
                       onChange={(e) => handleStartDateChange(e.target.value)}
+                      onClick={(event) => {
+                        if (typeof event.currentTarget.showPicker === "function") {
+                          event.currentTarget.showPicker()
+                        }
+                      }}
                       className="mt-1.5 border-white/10 bg-white/5"
                     />
                   </div>
@@ -490,15 +519,25 @@ function CreateTripPageContent() {
                     <Input
                       ref={endDateRef}
                       type="date"
-                      value={formData.endDate}
+                      value={formatDateForInput(formData.endDate)}
                       min={formData.startDate || undefined}
-                      onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
+                      onChange={(e) => handleEndDateChange(e.target.value)}
+                      onClick={(event) => {
+                        if (typeof event.currentTarget.showPicker === "function") {
+                          event.currentTarget.showPicker()
+                        }
+                      }}
                       className="mt-1.5 border-white/10 bg-white/5"
                     />
                   </div>
                 </div>
                 {formData.startDate && formData.endDate && formData.endDate < formData.startDate ? (
                   <p className="text-sm text-red-400">A data de volta nao pode ser anterior a data de ida.</p>
+                ) : null}
+                {tripDays ? (
+                  <div className="rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 text-sm text-foreground">
+                    {tripDays} {tripDays === 1 ? "dia" : "dias"} de viagem
+                  </div>
                 ) : null}
               </motion.div>
             )}

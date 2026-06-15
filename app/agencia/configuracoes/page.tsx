@@ -90,6 +90,9 @@ export default function SettingsPage() {
   const [showPhotoModal, setShowPhotoModal] = useState(false)
   const [showPasswordModal, setShowPasswordModal] = useState(false)
   const [showPlanModal, setShowPlanModal] = useState(false)
+  const [showArchiveModal, setShowArchiveModal] = useState(false)
+  const [archiveConfirmation, setArchiveConfirmation] = useState("")
+  const [isArchivingAgency, setIsArchivingAgency] = useState(false)
   const [agencyLogoFile, setAgencyLogoFile] = useState<File | null>(null)
   const [brandingLogoFile, setBrandingLogoFile] = useState<File | null>(null)
 
@@ -363,6 +366,38 @@ export default function SettingsPage() {
     router.replace("/login")
   }
 
+  const handleArchiveAgency = async () => {
+    if (archiveConfirmation.trim().toUpperCase() !== "ARQUIVAR") {
+      showToast('Digite "ARQUIVAR" para confirmar.')
+      return
+    }
+
+    if (!agency) {
+      showToast("Agencia nao encontrada para arquivamento.")
+      return
+    }
+
+    setIsArchivingAgency(true)
+
+    try {
+      const result = await updateAgencyRepository(agency.id, { status: "archived" })
+
+      if (!result.data) {
+        showToast(result.error || "Nao foi possivel arquivar a agencia.")
+        return
+      }
+
+      setShowArchiveModal(false)
+      setArchiveConfirmation("")
+      await refreshAgencyWorkspace()
+      showToast("Agencia arquivada com seguranca.")
+      void signOut()
+      router.replace("/login")
+    } finally {
+      setIsArchivingAgency(false)
+    }
+  }
+
   return (
     <div className="space-y-6 pb-20 lg:pb-0">
       {setupIncomplete && (
@@ -565,10 +600,14 @@ export default function SettingsPage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="mb-4 text-sm text-muted-foreground">Acoes irreversiveis que afetam sua conta permanentemente.</p>
-                  <Button variant="outline" className="gap-2 border-red-500/30 text-red-400 hover:bg-red-500/10">
+                  <p className="mb-4 text-sm text-muted-foreground">Arquive a agencia com seguranca sem apagar clientes, viagens, documentos ou historico.</p>
+                  <Button
+                    variant="outline"
+                    className="gap-2 border-red-500/30 text-red-400 hover:bg-red-500/10"
+                    onClick={() => setShowArchiveModal(true)}
+                  >
                     <Trash2 className="h-4 w-4" />
-                    Excluir Conta
+                    Excluir Agencia
                   </Button>
                 </CardContent>
               </Card>
@@ -761,6 +800,51 @@ export default function SettingsPage() {
                   </Button>
                 </div>
               ))}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={showArchiveModal}
+        onOpenChange={(open) => {
+          setShowArchiveModal(open)
+          if (!open) {
+            setArchiveConfirmation("")
+          }
+        }}
+      >
+        <DialogContent className="border-red-500/20 bg-card sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-red-400">Arquivar agencia</DialogTitle>
+            <DialogDescription>
+              A agencia sera desativada e arquivada com seguranca, sem excluir dados reais nem remover historico operacional.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="rounded-xl border border-red-500/20 bg-red-500/5 p-4 text-sm text-muted-foreground">
+              Digite <span className="font-medium text-foreground">ARQUIVAR</span> para confirmar a desativacao da agencia.
+            </div>
+            <div>
+              <Label className="text-muted-foreground">Confirmacao</Label>
+              <Input
+                value={archiveConfirmation}
+                onChange={(e) => setArchiveConfirmation(e.target.value)}
+                placeholder="ARQUIVAR"
+                className="mt-1.5 border-red-500/20 bg-white/5"
+              />
+            </div>
+            <div className="flex gap-3">
+              <Button variant="outline" className="flex-1 border-white/10" onClick={() => setShowArchiveModal(false)} disabled={isArchivingAgency}>
+                Cancelar
+              </Button>
+              <Button
+                className="flex-1 bg-red-500 text-white hover:bg-red-500/90"
+                onClick={() => void handleArchiveAgency()}
+                disabled={isArchivingAgency || archiveConfirmation.trim().toUpperCase() !== "ARQUIVAR"}
+              >
+                {isArchivingAgency ? "Arquivando..." : "Arquivar agencia"}
+              </Button>
             </div>
           </div>
         </DialogContent>

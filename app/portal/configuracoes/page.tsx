@@ -12,7 +12,6 @@ import {
   Crown,
   ChevronRight,
   LogOut,
-  Moon,
   Globe,
   HelpCircle,
   FileText,
@@ -113,6 +112,7 @@ export default function ConfiguracoesPage() {
   const [showBiometricModal, setShowBiometricModal] = useState(false)
   const [showPinModal, setShowPinModal] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [infoModal, setInfoModal] = useState<{ title: string; description: string } | null>(null)
   const [profileForm, setProfileForm] = useState(defaultProfile)
   const [photoPreview, setPhotoPreview] = useState("")
   const [photoFile, setPhotoFile] = useState<File | null>(null)
@@ -191,7 +191,10 @@ export default function ConfiguracoesPage() {
 
     void updateProfileRepository(authProfile.id, {
       settings: {
-        ...authProfile.settings,
+        language: authProfile.settings?.language ?? "pt-BR",
+        darkMode: authProfile.settings?.darkMode ?? true,
+        notificationsEnabled: authProfile.settings?.notificationsEnabled ?? true,
+        biometricEnabled: authProfile.settings?.biometricEnabled ?? false,
         pinEnabled: true,
         quickAccess: legacyPin,
       },
@@ -375,6 +378,10 @@ export default function ConfiguracoesPage() {
     router.replace("/login")
   }
 
+  const openInfoModal = (title: string, description: string) => {
+    setInfoModal({ title, description })
+  }
+
   const handleSaveBiometricPreference = async () => {
     console.log("[SETTINGS] save started")
     setIsSavingSettings(true)
@@ -532,6 +539,11 @@ export default function ConfiguracoesPage() {
           icon: Shield,
           label: "Sessoes ativas",
           description: "2 dispositivos conectados",
+          action: () =>
+            openInfoModal(
+              "Sessoes ativas",
+              "Em breve voce podera visualizar e encerrar dispositivos conectados a sua conta."
+            ),
         },
       ],
     },
@@ -539,18 +551,46 @@ export default function ConfiguracoesPage() {
       title: "Preferencias",
       items: [
         { icon: Bell, label: "Notificacoes", description: "Alertas e lembretes", switchKey: "notifications" as const },
-        { icon: Moon, label: "Tema escuro", description: "Ativado por padrao", switchKey: "darkMode" as const },
-        { icon: Globe, label: "Idioma", description: "Portugues (Brasil)" },
+        {
+          icon: Globe,
+          label: "Idioma",
+          description: "Portugues (Brasil)",
+          action: () =>
+            openInfoModal(
+              "Idioma",
+              "No momento, o Vuei esta disponivel em portugues. Novos idiomas serao adicionados futuramente."
+            ),
+        },
       ],
     },
     {
       title: "Suporte",
       items: [
-        { icon: HelpCircle, label: "Central de ajuda", description: "Duvidas frequentes" },
-        { icon: FileText, label: "Termos e privacidade", description: "Politicas do Vuei" },
+        {
+          icon: HelpCircle,
+          label: "Central de ajuda",
+          description: "Duvidas frequentes",
+          action: () =>
+            openInfoModal(
+              "Central de ajuda",
+              "Nossa central de ajuda estara disponivel em breve. Se precisar de suporte, entre em contato pelo canal oficial do Vuei."
+            ),
+        },
+        {
+          icon: FileText,
+          label: "Termos de uso",
+          description: "Regras e condicoes do Vuei",
+          action: () => router.push("/termos"),
+        },
+        {
+          icon: FileText,
+          label: "Politica de privacidade",
+          description: "Como seus dados sao tratados",
+          action: () => router.push("/privacidade"),
+        },
       ],
     },
-  ], [profile.plan, settings.darkMode, settings.faceId, settings.notifications, settings.pinEnabled])
+  ], [openInfoModal, profile.plan, router, settings.faceId, settings.notifications, settings.pinEnabled])
 
   return (
     <motion.div
@@ -655,7 +695,7 @@ export default function ConfiguracoesPage() {
                     onCheckedChange={(checked) => setSettings((prev) => ({ ...prev, [item.switchKey]: checked }))}
                     onClick={(event) => event.stopPropagation()}
                   />
-                ) : item.badgeText ? (
+                ) : "badgeText" in item && item.badgeText ? (
                   <Badge className={item.badgeClass}>{item.badgeText}</Badge>
                 ) : (
                   <ChevronRight size={18} className="text-muted-foreground" />
@@ -879,6 +919,18 @@ export default function ConfiguracoesPage() {
               </Button>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={Boolean(infoModal)} onOpenChange={(open) => !open && setInfoModal(null)}>
+        <DialogContent className="vuei-glass max-w-sm border-border/50">
+          <DialogHeader>
+            <DialogTitle>{infoModal?.title}</DialogTitle>
+            <DialogDescription>{infoModal?.description}</DialogDescription>
+          </DialogHeader>
+          <Button className="w-full bg-gradient-to-r from-primary to-secondary text-primary-foreground" onClick={() => setInfoModal(null)}>
+            Entendi
+          </Button>
         </DialogContent>
       </Dialog>
 

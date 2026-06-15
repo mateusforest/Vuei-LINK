@@ -20,6 +20,7 @@ export interface LegacyAgencySettings {
   address?: string
   logo?: string
   plan?: string
+  status?: "pending" | "active" | "suspended" | "archived"
 }
 
 export interface LegacyAgencyNotifications {
@@ -82,7 +83,7 @@ export function mapAgencySettingsToAgency(
     logo: agencyData.logo || null,
     ownerUserId: null,
     plan: agencyData.plan?.toLowerCase() === "enterprise" ? "enterprise" : agencyData.plan?.toLowerCase() === "starter" ? "starter" : "pro",
-    status: "active",
+    status: agencyData.status === "pending" || agencyData.status === "suspended" || agencyData.status === "archived" ? agencyData.status : "active",
     creditsBalance,
     settings: {
       email: agencyData.email || null,

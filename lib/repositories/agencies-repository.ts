@@ -41,6 +41,7 @@ interface AgencyConfigState {
     address?: string
     logo?: string
     plan?: string
+    status?: "pending" | "active" | "suspended" | "archived"
   }
   brandingData?: {
     linkLogo?: string
@@ -429,6 +430,7 @@ export async function updateAgency(id: string, payload: Partial<Agency>) {
       address: payload.settings?.address ?? config.agencyData?.address,
       logo: payload.logo ?? config.agencyData?.logo,
       plan: payload.plan ?? config.agencyData?.plan,
+      status: payload.status ?? config.agencyData?.status,
     },
     brandingData: {
       ...config.brandingData,

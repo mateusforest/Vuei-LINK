@@ -36,6 +36,7 @@ import { createTrip as createTripInRepository } from "@/lib/repositories/trips-r
 import { shouldUseSupabase } from "@/lib/data-source"
 import { writePendingTrip } from "@/lib/pending-trip"
 import { PortalActionDialog } from "@/components/portal/portal-action-dialog"
+import { calculateTripDays, formatDateForInput, isValidTripDate } from "@/lib/trip-date"
 
 const fadeInUp = {
   initial: { opacity: 0, y: 20 },
@@ -111,7 +112,12 @@ export default function CriarViagemPage() {
     switch (step) {
       case 1: return formData.name.length >= 3
       case 2: return formData.destination.length >= 3
-      case 3: return Boolean(formData.startDate && formData.endDate && formData.endDate >= formData.startDate)
+      case 3:
+        return Boolean(
+          isValidTripDate(formData.startDate) &&
+          isValidTripDate(formData.endDate) &&
+          formData.endDate >= formData.startDate
+        )
       case 4: return formData.style !== ""
       case 5: return formData.companions !== ""
       default: return false
@@ -128,6 +134,15 @@ export default function CriarViagemPage() {
   }
 
   const handleStartDateChange = (value: string) => {
+    if (!isValidTripDate(value)) {
+      setFormData((current) => ({
+        ...current,
+        startDate: "",
+        endDate: current.endDate,
+      }))
+      return
+    }
+
     setFormData((current) => ({
       ...current,
       startDate: value,
@@ -138,6 +153,15 @@ export default function CriarViagemPage() {
       focusEndDate()
     }, 0)
   }
+
+  const handleEndDateChange = (value: string) => {
+    setFormData((current) => ({
+      ...current,
+      endDate: isValidTripDate(value) ? value : "",
+    }))
+  }
+
+  const tripDays = calculateTripDays(formData.startDate, formData.endDate)
 
   const handleNext = () => {
     if (step < totalSteps) {
@@ -357,8 +381,13 @@ export default function CriarViagemPage() {
                   <Input
                     ref={startDateRef}
                     type="date"
-                    value={formData.startDate}
+                    value={formatDateForInput(formData.startDate)}
                     onChange={(e) => handleStartDateChange(e.target.value)}
+                    onClick={(event) => {
+                      if (typeof event.currentTarget.showPicker === "function") {
+                        event.currentTarget.showPicker()
+                      }
+                    }}
                     className="h-12 rounded-xl bg-muted/30 border-border/50"
                   />
                 </div>
@@ -370,9 +399,14 @@ export default function CriarViagemPage() {
                   <Input
                     ref={endDateRef}
                     type="date"
-                    value={formData.endDate}
+                    value={formatDateForInput(formData.endDate)}
                     min={formData.startDate || undefined}
-                    onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
+                    onChange={(e) => handleEndDateChange(e.target.value)}
+                    onClick={(event) => {
+                      if (typeof event.currentTarget.showPicker === "function") {
+                        event.currentTarget.showPicker()
+                      }
+                    }}
                     className="h-12 rounded-xl bg-muted/30 border-border/50"
                   />
                 </div>
@@ -382,16 +416,16 @@ export default function CriarViagemPage() {
                 <p className="text-sm text-red-400">A data de volta nao pode ser anterior a data de ida.</p>
               ) : null}
 
-              {formData.startDate && formData.endDate && (
+              {tripDays ? (
                 <Card className="p-4 bg-primary/5 border-primary/20">
                   <div className="flex items-center gap-2">
                     <Calendar size={16} className="text-primary" />
                     <span className="text-sm">
-                      {Math.ceil((new Date(formData.endDate).getTime() - new Date(formData.startDate).getTime()) / (1000 * 60 * 60 * 24))} dias de viagem
+                      {tripDays} {tripDays === 1 ? "dia" : "dias"} de viagem
                     </span>
                   </div>
                 </Card>
-              )}
+              ) : null}
             </motion.div>
           )}
 
