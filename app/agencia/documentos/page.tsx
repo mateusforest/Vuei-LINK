@@ -45,7 +45,8 @@ const documentTypes = [
   { value: "passport", label: "Passaportes" },
   { value: "visa", label: "Vistos" },
   { value: "voucher", label: "Vouchers" },
-  { value: "ticket", label: "Ingressos" },
+  { value: "ticket", label: "Passagens" },
+  { value: "admission_ticket", label: "Ingressos" },
   { value: "insurance", label: "Seguros" },
 ]
 
@@ -57,6 +58,7 @@ const getFileIcon = (type: string) => {
     case "voucher":
     case "insurance":
     case "ticket":
+    case "admission_ticket":
       return File
     default:
       return Image
@@ -72,6 +74,7 @@ export default function DocumentsPage() {
   const [dragOver, setDragOver] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [actionError, setActionError] = useState("")
+  const [actionNotice, setActionNotice] = useState("")
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const [uploadData, setUploadData] = useState({
@@ -101,6 +104,7 @@ export default function DocumentsPage() {
     if (!uploadData.name || !selectedFile) return
     setUploading(true)
     setActionError("")
+    setActionNotice("")
     const created = await addDocument({
       name: uploadData.name,
       type: uploadData.type,
@@ -112,6 +116,15 @@ export default function DocumentsPage() {
     })
     setUploading(false)
     if (created) {
+      if (uploadData.type === "ticket") {
+        if (created.flightExtractionStatus === "failed") {
+          setActionError(created.extractionError || "Passagem anexada, mas nao foi possivel iniciar a extracao agora.")
+        } else {
+          setActionNotice("Passagem anexada. Estamos extraindo as informacoes.")
+        }
+      } else {
+        setActionNotice("Documento anexado com sucesso.")
+      }
       setUploadModalOpen(false)
       setSelectedFile(null)
       setUploadData({ name: "", type: "voucher", clientId: "", tripId: "", isPrivate: false })
@@ -132,10 +145,12 @@ export default function DocumentsPage() {
     const validation = validateDocumentFile(file)
     if (!validation.valid) {
       setActionError(validation.error || "Arquivo invalido.")
+      setActionNotice("")
       return
     }
 
     setActionError("")
+    setActionNotice("")
     setSelectedFile(file)
     setUploadData((prev) => ({ ...prev, name: prev.name || file.name }))
   }
@@ -218,6 +233,11 @@ export default function DocumentsPage() {
       {actionError ? (
         <Card className="border-red-500/20 bg-red-500/5">
           <CardContent className="p-4 text-sm text-red-300">{actionError}</CardContent>
+        </Card>
+      ) : null}
+      {!actionError && actionNotice ? (
+        <Card className="border-emerald-500/20 bg-emerald-500/5">
+          <CardContent className="p-4 text-sm text-emerald-300">{actionNotice}</CardContent>
         </Card>
       ) : null}
 
@@ -458,7 +478,8 @@ export default function DocumentsPage() {
                 style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='rgba(255,255,255,0.4)'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center', backgroundSize: '16px' }}
               >
                 <option value="voucher" className="bg-[#0a0a0a]">Voucher</option>
-                <option value="ticket" className="bg-[#0a0a0a]">Ingresso</option>
+                <option value="ticket" className="bg-[#0a0a0a]">Passagem</option>
+                <option value="admission_ticket" className="bg-[#0a0a0a]">Ingresso</option>
                 <option value="passport" className="bg-[#0a0a0a]">Passaporte</option>
                 <option value="visa" className="bg-[#0a0a0a]">Visto</option>
                 <option value="insurance" className="bg-[#0a0a0a]">Seguro</option>

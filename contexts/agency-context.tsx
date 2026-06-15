@@ -26,6 +26,7 @@ import {
   listDocuments,
   uploadDocumentFile,
 } from "@/lib/repositories/documents-repository"
+import { requestTripFlightExtraction, upsertTripFlight } from "@/lib/repositories/trip-flights-repository"
 import { createTrip as createTripRecord, deleteTrip as deleteTripRecord, listTripsByAgency, updateTrip as updateTripRecord } from "@/lib/repositories/trips-repository"
 import { getProfileByEmail } from "@/lib/repositories/profiles-repository"
 import { updateProfile as updateProfileRecord } from "@/lib/repositories/profiles-repository"
@@ -79,7 +80,7 @@ export interface AgencyDocument {
   agencyId?: string
   ownerUserId?: string
   name: string
-  type: "voucher" | "ticket" | "passport" | "visa" | "insurance" | "itinerary" | "other"
+  type: "voucher" | "ticket" | "admission_ticket" | "passport" | "visa" | "insurance" | "itinerary" | "other"
   isPrivate: boolean
   fileUrl?: string
   filePath?: string
@@ -159,7 +160,13 @@ interface AgencyContextType {
   getTripById: (id: string) => AgencyTrip | undefined
   getTripsByClient: (clientId: string) => AgencyTrip[]
   documents: AgencyDocument[]
-  addDocument: (data: Omit<AgencyDocument, "id" | "createdAt"> & { file?: File | null }) => Promise<AgencyDocument | null>
+  addDocument: (
+    data: Omit<AgencyDocument, "id" | "createdAt"> & { file?: File | null }
+  ) => Promise<{
+    document: AgencyDocument
+    flightExtractionStatus: "not_applicable" | "started" | "failed"
+    extractionError?: string | null
+  } | null>
   deleteDocument: (id: string) => Promise<boolean>
   getDocumentsByTrip: (tripId: string) => AgencyDocument[]
   getDocumentsByClient: (clientId: string) => AgencyDocument[]
@@ -293,6 +300,7 @@ function mapDocumentRecordToAgencyDocument(document: {
     type:
       document.type === "voucher" ||
       document.type === "ticket" ||
+      document.type === "admission_ticket" ||
       document.type === "passport" ||
       document.type === "visa" ||
       document.type === "insurance" ||
@@ -1139,8 +1147,10 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
         return null
       }
 
+      const isFlightDocument = data.type === "ticket"
       const safeName = sanitizeFileName(data.file.name)
-      const path = `${user.id}/${agencyId}/${data.tripId}/${data.type}/${Date.now()}-${safeName}`
+      const storageFolder = isFlightDocument ? "tickets" : data.type
+      const path = `${user.id}/${agencyId}/${data.tripId}/${storageFolder}/${Date.now()}-${safeName}`
       const uploadResult = await uploadDocumentFile({ file: data.file, path })
 
       if (!uploadResult.data) {
@@ -1159,8 +1169,8 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
         fileUrl: uploadResult.data.fileUrl ?? null,
         mimeType: data.file.type || null,
         size: data.file.size ?? null,
-        isPrivate: data.isPrivate,
-        visibility: data.visibility ?? (data.isPrivate ? "private" : "agency_only"),
+        isPrivate: isFlightDocument ? false : data.isPrivate,
+        visibility: isFlightDocument ? "public_trip" : (data.visibility ?? (data.isPrivate ? "private" : "agency_only")),
       })
 
       if (!metadataResult.data) {
@@ -1169,9 +1179,47 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
       }
 
       const newDocument = mapDocumentRecordToAgencyDocument(metadataResult.data)
+      let flightExtractionStatus: "not_applicable" | "started" | "failed" = "not_applicable"
+      let extractionError: string | null = null
+
+      if (isFlightDocument && data.tripId) {
+        const flightResult = await upsertTripFlight({
+          tripId: data.tripId,
+          documentId: metadataResult.data.id,
+          extractionStatus: "pending",
+          extractedData: {
+            source: "agency_documents_upload",
+            created_from: "agency_portal",
+          },
+        })
+
+        if (!flightResult.data) {
+          flightExtractionStatus = "failed"
+          extractionError = flightResult.error ?? "Nao foi possivel preparar a extracao da passagem."
+        } else {
+          const extractionResult = await requestTripFlightExtraction({
+            tripId: data.tripId,
+            documentId: metadataResult.data.id,
+            flightId: flightResult.data.id,
+            tripSlug: getTripById(data.tripId)?.slug ?? null,
+          })
+
+          if (extractionResult.error) {
+            flightExtractionStatus = "failed"
+            extractionError = extractionResult.error
+          } else {
+            flightExtractionStatus = "started"
+          }
+        }
+      }
+
       setWorkspaceError(null)
       setDocuments((prev) => [newDocument, ...prev])
-      return newDocument
+      return {
+        document: newDocument,
+        flightExtractionStatus,
+        extractionError,
+      }
     }
 
     const newDocument: AgencyDocument = {
@@ -1181,8 +1229,12 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
     }
     setDocuments((prev) => [newDocument, ...prev])
     addActivity("Documento enviado", data.name, "document")
-    return newDocument
-  }, [addActivity, agencyId, isUsingRealData, user?.id])
+    return {
+      document: newDocument,
+      flightExtractionStatus: "not_applicable",
+      extractionError: null,
+    }
+  }, [addActivity, agencyId, getTripById, isUsingRealData, user?.id])
 
   const deleteDocument = useCallback(async (id: string) => {
     if (isUsingRealData) {
