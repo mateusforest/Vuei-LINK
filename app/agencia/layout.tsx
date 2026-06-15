@@ -31,6 +31,7 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { AgencyProvider, useAgency } from "@/contexts/agency-context"
 import { RouteGuard } from "@/components/auth/route-guard"
 import { useAuth } from "@/contexts/auth-context"
@@ -65,7 +66,7 @@ function AgencyLayoutInner({ children }: { children: React.ReactNode }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [notificationsOpen, setNotificationsOpen] = useState(false)
   const { profile } = useAuth()
-  const { credits, conciergeRequests, agency, workspaceLoading } = useAgency()
+  const { credits, conciergeRequests, agency, workspaceLoading, subscription, limitDialog, clearLimitDialog } = useAgency()
   const [agencyNotifications, setAgencyNotifications] = useState([
     {
       id: "agency-notification-1",
@@ -81,7 +82,7 @@ function AgencyLayoutInner({ children }: { children: React.ReactNode }) {
       message: "Seu saldo atual merece acompanhamento antes da proxima campanha.",
       type: "warning",
       read: false,
-      href: "/agencia/creditos",
+      href: "/agencia/planos",
     },
     {
       id: "agency-notification-3",
@@ -96,7 +97,7 @@ function AgencyLayoutInner({ children }: { children: React.ReactNode }) {
   const pendingRequests = conciergeRequests.filter(r => r.status === "pending").length
   const unreadNotifications = agencyNotifications.filter((notification) => !notification.read).length
   const displayName = agency?.name || profile?.name || "Agencia"
-  const displayPlan = agency?.plan ? agency.plan[0].toUpperCase() + agency.plan.slice(1) : "Agency"
+  const displayPlan = subscription.definition.name
   const headerImageUrl = agency?.logo || profile?.avatarUrl || undefined
   const initials = displayName
     .split(" ")
@@ -324,9 +325,9 @@ function AgencyLayoutInner({ children }: { children: React.ReactNode }) {
                       transition={{ duration: 1, delay: 0.5 }}
                     />
                   </div>
-                  <Link href="/agencia/creditos">
+                  <Link href="/agencia/planos">
                     <Button size="sm" className="w-full bg-primary/20 text-primary hover:bg-primary/30">
-                      Comprar mais
+                      Ver planos
                     </Button>
                   </Link>
                 </div>
@@ -527,6 +528,28 @@ function AgencyLayoutInner({ children }: { children: React.ReactNode }) {
           })}
         </div>
       </nav>
+
+      <Dialog open={Boolean(limitDialog)} onOpenChange={(open) => { if (!open) clearLimitDialog() }}>
+        <DialogContent className="border-white/10 bg-card sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{limitDialog?.title}</DialogTitle>
+            <DialogDescription>{limitDialog?.description}</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            {limitDialog?.actionHref ? (
+              <Button asChild className="w-full bg-gradient-to-r from-primary to-accent text-white">
+                <Link href={limitDialog.actionHref} onClick={() => clearLimitDialog()}>
+                  {limitDialog.actionLabel}
+                </Link>
+              </Button>
+            ) : (
+              <Button className="w-full bg-gradient-to-r from-primary to-accent text-white" onClick={() => clearLimitDialog()}>
+                {limitDialog?.actionLabel ?? "Entendi"}
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

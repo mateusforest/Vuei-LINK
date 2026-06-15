@@ -31,7 +31,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { useMaster } from "@/contexts/master-context"
 import { getAppUrl } from "@/lib/app-url"
 
 const fadeInUp = {
@@ -64,8 +63,29 @@ const integrations = [
   { name: "Sentry", status: "connected", description: "Monitoramento de erros" },
 ]
 
+const agencyPlans = [
+  {
+    code: "start",
+    name: "Start",
+    price: "R$ 69,90/mes",
+    limits: ["3 usuarios", "20 viagens ativas", "350 creditos por mes"],
+  },
+  {
+    code: "pro",
+    name: "Pro",
+    price: "R$ 109,90/mes",
+    badge: "Mais popular",
+    limits: ["5 usuarios", "100 viagens ativas", "600 creditos por mes"],
+  },
+  {
+    code: "business",
+    name: "Business",
+    price: "R$ 249,90/mes",
+    limits: ["15 usuarios", "220 viagens ativas", "1.500 creditos por mes"],
+  },
+]
+
 export default function MasterConfiguracoesPage() {
-  const { addActivity } = useMaster()
   const [activeSection, setActiveSection] = useState("plataforma")
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -75,11 +95,6 @@ export default function MasterConfiguracoesPage() {
     setTimeout(() => {
       setSaving(false)
       setSaved(true)
-      addActivity({
-        type: "system",
-        description: "Configuracoes da plataforma atualizadas",
-        entityName: "Sistema"
-      })
       setTimeout(() => setSaved(false), 2000)
     }, 1000)
   }
@@ -272,6 +287,51 @@ export default function MasterConfiguracoesPage() {
                     </div>
                   </div>
                 </div>
+              </div>
+            </Card>
+          )}
+
+          {/* Integrations */}
+          {activeSection === "planos" && (
+            <Card className="border-white/5 bg-black/40 backdrop-blur-xl p-6">
+              <h2 className="text-lg font-semibold text-foreground mb-6">Planos B2B da Agencia</h2>
+
+              <div className="grid gap-4 md:grid-cols-3">
+                {agencyPlans.map((plan) => (
+                  <div
+                    key={plan.code}
+                    className={`rounded-2xl border p-5 ${
+                      plan.code === "pro"
+                        ? "border-primary/30 bg-gradient-to-br from-primary/10 to-accent/10"
+                        : "border-white/10 bg-white/[0.02]"
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-lg font-semibold text-foreground">{plan.name}</p>
+                        <p className="text-sm text-muted-foreground">{plan.price}</p>
+                      </div>
+                      {plan.badge ? (
+                        <span className="rounded-full bg-primary px-2.5 py-1 text-[10px] font-semibold text-white">
+                          {plan.badge}
+                        </span>
+                      ) : null}
+                    </div>
+
+                    <div className="mt-4 space-y-2 text-sm text-muted-foreground">
+                      {plan.limits.map((limit) => (
+                        <div key={limit} className="flex items-center gap-2">
+                          <Users className="h-3.5 w-3.5 text-primary" />
+                          <span>{limit}</span>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="mt-5 rounded-xl border border-white/10 bg-black/20 p-3 text-xs text-muted-foreground">
+                      Configuracao inicial pronta para futura integracao Stripe. Sem cobranca nesta etapa.
+                    </div>
+                  </div>
+                ))}
               </div>
             </Card>
           )}

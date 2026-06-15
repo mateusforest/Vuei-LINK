@@ -90,6 +90,36 @@ export interface Database {
           updated_at?: string
         }
       }
+      agency_subscriptions: {
+        Row: {
+          id: string
+          agency_id: string
+          plan_code: "start" | "pro" | "business"
+          status: "active" | "inactive" | "cancelled"
+          started_at: string | null
+          expires_at: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          agency_id: string
+          plan_code?: "start" | "pro" | "business"
+          status?: "active" | "inactive" | "cancelled"
+          started_at?: string | null
+          expires_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          agency_id?: string
+          plan_code?: "start" | "pro" | "business"
+          status?: "active" | "inactive" | "cancelled"
+          started_at?: string | null
+          expires_at?: string | null
+          updated_at?: string
+        }
+      }
       ai_conversations: {
         Row: {
           id: string

@@ -37,7 +37,15 @@ import {
   listMessagesByConversationIds,
   updateConversationStatus,
 } from "@/lib/repositories/ai-repository"
-import type { Agency } from "@/types"
+import type { Agency, AgencyCommercialPlanCode, AgencyLimitDialogState, AgencyPlanSnapshot } from "@/types"
+import {
+  AGENCY_PLAN_LIMIT_ERROR,
+  AGENCY_TEAM_LIMIT_ERROR,
+  getAgencyPlanLimitDialog,
+  isAgencyActiveTripStatus,
+  resolveAgencyPlanSnapshot,
+} from "@/lib/billing/agency-plans"
+import { getAgencyBillingStatus, setAgencyPlanSelection } from "@/lib/repositories/agency-billing-repository"
 
 export interface Client extends Pick<CanonicalClient, "id" | "name"> {
   id: string
@@ -141,10 +149,16 @@ export interface Activity {
 
 interface AgencyCredits {
   balance: number
-  plan: "starter" | "professional" | "enterprise"
+  plan: AgencyCommercialPlanCode
   history: { action: string; amount: number; date: string; source: string }[]
   canonicalBalance?: CreditBalance
   canonicalTransactions?: CreditTransaction[]
+}
+
+type AgencyAddDocumentResult = {
+  document: AgencyDocument
+  flightExtractionStatus: "not_applicable" | "started" | "failed"
+  extractionError?: string
 }
 
 interface AgencyContextType {
@@ -162,11 +176,7 @@ interface AgencyContextType {
   documents: AgencyDocument[]
   addDocument: (
     data: Omit<AgencyDocument, "id" | "createdAt"> & { file?: File | null }
-  ) => Promise<{
-    document: AgencyDocument
-    flightExtractionStatus: "not_applicable" | "started" | "failed"
-    extractionError?: string | null
-  } | null>
+  ) => Promise<AgencyAddDocumentResult | null>
   deleteDocument: (id: string) => Promise<boolean>
   getDocumentsByTrip: (tripId: string) => AgencyDocument[]
   getDocumentsByClient: (clientId: string) => AgencyDocument[]
@@ -179,6 +189,12 @@ interface AgencyContextType {
   updateTeamMember: (id: string, data: Partial<TeamMember>) => Promise<{ success: boolean; error: string | null }>
   removeTeamMember: (id: string) => Promise<{ success: boolean; error: string | null }>
   credits: AgencyCredits
+  subscription: AgencyPlanSnapshot
+  activeTripsCount: number
+  teamSeatsUsed: number
+  limitDialog: AgencyLimitDialogState | null
+  clearLimitDialog: () => void
+  updateSubscriptionPlan: (planCode: AgencyCommercialPlanCode) => Promise<{ success: boolean; error: string | null }>
   useCredits: (amount: number, source: string, action: string) => boolean
   addCredits: (amount: number) => void
   activities: Activity[]
@@ -352,9 +368,34 @@ function buildCanonicalCredits(balance: number, history: AgencyCredits["history"
   }
 }
 
+function buildAgencyCredits(balance: number, planCode: AgencyCommercialPlanCode, history: AgencyCredits["history"] = []): AgencyCredits {
+  return {
+    balance,
+    plan: planCode,
+    history,
+    ...buildCanonicalCredits(balance, history),
+  }
+}
+
+function getActiveAgencyTeamMembersCount(teamMembers: TeamMember[]) {
+  return teamMembers.filter((member) => member.status !== "inactive").length
+}
+
+function getOperationError(result: unknown): string | null {
+  if (
+    result &&
+    typeof result === "object" &&
+    "error" in result &&
+    typeof (result as { error?: unknown }).error === "string"
+  ) {
+    return (result as { error: string }).error
+  }
+
+  return null
+}
+
 const AGENCY_STORAGE_KEY = "vuei_agency"
 const AGENCY_WORKSPACE_CACHE_KEY = "vuei_agency_workspace_cache"
-type PersistedAgencyState = AgencyStorageState<AgencyTrip, AgencyDocument, ConciergeRequest, TeamMember, Activity, AgencyCredits>
 const ACTIVE_CLIENT_TRIP_STATUSES: TripStatus[] = ["draft", "upcoming", "ongoing"]
 
 const initialClients: Client[] = [
@@ -455,25 +496,19 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
   const [activities, setActivities] = useState<Activity[]>(isUsingRealData ? [] : initialActivities)
   const [credits, setCredits] = useState<AgencyCredits>(() => {
     if (isUsingRealData) {
-      return {
-        balance: 0,
-        plan: "starter",
-        history: [],
-        ...buildCanonicalCredits(0, []),
-      }
+      return buildAgencyCredits(0, "start", [])
     }
-    const history = [{ action: "Plano Professional", amount: 500, date: new Date().toISOString(), source: "Sistema" }]
-    return {
-      balance: 500,
-      plan: "professional",
-      history,
-      ...buildCanonicalCredits(500, history),
-    }
+    const history = [{ action: "Plano Start", amount: 350, date: new Date().toISOString(), source: "Sistema" }]
+    return buildAgencyCredits(350, "start", history)
   })
+  const [subscription, setSubscription] = useState<AgencyPlanSnapshot>(() => resolveAgencyPlanSnapshot({ planCode: "start" }))
+  const [limitDialog, setLimitDialog] = useState<AgencyLimitDialogState | null>(null)
   const [isLoaded, setIsLoaded] = useState(false)
   const clientNameById = useMemo(() => new Map(clients.map((client) => [client.id, client.name])), [clients])
   const lastWorkspaceKeyRef = useRef<string | null>(null)
   const hasWarmStateRef = useRef(false)
+  const activeTripsCount = trips.filter((trip) => isAgencyActiveTripStatus(trip.status)).length
+  const teamSeatsUsed = getActiveAgencyTeamMembersCount(teamMembers)
 
   useEffect(() => {
     hasWarmStateRef.current = Boolean(agency || clients.length || trips.length || documents.length || teamMembers.length)
@@ -495,6 +530,7 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
         conciergeRequests: ConciergeRequest[]
         teamMembers: TeamMember[]
         credits: AgencyCredits
+        subscription?: AgencyPlanSnapshot
         workspaceError: string | null
       }
 
@@ -506,6 +542,7 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
       setConciergeRequests(parsed.conciergeRequests)
       setTeamMembers(parsed.teamMembers)
       setCredits(parsed.credits)
+      setSubscription(parsed.subscription ?? resolveAgencyPlanSnapshot({ planCode: parsed.credits?.plan ?? "start" }))
       setWorkspaceError(parsed.workspaceError)
       setSetupIncomplete(false)
       setIsLoaded(true)
@@ -526,6 +563,7 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
     conciergeRequests: ConciergeRequest[]
     teamMembers: TeamMember[]
     credits: AgencyCredits
+    subscription?: AgencyPlanSnapshot
     workspaceError: string | null
   }) => {
     if (typeof window === "undefined") return
@@ -586,6 +624,7 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
         ...stored.credits,
         ...buildCanonicalCredits(stored.credits.balance, stored.credits.history),
       })
+      setSubscription(resolveAgencyPlanSnapshot({ planCode: stored.credits.plan }))
     }
 
     setIsLoaded(true)
@@ -594,7 +633,7 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!isLoaded || typeof window === "undefined" || isUsingRealData) return
 
-    const payload: PersistedAgencyState = {
+    const payload = {
       schemaVersion: AGENCY_STORAGE_SCHEMA_VERSION,
       clients,
       trips,
@@ -631,12 +670,8 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
       setConciergeRequests([])
       setTeamMembers([])
       setActivities([])
-      setCredits({
-        balance: 0,
-        plan: "starter",
-        history: [],
-        ...buildCanonicalCredits(0, []),
-      })
+      setCredits(buildAgencyCredits(0, "start", []))
+      setSubscription(resolveAgencyPlanSnapshot({ planCode: "start" }))
       setIsLoaded(true)
       setWorkspaceLoading(false)
       return
@@ -663,12 +698,8 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
         setConciergeRequests([])
         setTeamMembers([])
         setActivities([])
-        setCredits({
-          balance: 0,
-          plan: "starter",
-          history: [],
-          ...buildCanonicalCredits(0, []),
-        })
+        setCredits(buildAgencyCredits(0, "start", []))
+        setSubscription(resolveAgencyPlanSnapshot({ planCode: "start" }))
         setIsLoaded(true)
         return
       }
@@ -679,8 +710,9 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
           role: profile.role === "agency_member" ? "agency_member" : "agency_owner",
         })
 
-        if (!profileUpdate.data && profileUpdate.error) {
-          console.error("[AUTH ERROR]", profileUpdate.error)
+        const profileUpdateError = getOperationError(profileUpdate)
+        if (!profileUpdate.data && profileUpdateError) {
+          console.error("[AUTH ERROR]", profileUpdateError)
         }
       }
 
@@ -692,19 +724,25 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
         listDocuments({ agencyId: resolvedAgency.id }),
         listAgencyMembers(resolvedAgency.id),
       ])
+      const billingStatusResult = await getAgencyBillingStatus(resolvedAgency.id)
 
       const mappedClients: Client[] = (clientsResult.data ?? [])
-        .map((client) => ({
-          id: client.id,
-          name: client.name,
-          email: client.email ?? "",
-          phone: client.phone ?? "",
-          document: client.document ?? undefined,
-          notes: client.notes ?? undefined,
-          status: client.status === "inactive" || client.status === "archived" ? client.status : "active",
-          createdAt: client.createdAt,
-          updatedAt: client.updatedAt,
-        }))
+        .map((client) => {
+          const status: Client["status"] =
+            client.status === "inactive" || client.status === "archived" ? client.status : "active"
+
+          return {
+            id: client.id,
+            name: client.name,
+            email: client.email ?? "",
+            phone: client.phone ?? "",
+            document: client.document ?? undefined,
+            notes: client.notes ?? undefined,
+            status,
+            createdAt: client.createdAt,
+            updatedAt: client.updatedAt,
+          }
+        })
         .filter((client) => isVisibleAgencyClient(client))
 
       const tripClientNameMap = new Map(mappedClients.map((client) => [client.id, client.name]))
@@ -735,9 +773,14 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
         resolvedAgency.creditsBalance > 0
           ? [{ action: "Saldo da agencia", amount: resolvedAgency.creditsBalance, date: new Date().toISOString(), source: "Supabase" }]
           : []
+      const resolvedSubscription = resolveAgencyPlanSnapshot({
+        agency: resolvedAgency,
+        billingStatus: billingStatusResult.data ?? null,
+      })
 
       const primaryWorkspaceError =
         agencyResult.error ||
+        billingStatusResult.error ||
         clientsResult.error ||
         tripsResult.error ||
         documentsResult.error ||
@@ -753,12 +796,8 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
       setDocuments(mappedDocuments)
       setTeamMembers(mappedTeamMembers)
       setActivities([])
-      setCredits({
-        balance: resolvedAgency.creditsBalance,
-        plan: resolvedAgency.plan === "pro" ? "professional" : resolvedAgency.plan,
-        history,
-        ...buildCanonicalCredits(resolvedAgency.creditsBalance, history),
-      })
+      setCredits(buildAgencyCredits(resolvedAgency.creditsBalance, resolvedSubscription.code, history))
+      setSubscription(resolvedSubscription)
 
       persistWorkspaceCache(workspaceKey, {
         agency: resolvedAgency,
@@ -768,12 +807,8 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
         documents: mappedDocuments,
         conciergeRequests: [],
         teamMembers: mappedTeamMembers,
-        credits: {
-          balance: resolvedAgency.creditsBalance,
-          plan: resolvedAgency.plan === "pro" ? "professional" : resolvedAgency.plan,
-          history,
-          ...buildCanonicalCredits(resolvedAgency.creditsBalance, history),
-        },
+        credits: buildAgencyCredits(resolvedAgency.creditsBalance, resolvedSubscription.code, history),
+        subscription: resolvedSubscription,
         workspaceError: primaryWorkspaceError,
       })
 
@@ -799,17 +834,17 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
       const tripById = new Map(canonicalTrips.map((trip) => [trip.id, trip]))
 
       const mappedConciergeRequests: ConciergeRequest[] = conversations
-        .map((conversation) => {
-          if (!conversation.tripId) return null
+        .flatMap((conversation) => {
+          if (!conversation.tripId) return []
 
           const trip = tripById.get(conversation.tripId)
-          if (!trip) return null
+          if (!trip) return []
 
           const messages = (messagesByConversationId.get(conversation.id) ?? []).slice().sort((left, right) => {
             return new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime()
           })
           const userMessage = messages.find((message) => message.role === "user")
-          if (!userMessage) return null
+          if (!userMessage) return []
 
           const responseMessage = [...messages]
             .reverse()
@@ -817,7 +852,7 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
           const lastMessage = messages[messages.length - 1]
           const clientId = conversation.clientId ?? trip.clientId ?? ""
 
-          return {
+          return [{
             id: conversation.id,
             conversationId: conversation.id,
             tripId: trip.id,
@@ -841,9 +876,8 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
               content: message.content,
               createdAt: message.createdAt,
             })),
-          } satisfies ConciergeRequest
+          } satisfies ConciergeRequest]
         })
-        .filter((request): request is ConciergeRequest => Boolean(request))
         .sort((left, right) => {
           return new Date(right.lastInteractionAt ?? right.createdAt).getTime() - new Date(left.lastInteractionAt ?? left.createdAt).getTime()
         })
@@ -1004,6 +1038,12 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
   const getClientById = useCallback((id: string) => clients.find((client) => client.id === id), [clients])
 
   const addTrip = useCallback(async (data: Omit<AgencyTrip, "id" | "slug" | "adminLink" | "shareLink" | "createdAt" | "coverImage">) => {
+    if (activeTripsCount >= subscription.definition.maxActiveTrips) {
+      setWorkspaceError(null)
+      setLimitDialog(getAgencyPlanLimitDialog(subscription.code, "trip_limit"))
+      return null
+    }
+
     if (isUsingRealData) {
       if (!agencyId) {
         const message = "Agencia nao configurada no Supabase. Finalize o cadastro da agencia antes de criar viagens."
@@ -1031,6 +1071,11 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
       })
 
       if (!result.data) {
+        if (result.error === AGENCY_PLAN_LIMIT_ERROR) {
+          setWorkspaceError(null)
+          setLimitDialog(getAgencyPlanLimitDialog(subscription.code, "trip_limit"))
+          return null
+        }
         setWorkspaceError(result.error ?? "Nao foi possivel criar a viagem no Supabase.")
         return null
       }
@@ -1065,7 +1110,7 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
     setTrips((prev) => [newTrip, ...prev])
     addActivity("Viagem criada", `${data.name} para ${data.clientName}`, "trip")
     return newTrip
-  }, [addActivity, agencyId, clientNameById, isUsingRealData, trips, user?.id])
+  }, [activeTripsCount, addActivity, agencyId, clientNameById, isUsingRealData, subscription.code, subscription.definition.maxActiveTrips, trips, user?.id])
 
   const updateTrip = useCallback(async (id: string, data: Partial<AgencyTrip>) => {
     if (isUsingRealData) {
@@ -1131,7 +1176,9 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
   const getTripById = useCallback((id: string) => trips.find((trip) => trip.id === id), [trips])
   const getTripsByClient = useCallback((clientId: string) => trips.filter((trip) => trip.clientId === clientId), [trips])
 
-  const addDocument = useCallback(async (data: Omit<AgencyDocument, "id" | "createdAt"> & { file?: File | null }) => {
+  const addDocument = useCallback(async (
+    data: Omit<AgencyDocument, "id" | "createdAt"> & { file?: File | null }
+  ): Promise<AgencyAddDocumentResult | null> => {
     if (isUsingRealData) {
       if (!agencyId) {
         const message = "Agencia nao configurada no Supabase. Finalize o cadastro antes de enviar documentos."
@@ -1228,7 +1275,7 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
       return {
         document: newDocument,
         flightExtractionStatus,
-        extractionError,
+        extractionError: extractionError ?? undefined,
       }
     }
 
@@ -1242,7 +1289,7 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
     return {
       document: newDocument,
       flightExtractionStatus: "not_applicable",
-      extractionError: null,
+      extractionError: undefined,
     }
   }, [addActivity, agencyId, getTripById, isUsingRealData, user?.id])
 
@@ -1353,9 +1400,22 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
         return { success: false, error: message }
       }
 
+      const latestMembersResult = await listAgencyMembers(agencyId)
+      if (latestMembersResult.error) {
+        setWorkspaceError(latestMembersResult.error)
+        return { success: false, error: latestMembersResult.error }
+      }
+
+      const usedSeats = (latestMembersResult.data ?? []).filter((member) => member.status !== "inactive").length
+      if (usedSeats >= subscription.definition.maxUsers) {
+        setWorkspaceError(null)
+        setLimitDialog(getAgencyPlanLimitDialog(subscription.code, "team_limit"))
+        return { success: false, error: AGENCY_TEAM_LIMIT_ERROR }
+      }
+
       const existingProfile = await getProfileByEmail(data.email)
       if (!existingProfile.data) {
-        const message = existingProfile.error ?? "Convite de novo usuario ainda depende de fluxo de convite."
+        const message = getOperationError(existingProfile) ?? "Convite de novo usuario ainda depende de fluxo de convite."
         setWorkspaceError(message)
         return { success: false, error: message }
       }
@@ -1397,7 +1457,7 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
           avatarUrl: result.data.avatarUrl,
         })
 
-        const message = profileUpdateResult.error ?? "Membro vinculado, mas falhou ao atualizar o profile da equipe."
+        const message = getOperationError(profileUpdateResult) ?? "Membro vinculado, mas falhou ao atualizar o profile da equipe."
         setWorkspaceError(message)
         return { success: false, error: message }
       }
@@ -1427,10 +1487,17 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
       id: `team-${Date.now()}`,
       createdAt: new Date().toISOString(),
     }
+
+    if (teamSeatsUsed >= subscription.definition.maxUsers) {
+      setWorkspaceError(null)
+      setLimitDialog(getAgencyPlanLimitDialog(subscription.code, "team_limit"))
+      return { success: false, error: AGENCY_TEAM_LIMIT_ERROR }
+    }
+
     setTeamMembers((prev) => [...prev, newMember])
     addActivity("Membro convidado", data.name, "team")
     return { success: true, error: null }
-  }, [addActivity, agencyId, isUsingRealData, teamMembers])
+  }, [addActivity, agencyId, isUsingRealData, subscription.code, subscription.definition.maxUsers, teamMembers, teamSeatsUsed])
 
   const updateTeamMember = useCallback(async (id: string, data: Partial<TeamMember>) => {
     if (isUsingRealData) {
@@ -1515,7 +1582,7 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
         })
 
         if (!profileUpdateResult.data) {
-          const message = profileUpdateResult.error ?? "Membro desativado, mas falhou ao atualizar o profile vinculado."
+          const message = getOperationError(profileUpdateResult) ?? "Membro desativado, mas falhou ao atualizar o profile vinculado."
           setWorkspaceError(message)
           return { success: false, error: message }
         }
@@ -1565,6 +1632,31 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
     addActivity("Creditos adquiridos", `${amount} creditos`, "credits")
   }, [addActivity])
 
+  const clearLimitDialog = useCallback(() => {
+    setLimitDialog(null)
+  }, [])
+
+  const updateSubscriptionPlan = useCallback(async (planCode: AgencyCommercialPlanCode) => {
+    if (!agencyId) {
+      return { success: false, error: "Agencia nao configurada para atualizar o plano." }
+    }
+
+    const result = await setAgencyPlanSelection(agencyId, planCode)
+    if (!result.data) {
+      return { success: false, error: result.error ?? "Nao foi possivel atualizar o plano da agencia." }
+    }
+
+    const nextSubscription = resolveAgencyPlanSnapshot({ billingStatus: result.data })
+    setSubscription(nextSubscription)
+    setCredits((prev) => ({
+      ...prev,
+      plan: nextSubscription.code,
+    }))
+    setLimitDialog(null)
+
+    return { success: true, error: null }
+  }, [agencyId])
+
   return (
     <AgencyContext.Provider
       value={{
@@ -1593,6 +1685,12 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
         updateTeamMember,
         removeTeamMember,
         credits,
+        subscription,
+        activeTripsCount,
+        teamSeatsUsed,
+        limitDialog,
+        clearLimitDialog,
+        updateSubscriptionPlan,
         useCredits,
         addCredits,
         activities,

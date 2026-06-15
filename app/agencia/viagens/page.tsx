@@ -171,7 +171,7 @@ function LinksModal({ open, onClose, trip }: { open: boolean; onClose: () => voi
 }
 
 export default function TripsPage() {
-  const { trips, deleteTrip, getDocumentsByTrip, conciergeRequests, setupIncomplete, workspaceError } = useAgency()
+  const { trips, deleteTrip, getDocumentsByTrip, conciergeRequests, setupIncomplete, workspaceError, activeTripsCount, subscription } = useAgency()
   const [searchQuery, setSearchQuery] = useState("")
   const [filter, setFilter] = useState<"all" | "upcoming" | "ongoing" | "completed">("all")
   const [linksTrip, setLinksTrip] = useState<AgencyTrip | null>(null)
@@ -228,7 +228,7 @@ export default function TripsPage() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Viagens</h1>
-          <p className="mt-1 text-muted-foreground">{trips.length} viagens cadastradas</p>
+          <p className="mt-1 text-muted-foreground">{activeTripsCount} de {subscription.definition.maxActiveTrips} viagens ativas no plano</p>
         </div>
         <Link href="/agencia/viagens/criar">
           <Button className="gap-2 bg-gradient-to-r from-primary to-accent text-white hover:opacity-90">

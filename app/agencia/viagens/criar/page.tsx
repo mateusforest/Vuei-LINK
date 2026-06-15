@@ -103,7 +103,7 @@ function CreateTripPageContent() {
         setCreatedTrip(newTrip)
         setCompleted(true)
       } else {
-        setSubmitError(workspaceError || "Nao foi possivel criar a viagem no Supabase.")
+        setSubmitError(workspaceError || "")
       }
     }
   }

@@ -35,6 +35,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useAgency } from "@/contexts/agency-context"
+import { AGENCY_TEAM_LIMIT_ERROR } from "@/lib/billing/agency-plans"
 
 const roles = [
   { value: "admin", label: "Administrador", desc: "Acesso total ao sistema" },
@@ -43,7 +44,7 @@ const roles = [
 ]
 
 export default function TeamPage() {
-  const { teamMembers, addTeamMember, updateTeamMember, removeTeamMember, workspaceError } = useAgency()
+  const { teamMembers, addTeamMember, updateTeamMember, removeTeamMember, workspaceError, teamSeatsUsed, subscription } = useAgency()
   const [searchQuery, setSearchQuery] = useState("")
   const [inviteModalOpen, setInviteModalOpen] = useState(false)
   const [inviteEmail, setInviteEmail] = useState("")
@@ -94,6 +95,9 @@ export default function TeamPage() {
     })
 
     if (!result.success) {
+      if (result.error === AGENCY_TEAM_LIMIT_ERROR) {
+        return
+      }
       window.alert(result.error || "Nao foi possivel vincular o membro a agencia.")
       return
     }
@@ -124,7 +128,7 @@ export default function TeamPage() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Equipe</h1>
-          <p className="mt-1 text-muted-foreground">{safeTeam.length} membros</p>
+          <p className="mt-1 text-muted-foreground">{teamSeatsUsed} de {subscription.definition.maxUsers} usuarios ativos no plano</p>
         </div>
         <Button
           onClick={() => setInviteModalOpen(true)}

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { motion } from "framer-motion"
+import Link from "next/link"
 import {
   Building2,
   Palette,
@@ -38,6 +39,8 @@ import { useRouter } from "next/navigation"
 import { updateAgency as updateAgencyRepository } from "@/lib/repositories/agencies-repository"
 import { shouldUseSupabase } from "@/lib/data-source"
 import { createSupabaseBrowserClient } from "@/lib/supabase/client"
+import { mapCommercialPlanToLegacyAgencyPlan } from "@/lib/billing/agency-plans"
+import type { AgencyCommercialPlanCode } from "@/types"
 
 const settingsSections = [
   { id: "agency", label: "Dados da Agencia", icon: Building2 },
@@ -49,22 +52,22 @@ const settingsSections = [
 
 const mockPlans = [
   {
-    id: "starter",
-    name: "Starter",
-    price: "R$ 79/mes",
-    benefits: ["300 creditos por mes", "1 usuario", "Suporte padrao"],
+    id: "start",
+    name: "Start",
+    price: "R$ 69,90/mes",
+    benefits: ["350 creditos por mes", "3 usuarios", "20 viagens ativas"],
   },
   {
     id: "pro",
     name: "Pro",
-    price: "R$ 199/mes",
-    benefits: ["1000 creditos por mes", "5 usuarios", "Templates premium"],
+    price: "R$ 109,90/mes",
+    benefits: ["600 creditos por mes", "5 usuarios", "100 viagens ativas"],
   },
   {
-    id: "enterprise",
-    name: "Enterprise",
-    price: "R$ 499/mes",
-    benefits: ["Creditos expandidos", "Usuarios ilimitados", "Atendimento prioritario"],
+    id: "business",
+    name: "Business",
+    price: "R$ 249,90/mes",
+    benefits: ["1.500 creditos por mes", "15 usuarios", "220 viagens ativas"],
   },
 ]
 
@@ -73,7 +76,7 @@ const STORAGE_KEY = "vuei_agencia_configuracoes_frontend"
 export default function SettingsPage() {
   const router = useRouter()
   const { signOut, user, profile } = useAuth()
-  const { credits, agency, setupIncomplete, workspaceError, refreshAgencyWorkspace } = useAgency()
+  const { credits, agency, setupIncomplete, workspaceError, refreshAgencyWorkspace, subscription, activeTripsCount, teamSeatsUsed, updateSubscriptionPlan } = useAgency()
   const [activeSection, setActiveSection] = useState("agency")
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -91,7 +94,7 @@ export default function SettingsPage() {
     phone: "+55 11 99999-0000",
     address: "Av. Paulista, 1000 - Sao Paulo, SP",
     logo: "",
-    plan: "Pro",
+    plan: "Start",
   })
   const [brandingData, setBrandingData] = useState({
     linkLogo: "",
@@ -122,7 +125,7 @@ export default function SettingsPage() {
           phone: agency.settings?.phone || profile?.phone || prev.phone,
           address: agency.settings?.address || prev.address,
           logo: agency.logo || prev.logo,
-          plan: agency.plan ? agency.plan[0].toUpperCase() + agency.plan.slice(1) : prev.plan,
+          plan: subscription.definition.name,
         }))
         setBrandingData({
           linkLogo: agency.branding?.linkLogoUrl || "",
@@ -152,7 +155,7 @@ export default function SettingsPage() {
     } catch {
       // fallback silencioso
     }
-  }, [agency, profile?.email, profile?.phone])
+  }, [agency, profile?.email, profile?.phone, subscription.definition.name])
 
   useEffect(() => {
     if (typeof window === "undefined") return
@@ -208,7 +211,7 @@ export default function SettingsPage() {
       const updateResult = await updateAgencyRepository(agency.id, {
         name: agencyData.name,
         logo: nextLogo || null,
-        plan: agencyData.plan.toLowerCase() as "starter" | "pro" | "enterprise",
+        plan: mapCommercialPlanToLegacyAgencyPlan(subscription.code),
         settings: {
           ...(agency.settings ?? {
             email: null,
@@ -598,33 +601,38 @@ export default function SettingsPage() {
                 <CardContent className="p-6">
                   <div className="flex items-start justify-between gap-4">
                     <div>
-                      <Badge className="bg-primary text-white">Plano {agencyData.plan}</Badge>
-                      <p className="mt-2 text-2xl font-bold text-foreground">R$ 199/mes</p>
-              <p className="text-sm text-muted-foreground">
-                {agency ? "Plano salvo na agencia real do Supabase" : "Plano ainda nao vinculado a uma agencia real"}
-              </p>
+                      <Badge className="bg-primary text-white">Plano {subscription.definition.name}</Badge>
+                      <p className="mt-2 text-2xl font-bold text-foreground">{subscription.definition.priceLabel}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {agency ? "Plano salvo na camada comercial da agencia" : "Plano ainda nao vinculado a uma agencia real"}
+                      </p>
                     </div>
-                    <Button variant="outline" className="border-white/10" onClick={() => setShowPlanModal(true)}>
-                      Alterar Plano
-                    </Button>
+                    <div className="flex flex-col gap-2 sm:flex-row">
+                      <Button asChild variant="outline" className="border-white/10">
+                        <Link href="/agencia/planos">Conhecer planos</Link>
+                      </Button>
+                      <Button variant="outline" className="border-white/10" onClick={() => setShowPlanModal(true)}>
+                        Ajustar plano interno
+                      </Button>
+                    </div>
                   </div>
                   <hr className="my-4 border-white/10" />
                   <div className="grid gap-2 text-sm">
                     <div className="flex items-center gap-2 text-muted-foreground">
                       <div className="h-1.5 w-1.5 rounded-full bg-primary" />
-                      1000 creditos IA inclusos/mes (Saldo: {credits.balance})
+                      {subscription.definition.monthlyCredits} creditos IA inclusos por mes (Saldo atual: {credits.balance})
                     </div>
                     <div className="flex items-center gap-2 text-muted-foreground">
                       <div className="h-1.5 w-1.5 rounded-full bg-primary" />
-                      Concierge ilimitado
+                      Ate {subscription.definition.maxUsers} usuarios ativos na equipe
                     </div>
                     <div className="flex items-center gap-2 text-muted-foreground">
                       <div className="h-1.5 w-1.5 rounded-full bg-primary" />
-                      5 usuarios
+                      Ate {subscription.definition.maxActiveTrips} viagens ativas
                     </div>
                     <div className="flex items-center gap-2 text-muted-foreground">
                       <div className="h-1.5 w-1.5 rounded-full bg-primary" />
-                      Templates premium
+                      Em uso agora: {teamSeatsUsed} usuarios e {activeTripsCount} viagens ativas
                     </div>
                   </div>
                 </CardContent>
@@ -712,16 +720,16 @@ export default function SettingsPage() {
         <DialogContent className="border-white/10 bg-card sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>Alterar plano</DialogTitle>
-            <DialogDescription>Escolha um plano para a sua operacao sem integrar pagamento agora.</DialogDescription>
+            <DialogDescription>Escolha um plano para a sua operacao sem integrar pagamento nesta etapa.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="rounded-xl border border-primary/20 bg-primary/5 p-4">
               <p className="text-sm text-muted-foreground">Plano atual</p>
-              <p className="text-lg font-semibold text-foreground">{agencyData.plan}</p>
+              <p className="text-lg font-semibold text-foreground">{subscription.definition.name}</p>
             </div>
             <div className="grid gap-3 md:grid-cols-3">
               {mockPlans.map((plan) => (
-                <div key={plan.id} className={`rounded-xl border p-4 ${agencyData.plan.toLowerCase() === plan.id ? "border-primary/40 bg-primary/5" : "border-white/10 bg-white/[0.02]"}`}>
+                <div key={plan.id} className={`rounded-xl border p-4 ${subscription.code === plan.id ? "border-primary/40 bg-primary/5" : "border-white/10 bg-white/[0.02]"}`}>
                   <p className="font-semibold text-foreground">{plan.name}</p>
                   <p className="mt-1 text-sm text-muted-foreground">{plan.price}</p>
                   <div className="mt-3 space-y-2">
@@ -731,13 +739,19 @@ export default function SettingsPage() {
                   </div>
                   <Button
                     className="mt-4 w-full bg-gradient-to-r from-primary to-accent text-white"
-                    onClick={() => {
+                    onClick={async () => {
+                      const result = await updateSubscriptionPlan(plan.id as AgencyCommercialPlanCode)
+                      if (!result.success) {
+                        showToast(result.error || "Nao foi possivel atualizar o plano.")
+                        return
+                      }
+
                       setAgencyData((prev) => ({ ...prev, plan: plan.name }))
                       setShowPlanModal(false)
-                      showToast(shouldUseSupabase() ? `Plano ${plan.name} selecionado. Clique em salvar para persistir.` : `Plano ${plan.name} selecionado.`)
+                      showToast(`Plano ${plan.name} selecionado sem cobranca real nesta etapa.`)
                     }}
                   >
-                    Selecionar plano
+                    {subscription.code === plan.id ? "Plano atual" : "Selecionar plano"}
                   </Button>
                 </div>
               ))}

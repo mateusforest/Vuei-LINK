@@ -1,88 +1,27 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import Link from "next/link"
 import { motion } from "framer-motion"
-import {
-  Sparkles,
-  TrendingUp,
-  Clock,
-  Zap,
-  CreditCard,
-  CheckCircle,
-  ArrowRight,
-  Crown,
-  Check,
-} from "lucide-react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
+import { Coins, TrendingUp, Clock, Crown, ChevronRight, Gift } from "lucide-react"
+import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
+import { Button } from "@/components/ui/button"
+import { Progress } from "@/components/ui/progress"
 import { useAgency } from "@/contexts/agency-context"
 import { shouldUseSupabase } from "@/lib/data-source"
 import { getCreditBalance, listCreditTransactions } from "@/lib/repositories/credits-repository"
 import type { CreditTransaction } from "@/types"
 
-const packages = [
-  {
-    id: 1,
-    name: "Starter",
-    credits: 500,
-    price: 49,
-    pricePerCredit: "R$ 0,10",
-    popular: false,
-  },
-  {
-    id: 2,
-    name: "Pro",
-    credits: 1500,
-    price: 119,
-    pricePerCredit: "R$ 0,08",
-    popular: true,
-    savings: "20%",
-  },
-  {
-    id: 3,
-    name: "Business",
-    credits: 5000,
-    price: 349,
-    pricePerCredit: "R$ 0,07",
-    popular: false,
-    savings: "30%",
-  },
-]
+const fadeInUp = {
+  initial: { opacity: 0, y: 20 },
+  animate: { opacity: 1, y: 0 },
+  transition: { duration: 0.45 },
+}
 
-const plans = [
-  {
-    name: "Basico",
-    price: 0,
-    features: ["100 creditos/mes", "Concierge basico", "1 usuario"],
-    current: false,
-  },
-  {
-    name: "Pro",
-    price: 199,
-    features: ["1000 creditos/mes", "Concierge ilimitado", "5 usuarios", "Templates premium", "Suporte prioritario"],
-    current: true,
-  },
-  {
-    name: "Enterprise",
-    price: 499,
-    features: ["Creditos ilimitados", "API acesso", "Usuarios ilimitados", "White label", "Gerente dedicado"],
-    current: false,
-  },
-]
-
-export default function CreditsPage() {
-  const { credits, addCredits, agencyId } = useAgency()
+export default function AgencyCreditsPage() {
+  const { agencyId, credits, subscription } = useAgency()
   const isRealMode = shouldUseSupabase()
-  const [purchasing, setPurchasing] = useState<number | null>(null)
-  const [upgradeOpen, setUpgradeOpen] = useState(false)
   const [realBalance, setRealBalance] = useState<number | null>(null)
   const [realHistory, setRealHistory] = useState<CreditTransaction[]>([])
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -112,14 +51,6 @@ export default function CreditsPage() {
     }
   }, [agencyId, isRealMode])
 
-  const handlePurchase = async (pkg: typeof packages[0]) => {
-    if (isRealMode) return
-    setPurchasing(pkg.id)
-    await new Promise(resolve => setTimeout(resolve, 1500))
-    addCredits(pkg.credits)
-    setPurchasing(null)
-  }
-
   const effectiveBalance = isRealMode ? (realBalance ?? 0) : credits.balance
   const effectiveHistory = useMemo(
     () =>
@@ -129,324 +60,131 @@ export default function CreditsPage() {
             amount: transaction.amount,
             date: transaction.createdAt,
             source: transaction.source || "Supabase",
-            description:
-              typeof transaction.metadata?.description === "string"
-                ? transaction.metadata.description
-                : undefined,
           }))
         : credits.history,
     [credits.history, isRealMode, realHistory],
   )
 
-  // Calculate usage stats
-  const todayUsage = effectiveHistory
-    .filter(h => {
-      const today = new Date().toDateString()
-      return new Date(h.date).toDateString() === today && h.amount < 0
-    })
-    .reduce((sum, h) => sum + Math.abs(h.amount), 0)
+  const grantedCredits = effectiveHistory.reduce((sum, item) => (item.amount > 0 ? sum + item.amount : sum), 0)
+  const usedCredits = effectiveHistory.reduce((sum, item) => (item.amount < 0 ? sum + Math.abs(item.amount) : sum), 0)
+  const usageBase = Math.max(grantedCredits, effectiveBalance + usedCredits, subscription.definition.monthlyCredits, 1)
+  const usagePercentage = (usedCredits / usageBase) * 100
 
-  const weekUsage = effectiveHistory
-    .filter(h => {
-      const weekAgo = new Date()
-      weekAgo.setDate(weekAgo.getDate() - 7)
-      return new Date(h.date) > weekAgo && h.amount < 0
-    })
-    .reduce((sum, h) => sum + Math.abs(h.amount), 0)
+  const formatDate = (dateStr: string) => {
+    const date = new Date(dateStr)
+    const now = new Date()
+    const diffMs = now.getTime() - date.getTime()
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+
+    if (diffDays === 0) return "Hoje"
+    if (diffDays === 1) return "Ontem"
+    if (diffDays < 7) return `Ha ${diffDays} dias`
+    return date.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })
+  }
 
   return (
-    <div className="space-y-6 pb-20 lg:pb-0">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">Creditos IA</h1>
-        <p className="mt-1 text-muted-foreground">Gerencie seus creditos e plano</p>
-      </div>
+    <div className="mx-auto max-w-5xl space-y-6">
+      <motion.div {...fadeInUp} className="flex items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold">Creditos IA</h1>
+          <p className="text-sm text-muted-foreground">Saldo, consumo e capacidade do plano atual da agencia.</p>
+        </div>
+        <Badge className="border-amber-500/30 bg-gradient-to-r from-amber-500/20 to-amber-600/20 text-amber-300">
+          <Crown size={14} className="mr-1" />
+          {subscription.definition.name}
+        </Badge>
+      </motion.div>
 
-      {/* Balance Card */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-      >
-        <Card className="overflow-hidden border-white/5 bg-gradient-to-br from-card via-primary/5 to-accent/5">
-          <CardContent className="p-6">
-            <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-              <div>
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Sparkles className="h-4 w-4 text-primary" />
-                  Saldo disponivel
-                </div>
-                <div className="mt-2 flex items-baseline gap-2">
-                  <span className="text-4xl font-bold text-foreground">{effectiveBalance.toLocaleString()}</span>
-                  <span className="text-muted-foreground">creditos</span>
-                </div>
-                <div className="mt-4 h-2 w-64 overflow-hidden rounded-full bg-white/10">
-                  <motion.div
-                    className="h-full rounded-full bg-gradient-to-r from-primary to-accent"
-                    initial={{ width: 0 }}
-                    animate={{ width: `${Math.min((effectiveBalance / 5000) * 100, 100)}%` }}
-                    transition={{ duration: 1, delay: 0.3 }}
-                  />
-                </div>
-                <p className="mt-2 text-xs text-muted-foreground">
-                  {Math.round((effectiveBalance / 5000) * 100)}% do limite maximo
-                </p>
+      <motion.div {...fadeInUp}>
+        <Card className="overflow-hidden border-primary/20 bg-gradient-to-br from-primary/10 via-card/60 to-secondary/10 p-6 vuei-glass">
+          <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Coins size={16} className="text-primary" />
+                Saldo disponivel
               </div>
-
-              <div className="grid grid-cols-3 gap-4">
-                <div className="rounded-xl border border-white/5 bg-white/[0.02] p-4 text-center">
-                  <Zap className="mx-auto h-5 w-5 text-primary" />
-                  <p className="mt-2 text-2xl font-bold text-foreground">{todayUsage}</p>
-                  <p className="text-xs text-muted-foreground">Usados hoje</p>
+              <div className="flex items-baseline gap-3">
+                <span className="text-5xl font-bold vuei-gradient-text">{effectiveBalance}</span>
+                <span className="text-muted-foreground">creditos</span>
+              </div>
+              <div className="space-y-1 text-sm text-muted-foreground">
+                <div className="flex items-center gap-2 text-green-400">
+                  <Gift size={14} />
+                  <span>{subscription.definition.monthlyCredits} creditos mensais no plano {subscription.definition.name}</span>
                 </div>
-                <div className="rounded-xl border border-white/5 bg-white/[0.02] p-4 text-center">
-                  <Clock className="mx-auto h-5 w-5 text-accent" />
-                  <p className="mt-2 text-2xl font-bold text-foreground">{weekUsage}</p>
-                  <p className="text-xs text-muted-foreground">Esta semana</p>
-                </div>
-                <div className="rounded-xl border border-white/5 bg-white/[0.02] p-4 text-center">
-                  <TrendingUp className="mx-auto h-5 w-5 text-green-400" />
-                  <p className="mt-2 text-2xl font-bold text-foreground">+12%</p>
-                  <p className="text-xs text-muted-foreground">vs mes ant.</p>
-                </div>
+                <div>{subscription.definition.maxUsers} usuarios e {subscription.definition.maxActiveTrips} viagens ativas inclusos</div>
               </div>
             </div>
-          </CardContent>
+
+            <div className="space-y-3 lg:text-right">
+              <div className="flex items-center gap-2 lg:justify-end">
+                <TrendingUp size={14} className="text-muted-foreground" />
+                <span className="text-sm text-muted-foreground">
+                  {usedCredits} de {usageBase} utilizados
+                </span>
+              </div>
+              <Progress value={usagePercentage} className="h-2 w-full lg:w-52" />
+              <p className="text-xs text-muted-foreground">
+                Sem compra real nesta etapa. O plano da agencia prepara a arquitetura para futura integracao Stripe.
+              </p>
+            </div>
+          </div>
         </Card>
       </motion.div>
 
       {loadError ? (
-        <Card className="border-red-500/20 bg-red-500/10 p-4 text-sm text-red-300">
-          {loadError}
-        </Card>
+        <motion.div {...fadeInUp}>
+          <Card className="border-red-500/20 bg-red-500/10 p-4 text-sm text-red-300">
+            {loadError}
+          </Card>
+        </motion.div>
       ) : null}
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        {/* Usage History */}
-        <Card className="border-white/5 bg-card/50 lg:col-span-2">
-          <CardHeader className="pb-2">
-            <CardTitle className="flex items-center gap-2 text-base font-semibold">
-              <Clock className="h-4 w-4 text-primary" />
-              Historico de Uso
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {effectiveHistory.length === 0 ? (
-              <div className="py-8 text-center text-muted-foreground">
-                Nenhum historico ainda
-              </div>
-            ) : (
-              effectiveHistory.slice(0, 6).map((item, index) => (
-                <motion.div
-                  key={index}
-                  initial={{ opacity: 0, x: -10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: index * 0.05 }}
-                  className="flex items-center justify-between rounded-lg border border-white/5 bg-white/[0.02] p-3"
-                >
-                  <div className="flex items-center gap-3">
-                    <div
-                      className={`rounded-lg p-2 ${
-                        item.amount > 0 ? "bg-green-500/10" : "bg-primary/10"
-                      }`}
-                    >
-                      {item.amount > 0 ? (
-                        <CreditCard className="h-4 w-4 text-green-400" />
-                      ) : (
-                        <Sparkles className="h-4 w-4 text-primary" />
-                      )}
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-foreground">{item.action}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {new Date(item.date).toLocaleDateString("pt-BR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
-                        {item.description && ` - ${item.description}`}
-                      </p>
-                    </div>
-                  </div>
-                  <span
-                    className={`font-semibold ${
-                      item.amount > 0 ? "text-green-400" : "text-muted-foreground"
-                    }`}
-                  >
-                    {item.amount > 0 ? "+" : ""}
-                    {item.amount}
-                  </span>
-                </motion.div>
-              ))
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Buy Credits */}
-        <div className="space-y-4">
-          <h3 className="text-sm font-medium text-muted-foreground">Comprar Creditos</h3>
-          {packages.map((pkg, index) => (
-            <motion.div
-              key={pkg.id}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.1 }}
-            >
-              <Card
-                className={`border-white/5 bg-card/50 transition-all hover:border-primary/20 ${
-                  pkg.popular ? "border-primary/50 bg-primary/5" : ""
-                }`}
-              >
-                <CardContent className="p-4">
-                  {pkg.popular && (
-                    <Badge className="mb-2 bg-primary text-[10px] text-white">Mais popular</Badge>
-                  )}
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-semibold text-foreground">{pkg.name}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {pkg.credits.toLocaleString()} creditos
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-xl font-bold text-foreground">R$ {pkg.price}</p>
-                      <p className="text-xs text-muted-foreground">{pkg.pricePerCredit}/credito</p>
-                    </div>
-                  </div>
-                  {pkg.savings && (
-                    <Badge variant="outline" className="mt-2 border-green-500/30 bg-green-500/10 text-green-400">
-                      Economia de {pkg.savings}
-                    </Badge>
-                  )}
-                  <Button
-                    className={`mt-3 w-full ${
-                      pkg.popular
-                        ? "bg-gradient-to-r from-primary to-accent text-white"
-                        : "border-white/10 bg-white/5 text-foreground hover:bg-white/10"
-                    }`}
-                    variant={pkg.popular ? "default" : "outline"}
-                  onClick={() => handlePurchase(pkg)}
-                    disabled={purchasing !== null || isRealMode}
-                  >
-                    {purchasing === pkg.id ? (
-                      <>
-                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
-                        Processando...
-                      </>
-                    ) : isRealMode ? (
-                      "Em breve"
-                    ) : (
-                      "Comprar"
-                    )}
-                  </Button>
-                </CardContent>
-              </Card>
-            </motion.div>
-          ))}
-        </div>
-        {isRealMode ? (
-          <p className="text-xs text-muted-foreground">
-            Compra de creditos da agencia ainda nao esta integrada ao backend real nesta fase.
-          </p>
-        ) : null}
-      </div>
-
-      {/* Plans */}
-      <div>
-        <h3 className="mb-4 text-sm font-medium text-muted-foreground">Planos</h3>
-        <div className="grid gap-4 lg:grid-cols-3">
-          {plans.map((plan, index) => (
-            <motion.div
-              key={plan.name}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.1 }}
-            >
-              <Card
-                className={`h-full border-white/5 bg-card/50 ${
-                  plan.current ? "border-primary/50 bg-primary/5" : ""
-                }`}
-              >
-                <CardContent className="flex h-full flex-col p-6">
-                  {plan.current && (
-                    <Badge className="mb-2 w-fit bg-primary text-[10px] text-white">Plano atual</Badge>
-                  )}
-                  <div className="flex items-center gap-2">
-                    {plan.name === "Enterprise" && <Crown className="h-5 w-5 text-yellow-500" />}
-                    <h4 className="text-lg font-semibold text-foreground">{plan.name}</h4>
-                  </div>
-                  <div className="mt-2">
-                    <span className="text-3xl font-bold text-foreground">
-                      {plan.price === 0 ? "Gratis" : `R$ ${plan.price}`}
-                    </span>
-                    {plan.price > 0 && <span className="text-muted-foreground">/mes</span>}
-                  </div>
-                  <ul className="mt-4 flex-1 space-y-2">
-                    {plan.features.map((feature) => (
-                      <li key={feature} className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <CheckCircle className="h-4 w-4 text-primary" />
-                        {feature}
-                      </li>
-                    ))}
-                  </ul>
-                  <Button
-                    className={`mt-4 w-full ${
-                      plan.current
-                        ? "border-white/10 bg-white/5 text-muted-foreground"
-                        : "bg-gradient-to-r from-primary to-accent text-white"
-                    }`}
-                    variant={plan.current ? "outline" : "default"}
-                    disabled={plan.current}
-                    onClick={() => !plan.current && setUpgradeOpen(true)}
-                  >
-                    {plan.current ? "Plano atual" : "Fazer upgrade"}
-                    {!plan.current && <ArrowRight className="ml-2 h-4 w-4" />}
-                  </Button>
-                </CardContent>
-              </Card>
-            </motion.div>
-          ))}
-        </div>
-      </div>
-
-      <Dialog open={upgradeOpen} onOpenChange={setUpgradeOpen}>
-        <DialogContent className="border-white/10 bg-card sm:max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Fazer upgrade</DialogTitle>
-            <DialogDescription>Escolha um novo plano para aumentar seus creditos e beneficios.</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="rounded-xl border border-primary/20 bg-primary/5 p-4">
-              <p className="text-sm text-muted-foreground">Plano atual</p>
-              <p className="text-lg font-semibold text-foreground">Pro</p>
-              <p className="text-sm text-muted-foreground">{effectiveBalance} creditos disponiveis agora</p>
+      <motion.div {...fadeInUp}>
+        <Card className="border-amber-500/20 bg-gradient-to-r from-amber-500/10 to-amber-600/10 p-6">
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div>
+              <h2 className="text-lg font-semibold">Planos, limites e pacotes extras</h2>
+              <p className="text-sm text-muted-foreground">
+                Compare Start, Pro e Business, veja a capacidade operacional e os pacotes de creditos extras.
+              </p>
             </div>
-            <div className="grid gap-3 md:grid-cols-2">
-              {plans.filter((plan) => !plan.current).map((plan) => (
-                <Card key={plan.name} className="border-white/10 bg-white/[0.02]">
-                  <CardContent className="space-y-4 p-5">
-                    <div>
-                      <p className="text-lg font-semibold text-foreground">{plan.name}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {plan.price === 0 ? "Gratis" : `R$ ${plan.price}/mes`}
-                      </p>
-                    </div>
-                    <div className="space-y-2">
-                      {plan.features.map((feature) => (
-                        <div key={feature} className="flex items-center gap-2 text-sm text-muted-foreground">
-                          <Check className="h-4 w-4 text-primary" />
-                          {feature}
-                        </div>
-                      ))}
-                    </div>
-                    <Button
-                      className="w-full bg-gradient-to-r from-primary to-accent text-white"
-                      onClick={() => setUpgradeOpen(false)}
-                    >
-                      Selecionar plano
-                    </Button>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+            <Button asChild className="rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 text-black font-semibold">
+              <Link href="/agencia/planos">
+                Ver planos
+                <ChevronRight size={16} className="ml-1" />
+              </Link>
+            </Button>
           </div>
-        </DialogContent>
-      </Dialog>
+        </Card>
+      </motion.div>
+
+      <motion.div {...fadeInUp}>
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="font-semibold">Historico de consumo</h2>
+        </div>
+        <Card className="divide-y divide-border/50 border-border/50 bg-card/50 vuei-glass">
+          {effectiveHistory.length === 0 ? (
+            <div className="p-4 text-sm text-muted-foreground">Nenhum consumo de creditos registrado ainda.</div>
+          ) : (
+            effectiveHistory.slice(0, 8).map((item, index) => (
+              <div key={`${item.action}-${index}`} className="flex items-center gap-4 p-4">
+                <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${item.amount > 0 ? "bg-green-500/20" : "bg-muted/50"}`}>
+                  <Clock size={16} className={item.amount > 0 ? "text-green-400" : "text-muted-foreground"} />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium">{item.action}</p>
+                  <p className="text-xs text-muted-foreground">{formatDate(item.date)}</p>
+                </div>
+                <span className={`text-sm font-semibold ${item.amount > 0 ? "text-green-400" : "text-muted-foreground"}`}>
+                  {item.amount > 0 ? "+" : ""}
+                  {item.amount}
+                </span>
+              </div>
+            ))
+          )}
+        </Card>
+      </motion.div>
     </div>
   )
 }

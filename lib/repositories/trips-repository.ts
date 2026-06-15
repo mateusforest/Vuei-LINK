@@ -9,6 +9,8 @@ import { buildAdminTripUrl, buildPublicTripUrl, generateSecureToken } from "@/li
 import type { Database } from "@/lib/supabase/types"
 import { getDestinationCoverImage } from "@/lib/trip-destination"
 import { getTravelerBillingStatus } from "@/lib/repositories/traveler-billing-repository"
+import { AGENCY_PLAN_LIMIT_ERROR } from "@/lib/billing/agency-plans"
+import { countActiveAgencyTripsForClient, getAgencyBillingStatusForClient } from "@/lib/billing/agency-billing"
 
 export interface ListTripsParams {
   ownerType?: TripOwnerType
@@ -469,6 +471,38 @@ export async function createTrip(payload: CreateTripPayload) {
           config: createSupabaseBrowserClientPlaceholder(),
           data: null,
           error: "agency_id obrigatorio para criar viagem da agencia.",
+        }
+      }
+
+      if (payload.ownerType === "agency" && payload.agencyId) {
+        const billingStatus = await getAgencyBillingStatusForClient(supabase, payload.agencyId)
+        if (billingStatus.error || !billingStatus.data) {
+          return {
+            source: "supabase" as const,
+            config: createSupabaseBrowserClientPlaceholder(),
+            data: null,
+            error: billingStatus.error ?? CREATE_TRIP_ERROR_MESSAGE,
+          }
+        }
+
+        const activeTripsResult = await countActiveAgencyTripsForClient(supabase, payload.agencyId)
+        if (activeTripsResult.error) {
+          console.error("[TRIP] agency active trips check error", activeTripsResult.error)
+          return {
+            source: "supabase" as const,
+            config: createSupabaseBrowserClientPlaceholder(),
+            data: null,
+            error: CREATE_TRIP_ERROR_MESSAGE,
+          }
+        }
+
+        if (activeTripsResult.count >= billingStatus.data.maxActiveTrips) {
+          return {
+            source: "supabase" as const,
+            config: createSupabaseBrowserClientPlaceholder(),
+            data: null,
+            error: AGENCY_PLAN_LIMIT_ERROR,
+          }
         }
       }
 
