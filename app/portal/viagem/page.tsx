@@ -84,7 +84,11 @@ export default function ViagemListPage() {
     if (!result.success) {
       setFeedback({ message: result.error || "Nao foi possivel excluir a viagem.", tone: "error" })
       window.setTimeout(() => setFeedback(null), 2500)
+      return
     }
+
+    setFeedback({ message: "Viagem excluida.", tone: "success" })
+    window.setTimeout(() => setFeedback(null), 2500)
   }
 
   const copyShareLink = async (tripId: string, link: string, type: string) => {

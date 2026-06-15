@@ -606,7 +606,7 @@ export async function deleteTrip(id: string) {
 
   if (shouldUseSupabase() && supabase) {
     try {
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from("trips")
         .update({
           status: "cancelled",
@@ -618,10 +618,8 @@ export async function deleteTrip(id: string) {
           updated_at: new Date().toISOString(),
         })
         .eq("id", id)
-        .select("id")
-        .maybeSingle()
 
-      if (!error && data) {
+      if (!error) {
         removeTripFromLegacyCaches(id)
         return {
           source: "supabase" as const,
@@ -635,7 +633,7 @@ export async function deleteTrip(id: string) {
         source: "supabase" as const,
         config: createSupabaseBrowserClientPlaceholder(),
         success: false,
-        error: error?.message || "Nenhuma viagem elegivel foi atualizada para exclusao.",
+        error: error?.message || "Nao foi possivel excluir a viagem no Supabase.",
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : "Falha ao remover viagem."
