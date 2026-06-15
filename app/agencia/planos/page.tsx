@@ -1,8 +1,9 @@
 "use client"
 
+import { useState } from "react"
 import { motion } from "framer-motion"
 import Link from "next/link"
-import { ChevronLeft, Check, Coins, Crown } from "lucide-react"
+import { ChevronDown, ChevronLeft, Check, Coins, Crown } from "lucide-react"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -20,6 +21,7 @@ const fadeInUp = {
 export default function AgencyPlansPage() {
   const { subscription, activeTripsCount, teamSeatsUsed } = useAgency()
   const plans = Object.values(AGENCY_PLAN_DEFINITIONS)
+  const [expandedPlan, setExpandedPlan] = useState<string | null>(null)
 
   return (
     <div className="mx-auto max-w-6xl space-y-8">
@@ -51,6 +53,14 @@ export default function AgencyPlansPage() {
       <motion.div {...fadeInUp} className="grid gap-5 lg:grid-cols-4">
         {plans.map((plan) => {
           const isCurrent = subscription.code === plan.code
+          const isExpanded = expandedPlan === plan.code
+          const highlights = plan.code === "free"
+            ? ["Sistema completo", "1 usuario", "1 viagem ativa", "40 creditos/mes"]
+            : plan.code === "start"
+              ? ["3 usuarios", "20 viagens ativas", "350 creditos/mes"]
+              : plan.code === "pro"
+                ? ["5 usuarios", "100 viagens ativas", "600 creditos/mes"]
+                : ["15 usuarios", "220 viagens ativas", "1.500 creditos/mes", "Atendimento prioritario"]
 
           return (
             <Card
@@ -59,7 +69,7 @@ export default function AgencyPlansPage() {
                 plan.code === "pro"
                   ? "border-amber-500/30 bg-gradient-to-br from-amber-500/10 via-card/70 to-secondary/10"
                   : "border-border/50 bg-card/50"
-              }`}
+              } flex min-h-[34rem] flex-col`}
             >
               {plan.code === "pro" ? (
                 <div className="absolute right-0 top-0 h-32 w-32 rounded-full bg-amber-500/15 blur-3xl" />
@@ -93,7 +103,7 @@ export default function AgencyPlansPage() {
               </div>
 
               <div className="mt-6 space-y-3">
-                {plan.features.map((feature) => (
+                {highlights.map((feature) => (
                   <div key={feature} className="flex items-start gap-3 text-sm">
                     <Check size={16} className="mt-0.5 shrink-0 text-emerald-400" />
                     <span>{feature}</span>
@@ -101,9 +111,31 @@ export default function AgencyPlansPage() {
                 ))}
               </div>
 
-              <Button disabled className="mt-8 w-full rounded-xl">
+              <button
+                type="button"
+                className="mt-5 flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
+                onClick={() => setExpandedPlan(isExpanded ? null : plan.code)}
+              >
+                <span>Ver funcionalidades</span>
+                <ChevronDown size={16} className={`transition-transform ${isExpanded ? "rotate-180" : ""}`} />
+              </button>
+
+              <div className={`overflow-hidden transition-all duration-300 ${isExpanded ? "mt-4 max-h-80" : "max-h-0"}`}>
+                <div className="space-y-3 border-t border-white/10 pt-4">
+                  {plan.features.map((feature) => (
+                    <div key={feature} className="flex items-start gap-3 text-sm">
+                      <Check size={16} className="mt-0.5 shrink-0 text-emerald-400" />
+                      <span>{feature}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="mt-auto pt-8">
+                <Button disabled className="w-full rounded-xl">
                 {isCurrent ? "Plano atual" : "Fazer upgrade em breve"}
-              </Button>
+                </Button>
+              </div>
             </Card>
           )
         })}

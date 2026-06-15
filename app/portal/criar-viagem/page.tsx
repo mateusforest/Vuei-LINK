@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { useRouter } from "next/navigation"
 import { 
@@ -94,6 +94,8 @@ export default function CriarViagemPage() {
   const [copiedLink, setCopiedLink] = useState<string | null>(null)
   const [errorMessage, setErrorMessage] = useState("")
   const [showLimitDialog, setShowLimitDialog] = useState(false)
+  const startDateRef = useRef<HTMLInputElement | null>(null)
+  const endDateRef = useRef<HTMLInputElement | null>(null)
 
   const totalSteps = 5
   const progress = (step / totalSteps) * 100
@@ -109,11 +111,32 @@ export default function CriarViagemPage() {
     switch (step) {
       case 1: return formData.name.length >= 3
       case 2: return formData.destination.length >= 3
-      case 3: return formData.startDate && formData.endDate
+      case 3: return Boolean(formData.startDate && formData.endDate && formData.endDate >= formData.startDate)
       case 4: return formData.style !== ""
       case 5: return formData.companions !== ""
       default: return false
     }
+  }
+
+  const focusEndDate = () => {
+    const nextInput = endDateRef.current
+    if (!nextInput) return
+    nextInput.focus()
+    if (typeof nextInput.showPicker === "function") {
+      nextInput.showPicker()
+    }
+  }
+
+  const handleStartDateChange = (value: string) => {
+    setFormData((current) => ({
+      ...current,
+      startDate: value,
+      endDate: current.endDate && current.endDate < value ? "" : current.endDate,
+    }))
+
+    window.setTimeout(() => {
+      focusEndDate()
+    }, 0)
   }
 
   const handleNext = () => {
@@ -332,9 +355,10 @@ export default function CriarViagemPage() {
                     Ida
                   </label>
                   <Input
+                    ref={startDateRef}
                     type="date"
                     value={formData.startDate}
-                    onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
+                    onChange={(e) => handleStartDateChange(e.target.value)}
                     className="h-12 rounded-xl bg-muted/30 border-border/50"
                   />
                 </div>
@@ -344,13 +368,19 @@ export default function CriarViagemPage() {
                     Volta
                   </label>
                   <Input
+                    ref={endDateRef}
                     type="date"
                     value={formData.endDate}
+                    min={formData.startDate || undefined}
                     onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
                     className="h-12 rounded-xl bg-muted/30 border-border/50"
                   />
                 </div>
               </div>
+
+              {formData.startDate && formData.endDate && formData.endDate < formData.startDate ? (
+                <p className="text-sm text-red-400">A data de volta nao pode ser anterior a data de ida.</p>
+              ) : null}
 
               {formData.startDate && formData.endDate && (
                 <Card className="p-4 bg-primary/5 border-primary/20">

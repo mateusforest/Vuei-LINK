@@ -1,6 +1,6 @@
 "use client"
 
-import { Suspense, useState, useEffect } from "react"
+import { Suspense, useState, useEffect, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
@@ -54,6 +54,8 @@ function CreateTripPageContent() {
   const [copiedAdmin, setCopiedAdmin] = useState(false)
   const [copiedShare, setCopiedShare] = useState(false)
   const [submitError, setSubmitError] = useState("")
+  const startDateRef = useRef<HTMLInputElement | null>(null)
+  const endDateRef = useRef<HTMLInputElement | null>(null)
   
   const [formData, setFormData] = useState({
     clientId: clientIdParam || "",
@@ -129,11 +131,32 @@ function CreateTripPageContent() {
     switch (currentStep) {
       case 1: return formData.clientName.length > 0
       case 2: return formData.destination.length > 0
-      case 3: return formData.startDate && formData.endDate
+      case 3: return Boolean(formData.startDate && formData.endDate && formData.endDate >= formData.startDate)
       case 4: return formData.passengersCount > 0
       case 5: return formData.travelStyle.length > 0
       default: return true
     }
+  }
+
+  const focusEndDate = () => {
+    const nextInput = endDateRef.current
+    if (!nextInput) return
+    nextInput.focus()
+    if (typeof nextInput.showPicker === "function") {
+      nextInput.showPicker()
+    }
+  }
+
+  const handleStartDateChange = (value: string) => {
+    setFormData((current) => ({
+      ...current,
+      startDate: value,
+      endDate: current.endDate && current.endDate < value ? "" : current.endDate,
+    }))
+
+    window.setTimeout(() => {
+      focusEndDate()
+    }, 0)
   }
 
   if (completed && createdTrip) {
@@ -455,22 +478,28 @@ function CreateTripPageContent() {
                   <div>
                     <Label className="text-muted-foreground">Data de ida</Label>
                     <Input
+                      ref={startDateRef}
                       type="date"
                       value={formData.startDate}
-                      onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
+                      onChange={(e) => handleStartDateChange(e.target.value)}
                       className="mt-1.5 border-white/10 bg-white/5"
                     />
                   </div>
                   <div>
                     <Label className="text-muted-foreground">Data de volta</Label>
                     <Input
+                      ref={endDateRef}
                       type="date"
                       value={formData.endDate}
+                      min={formData.startDate || undefined}
                       onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
                       className="mt-1.5 border-white/10 bg-white/5"
                     />
                   </div>
                 </div>
+                {formData.startDate && formData.endDate && formData.endDate < formData.startDate ? (
+                  <p className="text-sm text-red-400">A data de volta nao pode ser anterior a data de ida.</p>
+                ) : null}
               </motion.div>
             )}
 
