@@ -95,9 +95,15 @@ export interface Database {
           id: string
           agency_id: string
           plan_code: "free" | "start" | "pro" | "business"
-          status: "active" | "inactive" | "cancelled"
+          status: "active" | "inactive" | "cancelled" | "incomplete" | "trialing" | "past_due" | "canceled" | "unpaid"
           started_at: string | null
           expires_at: string | null
+          stripe_customer_id: string | null
+          stripe_subscription_id: string | null
+          stripe_price_id: string | null
+          current_period_start: string | null
+          current_period_end: string | null
+          cancel_at_period_end: boolean
           created_at: string
           updated_at: string
         }
@@ -105,19 +111,67 @@ export interface Database {
           id?: string
           agency_id: string
           plan_code?: "free" | "start" | "pro" | "business"
-          status?: "active" | "inactive" | "cancelled"
+          status?: "active" | "inactive" | "cancelled" | "incomplete" | "trialing" | "past_due" | "canceled" | "unpaid"
           started_at?: string | null
           expires_at?: string | null
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          stripe_price_id?: string | null
+          current_period_start?: string | null
+          current_period_end?: string | null
+          cancel_at_period_end?: boolean
           created_at?: string
           updated_at?: string
         }
         Update: {
           agency_id?: string
           plan_code?: "free" | "start" | "pro" | "business"
-          status?: "active" | "inactive" | "cancelled"
+          status?: "active" | "inactive" | "cancelled" | "incomplete" | "trialing" | "past_due" | "canceled" | "unpaid"
           started_at?: string | null
           expires_at?: string | null
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          stripe_price_id?: string | null
+          current_period_start?: string | null
+          current_period_end?: string | null
+          cancel_at_period_end?: boolean
           updated_at?: string
+        }
+      }
+      agency_plan_credit_cycles: {
+        Row: {
+          id: string
+          agency_id: string
+          subscription_id: string | null
+          plan_code: "free" | "start" | "pro" | "business"
+          period_start: string
+          period_end: string
+          granted_credits: number
+          used_credits: number
+          stripe_invoice_id: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          agency_id: string
+          subscription_id?: string | null
+          plan_code: "free" | "start" | "pro" | "business"
+          period_start: string
+          period_end: string
+          granted_credits: number
+          used_credits?: number
+          stripe_invoice_id?: string | null
+          created_at?: string
+        }
+        Update: {
+          agency_id?: string
+          subscription_id?: string | null
+          plan_code?: "free" | "start" | "pro" | "business"
+          period_start?: string
+          period_end?: string
+          granted_credits?: number
+          used_credits?: number
+          stripe_invoice_id?: string | null
         }
       }
       ai_conversations: {

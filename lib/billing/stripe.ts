@@ -31,6 +31,18 @@ export function getStripePriceIdForCreditPackage(code: "starter" | "popular" | "
   return getRequiredEnv("STRIPE_PRICE_CREDITS_PRO")
 }
 
+export function getStripePriceIdForAgencyPlan(code: "start" | "pro" | "business") {
+  if (code === "start") return getRequiredEnv("STRIPE_PRICE_AGENCY_START_MONTHLY")
+  if (code === "pro") return getRequiredEnv("STRIPE_PRICE_AGENCY_PRO_MONTHLY")
+  return getRequiredEnv("STRIPE_PRICE_AGENCY_BUSINESS_MONTHLY")
+}
+
+export function getStripePriceIdForAgencyCreditPackage(code: "starter" | "popular" | "pro") {
+  if (code === "starter") return getRequiredEnv("STRIPE_PRICE_AGENCY_CREDITS_STARTER")
+  if (code === "popular") return getRequiredEnv("STRIPE_PRICE_AGENCY_CREDITS_POPULAR")
+  return getRequiredEnv("STRIPE_PRICE_AGENCY_CREDITS_PRO")
+}
+
 export function getStripeClient() {
   if (!stripeClient) {
     stripeClient = new Stripe(getStripeSecretKey(), {

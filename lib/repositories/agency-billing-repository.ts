@@ -1,4 +1,4 @@
-import type { AgencyBillingStatusSummary, AgencyCommercialPlanCode } from "@/types"
+import type { AgencyBillingApiStatus, AgencyBillingStatusSummary, AgencyCommercialPlanCode } from "@/types"
 import { shouldUseSupabase } from "@/lib/data-source"
 import { createSupabaseBrowserClient } from "@/lib/supabase/client"
 import { getDefaultAgencyBillingStatus, getAgencyBillingStatusForClient, upsertAgencySubscriptionForClient } from "@/lib/billing/agency-billing"
@@ -16,6 +16,15 @@ interface PersistedAgencyBillingState {
       expiresAt: string | null
     }
   >
+}
+
+interface BillingRedirectResponse {
+  url?: string | null
+  error?: string | null
+}
+
+async function parseJson<T>(response: Response) {
+  return (await response.json().catch(() => null)) as T | null
 }
 
 function readLocalBillingState(): PersistedAgencyBillingState {
@@ -103,5 +112,71 @@ export async function setAgencyPlanSelection(agencyId: string, planCode: AgencyC
     source: "supabase" as const,
     data: result.data,
     error: result.error,
+  }
+}
+
+export async function getAgencyBillingStatusFromApi() {
+  if (!shouldUseSupabase()) {
+    return { source: "local" as const, data: null as AgencyBillingApiStatus | null, error: null }
+  }
+
+  const response = await fetch("/api/billing/agency/status", {
+    method: "GET",
+    cache: "no-store",
+  })
+
+  const data = await parseJson<AgencyBillingApiStatus & { error?: string }>(response)
+
+  return {
+    source: "api" as const,
+    data: response.ok && data ? data : null,
+    error: response.ok ? null : data?.error ?? "Nao foi possivel carregar o billing da agencia.",
+  }
+}
+
+export async function createAgencyPlanCheckout(planCode: "start" | "pro" | "business") {
+  const response = await fetch("/api/billing/agency/checkout", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ planCode }),
+  })
+
+  const data = await parseJson<BillingRedirectResponse>(response)
+
+  return {
+    data,
+    error: response.ok ? null : data?.error ?? "Nao foi possivel iniciar o checkout da agencia.",
+  }
+}
+
+export async function createAgencyCreditsCheckout(packageCode: "starter" | "popular" | "pro") {
+  const response = await fetch("/api/billing/agency/credits/checkout", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ packageCode }),
+  })
+
+  const data = await parseJson<BillingRedirectResponse>(response)
+
+  return {
+    data,
+    error: response.ok ? null : data?.error ?? "Nao foi possivel iniciar o checkout de creditos da agencia.",
+  }
+}
+
+export async function createAgencyCustomerPortal() {
+  const response = await fetch("/api/billing/agency/portal", {
+    method: "POST",
+  })
+
+  const data = await parseJson<BillingRedirectResponse>(response)
+
+  return {
+    data,
+    error: response.ok ? null : data?.error ?? "Nao foi possivel abrir o portal de assinatura da agencia.",
   }
 }

@@ -1,7 +1,15 @@
 export type AgencyPlan = "starter" | "pro" | "enterprise"
 export type AgencyPlanCode = AgencyPlan
 export type AgencyCommercialPlanCode = "free" | "start" | "pro" | "business"
-export type AgencySubscriptionStatus = "active" | "inactive" | "cancelled"
+export type AgencySubscriptionStatus =
+  | "active"
+  | "inactive"
+  | "cancelled"
+  | "incomplete"
+  | "trialing"
+  | "past_due"
+  | "canceled"
+  | "unpaid"
 
 export type AgencyStatus = "pending" | "active" | "suspended" | "archived"
 
@@ -62,6 +70,12 @@ export interface AgencyBillingStatusSummary {
   maxActiveTrips: number
   monthlyCredits: number
   features: string[]
+  stripeCustomerId?: string | null
+  stripeSubscriptionId?: string | null
+  stripePriceId?: string | null
+  currentPeriodStart?: string | null
+  currentPeriodEnd?: string | null
+  cancelAtPeriodEnd?: boolean
 }
 
 export interface AgencyPlanSnapshot {
@@ -70,6 +84,28 @@ export interface AgencyPlanSnapshot {
   status: AgencySubscriptionStatus
   startedAt: string | null
   expiresAt: string | null
+}
+
+export interface AgencyCreditBalanceSummary {
+  planCreditsAvailable: number
+  purchasedCreditsAvailable: number
+  totalAvailable: number
+  currentPlan: AgencyCommercialPlanCode
+  currentPeriodEnd: string | null
+  usedCredits: number
+}
+
+export interface AgencyBillingApiStatus extends AgencyCreditBalanceSummary {
+  agencyId: string | null
+  planCode: AgencyCommercialPlanCode
+  status: AgencySubscriptionStatus
+  maxUsers: number
+  maxActiveTrips: number
+  monthlyCredits: number
+  stripeCustomerId: string | null
+  stripeSubscriptionId: string | null
+  cancelAtPeriodEnd: boolean
+  canManageBilling: boolean
 }
 
 export interface AgencyLimitDialogState {

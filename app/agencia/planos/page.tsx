@@ -1,16 +1,24 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useMemo, useState } from "react"
+import { useSearchParams } from "next/navigation"
 import { motion } from "framer-motion"
 import Link from "next/link"
-import { ChevronDown, ChevronLeft, Check, Coins, Crown } from "lucide-react"
+import { ChevronDown, ChevronLeft, Check, Coins, Crown, Loader2 } from "lucide-react"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import { useAgency } from "@/contexts/agency-context"
+import type { AgencyBillingApiStatus } from "@/types"
 import { AGENCY_PLAN_DEFINITIONS } from "@/lib/billing/agency-plans"
 import { TRAVELER_CREDIT_PACKAGES } from "@/lib/billing/traveler-plans"
+import {
+  createAgencyCreditsCheckout,
+  createAgencyCustomerPortal,
+  createAgencyPlanCheckout,
+  getAgencyBillingStatusFromApi,
+} from "@/lib/repositories/agency-billing-repository"
 
 const fadeInUp = {
   initial: { opacity: 0, y: 20 },
@@ -20,8 +28,82 @@ const fadeInUp = {
 
 export default function AgencyPlansPage() {
   const { subscription, activeTripsCount, teamSeatsUsed } = useAgency()
+  const searchParams = useSearchParams()
   const plans = Object.values(AGENCY_PLAN_DEFINITIONS)
   const [expandedPlan, setExpandedPlan] = useState<string | null>(null)
+  const [billingStatus, setBillingStatus] = useState<AgencyBillingApiStatus | null>(null)
+  const [statusError, setStatusError] = useState<string | null>(null)
+  const [planLoading, setPlanLoading] = useState<"start" | "pro" | "business" | null>(null)
+  const [packageLoading, setPackageLoading] = useState<"starter" | "popular" | "pro" | null>(null)
+  const [portalLoading, setPortalLoading] = useState(false)
+  const [actionError, setActionError] = useState<string | null>(null)
+  const checkoutStatus = searchParams.get("checkout")
+
+  useEffect(() => {
+    let active = true
+
+    void (async () => {
+      const result = await getAgencyBillingStatusFromApi()
+      if (!active) return
+
+      setBillingStatus(result.data)
+      setStatusError(result.error)
+    })()
+
+    return () => {
+      active = false
+    }
+  }, [])
+
+  const currentPlanCode = billingStatus?.planCode ?? subscription.code
+  const currentPeriodEnd = billingStatus?.currentPeriodEnd ?? null
+  const canManageSubscription = Boolean(billingStatus?.stripeCustomerId || currentPlanCode !== "free")
+
+  const currentPlanDefinition = useMemo(() => {
+    return AGENCY_PLAN_DEFINITIONS[currentPlanCode]
+  }, [currentPlanCode])
+
+  const handlePlanCheckout = async (planCode: "start" | "pro" | "business") => {
+    setActionError(null)
+    setPlanLoading(planCode)
+
+    const result = await createAgencyPlanCheckout(planCode)
+    if (result.error || !result.data?.url) {
+      setActionError(result.error ?? "Nao foi possivel iniciar o checkout da agencia.")
+      setPlanLoading(null)
+      return
+    }
+
+    window.location.href = result.data.url
+  }
+
+  const handleCreditsCheckout = async (packageCode: "starter" | "popular" | "pro") => {
+    setActionError(null)
+    setPackageLoading(packageCode)
+
+    const result = await createAgencyCreditsCheckout(packageCode)
+    if (result.error || !result.data?.url) {
+      setActionError(result.error ?? "Nao foi possivel iniciar a compra de creditos.")
+      setPackageLoading(null)
+      return
+    }
+
+    window.location.href = result.data.url
+  }
+
+  const handleOpenPortal = async () => {
+    setActionError(null)
+    setPortalLoading(true)
+
+    const result = await createAgencyCustomerPortal()
+    if (result.error || !result.data?.url) {
+      setActionError(result.error ?? "Nao foi possivel abrir o portal de assinatura.")
+      setPortalLoading(false)
+      return
+    }
+
+    window.location.href = result.data.url
+  }
 
   return (
     <div className="mx-auto max-w-6xl space-y-8">
@@ -47,13 +129,50 @@ export default function AgencyPlansPage() {
           <Badge variant="secondary" className="border-border/50 bg-card/60 text-muted-foreground">
             {teamSeatsUsed} usuarios ativos na equipe
           </Badge>
+          {canManageSubscription ? (
+            <Button variant="outline" className="rounded-xl" onClick={handleOpenPortal} disabled={portalLoading}>
+              {portalLoading ? <Loader2 size={16} className="mr-2 animate-spin" /> : <Crown size={16} className="mr-2" />}
+              Gerenciar assinatura
+            </Button>
+          ) : null}
+          {currentPeriodEnd ? (
+            <Badge variant="secondary" className="border-border/50 bg-card/60 text-muted-foreground">
+              Ciclo atual ate {new Date(currentPeriodEnd).toLocaleDateString("pt-BR")}
+            </Badge>
+          ) : null}
         </div>
+
+        {checkoutStatus === "success" ? (
+          <Card className="border-emerald-500/20 bg-emerald-500/10 p-4 text-sm text-emerald-300">
+            Checkout concluido. O billing da agencia so muda quando o webhook real do Stripe confirma o evento.
+          </Card>
+        ) : null}
+
+        {checkoutStatus === "canceled" ? (
+          <Card className="border-amber-500/20 bg-amber-500/10 p-4 text-sm text-amber-300">
+            Checkout cancelado. Nenhuma alteracao foi aplicada ao billing da agencia.
+          </Card>
+        ) : null}
+
+        {statusError ? (
+          <Card className="border-amber-500/20 bg-amber-500/10 p-4 text-sm text-amber-300">
+            {statusError}
+          </Card>
+        ) : null}
+
+        {actionError ? (
+          <Card className="border-red-500/20 bg-red-500/10 p-4 text-sm text-red-300">
+            {actionError}
+          </Card>
+        ) : null}
       </motion.div>
 
       <motion.div {...fadeInUp} className="grid gap-5 lg:grid-cols-4">
         {plans.map((plan) => {
-          const isCurrent = subscription.code === plan.code
+          const isCurrent = currentPlanCode === plan.code
           const isExpanded = expandedPlan === plan.code
+          const isPaidPlan = plan.code === "start" || plan.code === "pro" || plan.code === "business"
+          const paidPlanCode = isPaidPlan ? (plan.code as "start" | "pro" | "business") : null
           const highlights = plan.code === "free"
             ? ["Sistema completo", "1 usuario", "1 viagem ativa", "40 creditos/mes"]
             : plan.code === "start"
@@ -132,8 +251,18 @@ export default function AgencyPlansPage() {
               </div>
 
               <div className="mt-auto pt-8">
-                <Button disabled className="w-full rounded-xl">
-                {isCurrent ? "Plano atual" : "Fazer upgrade em breve"}
+                <Button
+                  className="w-full rounded-xl"
+                  variant={plan.code === "pro" ? "default" : "outline"}
+                  disabled={isCurrent || Boolean(planLoading) || !isPaidPlan}
+                  onClick={() => {
+                    if (paidPlanCode) {
+                      void handlePlanCheckout(paidPlanCode)
+                    }
+                  }}
+                >
+                  {planLoading === plan.code ? <Loader2 size={16} className="mr-2 animate-spin" /> : null}
+                  {isCurrent ? "Plano atual" : isPaidPlan ? "Fazer upgrade" : "Disponivel por padrao"}
                 </Button>
               </div>
             </Card>
@@ -150,7 +279,7 @@ export default function AgencyPlansPage() {
             <div>
               <h2 className="text-xl font-semibold">Creditos extras</h2>
               <p className="text-sm text-muted-foreground">
-                Os mesmos pacotes do traveler ja ficam preparados para a futura integracao de pagamentos da agencia.
+                Os mesmos pacotes do traveler agora tambem ficam preparados para o checkout B2B da agencia.
               </p>
             </div>
           </div>
@@ -165,8 +294,14 @@ export default function AgencyPlansPage() {
                 <p className="text-3xl font-bold">{pkg.credits}</p>
                 <p className="text-sm text-muted-foreground">creditos</p>
                 <p className="mt-4 text-xl font-semibold">{pkg.priceLabel}</p>
-                <Button className="mt-5 w-full rounded-xl" variant={pkg.code === "popular" ? "default" : "outline"} disabled>
-                  Em breve
+                <Button
+                  className="mt-5 w-full rounded-xl"
+                  variant={pkg.code === "popular" ? "default" : "outline"}
+                  onClick={() => handleCreditsCheckout(pkg.code)}
+                  disabled={packageLoading !== null}
+                >
+                  {packageLoading === pkg.code ? <Loader2 size={16} className="mr-2 animate-spin" /> : null}
+                  Comprar creditos
                 </Button>
               </Card>
             ))}
@@ -196,7 +331,7 @@ export default function AgencyPlansPage() {
             <AccordionItem value="rollover">
               <AccordionTrigger>Os creditos acumulam?</AccordionTrigger>
               <AccordionContent>
-                Nesta etapa a compra real ainda nao foi integrada. A arquitetura ja separa o plano da agencia para futura integracao Stripe.
+                Creditos comprados acumulam. Creditos do plano valem para o ciclo atual e sao renovados pelo billing da assinatura.
               </AccordionContent>
             </AccordionItem>
             <AccordionItem value="limits">
@@ -212,6 +347,21 @@ export default function AgencyPlansPage() {
               </AccordionContent>
             </AccordionItem>
           </Accordion>
+        </Card>
+      </motion.div>
+
+      <motion.div {...fadeInUp}>
+        <Card className="border-border/50 bg-card/50 p-5 vuei-glass">
+          <div className="flex flex-col gap-2 text-sm text-muted-foreground md:flex-row md:items-center md:justify-between">
+            <span>
+              Plano atual: <span className="font-medium text-foreground">{currentPlanDefinition.name}</span>
+            </span>
+            {billingStatus ? (
+              <span>
+                Saldo atual resolvido no backend: <span className="font-medium text-foreground">{billingStatus.totalAvailable} creditos</span>
+              </span>
+            ) : null}
+          </div>
         </Card>
       </motion.div>
     </div>

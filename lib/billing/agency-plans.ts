@@ -98,6 +98,7 @@ export const AGENCY_TEAM_LIMIT_ERROR = "AGENCY_TEAM_LIMIT_REACHED"
 
 export function normalizeAgencyCommercialPlanCode(value: string | null | undefined): AgencyCommercialPlanCode {
   if (value === "free") return "free"
+  if (value === "start") return "start"
   if (value === "pro") return "pro"
   if (value === "business" || value === "enterprise") return "business"
   return "free"

@@ -1,16 +1,27 @@
 import { NextResponse } from "next/server"
 import type Stripe from "stripe"
 import { createSupabaseAdminClient, hasSupabaseAdminEnv } from "@/lib/supabase/admin"
-import { getStripeClient, getStripeWebhookSecret, getStripePriceIdForTravelerPremium } from "@/lib/billing/stripe"
 import {
-  ensureTravelerSubscriptionRow,
+  getStripeClient,
+  getStripeWebhookSecret,
+  getStripePriceIdForTravelerPremium,
+  getStripePriceIdForAgencyPlan,
+} from "@/lib/billing/stripe"
+import {
   findTravelerSubscriptionByCustomerId,
-  findTravelerSubscriptionByStripeSubscriptionId,
   grantTravelerPlanCycleFromInvoice,
   updateTravelerStripeCustomerId,
   upsertTravelerSubscriptionFromStripe,
 } from "@/lib/billing/traveler-billing"
 import { getTravelerCreditPackage } from "@/lib/billing/traveler-plans"
+import {
+  createAgencyPlanCreditCycleFromInvoice,
+  findAgencySubscriptionByCustomerId,
+  findAgencySubscriptionByStripeSubscriptionId,
+  grantAgencyPurchasedCredits,
+  updateAgencyStripeCustomerId,
+  updateAgencySubscriptionFromStripe,
+} from "@/lib/billing/agency-billing"
 
 export const runtime = "nodejs"
 
@@ -23,18 +34,33 @@ function mapStripeSubscriptionStatus(status: Stripe.Subscription.Status) {
   return "incomplete" as const
 }
 
-function resolveTravelerPlanFromPriceId(priceId: string | null | undefined) {
-  return priceId === getStripePriceIdForTravelerPremium() ? "premium" : "free"
+function safePrice(getter: () => string) {
+  try {
+    return getter()
+  } catch {
+    return null
+  }
 }
 
-function getCheckoutMetadataValue(metadata: Record<string, string> | null | undefined, key: string) {
+function resolveTravelerPlanFromPriceId(priceId: string | null | undefined) {
+  return priceId === safePrice(getStripePriceIdForTravelerPremium) ? "premium" : "free"
+}
+
+function resolveAgencyPlanFromPriceId(priceId: string | null | undefined) {
+  if (priceId === safePrice(() => getStripePriceIdForAgencyPlan("start"))) return "start" as const
+  if (priceId === safePrice(() => getStripePriceIdForAgencyPlan("pro"))) return "pro" as const
+  if (priceId === safePrice(() => getStripePriceIdForAgencyPlan("business"))) return "business" as const
+  return "free" as const
+}
+
+function getMetadataValue(metadata: Record<string, string> | null | undefined, key: string) {
   const value = metadata?.[key]
   return typeof value === "string" && value.length > 0 ? value : null
 }
 
 function getStripeSubscriptionPeriod(subscription: Stripe.Subscription) {
-  const rawStart = (subscription as any).current_period_start
-  const rawEnd = (subscription as any).current_period_end
+  const rawStart = (subscription as { current_period_start?: number }).current_period_start
+  const rawEnd = (subscription as { current_period_end?: number }).current_period_end
 
   return {
     currentPeriodStart: typeof rawStart === "number" ? new Date(rawStart * 1000).toISOString() : null,
@@ -43,7 +69,7 @@ function getStripeSubscriptionPeriod(subscription: Stripe.Subscription) {
 }
 
 function getStripeInvoiceSubscriptionId(invoice: Stripe.Invoice) {
-  const subscriptionId = (invoice as any).subscription
+  const subscriptionId = (invoice as { subscription?: string | null }).subscription
   return typeof subscriptionId === "string" ? subscriptionId : null
 }
 
@@ -59,8 +85,7 @@ async function markStripeEventProcessed(eventId: string, type: string) {
 
 async function isStripeEventAlreadyProcessed(eventId: string) {
   const adminClient = createSupabaseAdminClient()
-  const { data, error } = await (adminClient
-    .from("stripe_events" as any) as any)
+  const { data, error } = await (adminClient.from("stripe_events" as any) as any)
     .select("id")
     .eq("id", eventId)
     .maybeSingle()
@@ -74,7 +99,7 @@ async function isStripeEventAlreadyProcessed(eventId: string) {
 async function upsertTravelerSubscriptionFromStripeObject(subscription: Stripe.Subscription, fallbackUserId?: string | null) {
   const adminClient = createSupabaseAdminClient()
   const priceId = subscription.items.data[0]?.price?.id ?? null
-  const metadataUserId = getCheckoutMetadataValue(subscription.metadata, "user_id")
+  const metadataUserId = getMetadataValue(subscription.metadata, "user_id")
   let userId = fallbackUserId ?? metadataUserId
 
   if (!userId && typeof subscription.customer === "string") {
@@ -107,13 +132,56 @@ async function upsertTravelerSubscriptionFromStripeObject(subscription: Stripe.S
   }
 }
 
-async function handleCreditPackageCheckoutCompleted(session: Stripe.Checkout.Session) {
+async function upsertAgencySubscriptionFromStripeObject(subscription: Stripe.Subscription, fallbackAgencyId?: string | null) {
+  const adminClient = createSupabaseAdminClient()
+  const priceId = subscription.items.data[0]?.price?.id ?? null
+  const metadataAgencyId = getMetadataValue(subscription.metadata, "agency_id")
+  let agencyId = fallbackAgencyId ?? metadataAgencyId
+
+  if (!agencyId && typeof subscription.customer === "string") {
+    const byCustomer = await findAgencySubscriptionByCustomerId(adminClient, subscription.customer)
+    if (byCustomer.data) {
+      agencyId = byCustomer.data.agency_id
+    }
+  }
+
+  if (!agencyId) {
+    const bySubscription = await findAgencySubscriptionByStripeSubscriptionId(adminClient, subscription.id)
+    if (bySubscription.data) {
+      agencyId = bySubscription.data.agency_id
+    }
+  }
+
+  if (!agencyId) {
+    return { error: "Nao foi possivel identificar a agencia desta assinatura Stripe." }
+  }
+
+  const result = await updateAgencySubscriptionFromStripe(adminClient, {
+    agencyId,
+    planCode: resolveAgencyPlanFromPriceId(priceId),
+    status: mapStripeSubscriptionStatus(subscription.status),
+    stripeCustomerId: typeof subscription.customer === "string" ? subscription.customer : null,
+    stripeSubscriptionId: subscription.id,
+    stripePriceId: priceId,
+    currentPeriodStart: getStripeSubscriptionPeriod(subscription).currentPeriodStart,
+    currentPeriodEnd: getStripeSubscriptionPeriod(subscription).currentPeriodEnd,
+    cancelAtPeriodEnd: subscription.cancel_at_period_end,
+  })
+
+  return {
+    data: result.data,
+    error: result.error,
+    agencyId,
+  }
+}
+
+async function handleTravelerCreditPackageCheckoutCompleted(session: Stripe.Checkout.Session) {
   if (session.payment_status !== "paid") {
     return null
   }
 
-  const userId = getCheckoutMetadataValue(session.metadata, "user_id")
-  const packageCode = getCheckoutMetadataValue(session.metadata, "package_code") as "starter" | "popular" | "pro" | null
+  const userId = getMetadataValue(session.metadata, "user_id")
+  const packageCode = getMetadataValue(session.metadata, "package_code") as "starter" | "popular" | "pro" | null
   const selectedPackage = packageCode ? getTravelerCreditPackage(packageCode) : null
 
   if (!userId || !selectedPackage) {
@@ -121,9 +189,7 @@ async function handleCreditPackageCheckoutCompleted(session: Stripe.Checkout.Ses
   }
 
   const adminClient = createSupabaseAdminClient()
-
-  const existingTransaction = await (adminClient
-    .from("credit_transactions") as any)
+  const existingTransaction = await (adminClient.from("credit_transactions") as any)
     .select("id")
     .eq("owner_type", "traveler")
     .eq("owner_user_id", userId)
@@ -167,12 +233,68 @@ async function handleCreditPackageCheckoutCompleted(session: Stripe.Checkout.Ses
   return insertResult.error?.message ?? null
 }
 
-async function handleSubscriptionCheckoutCompleted(session: Stripe.Checkout.Session) {
-  const userId = getCheckoutMetadataValue(session.metadata, "user_id")
+async function handleAgencyCreditPackageCheckoutCompleted(session: Stripe.Checkout.Session) {
+  if (session.payment_status !== "paid") {
+    return null
+  }
 
-  if (typeof session.customer === "string" && userId) {
-    const adminClient = createSupabaseAdminClient()
-    const customerLinkResult = await updateTravelerStripeCustomerId(adminClient, userId, session.customer)
+  const agencyId = getMetadataValue(session.metadata, "agency_id")
+  const userId = getMetadataValue(session.metadata, "user_id")
+  const packageCode = getMetadataValue(session.metadata, "package_code") as "starter" | "popular" | "pro" | null
+  const selectedPackage = packageCode ? getTravelerCreditPackage(packageCode) : null
+
+  if (!agencyId || !userId || !selectedPackage) {
+    return "Metadata incompleta para registrar a compra de creditos da agencia."
+  }
+
+  const adminClient = createSupabaseAdminClient()
+
+  if (typeof session.customer === "string") {
+    const customerLinkResult = await updateAgencyStripeCustomerId(adminClient, agencyId, session.customer)
+    if (customerLinkResult.error) {
+      return customerLinkResult.error
+    }
+  }
+
+  const grantResult = await grantAgencyPurchasedCredits(adminClient, {
+    agencyId,
+    userId,
+    packageCode: selectedPackage.code,
+    packageName: selectedPackage.name,
+    credits: selectedPackage.credits,
+    stripeCheckoutSessionId: session.id,
+    stripePaymentIntentId: typeof session.payment_intent === "string" ? session.payment_intent : null,
+  })
+
+  return grantResult.error ?? null
+}
+
+async function handleSubscriptionCheckoutCompleted(session: Stripe.Checkout.Session, billingScope: "traveler" | "agency") {
+  const adminClient = createSupabaseAdminClient()
+
+  if (billingScope === "traveler") {
+    const userId = getMetadataValue(session.metadata, "user_id")
+
+    if (typeof session.customer === "string" && userId) {
+      const customerLinkResult = await updateTravelerStripeCustomerId(adminClient, userId, session.customer)
+      if (customerLinkResult.error) {
+        return customerLinkResult.error
+      }
+    }
+
+    if (typeof session.subscription === "string") {
+      const stripe = getStripeClient()
+      const subscription = await stripe.subscriptions.retrieve(session.subscription)
+      const updateResult = await upsertTravelerSubscriptionFromStripeObject(subscription, userId)
+      return updateResult.error ?? null
+    }
+
+    return null
+  }
+
+  const agencyId = getMetadataValue(session.metadata, "agency_id")
+  if (typeof session.customer === "string" && agencyId) {
+    const customerLinkResult = await updateAgencyStripeCustomerId(adminClient, agencyId, session.customer)
     if (customerLinkResult.error) {
       return customerLinkResult.error
     }
@@ -181,21 +303,14 @@ async function handleSubscriptionCheckoutCompleted(session: Stripe.Checkout.Sess
   if (typeof session.subscription === "string") {
     const stripe = getStripeClient()
     const subscription = await stripe.subscriptions.retrieve(session.subscription)
-    const updateResult = await upsertTravelerSubscriptionFromStripeObject(subscription, userId)
+    const updateResult = await upsertAgencySubscriptionFromStripeObject(subscription, agencyId)
     return updateResult.error ?? null
   }
 
   return null
 }
 
-async function handleInvoicePaid(invoice: Stripe.Invoice) {
-  const subscriptionId = getStripeInvoiceSubscriptionId(invoice)
-  if (!subscriptionId) {
-    return null
-  }
-
-  const stripe = getStripeClient()
-  const subscription = await stripe.subscriptions.retrieve(subscriptionId)
+async function handleTravelerInvoicePaid(invoice: Stripe.Invoice, subscription: Stripe.Subscription) {
   const subscriptionResult = await upsertTravelerSubscriptionFromStripeObject(subscription)
   if (subscriptionResult.error || !subscriptionResult.data || !subscriptionResult.userId) {
     return subscriptionResult.error ?? "Nao foi possivel sincronizar a assinatura traveler apos invoice.paid."
@@ -212,6 +327,7 @@ async function handleInvoicePaid(invoice: Stripe.Invoice) {
   if (!currentPeriodStart || !currentPeriodEnd) {
     return "Nao foi possivel identificar o periodo da assinatura premium."
   }
+
   const grantResult = await grantTravelerPlanCycleFromInvoice(adminClient, {
     userId: subscriptionResult.userId,
     subscriptionId: subscriptionResult.data.id,
@@ -225,6 +341,58 @@ async function handleInvoicePaid(invoice: Stripe.Invoice) {
   return grantResult.error ?? null
 }
 
+async function handleAgencyInvoicePaid(invoice: Stripe.Invoice, subscription: Stripe.Subscription) {
+  const subscriptionResult = await upsertAgencySubscriptionFromStripeObject(subscription)
+  if (subscriptionResult.error || !subscriptionResult.data || !subscriptionResult.agencyId) {
+    return subscriptionResult.error ?? "Nao foi possivel sincronizar a assinatura da agencia apos invoice.paid."
+  }
+
+  const priceId = subscription.items.data[0]?.price?.id ?? null
+  const planCode = resolveAgencyPlanFromPriceId(priceId)
+  if (planCode === "free") {
+    return null
+  }
+
+  const { currentPeriodStart, currentPeriodEnd } = getStripeSubscriptionPeriod(subscription)
+  if (!currentPeriodStart || !currentPeriodEnd) {
+    return "Nao foi possivel identificar o periodo da assinatura da agencia."
+  }
+
+  const adminClient = createSupabaseAdminClient()
+  const existingSubscription = await findAgencySubscriptionByStripeSubscriptionId(adminClient, subscription.id)
+  if (existingSubscription.error || !existingSubscription.data) {
+    return existingSubscription.error ?? "Nao foi possivel localizar a subscription canonica da agencia."
+  }
+
+  const cycleResult = await createAgencyPlanCreditCycleFromInvoice(adminClient, {
+    agencyId: subscriptionResult.agencyId,
+    subscriptionId: existingSubscription.data.id,
+    planCode,
+    periodStart: currentPeriodStart,
+    periodEnd: currentPeriodEnd,
+    stripeInvoiceId: invoice.id,
+  })
+
+  return cycleResult.error ?? null
+}
+
+async function handleInvoicePaid(invoice: Stripe.Invoice) {
+  const subscriptionId = getStripeInvoiceSubscriptionId(invoice)
+  if (!subscriptionId) {
+    return null
+  }
+
+  const stripe = getStripeClient()
+  const subscription = await stripe.subscriptions.retrieve(subscriptionId)
+  const billingScope = getMetadataValue(subscription.metadata, "billing_scope")
+
+  if (billingScope === "agency") {
+    return handleAgencyInvoicePaid(invoice, subscription)
+  }
+
+  return handleTravelerInvoicePaid(invoice, subscription)
+}
+
 async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
   const subscriptionId = getStripeInvoiceSubscriptionId(invoice)
   if (!subscriptionId) {
@@ -233,12 +401,25 @@ async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
 
   const stripe = getStripeClient()
   const subscription = await stripe.subscriptions.retrieve(subscriptionId)
-  const result = await upsertTravelerSubscriptionFromStripeObject(subscription)
+  const billingScope = getMetadataValue(subscription.metadata, "billing_scope")
 
+  if (billingScope === "agency") {
+    const result = await upsertAgencySubscriptionFromStripeObject(subscription)
+    return result.error ?? null
+  }
+
+  const result = await upsertTravelerSubscriptionFromStripeObject(subscription)
   return result.error ?? null
 }
 
 async function handleSubscriptionLifecycleEvent(subscription: Stripe.Subscription) {
+  const billingScope = getMetadataValue(subscription.metadata, "billing_scope")
+
+  if (billingScope === "agency") {
+    const result = await upsertAgencySubscriptionFromStripeObject(subscription)
+    return result.error ?? null
+  }
+
   const result = await upsertTravelerSubscriptionFromStripeObject(subscription)
   return result.error ?? null
 }
@@ -281,12 +462,17 @@ export async function POST(request: Request) {
       case "checkout.session.completed":
         {
           const session = event.data.object as Stripe.Checkout.Session
-          const checkoutType = getCheckoutMetadataValue(session.metadata, "checkout_type")
+          const checkoutType = getMetadataValue(session.metadata, "checkout_type")
+          const billingScope = getMetadataValue(session.metadata, "billing_scope")
 
-          if (checkoutType === "credit_package") {
-            processingError = await handleCreditPackageCheckoutCompleted(session)
+          if (checkoutType === "credit_package" && billingScope === "agency") {
+            processingError = await handleAgencyCreditPackageCheckoutCompleted(session)
+          } else if (checkoutType === "credit_package") {
+            processingError = await handleTravelerCreditPackageCheckoutCompleted(session)
+          } else if (checkoutType === "subscription" && billingScope === "agency") {
+            processingError = await handleSubscriptionCheckoutCompleted(session, "agency")
           } else if (checkoutType === "subscription") {
-            processingError = await handleSubscriptionCheckoutCompleted(session)
+            processingError = await handleSubscriptionCheckoutCompleted(session, "traveler")
           }
         }
         break
