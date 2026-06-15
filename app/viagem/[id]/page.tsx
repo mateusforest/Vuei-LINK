@@ -21,7 +21,8 @@ import { getOfflineDocumentBlob, getOfflineImageBlob, loadTripOfflinePackage } f
 import { isOfflineModeActive } from "@/lib/offline/offline-mode"
 import { useAuth } from "@/contexts/auth-context"
 import { buildAdminTripUrl, buildPublicTripUrl, isAdminLinkMode } from "@/lib/security/link-tokens"
-import { resolveTravelerPlan } from "@/lib/billing/traveler-plans"
+import { resolveTravelerPlan, resolveTravelerPlanFromBillingStatus } from "@/lib/billing/traveler-plans"
+import { getTravelerBillingStatus } from "@/lib/repositories/traveler-billing-repository"
 import type { TripFlightRecord } from "@/types/flight"
 import type { TripItineraryRecord, TripItineraryContent } from "@/types"
 import type { OfflineStoredTripPackage, OfflineTripPackageAudience, OfflineTripPackageStatus } from "@/lib/offline/types"
@@ -5119,7 +5120,7 @@ export default function TripPage() {
   const pathname = usePathname()
   const router = useRouter()
   const { user, profile, loading: authLoading } = useAuth()
-  const travelerPlan = resolveTravelerPlan(profile)
+  const [travelerPlan, setTravelerPlan] = useState(() => resolveTravelerPlan(profile))
   const adminRouteActive = Boolean(pathname?.startsWith("/viagem/") && pathname?.endsWith("/admin"))
   const routeSlug =
     typeof params?.id === "string"
@@ -5185,6 +5186,28 @@ export default function TripPage() {
       }
     }
   }, [])
+
+  useEffect(() => {
+    setTravelerPlan(resolveTravelerPlan(profile))
+
+    if (!shouldUseSupabase() || !user || profile?.role !== "traveler") {
+      return
+    }
+
+    let mounted = true
+
+    const loadTravelerBilling = async () => {
+      const result = await getTravelerBillingStatus()
+      if (!mounted || result.error || !result.data) return
+      setTravelerPlan(resolveTravelerPlanFromBillingStatus(result.data))
+    }
+
+    void loadTravelerBilling()
+
+    return () => {
+      mounted = false
+    }
+  }, [profile, user])
 
   useEffect(() => {
     setSensitiveAccessGranted(false)

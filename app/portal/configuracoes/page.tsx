@@ -35,10 +35,10 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
+import { useTrips } from "@/contexts/trips-context"
 import { shouldUseSupabase } from "@/lib/data-source"
 import { updateProfile as updateProfileRepository } from "@/lib/repositories/profiles-repository"
 import { createSupabaseBrowserClient } from "@/lib/supabase/client"
-import { resolveTravelerPlan } from "@/lib/billing/traveler-plans"
 import {
   disableQuickAccessBiometric,
   disableQuickAccessPin,
@@ -100,6 +100,7 @@ export default function ConfiguracoesPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { signOut, profile: authProfile, refreshProfile } = useAuth()
+  const { subscription } = useTrips()
   const [profile, setProfile] = useState(defaultProfile)
   const [settings, setSettings] = useState(defaultSettings)
   const [toastMessage, setToastMessage] = useState("")
@@ -132,12 +133,11 @@ export default function ConfiguracoesPage() {
         return
       }
 
-      const travelerPlan = resolveTravelerPlan(authProfile)
       const nextProfile = {
         name: authProfile.name || defaultProfile.name,
         email: authProfile.email || defaultProfile.email,
         phone: authProfile.phone || defaultProfile.phone,
-        plan: authProfile.role === "agency_owner" || authProfile.role === "agency_member" ? "Agency" : travelerPlan.definition.name,
+        plan: authProfile.role === "agency_owner" || authProfile.role === "agency_member" ? "Agency" : subscription.definition.name,
         avatar: authProfile.avatarUrl || "",
         createdAt: authProfile.createdAt
           ? new Date(authProfile.createdAt).toLocaleDateString("pt-BR", { month: "long", year: "numeric" })
@@ -180,7 +180,7 @@ export default function ConfiguracoesPage() {
     } catch {
       // fallback silencioso
     }
-  }, [authProfile])
+  }, [authProfile, subscription.definition.name])
 
   useEffect(() => {
     if (!shouldUseSupabase() || !authProfile?.id) return

@@ -1,6 +1,4 @@
-import type { Profile } from "@/types"
-
-export type TravelerPlanCode = "free" | "premium"
+import type { Profile, TravelerBillingStatusSummary, TravelerPlanCode } from "@/types"
 
 export interface TravelerPlanDefinition {
   code: TravelerPlanCode
@@ -132,6 +130,11 @@ export interface TravelerPlanSnapshot {
   code: TravelerPlanCode
   definition: TravelerPlanDefinition
   isPremium: boolean
+  subscriptionStatus?: TravelerBillingStatusSummary["subscriptionStatus"]
+  currentPeriodEnd?: string | null
+  stripeCustomerId?: string | null
+  stripeSubscriptionId?: string | null
+  cancelAtPeriodEnd?: boolean
 }
 
 export function getTravelerPlanDefinition(code: TravelerPlanCode) {
@@ -140,6 +143,10 @@ export function getTravelerPlanDefinition(code: TravelerPlanCode) {
 
 export function getTravelerAiCreditCost(code: TravelerAiCreditCostCode) {
   return TRAVELER_AI_CREDIT_COSTS[code]
+}
+
+export function getTravelerCreditPackage(code: TravelerCreditPackageDefinition["code"]) {
+  return TRAVELER_CREDIT_PACKAGES.find((pkg) => pkg.code === code) ?? null
 }
 
 export function resolveTravelerPlan(profile: Profile | null | undefined): TravelerPlanSnapshot {
@@ -157,5 +164,20 @@ export function resolveTravelerPlan(profile: Profile | null | undefined): Travel
     code,
     definition,
     isPremium: definition.code === "premium",
+  }
+}
+
+export function resolveTravelerPlanFromBillingStatus(status: TravelerBillingStatusSummary): TravelerPlanSnapshot {
+  const definition = getTravelerPlanDefinition(status.currentPlan)
+
+  return {
+    code: status.currentPlan,
+    definition,
+    isPremium: status.currentPlan === "premium",
+    subscriptionStatus: status.subscriptionStatus,
+    currentPeriodEnd: status.currentPeriodEnd,
+    stripeCustomerId: status.stripeCustomerId,
+    stripeSubscriptionId: status.stripeSubscriptionId,
+    cancelAtPeriodEnd: status.cancelAtPeriodEnd,
   }
 }

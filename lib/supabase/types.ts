@@ -447,6 +447,105 @@ export interface Database {
           created_by?: string | null
         }
       }
+      traveler_subscriptions: {
+        Row: {
+          id: string
+          user_id: string
+          plan_code: "free" | "premium"
+          status: "free" | "incomplete" | "trialing" | "active" | "past_due" | "canceled" | "unpaid"
+          stripe_customer_id: string | null
+          stripe_subscription_id: string | null
+          stripe_price_id: string | null
+          current_period_start: string | null
+          current_period_end: string | null
+          cancel_at_period_end: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          plan_code?: "free" | "premium"
+          status?: "free" | "incomplete" | "trialing" | "active" | "past_due" | "canceled" | "unpaid"
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          stripe_price_id?: string | null
+          current_period_start?: string | null
+          current_period_end?: string | null
+          cancel_at_period_end?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          user_id?: string
+          plan_code?: "free" | "premium"
+          status?: "free" | "incomplete" | "trialing" | "active" | "past_due" | "canceled" | "unpaid"
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          stripe_price_id?: string | null
+          current_period_start?: string | null
+          current_period_end?: string | null
+          cancel_at_period_end?: boolean
+          updated_at?: string
+        }
+      }
+      traveler_plan_credit_cycles: {
+        Row: {
+          id: string
+          user_id: string
+          subscription_id: string | null
+          plan_code: "free" | "premium"
+          period_start: string
+          period_end: string
+          granted_credits: number
+          used_credits: number
+          expired_credits: number
+          stripe_invoice_id: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          subscription_id?: string | null
+          plan_code: "free" | "premium"
+          period_start: string
+          period_end: string
+          granted_credits: number
+          used_credits?: number
+          expired_credits?: number
+          stripe_invoice_id?: string | null
+          created_at?: string
+        }
+        Update: {
+          user_id?: string
+          subscription_id?: string | null
+          plan_code?: "free" | "premium"
+          period_start?: string
+          period_end?: string
+          granted_credits?: number
+          used_credits?: number
+          expired_credits?: number
+          stripe_invoice_id?: string | null
+        }
+      }
+      stripe_events: {
+        Row: {
+          id: string
+          type: string
+          processed_at: string
+          created_at: string
+        }
+        Insert: {
+          id: string
+          type: string
+          processed_at?: string
+          created_at?: string
+        }
+        Update: {
+          type?: string
+          processed_at?: string
+        }
+      }
       trip_hotels: {
         Row: {
           id: string

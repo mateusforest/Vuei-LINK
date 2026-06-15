@@ -23,7 +23,8 @@ import {
   mapLegacyCreditsToCreditBalance,
   type LegacyCreditsState,
 } from "@/lib/mappers/credit-mappers"
-import { resolveTravelerPlan, type TravelerPlanSnapshot } from "@/lib/billing/traveler-plans"
+import { resolveTravelerPlan, resolveTravelerPlanFromBillingStatus, type TravelerPlanSnapshot } from "@/lib/billing/traveler-plans"
+import { getTravelerBillingStatus } from "@/lib/repositories/traveler-billing-repository"
 
 export interface Trip extends Pick<CanonicalTrip, "id" | "slug" | "destination" | "country" | "city" | "startDate" | "endDate" | "coverImage" | "createdAt"> {
   id: string
@@ -235,7 +236,7 @@ export function TripsProvider({ children }: { children: ReactNode }) {
   }))
   const [isLoaded, setIsLoaded] = useState(false)
   const [loadingTrips, setLoadingTrips] = useState(false)
-  const subscription = resolveTravelerPlan(profile)
+  const [subscription, setSubscription] = useState<TravelerPlanSnapshot>(() => resolveTravelerPlan(profile))
   const activeTripsCount = trips.filter((trip) => isActiveTripStatus(trip.status)).length
   const maxActiveTrips = subscription.definition.limits.maxActiveTrips
   const canCreateMoreTrips = maxActiveTrips === null || activeTripsCount < maxActiveTrips
@@ -294,6 +295,41 @@ export function TripsProvider({ children }: { children: ReactNode }) {
     }
     window.localStorage.setItem(CREDITS_KEY, JSON.stringify(payload))
   }, [credits, isLoaded])
+
+  useEffect(() => {
+    if (!isLoaded) return
+
+    if (!shouldUseSupabase()) {
+      setSubscription(resolveTravelerPlan(profile))
+      return
+    }
+
+    if (!user) {
+      setSubscription(resolveTravelerPlan(profile))
+      return
+    }
+
+    let mounted = true
+
+    const syncBillingStatus = async () => {
+      const result = await getTravelerBillingStatus()
+      if (!mounted || result.error || !result.data) return
+      const billingStatus = result.data
+
+      setSubscription(resolveTravelerPlanFromBillingStatus(billingStatus))
+      setCredits((prev) => ({
+        ...prev,
+        balance: billingStatus.totalAvailable,
+        ...buildCanonicalCredits(billingStatus.totalAvailable, prev.history),
+      }))
+    }
+
+    void syncBillingStatus()
+
+    return () => {
+      mounted = false
+    }
+  }, [isLoaded, profile, user])
 
   useEffect(() => {
     if (!isLoaded || loading || !shouldUseSupabase()) return

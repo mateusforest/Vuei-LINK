@@ -8,6 +8,7 @@ import { buildUniqueTripSlug, extractTripsStoragePayload, mapStoredTripToTrip, s
 import { buildAdminTripUrl, buildPublicTripUrl, generateSecureToken } from "@/lib/security/link-tokens"
 import type { Database } from "@/lib/supabase/types"
 import { getDestinationCoverImage } from "@/lib/trip-destination"
+import { getTravelerBillingStatus } from "@/lib/repositories/traveler-billing-repository"
 
 export interface ListTripsParams {
   ownerType?: TripOwnerType
@@ -472,6 +473,16 @@ export async function createTrip(payload: CreateTripPayload) {
       }
 
       if (payload.ownerType === "traveler" && payload.ownerUserId) {
+        const billingStatus = await getTravelerBillingStatus()
+        if (billingStatus.error) {
+          return {
+            source: "supabase" as const,
+            config: createSupabaseBrowserClientPlaceholder(),
+            data: null,
+            error: billingStatus.error,
+          }
+        }
+
         const { count, error: activeTripsError } = await supabase
           .from("trips")
           .select("id", { count: "exact", head: true })
@@ -489,7 +500,7 @@ export async function createTrip(payload: CreateTripPayload) {
           }
         }
 
-        if ((count ?? 0) >= 1) {
+        if (billingStatus.data?.currentPlan !== "premium" && (count ?? 0) >= 1) {
           return {
             source: "supabase" as const,
             config: createSupabaseBrowserClientPlaceholder(),

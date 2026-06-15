@@ -2,13 +2,19 @@ import type { SupabaseClient, User } from "@supabase/supabase-js"
 import type { Database } from "@/lib/supabase/types"
 import { getCurrentProfile } from "@/lib/auth/get-current-profile"
 
-const DEFAULT_TRAVELER_CREDITS = 150
-const ALLOWED_PROFILE_ROLES = new Set(["traveler", "agency_owner", "agency_member", "master"])
+const DEFAULT_TRAVELER_CREDITS = 0
+type ProfileRole = Database["public"]["Tables"]["profiles"]["Row"]["role"]
 
-function getUserRole(user: User) {
-  return typeof user.user_metadata?.role === "string" && ALLOWED_PROFILE_ROLES.has(user.user_metadata.role)
-    ? user.user_metadata.role
-    : "traveler"
+const ALLOWED_PROFILE_ROLES = new Set<ProfileRole>(["traveler", "agency_owner", "agency_member", "master"])
+
+function getUserRole(user: User): ProfileRole {
+  const role = user.user_metadata?.role
+
+  if (typeof role === "string" && ALLOWED_PROFILE_ROLES.has(role as ProfileRole)) {
+    return role as ProfileRole
+  }
+
+  return "traveler"
 }
 
 function getUserName(user: User) {
@@ -49,7 +55,7 @@ export async function ensureProfile(user: User, client?: SupabaseClient<Database
     }
 
     if (Object.keys(updates).length > 0) {
-      const { error } = await resolvedClient.from("profiles").update(updates).eq("id", user.id)
+      const { error } = await (resolvedClient.from("profiles") as any).update(updates as any).eq("id", user.id)
       if (error) {
         console.error("[AUTH ERROR]", error.message)
       }
@@ -78,7 +84,7 @@ export async function ensureProfile(user: User, client?: SupabaseClient<Database
     },
   }
 
-  const { error } = await resolvedClient.from("profiles").insert(payload)
+  const { error } = await (resolvedClient.from("profiles") as any).insert(payload as any)
   if (error) {
     console.error("[AUTH ERROR]", error.message)
     return null

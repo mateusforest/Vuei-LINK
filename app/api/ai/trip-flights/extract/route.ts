@@ -6,6 +6,7 @@ import type { Database } from "@/lib/supabase/types"
 import { countUsefulFlightFields, requestFlightExtraction } from "@/lib/ai/flight-extraction"
 import { estimateCostUsd, getTicketExtractionCreditCost } from "@/lib/ai/credit-consumption"
 import { createAiUsageLog } from "@/lib/ai/usage-logs"
+import { consumeTravelerCredits, getTravelerCreditBalance } from "@/lib/billing/traveler-billing"
 
 interface FlightExtractionRequestBody {
   tripId?: string
@@ -117,6 +118,12 @@ async function getCreditsBalance(
   ownerType: "traveler" | "agency",
   ownerId: string,
 ) {
+  if (ownerType === "traveler") {
+    const adminClient = createSupabaseAdminClient()
+    const result = await getTravelerCreditBalance(adminClient, ownerId)
+    return { balance: result.data?.totalAvailable ?? 0, error: result.error }
+  }
+
   if (ownerType === "agency") {
     const { data, error } = await client.from("agencies").select("credits_balance").eq("id", ownerId).maybeSingle()
     return { balance: data?.credits_balance ?? 0, error: error?.message ?? null }
@@ -536,25 +543,46 @@ export async function POST(request: Request) {
       console.error("[AI][FLIGHT_EXTRACTION] usage log error", usageInsert.error)
     }
 
-    const creditsInsert = await supabase.from("credit_transactions").insert({
-      owner_type: ownerType,
-      owner_user_id: ownerType === "traveler" ? actingUserId : null,
-      agency_id: ownerType === "agency" ? accessResult.trip.agency_id : null,
-      type: "consume",
-      amount: -creditsPerCall,
-      reason: `Consumo da leitura de passagem para ${accessResult.trip.title}`,
-      source: "ai_flight_extraction",
-      metadata: {
-        module: "flight_reader",
-        trip_id: accessResult.trip.id,
-        document_id: entityResult.document.id,
-        flight_id: entityResult.flight.id,
-      },
-      created_by: actingUserId,
-    })
+    if (ownerType === "traveler" && actingUserId) {
+      const adminClient = createSupabaseAdminClient()
+      const consumeResult = await consumeTravelerCredits(adminClient, {
+        userId: actingUserId,
+        amount: creditsPerCall,
+        reason: `Consumo da leitura de passagem para ${accessResult.trip.title}`,
+        source: "ai_flight_extraction",
+        metadata: {
+          module: "flight_reader",
+          trip_id: accessResult.trip.id,
+          document_id: entityResult.document.id,
+          flight_id: entityResult.flight.id,
+        },
+        createdBy: actingUserId,
+      })
 
-    if (creditsInsert.error) {
-      console.error("[AI][FLIGHT_EXTRACTION] credit transaction error", creditsInsert.error.message)
+      if (!consumeResult.success) {
+        console.error("[AI][FLIGHT_EXTRACTION] traveler credit transaction error", consumeResult.error)
+      }
+    } else {
+      const creditsInsert = await supabase.from("credit_transactions").insert({
+        owner_type: ownerType,
+        owner_user_id: ownerType === "traveler" ? actingUserId : null,
+        agency_id: ownerType === "agency" ? accessResult.trip.agency_id : null,
+        type: "consume",
+        amount: -creditsPerCall,
+        reason: `Consumo da leitura de passagem para ${accessResult.trip.title}`,
+        source: "ai_flight_extraction",
+        metadata: {
+          module: "flight_reader",
+          trip_id: accessResult.trip.id,
+          document_id: entityResult.document.id,
+          flight_id: entityResult.flight.id,
+        },
+        created_by: actingUserId,
+      })
+
+      if (creditsInsert.error) {
+        console.error("[AI][FLIGHT_EXTRACTION] credit transaction error", creditsInsert.error.message)
+      }
     }
   }
 

@@ -10,6 +10,7 @@ import { createAiUsageLog } from "@/lib/ai/usage-logs"
 import { getDestinationCoverImage, getDestinationMetadata } from "@/lib/trip-destination"
 import type { Document } from "@/types/document"
 import type { TripItineraryRecord, TripItineraryContent } from "@/types/itinerary"
+import { consumeTravelerCredits, getTravelerCreditBalance } from "@/lib/billing/traveler-billing"
 
 export const runtime = "nodejs"
 export const maxDuration = 60
@@ -167,13 +168,23 @@ async function getCreditsBalance(
   ownerType: "traveler" | "agency",
   ownerId: string,
 ) {
+  if (ownerType === "traveler") {
+    const adminClient = createSupabaseAdminClient()
+    const result = await getTravelerCreditBalance(adminClient, ownerId)
+    return {
+      balance: result.data?.totalAvailable ?? 0,
+      error: result.error,
+      currentPlan: result.data?.currentPlan ?? "free",
+    }
+  }
+
   if (ownerType === "agency") {
     const { data, error } = await client.from("agencies").select("credits_balance").eq("id", ownerId).maybeSingle()
-    return { balance: data?.credits_balance ?? 0, error: error?.message ?? null }
+    return { balance: data?.credits_balance ?? 0, error: error?.message ?? null, currentPlan: "premium" as const }
   }
 
   const { data, error } = await client.from("profiles").select("credits_balance").eq("id", ownerId).maybeSingle()
-  return { balance: data?.credits_balance ?? 0, error: error?.message ?? null }
+  return { balance: data?.credits_balance ?? 0, error: error?.message ?? null, currentPlan: "free" as const }
 }
 
 function buildTravelerName(params: { trip: TripRow; ownerProfile: ProfileRow | null; client: ClientRow | null }) {
@@ -354,10 +365,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: accessResult.error ?? "Viagem nao encontrada." }, { status: 403 })
   }
 
-  if (accessResult.trip.owner_type === "traveler") {
-    return NextResponse.json({ error: PREMIUM_REQUIRED_ERROR, code: "premium_required" }, { status: 403 })
-  }
-
   const ownerType = accessResult.membership ? "agency" : "traveler"
   const ownerId = ownerType === "agency" ? accessResult.trip.agency_id : actingUserId
   const actingOwnerUserId = actingUserId ?? accessResult.trip.owner_user_id ?? null
@@ -371,6 +378,11 @@ export async function POST(request: Request) {
   if (balanceResult.error) {
     return NextResponse.json({ error: balanceResult.error }, { status: 500 })
   }
+
+  if (ownerType === "traveler" && balanceResult.currentPlan !== "premium") {
+    return NextResponse.json({ error: PREMIUM_REQUIRED_ERROR, code: "premium_required" }, { status: 403 })
+  }
+
   if ((balanceResult.balance ?? 0) < creditCost) {
     return NextResponse.json({ error: "Saldo insuficiente para gerar este roteiro com IA." }, { status: 402 })
   }
@@ -473,22 +485,6 @@ export async function POST(request: Request) {
       status: "failed",
       metadata: usageMetadata,
     })
-
-    const failedCreditInsert = await registerItineraryCreditConsumption(supabase, {
-      ownerType,
-      ownerUserId: actingOwnerUserId,
-      agencyId: accessResult.trip.agency_id,
-      amount: creditCost,
-      tripId: accessResult.trip.id,
-      itineraryId: generatingRecord.data.id,
-      mode,
-      createdBy: actingOwnerUserId,
-      failed: true,
-    })
-
-    if (failedCreditInsert.error) {
-      console.error("[AI][ITINERARY] failed credit transaction error", failedCreditInsert.error.message)
-    }
 
     return NextResponse.json({ error: aiResult.error ?? "Nao foi possivel gerar o roteiro." }, { status: 422 })
   }
@@ -636,22 +632,6 @@ export async function POST(request: Request) {
         },
       })
 
-      const failedCreditInsert = await registerItineraryCreditConsumption(supabase, {
-        ownerType,
-        ownerUserId: actingOwnerUserId,
-        agencyId: accessResult.trip.agency_id,
-        amount: creditCost,
-        tripId: accessResult.trip.id,
-        itineraryId: generatingRecord.data.id,
-        mode,
-        createdBy: actingOwnerUserId,
-        failed: true,
-      })
-
-      if (failedCreditInsert.error) {
-        console.error("[AI][ITINERARY] failed credit transaction error", failedCreditInsert.error.message)
-      }
-
       return NextResponse.json({ error: upload.error.message }, { status: 500 })
     }
 
@@ -686,22 +666,6 @@ export async function POST(request: Request) {
           signed_url_error: signedPdfResult.error?.message || "Nao foi possivel validar o PDF salvo no Storage.",
         },
       })
-
-      const failedCreditInsert = await registerItineraryCreditConsumption(supabase, {
-        ownerType,
-        ownerUserId: actingOwnerUserId,
-        agencyId: accessResult.trip.agency_id,
-        amount: creditCost,
-        tripId: accessResult.trip.id,
-        itineraryId: generatingRecord.data.id,
-        mode,
-        createdBy: actingOwnerUserId,
-        failed: true,
-      })
-
-      if (failedCreditInsert.error) {
-        console.error("[AI][ITINERARY] failed credit transaction error", failedCreditInsert.error.message)
-      }
 
       return NextResponse.json({ error: signedPdfResult.error?.message || "Nao foi possivel validar o PDF salvo no Storage." }, { status: 500 })
     }
@@ -759,22 +723,6 @@ export async function POST(request: Request) {
         },
       })
 
-      const failedCreditInsert = await registerItineraryCreditConsumption(supabase, {
-        ownerType,
-        ownerUserId: actingOwnerUserId,
-        agencyId: accessResult.trip.agency_id,
-        amount: creditCost,
-        tripId: accessResult.trip.id,
-        itineraryId: generatingRecord.data.id,
-        mode,
-        createdBy: actingOwnerUserId,
-        failed: true,
-      })
-
-      if (failedCreditInsert.error) {
-        console.error("[AI][ITINERARY] failed credit transaction error", failedCreditInsert.error.message)
-      }
-
       return NextResponse.json({ error: documentInsert.error?.message || "Nao foi possivel registrar o PDF do roteiro." }, { status: 500 })
     }
 
@@ -812,22 +760,6 @@ export async function POST(request: Request) {
         },
       })
 
-      const failedCreditInsert = await registerItineraryCreditConsumption(supabase, {
-        ownerType,
-        ownerUserId: actingOwnerUserId,
-        agencyId: accessResult.trip.agency_id,
-        amount: creditCost,
-        tripId: accessResult.trip.id,
-        itineraryId: generatingRecord.data.id,
-        mode,
-        createdBy: actingOwnerUserId,
-        failed: true,
-      })
-
-      if (failedCreditInsert.error) {
-        console.error("[AI][ITINERARY] failed credit transaction error", failedCreditInsert.error.message)
-      }
-
       return NextResponse.json({ error: `Falha na geracao do PDF do roteiro: ${message}` }, { status: 500 })
     }
   }
@@ -858,22 +790,6 @@ export async function POST(request: Request) {
       },
     })
 
-    const failedCreditInsert = await registerItineraryCreditConsumption(supabase, {
-      ownerType,
-      ownerUserId: actingOwnerUserId,
-      agencyId: accessResult.trip.agency_id,
-      amount: creditCost,
-      tripId: accessResult.trip.id,
-      itineraryId: generatingRecord.data.id,
-      mode,
-      createdBy: actingOwnerUserId,
-      failed: true,
-    })
-
-    if (failedCreditInsert.error) {
-      console.error("[AI][ITINERARY] failed credit transaction error", failedCreditInsert.error.message)
-    }
-
     return NextResponse.json({ error: itineraryUpdate.error ?? "Nao foi possivel finalizar o roteiro gerado." }, { status: 500 })
   }
 
@@ -902,19 +818,41 @@ export async function POST(request: Request) {
     console.error("[AI][ITINERARY] usage log error", usageInsert.error)
   }
 
-  const creditInsert = await registerItineraryCreditConsumption(supabase, {
-    ownerType,
-    ownerUserId: actingOwnerUserId,
-    agencyId: accessResult.trip.agency_id,
-    amount: creditCost,
-    tripId: accessResult.trip.id,
-    itineraryId: itineraryUpdate.data.id,
-    mode,
-    createdBy: actingOwnerUserId,
-  })
+  if (ownerType === "traveler" && actingOwnerUserId) {
+    const adminClient = createSupabaseAdminClient()
+    const consumeResult = await consumeTravelerCredits(adminClient, {
+      userId: actingOwnerUserId,
+      amount: creditCost,
+      reason: `Geracao de roteiro ${mode === "simple" ? "simples" : "completo"} para a viagem`,
+      source: "ai_itinerary_generation",
+      metadata: {
+        module: "itinerary",
+        trip_id: accessResult.trip.id,
+        itinerary_id: itineraryUpdate.data.id,
+        mode,
+        failed: false,
+      },
+      createdBy: actingOwnerUserId,
+    })
 
-  if (creditInsert.error) {
-    console.error("[AI][ITINERARY] credit transaction error", creditInsert.error.message)
+    if (!consumeResult.success) {
+      console.error("[AI][ITINERARY] traveler credit transaction error", consumeResult.error)
+    }
+  } else {
+    const creditInsert = await registerItineraryCreditConsumption(supabase, {
+      ownerType,
+      ownerUserId: actingOwnerUserId,
+      agencyId: accessResult.trip.agency_id,
+      amount: creditCost,
+      tripId: accessResult.trip.id,
+      itineraryId: itineraryUpdate.data.id,
+      mode,
+      createdBy: actingOwnerUserId,
+    })
+
+    if (creditInsert.error) {
+      console.error("[AI][ITINERARY] credit transaction error", creditInsert.error.message)
+    }
   }
 
   logItineraryDev("response_ready", {

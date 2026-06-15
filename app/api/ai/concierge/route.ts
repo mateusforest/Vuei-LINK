@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { createSupabaseServerClient } from "@/lib/supabase/server"
+import { createSupabaseAdminClient, hasSupabaseAdminEnv } from "@/lib/supabase/admin"
 import { shouldUseSupabase } from "@/lib/data-source"
 import type { AiPrompt } from "@/types"
 import type { Database } from "@/lib/supabase/types"
@@ -8,6 +9,7 @@ import { getConciergeCreditCost, estimateCostUsd } from "@/lib/ai/credit-consump
 import { buildFallbackConciergePrompt, buildPromptInput } from "@/lib/ai/prompts"
 import { buildTripContextSummary } from "@/lib/ai/trip-context"
 import { createAiUsageLog } from "@/lib/ai/usage-logs"
+import { consumeTravelerCredits, getTravelerCreditBalance } from "@/lib/billing/traveler-billing"
 
 type JsonObject = Record<string, unknown>
 
@@ -113,6 +115,12 @@ async function getCreditsBalance(
   ownerType: "traveler" | "agency",
   ownerId: string,
 ) {
+  if (ownerType === "traveler") {
+    const adminClient = createSupabaseAdminClient()
+    const result = await getTravelerCreditBalance(adminClient, ownerId)
+    return { balance: result.data?.totalAvailable ?? 0, error: result.error }
+  }
+
   if (ownerType === "agency") {
     const { data, error } = await client.from("agencies").select("credits_balance").eq("id", ownerId).maybeSingle()
     return { balance: data?.credits_balance ?? 0, error: error?.message ?? null }
@@ -230,6 +238,10 @@ export async function POST(request: Request) {
       { error: "A IA operacional real so fica disponivel quando o Supabase estiver ativo." },
       { status: 503 }
     )
+  }
+
+  if (!hasSupabaseAdminEnv()) {
+    return NextResponse.json({ error: "A configuracao administrativa do billing traveler nao esta disponivel." }, { status: 503 })
   }
 
   const body = (await request.json().catch(() => null)) as ConciergeRequestBody | null
@@ -440,25 +452,46 @@ export async function POST(request: Request) {
     warning = "A resposta foi gerada, mas o log operacional da IA ainda nao foi salvo. Revise o schema de ai_usage_logs."
   }
 
-  const creditsInsert = await supabase.from("credit_transactions").insert({
-    owner_type: ownerType,
-    owner_user_id: ownerType === "traveler" ? user.id : null,
-    agency_id: ownerType === "agency" ? accessResult.trip.agency_id : null,
-    type: "consume",
-    amount: -creditsToCharge,
-    reason: `Consumo do concierge IA para ${accessResult.trip.title}`,
-    source: "ai_concierge",
-    metadata: {
-      module: "concierge",
-      trip_id: accessResult.trip.id,
-      conversation_id: conversationResult.conversationId,
-    },
-    created_by: user.id,
-  })
+  if (ownerType === "traveler") {
+    const adminClient = createSupabaseAdminClient()
+    const consumeResult = await consumeTravelerCredits(adminClient, {
+      userId: user.id,
+      amount: creditsToCharge,
+      reason: `Consumo do concierge IA para ${accessResult.trip.title}`,
+      source: "ai_concierge",
+      metadata: {
+        module: "concierge",
+        trip_id: accessResult.trip.id,
+        conversation_id: conversationResult.conversationId,
+      },
+      createdBy: user.id,
+    })
 
-  if (creditsInsert.error) {
-    console.error("[AI] credits consume error", creditsInsert.error.message)
-    warning = "A resposta foi gerada, mas o consumo de creditos ainda nao foi registrado. Revise o ledger de creditos."
+    if (!consumeResult.success) {
+      console.error("[AI] traveler credits consume error", consumeResult.error)
+      warning = "A resposta foi gerada, mas o consumo de creditos ainda nao foi registrado. Revise o ledger de creditos."
+    }
+  } else {
+    const creditsInsert = await supabase.from("credit_transactions").insert({
+      owner_type: ownerType,
+      owner_user_id: ownerType === "traveler" ? user.id : null,
+      agency_id: ownerType === "agency" ? accessResult.trip.agency_id : null,
+      type: "consume",
+      amount: -creditsToCharge,
+      reason: `Consumo do concierge IA para ${accessResult.trip.title}`,
+      source: "ai_concierge",
+      metadata: {
+        module: "concierge",
+        trip_id: accessResult.trip.id,
+        conversation_id: conversationResult.conversationId,
+      },
+      created_by: user.id,
+    })
+
+    if (creditsInsert.error) {
+      console.error("[AI] credits consume error", creditsInsert.error.message)
+      warning = "A resposta foi gerada, mas o consumo de creditos ainda nao foi registrado. Revise o ledger de creditos."
+    }
   }
 
   return NextResponse.json({

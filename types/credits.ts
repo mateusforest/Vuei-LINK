@@ -57,3 +57,21 @@ export interface Plan {
   createdAt: string
   updatedAt: string
 }
+
+export type TravelerPlanCode = "free" | "premium"
+export type TravelerSubscriptionStatus = "free" | "incomplete" | "trialing" | "active" | "past_due" | "canceled" | "unpaid"
+
+export interface TravelerCreditBalanceSummary {
+  planCreditsAvailable: number
+  purchasedCreditsAvailable: number
+  totalAvailable: number
+  currentPlan: TravelerPlanCode
+  currentPeriodEnd: string | null
+}
+
+export interface TravelerBillingStatusSummary extends TravelerCreditBalanceSummary {
+  subscriptionStatus: TravelerSubscriptionStatus
+  stripeCustomerId: string | null
+  stripeSubscriptionId: string | null
+  cancelAtPeriodEnd: boolean
+}
