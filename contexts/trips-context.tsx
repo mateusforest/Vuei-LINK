@@ -23,6 +23,7 @@ import {
   mapLegacyCreditsToCreditBalance,
   type LegacyCreditsState,
 } from "@/lib/mappers/credit-mappers"
+import { resolveTravelerPlan, type TravelerPlanSnapshot } from "@/lib/billing/traveler-plans"
 
 export interface Trip extends Pick<CanonicalTrip, "id" | "slug" | "destination" | "country" | "city" | "startDate" | "endDate" | "coverImage" | "createdAt"> {
   id: string
@@ -53,8 +54,11 @@ interface TripsContextCredits {
 interface TripsContextType {
   trips: Trip[]
   activeTrip: Trip | null
+  activeTripsCount: number
+  canCreateMoreTrips: boolean
   loadingTrips: boolean
   credits: TripsContextCredits
+  subscription: TravelerPlanSnapshot
   addTrip: (trip: Omit<Trip, "id" | "slug" | "adminLink" | "shareLink" | "createdAt" | "coverImage">) => Trip
   syncTripFromBackend: (trip: CanonicalTrip) => Trip
   updateTrip: (id: string, data: Partial<Trip>) => void
@@ -210,10 +214,14 @@ const STORAGE_KEY = "vuei_trips"
 const CREDITS_KEY = "vuei_credits"
 const TRIPS_BOOT_TIMEOUT_MS = 10_000
 
+function isActiveTripStatus(status: Trip["status"]) {
+  return status === "upcoming" || status === "ongoing"
+}
+
 export function TripsProvider({ children }: { children: ReactNode }) {
   // Mantemos a persistencia local nesta fase para nao alterar o fluxo aprovado.
   // A migracao gradual para trips-repository/credits-repository fica isolada fora deste contexto.
-  const { user, loading } = useAuth()
+  const { user, profile, loading } = useAuth()
   const defaultCreditsHistory = [
     { action: "Bonus de boas-vindas", amount: 100, date: new Date().toISOString(), source: "Sistema" },
     { action: "Promocao de lancamento", amount: 50, date: new Date().toISOString(), source: "Sistema" },
@@ -227,6 +235,10 @@ export function TripsProvider({ children }: { children: ReactNode }) {
   }))
   const [isLoaded, setIsLoaded] = useState(false)
   const [loadingTrips, setLoadingTrips] = useState(false)
+  const subscription = resolveTravelerPlan(profile)
+  const activeTripsCount = trips.filter((trip) => isActiveTripStatus(trip.status)).length
+  const maxActiveTrips = subscription.definition.limits.maxActiveTrips
+  const canCreateMoreTrips = maxActiveTrips === null || activeTripsCount < maxActiveTrips
 
   useEffect(() => {
     if (typeof window === "undefined") return
@@ -492,8 +504,11 @@ export function TripsProvider({ children }: { children: ReactNode }) {
       value={{
         trips,
         activeTrip,
+        activeTripsCount,
+        canCreateMoreTrips,
         loadingTrips,
         credits,
+        subscription,
         addTrip,
         syncTripFromBackend,
         updateTrip,

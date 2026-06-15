@@ -83,6 +83,8 @@ interface GenerateItineraryRequestBody {
   adminToken?: string
 }
 
+const PREMIUM_REQUIRED_ERROR = "Assine o Premium para gerar roteiros inteligentes, criar viagens ilimitadas e receber créditos mensais inclusos."
+
 async function getTripByAdminAccess(
   client: ReturnType<typeof createSupabaseAdminClient>,
   payload: { tripId: string; tripSlug?: string | null; adminToken?: string | null },
@@ -350,6 +352,10 @@ export async function POST(request: Request) {
   }
   if (!accessResult.trip) {
     return NextResponse.json({ error: accessResult.error ?? "Viagem nao encontrada." }, { status: 403 })
+  }
+
+  if (accessResult.trip.owner_type === "traveler") {
+    return NextResponse.json({ error: PREMIUM_REQUIRED_ERROR, code: "premium_required" }, { status: 403 })
   }
 
   const ownerType = accessResult.membership ? "agency" : "traveler"

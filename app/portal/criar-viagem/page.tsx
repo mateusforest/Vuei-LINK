@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { useRouter } from "next/navigation"
 import { 
@@ -35,6 +35,7 @@ import { useAuth } from "@/contexts/auth-context"
 import { createTrip as createTripInRepository } from "@/lib/repositories/trips-repository"
 import { shouldUseSupabase } from "@/lib/data-source"
 import { writePendingTrip } from "@/lib/pending-trip"
+import { PortalActionDialog } from "@/components/portal/portal-action-dialog"
 
 const fadeInUp = {
   initial: { opacity: 0, y: 20 },
@@ -76,7 +77,7 @@ function Toast({ message, visible }: { message: string; visible: boolean }) {
 
 export default function CriarViagemPage() {
   const router = useRouter()
-  const { addTrip, syncTripFromBackend } = useTrips()
+  const { addTrip, syncTripFromBackend, canCreateMoreTrips, subscription } = useTrips()
   const { user } = useAuth()
   const [step, setStep] = useState(1)
   const [formData, setFormData] = useState({
@@ -92,9 +93,17 @@ export default function CriarViagemPage() {
   const [createdTrip, setCreatedTrip] = useState<Trip | null>(null)
   const [copiedLink, setCopiedLink] = useState<string | null>(null)
   const [errorMessage, setErrorMessage] = useState("")
+  const [showLimitDialog, setShowLimitDialog] = useState(false)
 
   const totalSteps = 5
   const progress = (step / totalSteps) * 100
+  const blockedByFreePlan = subscription.code === "free" && !canCreateMoreTrips
+
+  useEffect(() => {
+    if (blockedByFreePlan) {
+      setShowLimitDialog(true)
+    }
+  }, [blockedByFreePlan])
 
   const canProceed = () => {
     switch (step) {
@@ -124,6 +133,11 @@ export default function CriarViagemPage() {
   }
 
   const createTrip = async () => {
+    if (blockedByFreePlan) {
+      setShowLimitDialog(true)
+      return
+    }
+
     setIsCreating(true)
     setErrorMessage("")
 
@@ -569,6 +583,14 @@ export default function CriarViagemPage() {
       )}
 
       <Toast message={copiedLink === "admin" ? "Link admin copiado!" : "Link publico copiado!"} visible={!!copiedLink} />
+      <PortalActionDialog
+        open={showLimitDialog}
+        onOpenChange={setShowLimitDialog}
+        title="Limite do plano gratuito atingido"
+        description="O plano gratuito permite apenas uma viagem ativa por vez. Faça upgrade para o Premium para criar viagens ilimitadas."
+        actionLabel="Conhecer Premium"
+        actionHref="/portal/planos"
+      />
     </div>
   )
 }

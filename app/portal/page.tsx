@@ -21,6 +21,7 @@ import { Button } from "@/components/ui/button"
 import { useTrips } from "@/contexts/trips-context"
 import { useAuth } from "@/contexts/auth-context"
 import { ensureTripIsPublic } from "@/lib/repositories/trips-repository"
+import { CreateTripButton } from "@/components/portal/create-trip-button"
 
 const fadeInUp = {
   initial: { opacity: 0, y: 20 },
@@ -183,14 +184,13 @@ export default function PortalHomePage() {
                     {activeTrip.destination}
                   </p>
                 </div>
-                <Button
+                <CreateTripButton
                   variant="outline"
                   className="border-border/50"
-                  onClick={() => router.push("/portal/criar-viagem")}
                 >
                   <Plus size={16} className="mr-2" />
                   Criar nova viagem
-                </Button>
+                </CreateTripButton>
               </div>
 
               <div className="mb-5 flex items-center gap-4 text-sm text-muted-foreground">
@@ -253,13 +253,10 @@ export default function PortalHomePage() {
             <p className="mb-6 text-sm text-muted-foreground">
               Organize tudo em um unico link: roteiro, documentos, passagens e mais.
             </p>
-            <Button
-              className="border-0 bg-gradient-to-r from-[#5de0e6] to-[#004aad] text-white"
-              onClick={() => router.push("/portal/criar-viagem")}
-            >
+            <CreateTripButton className="border-0 bg-gradient-to-r from-[#5de0e6] to-[#004aad] text-white">
               <Plus size={18} className="mr-2" />
               Nova Viagem
-            </Button>
+            </CreateTripButton>
           </Card>
         )}
       </motion.div>
@@ -268,10 +265,10 @@ export default function PortalHomePage() {
         <motion.div variants={fadeInUp}>
           <div className="mb-4 flex items-center justify-between">
             <h2 className="text-lg font-semibold">Viagens criadas</h2>
-            <Button variant="ghost" size="sm" onClick={() => router.push("/portal/criar-viagem")}>
+            <CreateTripButton variant="ghost" size="sm">
               <Plus size={16} className="mr-1" />
               Criar nova viagem
-            </Button>
+            </CreateTripButton>
           </div>
 
           <div className="space-y-3">

@@ -24,6 +24,7 @@ import { cn } from "@/lib/utils"
 import { TripsProvider, useTrips } from "@/contexts/trips-context"
 import { RouteGuard } from "@/components/auth/route-guard"
 import { useAuth } from "@/contexts/auth-context"
+import { CreateTripButton } from "@/components/portal/create-trip-button"
 
 const navItems = [
   { href: "/portal", icon: Home, label: "Início" },
@@ -134,17 +135,16 @@ function PortalLayoutInner({ children }: { children: React.ReactNode }) {
 
               {/* Create Trip Button */}
               <div className="my-6 px-1">
-                <Link
-                  href="/portal/criar-viagem"
+                <CreateTripButton
                   className={cn(
-                    "flex items-center justify-center gap-2 py-3 rounded-xl font-semibold transition-all duration-300",
+                    "flex w-full items-center justify-center gap-2 py-3 rounded-xl font-semibold transition-all duration-300",
                     "bg-gradient-to-r from-primary to-secondary text-primary-foreground vuei-button-glow hover:opacity-90",
                     sidebarCollapsed ? "px-3" : "px-4"
                   )}
                 >
                   <Plus size={20} />
                   {!sidebarCollapsed && <span>Nova Viagem</span>}
-                </Link>
+                </CreateTripButton>
               </div>
 
               {/* Secondary Navigation */}
@@ -272,13 +272,10 @@ function PortalLayoutInner({ children }: { children: React.ReactNode }) {
                 </Link>
               )
             })}
-            <Link
-              href="/portal/criar-viagem"
-              className="flex flex-col items-center gap-1 px-3 py-1.5 rounded-xl bg-gradient-to-r from-primary to-secondary"
-            >
+            <CreateTripButton className="flex h-auto flex-col items-center gap-1 px-3 py-1.5 rounded-xl bg-gradient-to-r from-primary to-secondary">
               <Plus size={22} className="text-primary-foreground" />
               <span className="text-[10px] font-medium text-primary-foreground">Criar</span>
-            </Link>
+            </CreateTripButton>
           </div>
         </nav>
       )}

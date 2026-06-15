@@ -38,6 +38,7 @@ import { useAuth } from "@/contexts/auth-context"
 import { shouldUseSupabase } from "@/lib/data-source"
 import { updateProfile as updateProfileRepository } from "@/lib/repositories/profiles-repository"
 import { createSupabaseBrowserClient } from "@/lib/supabase/client"
+import { resolveTravelerPlan } from "@/lib/billing/traveler-plans"
 import {
   disableQuickAccessBiometric,
   disableQuickAccessPin,
@@ -68,7 +69,7 @@ const defaultProfile = {
   name: "Conta",
   email: "",
   phone: "",
-  plan: "Premium",
+  plan: "Free",
   avatar: "",
   createdAt: "Nao informado",
 }
@@ -131,11 +132,12 @@ export default function ConfiguracoesPage() {
         return
       }
 
+      const travelerPlan = resolveTravelerPlan(authProfile)
       const nextProfile = {
         name: authProfile.name || defaultProfile.name,
         email: authProfile.email || defaultProfile.email,
         phone: authProfile.phone || defaultProfile.phone,
-        plan: authProfile.role === "agency_owner" || authProfile.role === "agency_member" ? "Agency" : "Premium",
+        plan: authProfile.role === "agency_owner" || authProfile.role === "agency_member" ? "Agency" : travelerPlan.definition.name,
         avatar: authProfile.avatarUrl || "",
         createdAt: authProfile.createdAt
           ? new Date(authProfile.createdAt).toLocaleDateString("pt-BR", { month: "long", year: "numeric" })

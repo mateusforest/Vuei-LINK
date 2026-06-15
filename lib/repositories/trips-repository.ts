@@ -30,6 +30,7 @@ interface RepositoryTripResult {
 }
 
 const CREATE_TRIP_ERROR_MESSAGE = "Nao foi possivel criar a viagem. Tente novamente."
+const FREE_PLAN_TRIP_LIMIT_ERROR_MESSAGE = "O plano gratuito permite apenas uma viagem ativa por vez. Faça upgrade para o Premium para criar viagens ilimitadas."
 const MAX_TRIP_SLUG_ATTEMPTS = 5
 
 function isDeletedTripStatus(status?: string | null) {
@@ -467,6 +468,34 @@ export async function createTrip(payload: CreateTripPayload) {
           config: createSupabaseBrowserClientPlaceholder(),
           data: null,
           error: "agency_id obrigatorio para criar viagem da agencia.",
+        }
+      }
+
+      if (payload.ownerType === "traveler" && payload.ownerUserId) {
+        const { count, error: activeTripsError } = await supabase
+          .from("trips")
+          .select("id", { count: "exact", head: true })
+          .eq("owner_user_id", payload.ownerUserId)
+          .eq("owner_type", "traveler")
+          .in("status", ["draft", "upcoming", "ongoing"])
+
+        if (activeTripsError) {
+          console.error("[TRIP] active trips check error", activeTripsError)
+          return {
+            source: "supabase" as const,
+            config: createSupabaseBrowserClientPlaceholder(),
+            data: null,
+            error: CREATE_TRIP_ERROR_MESSAGE,
+          }
+        }
+
+        if ((count ?? 0) >= 1) {
+          return {
+            source: "supabase" as const,
+            config: createSupabaseBrowserClientPlaceholder(),
+            data: null,
+            error: FREE_PLAN_TRIP_LIMIT_ERROR_MESSAGE,
+          }
         }
       }
 

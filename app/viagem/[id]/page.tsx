@@ -21,6 +21,7 @@ import { getOfflineDocumentBlob, getOfflineImageBlob, loadTripOfflinePackage } f
 import { isOfflineModeActive } from "@/lib/offline/offline-mode"
 import { useAuth } from "@/contexts/auth-context"
 import { buildAdminTripUrl, buildPublicTripUrl, isAdminLinkMode } from "@/lib/security/link-tokens"
+import { resolveTravelerPlan } from "@/lib/billing/traveler-plans"
 import type { TripFlightRecord } from "@/types/flight"
 import type { TripItineraryRecord, TripItineraryContent } from "@/types"
 import type { OfflineStoredTripPackage, OfflineTripPackageAudience, OfflineTripPackageStatus } from "@/lib/offline/types"
@@ -5118,6 +5119,7 @@ export default function TripPage() {
   const pathname = usePathname()
   const router = useRouter()
   const { user, profile, loading: authLoading } = useAuth()
+  const travelerPlan = resolveTravelerPlan(profile)
   const adminRouteActive = Boolean(pathname?.startsWith("/viagem/") && pathname?.endsWith("/admin"))
   const routeSlug =
     typeof params?.id === "string"
@@ -5145,6 +5147,7 @@ export default function TripPage() {
   const [securityModalOpen, setSecurityModalOpen] = useState(false)
   const [quickAccessGateRequired, setQuickAccessGateRequired] = useState(false)
   const [adminLinkMutationMode, setAdminLinkMutationMode] = useState(false)
+  const [premiumGateModalOpen, setPremiumGateModalOpen] = useState(false)
   const [offlineModeEnabled, setOfflineModeEnabled] = useState(false)
   const [offlinePackageStatus, setOfflinePackageStatus] = useState<OfflineTripPackageStatus | null>(null)
   const [offlineDocumentContext, setOfflineDocumentContext] = useState<OfflineDocumentContext | null>(null)
@@ -6128,6 +6131,18 @@ export default function TripPage() {
 
   const handleGenerateItinerary = async (mode: "simple" | "complete_pdf") => {
     if (blockOfflineMutation()) return
+
+    const travelerTrip = !tripData.agencyId
+    const premiumLocked =
+      travelerTrip &&
+      ((mode === "simple" && !travelerPlan.definition.limits.simpleItinerary) ||
+        (mode === "complete_pdf" && !travelerPlan.definition.limits.completeItineraryPdf))
+
+    if (premiumLocked) {
+      setPremiumGateModalOpen(true)
+      return
+    }
+
     if (!ensureSensitiveAccess()) return
 
     const label = mode === "simple" ? "roteiro simples" : "roteiro completo"
@@ -6565,6 +6580,22 @@ export default function TripPage() {
           <TripSettingsModal open={tripSettingsOpen} onClose={() => setTripSettingsOpen(false)} tripData={tripData} onSave={handleSaveTripSettings} />
           <TripSecurityModal open={securitySettingsOpen} onClose={() => setSecuritySettingsOpen(false)} tripId={tripData.id} tripTitle={tripData.destination} onSecurityUpdated={() => setToast({ message: "Seguranca do dispositivo atualizada.", type: "success" })} />
           <CreditsModal open={creditsOpen} onClose={() => setCreditsOpen(false)} credits={tripData.credits} />
+          <Modal open={premiumGateModalOpen} onClose={() => setPremiumGateModalOpen(false)} title="Disponível no Premium">
+            <div className="space-y-5">
+              <p className="text-sm text-white/60">
+                Assine o Premium para gerar roteiros inteligentes, criar viagens ilimitadas e receber créditos mensais inclusos.
+              </p>
+              <Button
+                className="w-full rounded-2xl border-0 bg-gradient-to-r from-[#5de0e6] to-[#004aad] text-white"
+                onClick={() => {
+                  setPremiumGateModalOpen(false)
+                  router.push("/portal/planos")
+                }}
+              >
+                Conhecer Premium
+              </Button>
+            </div>
+          </Modal>
 
           <AnimatePresence>
             {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
