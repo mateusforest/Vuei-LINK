@@ -47,14 +47,18 @@ const staggerContainer = {
   }
 }
 
-function Toast({ message, visible }: { message: string; visible: boolean }) {
+function Toast({ message, visible, tone = "success" }: { message: string; visible: boolean; tone?: "success" | "error" }) {
   if (!visible) return null
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: 20 }}
-      className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-xl bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 text-sm flex items-center gap-2"
+      className={`fixed bottom-24 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-xl text-sm flex items-center gap-2 ${
+        tone === "error"
+          ? "bg-red-500/20 border border-red-500/30 text-red-300"
+          : "bg-emerald-500/20 border border-emerald-500/30 text-emerald-400"
+      }`}
     >
       <Check size={16} />
       {message}
@@ -66,12 +70,21 @@ export default function ViagemListPage() {
   const router = useRouter()
   const { trips, deleteTrip, setActiveTrip } = useTrips()
   const [copiedLink, setCopiedLink] = useState<string | null>(null)
+  const [feedback, setFeedback] = useState<{ message: string; tone: "success" | "error" } | null>(null)
   const [filter, setFilter] = useState<"all" | "upcoming" | "ongoing" | "completed">("all")
 
   const copyLink = (link: string, type: string) => {
     navigator.clipboard.writeText(link)
     setCopiedLink(type)
     setTimeout(() => setCopiedLink(null), 2000)
+  }
+
+  const handleDeleteTrip = async (tripId: string) => {
+    const removed = await deleteTrip(tripId)
+    if (!removed) {
+      setFeedback({ message: "Nao foi possivel excluir a viagem.", tone: "error" })
+      window.setTimeout(() => setFeedback(null), 2500)
+    }
   }
 
   const copyShareLink = async (tripId: string, link: string, type: string) => {
@@ -264,7 +277,7 @@ export default function ViagemListPage() {
                           Compartilhar
                         </DropdownMenuItem>
                         <DropdownMenuSeparator className="bg-white/10" />
-                        <DropdownMenuItem onClick={() => deleteTrip(trip.id)} className="cursor-pointer text-red-400 focus:text-red-400">
+                        <DropdownMenuItem onClick={() => void handleDeleteTrip(trip.id)} className="cursor-pointer text-red-400 focus:text-red-400">
                           <Trash2 size={14} className="mr-2" />
                           Excluir
                         </DropdownMenuItem>
@@ -301,7 +314,7 @@ export default function ViagemListPage() {
         </motion.div>
       )}
 
-      <Toast message="Link copiado!" visible={!!copiedLink} />
+      <Toast message={feedback?.message ?? "Link copiado!"} visible={Boolean(copiedLink || feedback)} tone={feedback?.tone ?? "success"} />
     </motion.div>
   )
 }

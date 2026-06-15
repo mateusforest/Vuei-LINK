@@ -3,7 +3,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from "react"
 import type { CreditBalance, CreditTransaction, Trip as CanonicalTrip, TripStatus } from "@/types"
 import { useAuth } from "@/contexts/auth-context"
-import { createTrip as createTripInRepository, listTripsByUser } from "@/lib/repositories/trips-repository"
+import { createTrip as createTripInRepository, deleteTrip as deleteTripInRepository, listTripsByUser } from "@/lib/repositories/trips-repository"
 import { shouldUseSupabase } from "@/lib/data-source"
 import { withTimeout } from "@/lib/async/with-timeout"
 import { clearPendingTrip, readPendingTrip } from "@/lib/pending-trip"
@@ -58,7 +58,7 @@ interface TripsContextType {
   addTrip: (trip: Omit<Trip, "id" | "slug" | "adminLink" | "shareLink" | "createdAt" | "coverImage">) => Trip
   syncTripFromBackend: (trip: CanonicalTrip) => Trip
   updateTrip: (id: string, data: Partial<Trip>) => void
-  deleteTrip: (id: string) => void
+  deleteTrip: (id: string) => Promise<boolean>
   setActiveTrip: (id: string | null) => void
   getTripBySlug: (slug: string) => Trip | undefined
   useCredits: (amount: number, source: string, action: string) => boolean
@@ -423,12 +423,28 @@ export function TripsProvider({ children }: { children: ReactNode }) {
     }
   }, [activeTrip])
 
-  const deleteTrip = useCallback((id: string) => {
-    setTrips((prev) => prev.filter((trip) => trip.id !== id))
-    if (activeTrip?.id === id) {
-      setActiveTripState(null)
+  const deleteTrip = useCallback(async (id: string) => {
+    const previousTrips = trips
+    const previousActiveTrip = activeTrip
+    const nextTrips = previousTrips.filter((trip) => trip.id !== id)
+
+    setTrips(nextTrips)
+    if (previousActiveTrip?.id === id) {
+      setActiveTripState(nextTrips[0] ?? null)
     }
-  }, [activeTrip])
+
+    if (shouldUseSupabase()) {
+      const result = await deleteTripInRepository(id)
+      if (!result.success) {
+        console.error("[TRIPS] delete error", result.error)
+        setTrips(previousTrips)
+        setActiveTripState(previousActiveTrip)
+        return false
+      }
+    }
+
+    return true
+  }, [activeTrip, trips])
 
   const setActiveTrip = useCallback((id: string | null) => {
     if (id === null) {

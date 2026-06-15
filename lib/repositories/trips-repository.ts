@@ -3,6 +3,7 @@ import { shouldUseSupabase } from "@/lib/data-source"
 import { ensureProfile } from "@/lib/auth/ensure-profile"
 import { normalizeLegacyAgencyTrips, normalizeLegacyTrips } from "@/lib/local-storage-migration"
 import { createSupabaseBrowserClient, createSupabaseBrowserClientPlaceholder } from "@/lib/supabase/client"
+import { extractAgencyStorageState } from "@/lib/mappers/agency-mappers"
 import { buildUniqueTripSlug, mapStoredTripToTrip, slugifyTripBase, type LegacyStoredTrip } from "@/lib/mappers/trip-mappers"
 import { buildAdminTripUrl, buildPublicTripUrl, generateSecureToken } from "@/lib/security/link-tokens"
 import type { Database } from "@/lib/supabase/types"
@@ -153,6 +154,25 @@ function writeLocalTrips(nextTrips: Trip[]) {
   } catch {
     // Mantem fallback silencioso para nao quebrar o app atual.
   }
+}
+
+function removeTripFromLegacyCaches(id: string) {
+  if (typeof window === "undefined") return
+
+  const travelerPayload = {
+    schemaVersion: 2,
+    trips: extractTripsStoragePayload(window.localStorage.getItem("vuei_trips")).trips.filter((trip) => trip.id !== id),
+  }
+  window.localStorage.setItem("vuei_trips", JSON.stringify(travelerPayload))
+
+  const agencyState = extractAgencyStorageState(window.localStorage.getItem("vuei_agency"))
+  window.localStorage.setItem(
+    "vuei_agency",
+    JSON.stringify({
+      ...agencyState,
+      trips: (agencyState.trips ?? []).filter((trip: any) => trip?.id !== id),
+    }),
+  )
 }
 
 function filterTrips(trips: Trip[], params?: ListTripsParams) {
@@ -580,6 +600,7 @@ export async function deleteTrip(id: string) {
       const { error } = await supabase.from("trips").delete().eq("id", id)
 
       if (!error) {
+        removeTripFromLegacyCaches(id)
         return {
           source: "supabase" as const,
           config: createSupabaseBrowserClientPlaceholder(),
@@ -615,6 +636,7 @@ export async function deleteTrip(id: string) {
   }
 
   writeLocalTrips(readStoredTrips().filter((trip) => trip.id !== id))
+  removeTripFromLegacyCaches(id)
   return { source: "local" as const, success: true, error: null }
 }
 
