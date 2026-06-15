@@ -1,16 +1,26 @@
 create table if not exists public.agency_subscriptions (
   id uuid primary key default gen_random_uuid(),
   agency_id uuid not null references public.agencies(id) on delete cascade,
-  plan_code text not null default 'start',
+  plan_code text not null default 'free',
   status text not null default 'active',
   started_at timestamptz,
   expires_at timestamptz,
   created_at timestamptz not null default timezone('utc', now()),
   updated_at timestamptz not null default timezone('utc', now()),
   constraint agency_subscriptions_agency_id_key unique (agency_id),
-  constraint agency_subscriptions_plan_code_check check (plan_code in ('start', 'pro', 'business')),
+  constraint agency_subscriptions_plan_code_check check (plan_code in ('free', 'start', 'pro', 'business')),
   constraint agency_subscriptions_status_check check (status in ('active', 'inactive', 'cancelled'))
 );
+
+alter table public.agency_subscriptions
+  alter column plan_code set default 'free';
+
+alter table public.agency_subscriptions
+  drop constraint if exists agency_subscriptions_plan_code_check;
+
+alter table public.agency_subscriptions
+  add constraint agency_subscriptions_plan_code_check
+  check (plan_code in ('free', 'start', 'pro', 'business'));
 
 create index if not exists agency_subscriptions_plan_code_idx
   on public.agency_subscriptions (plan_code);
@@ -91,3 +101,14 @@ create policy "Agency subscriptions manage own agency"
         and p.role = 'master'
     )
   );
+
+-- Query segura opcional para ambientes sem Stripe:
+-- rebaixa apenas subscriptions canônicas criadas automaticamente como start,
+-- mantendo espaço para preservar casos ajustados manualmente.
+-- update public.agency_subscriptions
+-- set plan_code = 'free',
+--     updated_at = timezone('utc', now())
+-- where plan_code = 'start'
+--   and status = 'active'
+--   and started_at is not null
+--   and expires_at is null;

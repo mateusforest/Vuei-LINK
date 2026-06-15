@@ -52,6 +52,12 @@ const settingsSections = [
 
 const mockPlans = [
   {
+    id: "free",
+    name: "Free",
+    price: "R$ 0",
+    benefits: ["40 creditos por mes", "1 usuario", "1 viagem ativa"],
+  },
+  {
     id: "start",
     name: "Start",
     price: "R$ 69,90/mes",
@@ -94,7 +100,7 @@ export default function SettingsPage() {
     phone: "+55 11 99999-0000",
     address: "Av. Paulista, 1000 - Sao Paulo, SP",
     logo: "",
-    plan: "Start",
+    plan: "Free",
   })
   const [brandingData, setBrandingData] = useState({
     linkLogo: "",
@@ -727,7 +733,7 @@ export default function SettingsPage() {
               <p className="text-sm text-muted-foreground">Plano atual</p>
               <p className="text-lg font-semibold text-foreground">{subscription.definition.name}</p>
             </div>
-            <div className="grid gap-3 md:grid-cols-3">
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
               {mockPlans.map((plan) => (
                 <div key={plan.id} className={`rounded-xl border p-4 ${subscription.code === plan.id ? "border-primary/40 bg-primary/5" : "border-white/10 bg-white/[0.02]"}`}>
                   <p className="font-semibold text-foreground">{plan.name}</p>

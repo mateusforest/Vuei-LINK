@@ -10,6 +10,31 @@ import type {
 } from "@/types"
 
 export const AGENCY_PLAN_DEFINITIONS: Record<AgencyCommercialPlanCode, AgencyPlanDefinition> = {
+  free: {
+    code: "free",
+    name: "Free",
+    priceLabel: "R$ 0",
+    monthlyCredits: 40,
+    maxUsers: 1,
+    maxActiveTrips: 1,
+    features: [
+      "Portal Agencia completo",
+      "Dashboard",
+      "Clientes",
+      "Viagens",
+      "Documentos",
+      "Passagens IA",
+      "Hospedagens",
+      "Roteiros IA",
+      "Concierge IA",
+      "Analytics",
+      "Compartilhamento",
+      "Offline",
+      "1 usuario",
+      "1 viagem ativa",
+      "40 creditos por mes",
+    ],
+  },
   start: {
     code: "start",
     name: "Start",
@@ -72,15 +97,17 @@ export const AGENCY_PLAN_LIMIT_ERROR = "AGENCY_PLAN_LIMIT_REACHED"
 export const AGENCY_TEAM_LIMIT_ERROR = "AGENCY_TEAM_LIMIT_REACHED"
 
 export function normalizeAgencyCommercialPlanCode(value: string | null | undefined): AgencyCommercialPlanCode {
+  if (value === "free") return "free"
   if (value === "pro") return "pro"
   if (value === "business" || value === "enterprise") return "business"
-  return "start"
+  return "free"
 }
 
 export function mapLegacyAgencyPlanToCommercialPlan(plan: AgencyPlan | string | null | undefined): AgencyCommercialPlanCode {
+  if (plan === "free") return "free"
   if (plan === "pro") return "pro"
   if (plan === "enterprise" || plan === "business") return "business"
-  return "start"
+  return "free"
 }
 
 export function mapCommercialPlanToLegacyAgencyPlan(planCode: AgencyCommercialPlanCode): AgencyPlan {
@@ -118,6 +145,16 @@ export function getAgencyPlanLimitDialog(
   const definition = AGENCY_PLAN_DEFINITIONS[planCode]
 
   if (kind === "trip_limit") {
+    if (planCode === "free") {
+      return {
+        kind,
+        title: "Limite do plano gratuito atingido",
+        description: "O plano gratuito da agencia permite 1 viagem ativa para testar o Vuei. Faca upgrade para criar mais viagens e ampliar sua operacao.",
+        actionLabel: "Conhecer planos",
+        actionHref: "/agencia/planos",
+      }
+    }
+
     if (planCode === "business") {
       return {
         kind,
@@ -131,6 +168,16 @@ export function getAgencyPlanLimitDialog(
       kind,
       title: "Limite do plano atingido",
       description: `Seu plano atual permite ate ${definition.maxActiveTrips} viagens ativas. Faca upgrade para aumentar sua capacidade operacional.`,
+      actionLabel: "Conhecer planos",
+      actionHref: "/agencia/planos",
+    }
+  }
+
+  if (planCode === "free") {
+    return {
+      kind,
+      title: "Limite de usuarios atingido",
+      description: "O plano gratuito permite 1 usuario. Faca upgrade para adicionar mais pessoas a equipe.",
       actionLabel: "Conhecer planos",
       actionHref: "/agencia/planos",
     }

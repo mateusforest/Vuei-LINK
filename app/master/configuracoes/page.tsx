@@ -65,6 +65,12 @@ const integrations = [
 
 const agencyPlans = [
   {
+    code: "free",
+    name: "Free",
+    price: "R$ 0",
+    limits: ["1 usuario", "1 viagem ativa", "40 creditos por mes"],
+  },
+  {
     code: "start",
     name: "Start",
     price: "R$ 69,90/mes",
@@ -296,7 +302,7 @@ export default function MasterConfiguracoesPage() {
             <Card className="border-white/5 bg-black/40 backdrop-blur-xl p-6">
               <h2 className="text-lg font-semibold text-foreground mb-6">Planos B2B da Agencia</h2>
 
-              <div className="grid gap-4 md:grid-cols-3">
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                 {agencyPlans.map((plan) => (
                   <div
                     key={plan.code}

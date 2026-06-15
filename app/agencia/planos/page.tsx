@@ -48,7 +48,7 @@ export default function AgencyPlansPage() {
         </div>
       </motion.div>
 
-      <motion.div {...fadeInUp} className="grid gap-5 lg:grid-cols-3">
+      <motion.div {...fadeInUp} className="grid gap-5 lg:grid-cols-4">
         {plans.map((plan) => {
           const isCurrent = subscription.code === plan.code
 
@@ -102,7 +102,7 @@ export default function AgencyPlansPage() {
               </div>
 
               <Button disabled className="mt-8 w-full rounded-xl">
-                Em breve
+                {isCurrent ? "Plano atual" : "Fazer upgrade em breve"}
               </Button>
             </Card>
           )

@@ -29,7 +29,7 @@ function buildAgencyBillingStatus(
 }
 
 export function getDefaultAgencyBillingStatus(agencyId: string | null): AgencyBillingStatusSummary {
-  return buildAgencyBillingStatus(agencyId, "start", "active", null, null)
+  return buildAgencyBillingStatus(agencyId, "free", "active", null, null)
 }
 
 export function mapAgencySubscriptionRowToBillingStatus(row: AgencySubscriptionRow | null | undefined): AgencyBillingStatusSummary {

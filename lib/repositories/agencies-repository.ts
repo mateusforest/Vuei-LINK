@@ -3,6 +3,7 @@ import { shouldUseSupabase } from "@/lib/data-source"
 import { createSupabaseBrowserClient, createSupabaseBrowserClientPlaceholder } from "@/lib/supabase/client"
 import type { Database } from "@/lib/supabase/types"
 import { mapAgencySettingsToAgency } from "@/lib/mappers/agency-mappers"
+import { upsertAgencySubscriptionForClient } from "@/lib/billing/agency-billing"
 
 export interface AgencyMember {
   id: string
@@ -224,6 +225,24 @@ export async function createAgency(payload: CreateAgencyPayload) {
           source: "supabase" as const,
           data: null,
           error: `Agencia criada, mas falhou ao atualizar o profile: ${profileError.message}`,
+        }
+      }
+
+      const billingResult = await upsertAgencySubscriptionForClient(client, {
+        agencyId: data.id,
+        planCode: "free",
+        status: "active",
+      })
+
+      if (billingResult.error) {
+        console.error("[AUTH ERROR]", billingResult.error)
+        await client.from("profiles").update({ agency_id: null, role: "traveler" }).eq("id", payload.ownerUserId)
+        await client.from("agency_members").delete().eq("agency_id", data.id).eq("profile_id", payload.ownerUserId)
+        await client.from("agencies").delete().eq("id", data.id)
+        return {
+          source: "supabase" as const,
+          data: null,
+          error: `Agencia criada, mas falhou ao iniciar a assinatura Free: ${billingResult.error}`,
         }
       }
 

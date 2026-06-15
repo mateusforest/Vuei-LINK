@@ -94,7 +94,7 @@ export interface Database {
         Row: {
           id: string
           agency_id: string
-          plan_code: "start" | "pro" | "business"
+          plan_code: "free" | "start" | "pro" | "business"
           status: "active" | "inactive" | "cancelled"
           started_at: string | null
           expires_at: string | null
@@ -104,7 +104,7 @@ export interface Database {
         Insert: {
           id?: string
           agency_id: string
-          plan_code?: "start" | "pro" | "business"
+          plan_code?: "free" | "start" | "pro" | "business"
           status?: "active" | "inactive" | "cancelled"
           started_at?: string | null
           expires_at?: string | null
@@ -113,7 +113,7 @@ export interface Database {
         }
         Update: {
           agency_id?: string
-          plan_code?: "start" | "pro" | "business"
+          plan_code?: "free" | "start" | "pro" | "business"
           status?: "active" | "inactive" | "cancelled"
           started_at?: string | null
           expires_at?: string | null

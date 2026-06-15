@@ -424,25 +424,6 @@ const initialTrips: AgencyTrip[] = [
     shareLink: buildPublicTripUrl("lua-de-mel-em-paris"),
     createdAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
   },
-  {
-    id: "agency-trip-2",
-    slug: "ferias-em-tokyo",
-    clientId: "client-2",
-    clientName: "Joao Santos",
-    name: "Ferias em Tokyo",
-    destination: "Tokyo, Japao",
-    country: "Japao",
-    city: "Tokyo",
-    startDate: "2024-08-10",
-    endDate: "2024-08-20",
-    style: "familia",
-    passengersCount: 4,
-    status: "upcoming",
-    coverImage: "https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?w=800&q=80",
-    adminLink: buildAdminTripUrl("ferias-em-tokyo"),
-    shareLink: buildPublicTripUrl("ferias-em-tokyo"),
-    createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
-  },
 ]
 
 const initialConciergeRequests: ConciergeRequest[] = [
@@ -456,28 +437,15 @@ const initialConciergeRequests: ConciergeRequest[] = [
     status: "pending",
     createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
   },
-  {
-    id: "req-2",
-    tripId: "agency-trip-2",
-    clientId: "client-2",
-    clientName: "Joao Santos",
-    destination: "Tokyo, Japao",
-    question: "Preciso de recomendacao de passeio para criancas em Shibuya",
-    response: "Recomendo o Shibuya Sky para uma vista incrivel da cidade! As criancas vao adorar o mirante interativo.",
-    status: "answered",
-    createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-  },
 ]
 
 const initialTeamMembers: TeamMember[] = [
   { id: "team-1", name: "Admin Principal", email: "admin@agencia.com", role: "owner", status: "active", createdAt: new Date().toISOString() },
-  { id: "team-2", name: "Agente 1", email: "agente1@agencia.com", role: "agent", status: "active", createdAt: new Date().toISOString() },
 ]
 
 const initialActivities: Activity[] = [
   { id: "act-1", action: "Viagem criada", description: "Lua de Mel em Paris para Maria Silva", type: "trip", timestamp: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString() },
-  { id: "act-2", action: "Viagem criada", description: "Ferias em Tokyo para Joao Santos", type: "trip", timestamp: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString() },
-  { id: "act-3", action: "Solicitacao recebida", description: "Maria Silva perguntou sobre restaurantes", type: "concierge", timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString() },
+  { id: "act-2", action: "Solicitacao recebida", description: "Maria Silva perguntou sobre restaurantes", type: "concierge", timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString() },
 ]
 
 export function AgencyProvider({ children }: { children: ReactNode }) {
@@ -496,12 +464,12 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
   const [activities, setActivities] = useState<Activity[]>(isUsingRealData ? [] : initialActivities)
   const [credits, setCredits] = useState<AgencyCredits>(() => {
     if (isUsingRealData) {
-      return buildAgencyCredits(0, "start", [])
+      return buildAgencyCredits(0, "free", [])
     }
-    const history = [{ action: "Plano Start", amount: 350, date: new Date().toISOString(), source: "Sistema" }]
-    return buildAgencyCredits(350, "start", history)
+    const history = [{ action: "Plano Free", amount: 40, date: new Date().toISOString(), source: "Sistema" }]
+    return buildAgencyCredits(40, "free", history)
   })
-  const [subscription, setSubscription] = useState<AgencyPlanSnapshot>(() => resolveAgencyPlanSnapshot({ planCode: "start" }))
+  const [subscription, setSubscription] = useState<AgencyPlanSnapshot>(() => resolveAgencyPlanSnapshot({ planCode: "free" }))
   const [limitDialog, setLimitDialog] = useState<AgencyLimitDialogState | null>(null)
   const [isLoaded, setIsLoaded] = useState(false)
   const clientNameById = useMemo(() => new Map(clients.map((client) => [client.id, client.name])), [clients])
@@ -542,7 +510,7 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
       setConciergeRequests(parsed.conciergeRequests)
       setTeamMembers(parsed.teamMembers)
       setCredits(parsed.credits)
-      setSubscription(parsed.subscription ?? resolveAgencyPlanSnapshot({ planCode: parsed.credits?.plan ?? "start" }))
+      setSubscription(parsed.subscription ?? resolveAgencyPlanSnapshot({ planCode: parsed.credits?.plan ?? "free" }))
       setWorkspaceError(parsed.workspaceError)
       setSetupIncomplete(false)
       setIsLoaded(true)
@@ -670,8 +638,8 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
       setConciergeRequests([])
       setTeamMembers([])
       setActivities([])
-      setCredits(buildAgencyCredits(0, "start", []))
-      setSubscription(resolveAgencyPlanSnapshot({ planCode: "start" }))
+      setCredits(buildAgencyCredits(0, "free", []))
+      setSubscription(resolveAgencyPlanSnapshot({ planCode: "free" }))
       setIsLoaded(true)
       setWorkspaceLoading(false)
       return
@@ -698,8 +666,8 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
         setConciergeRequests([])
         setTeamMembers([])
         setActivities([])
-        setCredits(buildAgencyCredits(0, "start", []))
-        setSubscription(resolveAgencyPlanSnapshot({ planCode: "start" }))
+        setCredits(buildAgencyCredits(0, "free", []))
+        setSubscription(resolveAgencyPlanSnapshot({ planCode: "free" }))
         setIsLoaded(true)
         return
       }

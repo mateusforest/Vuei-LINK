@@ -1,6 +1,6 @@
 export type AgencyPlan = "starter" | "pro" | "enterprise"
 export type AgencyPlanCode = AgencyPlan
-export type AgencyCommercialPlanCode = "start" | "pro" | "business"
+export type AgencyCommercialPlanCode = "free" | "start" | "pro" | "business"
 export type AgencySubscriptionStatus = "active" | "inactive" | "cancelled"
 
 export type AgencyStatus = "pending" | "active" | "suspended" | "archived"
