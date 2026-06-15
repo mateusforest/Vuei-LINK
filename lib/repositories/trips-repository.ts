@@ -29,6 +29,10 @@ interface RepositoryTripResult {
   config?: ReturnType<typeof createSupabaseBrowserClientPlaceholder>
 }
 
+function isDeletedTripStatus(status?: string | null) {
+  return status === "cancelled" || status === "deleted" || status === "archived"
+}
+
 function readStoredTrips() {
   return [...normalizeLegacyTrips(), ...normalizeLegacyAgencyTrips()]
 }
@@ -176,9 +180,10 @@ function removeTripFromLegacyCaches(id: string) {
 }
 
 function filterTrips(trips: Trip[], params?: ListTripsParams) {
-  if (!params) return trips
+  const visibleTrips = trips.filter((trip) => !isDeletedTripStatus(trip.status))
+  if (!params) return visibleTrips
 
-  return trips.filter((trip) => {
+  return visibleTrips.filter((trip) => {
     if (params.ownerType && trip.ownerType !== params.ownerType) return false
     if (params.ownerUserId && trip.ownerUserId !== params.ownerUserId) return false
     if (params.agencyId && trip.agencyId !== params.agencyId) return false
@@ -242,6 +247,7 @@ export async function listTrips(params?: ListTripsParams) {
       if (params?.agencyId) query = query.eq("agency_id", params.agencyId)
       if (params?.clientId) query = query.eq("client_id", params.clientId)
       if (params?.status) query = query.eq("status", params.status)
+      if (!params?.status) query = query.neq("status", "cancelled")
 
       const { data, error } = await query
 
@@ -249,7 +255,7 @@ export async function listTrips(params?: ListTripsParams) {
         return {
           source: "supabase" as const,
           config: createSupabaseBrowserClientPlaceholder(),
-          data: data.map(mapTripRowToTrip),
+          data: data.map(mapTripRowToTrip).filter((trip) => !isDeletedTripStatus(trip.status)),
         }
       }
       if (error) {
@@ -300,10 +306,11 @@ export async function getTripBySlug(slug: string) {
     try {
       const { data, error } = await supabase.from("trips").select("*").eq("slug", slug).maybeSingle()
       if (!error && data) {
+        const mappedTrip = mapTripRowToTrip(data)
         return {
           source: "supabase" as const,
           config: createSupabaseBrowserClientPlaceholder(),
-          data: mapTripRowToTrip(data),
+          data: isDeletedTripStatus(mappedTrip.status) ? null : mappedTrip,
         }
       }
       if (error) {
@@ -338,10 +345,11 @@ export async function getTripByAdminToken(token: string) {
     try {
       const { data, error } = await supabase.from("trips").select("*").eq("admin_token", token).maybeSingle()
       if (!error && data) {
+        const mappedTrip = mapTripRowToTrip(data)
         return {
           source: "supabase" as const,
           config: createSupabaseBrowserClientPlaceholder(),
-          data: mapTripRowToTrip(data),
+          data: isDeletedTripStatus(mappedTrip.status) ? null : mappedTrip,
         }
       }
       return {
@@ -373,10 +381,11 @@ export async function getTripByPublicToken(token: string) {
     try {
       const { data, error } = await supabase.from("trips").select("*").eq("public_token", token).maybeSingle()
       if (!error && data) {
+        const mappedTrip = mapTripRowToTrip(data)
         return {
           source: "supabase" as const,
           config: createSupabaseBrowserClientPlaceholder(),
-          data: mapTripRowToTrip(data),
+          data: isDeletedTripStatus(mappedTrip.status) ? null : mappedTrip,
         }
       }
       return {
@@ -597,9 +606,22 @@ export async function deleteTrip(id: string) {
 
   if (shouldUseSupabase() && supabase) {
     try {
-      const { error } = await supabase.from("trips").delete().eq("id", id)
+      const { data, error } = await supabase
+        .from("trips")
+        .update({
+          status: "cancelled",
+          visibility: "private",
+          public_token: null,
+          admin_token: null,
+          public_link: null,
+          admin_link: null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", id)
+        .select("id")
+        .maybeSingle()
 
-      if (!error) {
+      if (!error && data) {
         removeTripFromLegacyCaches(id)
         return {
           source: "supabase" as const,
@@ -613,7 +635,7 @@ export async function deleteTrip(id: string) {
         source: "supabase" as const,
         config: createSupabaseBrowserClientPlaceholder(),
         success: false,
-        error: error.message,
+        error: error?.message || "Nenhuma viagem elegivel foi atualizada para exclusao.",
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : "Falha ao remover viagem."

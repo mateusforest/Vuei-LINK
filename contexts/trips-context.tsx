@@ -58,7 +58,7 @@ interface TripsContextType {
   addTrip: (trip: Omit<Trip, "id" | "slug" | "adminLink" | "shareLink" | "createdAt" | "coverImage">) => Trip
   syncTripFromBackend: (trip: CanonicalTrip) => Trip
   updateTrip: (id: string, data: Partial<Trip>) => void
-  deleteTrip: (id: string) => Promise<boolean>
+  deleteTrip: (id: string) => Promise<{ success: boolean; error?: string | null }>
   setActiveTrip: (id: string | null) => void
   getTripBySlug: (slug: string) => Trip | undefined
   useCredits: (amount: number, source: string, action: string) => boolean
@@ -439,11 +439,11 @@ export function TripsProvider({ children }: { children: ReactNode }) {
         console.error("[TRIPS] delete error", result.error)
         setTrips(previousTrips)
         setActiveTripState(previousActiveTrip)
-        return false
+        return { success: false, error: result.error ?? "Nao foi possivel excluir viagem." }
       }
     }
 
-    return true
+    return { success: true, error: null }
   }, [activeTrip, trips])
 
   const setActiveTrip = useCallback((id: string | null) => {

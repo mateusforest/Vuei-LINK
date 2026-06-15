@@ -80,9 +80,9 @@ export default function ViagemListPage() {
   }
 
   const handleDeleteTrip = async (tripId: string) => {
-    const removed = await deleteTrip(tripId)
-    if (!removed) {
-      setFeedback({ message: "Nao foi possivel excluir a viagem.", tone: "error" })
+    const result = await deleteTrip(tripId)
+    if (!result.success) {
+      setFeedback({ message: result.error || "Nao foi possivel excluir a viagem.", tone: "error" })
       window.setTimeout(() => setFeedback(null), 2500)
     }
   }
