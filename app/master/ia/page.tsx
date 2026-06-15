@@ -23,6 +23,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
 import { useMaster } from "@/contexts/master-context"
+import { formatMasterAiFeatureLabel, formatMasterAiStatusLabel } from "@/lib/master/labels"
 
 const fadeInUp = {
   initial: { opacity: 0, y: 20 },
@@ -159,7 +160,7 @@ export default function MasterIAPage() {
             <div className="flex items-start gap-3">
               <AlertTriangle className="h-4 w-4 text-amber-400 mt-0.5" />
               <div className="space-y-1 text-sm text-amber-100">
-                {dataErrors.aiPrompts ? <p>Prompts: {dataErrors.aiPrompts}</p> : null}
+                {dataErrors.aiPrompts ? <p>Prompts operacionais: {dataErrors.aiPrompts}</p> : null}
                 {dataErrors.aiUsageLogs ? <p>Usage logs: {dataErrors.aiUsageLogs}</p> : null}
               </div>
             </div>
@@ -296,9 +297,9 @@ export default function MasterIAPage() {
                     <div className="flex items-start justify-between gap-4">
                       <div className="space-y-1 min-w-0">
                         <div className="flex items-center gap-2">
-                          <span className="text-sm font-medium text-foreground">{log.feature}</span>
+                          <span className="text-sm font-medium text-foreground">{formatMasterAiFeatureLabel(log.feature)}</span>
                           <Badge variant="outline" className={log.status === "completed" ? "border-emerald-500/30 text-emerald-400" : "border-amber-500/30 text-amber-400"}>
-                            {log.status}
+                            {formatMasterAiStatusLabel(log.status)}
                           </Badge>
                         </div>
                         <div className="text-xs text-muted-foreground">

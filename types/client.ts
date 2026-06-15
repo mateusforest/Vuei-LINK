@@ -9,6 +9,7 @@ export interface Client {
   document: string | null
   notes: string | null
   status: ClientStatus
+  creditsBalance?: number | null
   createdAt: string
   updatedAt: string
 }

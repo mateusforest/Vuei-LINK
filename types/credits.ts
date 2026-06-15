@@ -1,4 +1,4 @@
-export type CreditOwnerType = "profile" | "agency"
+export type CreditOwnerType = "profile" | "agency" | "client"
 
 export type CreditTransactionType =
   | "grant"

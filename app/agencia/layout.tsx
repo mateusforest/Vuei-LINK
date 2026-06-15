@@ -97,6 +97,7 @@ function AgencyLayoutInner({ children }: { children: React.ReactNode }) {
   const unreadNotifications = agencyNotifications.filter((notification) => !notification.read).length
   const displayName = agency?.name || profile?.name || "Agencia"
   const displayPlan = agency?.plan ? agency.plan[0].toUpperCase() + agency.plan.slice(1) : "Agency"
+  const headerImageUrl = agency?.logo || profile?.avatarUrl || undefined
   const initials = displayName
     .split(" ")
     .filter(Boolean)
@@ -358,7 +359,7 @@ function AgencyLayoutInner({ children }: { children: React.ReactNode }) {
               {notificationsOpen ? renderNotificationsMenu() : null}
             </div>
             <Avatar className="h-8 w-8 border border-white/10">
-              <AvatarImage src={profile?.avatarUrl || undefined} />
+              <AvatarImage src={headerImageUrl} />
               <AvatarFallback className="bg-primary/20 text-xs text-primary">{initials}</AvatarFallback>
             </Avatar>
           </div>
@@ -464,7 +465,7 @@ function AgencyLayoutInner({ children }: { children: React.ReactNode }) {
                 <div className="text-xs text-muted-foreground">{displayPlan}</div>
               </div>
               <Avatar className="h-10 w-10 border-2 border-primary/30">
-                <AvatarImage src={profile?.avatarUrl || undefined} />
+                <AvatarImage src={headerImageUrl} />
                 <AvatarFallback className="bg-primary/20 text-primary">{initials}</AvatarFallback>
               </Avatar>
             </div>

@@ -956,6 +956,13 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
   }, [isUsingRealData])
 
   const deleteClient = useCallback(async (id: string) => {
+    const linkedTrips = trips.filter((trip) => trip.clientId === id)
+
+    if (linkedTrips.length > 0) {
+      setWorkspaceError("Este cliente possui viagens vinculadas e nao pode ser excluido agora.")
+      return false
+    }
+
     if (isUsingRealData) {
       const result = await deleteClientRecord(id)
       if (!result.success) {
@@ -971,7 +978,7 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
     setClients((prev) => prev.filter((item) => item.id !== id))
     if (client) addActivity("Cliente removido", client.name, "client")
     return true
-  }, [addActivity, clients, isUsingRealData])
+  }, [addActivity, clients, isUsingRealData, trips])
 
   const getClientById = useCallback((id: string) => clients.find((client) => client.id === id), [clients])
 

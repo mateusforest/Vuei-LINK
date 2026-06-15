@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { motion } from "framer-motion"
 import {
   Coins,
@@ -17,10 +17,16 @@ import {
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
 import { useMaster } from "@/contexts/master-context"
+import { useAuth } from "@/contexts/auth-context"
 import { shouldUseSupabase } from "@/lib/data-source"
-import { getCreditsOverview, listAllCreditTransactions } from "@/lib/repositories/credits-repository"
-import type { CreditTransaction } from "@/types"
+import { getCreditBalance, getCreditsOverview, grantCredits, listAllCreditTransactions } from "@/lib/repositories/credits-repository"
+import { listAllClients } from "@/lib/repositories/clients-repository"
+import { formatMasterCreditTransactionDetail, formatMasterCreditTransactionLabel } from "@/lib/master/labels"
+import type { Client, CreditOwnerType, CreditTransaction } from "@/types"
 
 const fadeInUp = {
   initial: { opacity: 0, y: 20 },
@@ -39,26 +45,6 @@ const creditPackages = [
   { name: "Enterprise", credits: 200000, price: 1499, popular: false },
 ]
 
-function formatTransactionLabel(transaction: CreditTransaction) {
-  const ownerLabel = transaction.ownerType === "agency" ? "Agencia" : "Viajante"
-  return transaction.reason || `${ownerLabel} - ${transaction.type}`
-}
-
-function formatTransactionValue(transaction: CreditTransaction) {
-  switch (transaction.type) {
-    case "purchase":
-      return "Compra pendente"
-    case "grant":
-      return "Credito concedido"
-    case "refund":
-      return "Reembolso"
-    case "adjustment":
-      return "Ajuste"
-    default:
-      return transaction.source || "Consumo"
-  }
-}
-
 function formatRelativeTime(dateString: string) {
   const diffMs = Date.now() - new Date(dateString).getTime()
   const diffMinutes = Math.max(Math.floor(diffMs / 60000), 0)
@@ -70,10 +56,20 @@ function formatRelativeTime(dateString: string) {
   return `${diffDays}d`
 }
 
+type GrantTargetOption = {
+  id: string
+  ownerType: CreditOwnerType
+  name: string
+  description: string
+  balance: number
+}
+
 export default function MasterCreditosPage() {
   const { agencies, users } = useMaster()
+  const { user } = useAuth()
   const isRealMode = shouldUseSupabase()
   const [transactions, setTransactions] = useState<CreditTransaction[]>([])
+  const [clients, setClients] = useState<Client[]>([])
   const [overview, setOverview] = useState({
     totalAvailable: 0,
     totalConsumed: 0,
@@ -81,50 +77,106 @@ export default function MasterCreditosPage() {
     transactionsCount: 0,
   })
   const [loadError, setLoadError] = useState<string | null>(null)
+  const [grantOpen, setGrantOpen] = useState(false)
+  const [grantSubmitting, setGrantSubmitting] = useState(false)
+  const [grantError, setGrantError] = useState<string | null>(null)
+  const [grantSuccess, setGrantSuccess] = useState<string | null>(null)
+  const [grantTargetId, setGrantTargetId] = useState("")
+  const [grantAmount, setGrantAmount] = useState("100")
+  const [grantReason, setGrantReason] = useState("")
+  const [balanceOverrides, setBalanceOverrides] = useState<Record<string, number>>({})
+
+  const grantTargets = useMemo<GrantTargetOption[]>(() => {
+    const agencyTargets = agencies.map((agency) => ({
+      id: `agency:${agency.id}`,
+      ownerType: "agency" as const,
+      name: agency.name,
+      description: "Agencia",
+      balance: balanceOverrides[`agency:${agency.id}`] ?? agency.creditsBalance,
+    }))
+
+    const userTargets = users.map((profile) => ({
+      id: `profile:${profile.id}`,
+      ownerType: "profile" as const,
+      name: profile.name,
+      description: profile.email,
+      balance: balanceOverrides[`profile:${profile.id}`] ?? profile.creditsBalance,
+    }))
+
+    const clientTargets = clients.map((client) => ({
+      id: `client:${client.id}`,
+      ownerType: "client" as const,
+      name: client.name,
+      description: client.email || "Cliente da agencia",
+      balance: balanceOverrides[`client:${client.id}`] ?? client.creditsBalance ?? 0,
+    }))
+
+    return [...agencyTargets, ...userTargets, ...clientTargets]
+  }, [agencies, balanceOverrides, clients, users])
+
+  const selectedGrantTarget = useMemo(
+    () => grantTargets.find((target) => target.id === grantTargetId) ?? null,
+    [grantTargetId, grantTargets],
+  )
+
+  const loadCredits = useCallback(async () => {
+    const [overviewResult, transactionsResult, clientsResult] = await Promise.all([
+      getCreditsOverview(),
+      listAllCreditTransactions(20),
+      listAllClients(),
+    ])
+
+    setLoadError(overviewResult.error ?? transactionsResult.error ?? clientsResult.error ?? null)
+    setOverview(
+      overviewResult.data ?? {
+        totalAvailable: 0,
+        totalConsumed: 0,
+        monthlyUsage: 0,
+        transactionsCount: 0,
+      },
+    )
+    setTransactions(transactionsResult.data ?? [])
+    setClients(clientsResult.data ?? [])
+  }, [])
 
   useEffect(() => {
     if (!isRealMode) return
 
     let mounted = true
 
-    const loadCredits = async () => {
-      const [overviewResult, transactionsResult] = await Promise.all([
-        getCreditsOverview(),
-        listAllCreditTransactions(20),
-      ])
-
+    void (async () => {
+      await loadCredits()
       if (!mounted) return
-
-      setLoadError(overviewResult.error ?? transactionsResult.error ?? null)
-      setOverview(
-        overviewResult.data ?? {
-          totalAvailable: 0,
-          totalConsumed: 0,
-          monthlyUsage: 0,
-          transactionsCount: 0,
-        },
-      )
-      setTransactions(transactionsResult.data ?? [])
-    }
-
-    void loadCredits()
+    })()
 
     return () => {
       mounted = false
     }
-  }, [isRealMode])
+  }, [isRealMode, loadCredits])
 
   const topConsumers = useMemo(
     () =>
-      [...agencies, ...users.filter((user) => user.type === "traveler")]
-        .sort((a, b) => b.creditsBalance - a.creditsBalance)
-        .slice(0, 4)
-        .map((item) => ({
-          name: item.name,
-          type: "tripsCount" in item ? "agency" : "user",
-          currentBalance: item.creditsBalance,
+      [
+        ...agencies.map((agency) => ({
+          name: agency.name,
+          type: "agency" as const,
+          currentBalance: balanceOverrides[`agency:${agency.id}`] ?? agency.creditsBalance,
         })),
-    [agencies, users],
+        ...users.map((profile) => ({
+          name: profile.name,
+          type: "user" as const,
+          currentBalance: balanceOverrides[`profile:${profile.id}`] ?? profile.creditsBalance,
+        })),
+        ...clients.map((client) => ({
+          name: client.name,
+          type: "client" as const,
+          currentBalance: balanceOverrides[`client:${client.id}`] ?? client.creditsBalance ?? 0,
+        })),
+      ]
+        .sort((a, b) => b.currentBalance - a.currentBalance)
+        .slice(0, 4)
+        .filter((item) => item.currentBalance > 0),
+    [agencies, balanceOverrides, clients, users],
   )
 
   const availableBase = Math.max(overview.totalAvailable + overview.totalConsumed, 1)
@@ -155,6 +207,73 @@ export default function MasterCreditosPage() {
     },
   ]
 
+  const resetGrantForm = () => {
+    setGrantTargetId("")
+    setGrantAmount("100")
+    setGrantReason("")
+    setGrantError(null)
+    setGrantSuccess(null)
+  }
+
+  const handleGrantCredits = async () => {
+    setGrantError(null)
+    setGrantSuccess(null)
+
+    if (!selectedGrantTarget) {
+      setGrantError("Selecione quem vai receber os creditos.")
+      return
+    }
+
+    const normalizedAmount = Number.parseInt(grantAmount, 10)
+    if (!Number.isFinite(normalizedAmount) || normalizedAmount <= 0) {
+      setGrantError("Informe uma quantidade positiva de creditos.")
+      return
+    }
+
+    if (!grantReason.trim()) {
+      setGrantError("Informe o motivo da concessao.")
+      return
+    }
+
+    setGrantSubmitting(true)
+
+    try {
+      const result = await grantCredits({
+        ownerType: selectedGrantTarget.ownerType,
+        ownerId: selectedGrantTarget.id.split(":")[1] ?? "",
+        amount: normalizedAmount,
+        reason: grantReason.trim(),
+        source: "admin_grant",
+        createdBy: user?.id ?? null,
+        metadata: {
+          targetName: selectedGrantTarget.name,
+          targetType: selectedGrantTarget.ownerType,
+          grantedFrom: "master",
+        },
+      })
+
+      if (!result.data) {
+        setGrantError(result.error ?? "Nao foi possivel conceder creditos.")
+        return
+      }
+
+      const balanceResult = await getCreditBalance(selectedGrantTarget.ownerType, selectedGrantTarget.id.split(":")[1] ?? "")
+      if (balanceResult.data) {
+        setBalanceOverrides((current) => ({
+          ...current,
+          [selectedGrantTarget.id]: balanceResult.data!.balance,
+        }))
+      }
+
+      await loadCredits()
+      setGrantSuccess("Creditos enviados com sucesso.")
+      setGrantOpen(false)
+      resetGrantForm()
+    } finally {
+      setGrantSubmitting(false)
+    }
+  }
+
   return (
     <motion.div initial="initial" animate="animate" variants={stagger} className="space-y-8">
       <motion.div variants={fadeInUp} className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
@@ -163,6 +282,10 @@ export default function MasterCreditosPage() {
           <p className="text-sm text-muted-foreground">Leitura real do saldo e ledger de creditos da plataforma</p>
         </div>
         <div className="flex gap-3">
+          <Button variant="outline" className="gap-2 border-white/10 hover:bg-white/5" onClick={() => setGrantOpen(true)}>
+            <Gift className="h-4 w-4" />
+            Enviar creditos
+          </Button>
           <Button variant="outline" className="gap-2 border-white/10 hover:bg-white/5" disabled>
             <Gift className="h-4 w-4" />
             Campanhas em breve
@@ -240,7 +363,7 @@ export default function MasterCreditosPage() {
           <Card className="border-white/5 bg-black/40 backdrop-blur-xl p-6">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-lg font-semibold text-foreground">Transacoes Recentes</h2>
-              <span className="text-xs text-muted-foreground">credit_transactions</span>
+              <span className="text-xs text-muted-foreground">ledger operacional</span>
             </div>
 
             <div className="space-y-3">
@@ -268,8 +391,8 @@ export default function MasterCreditosPage() {
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium text-foreground">{formatTransactionLabel(tx)}</div>
-                      <div className="text-xs text-muted-foreground">{formatTransactionValue(tx)}</div>
+                      <div className="text-sm font-medium text-foreground">{formatMasterCreditTransactionLabel(tx)}</div>
+                      <div className="text-xs text-muted-foreground">{formatMasterCreditTransactionDetail(tx)}</div>
                     </div>
                     <div className="text-right">
                       <div className={`text-sm font-semibold ${tx.amount > 0 ? "text-emerald-400" : "text-red-400"}`}>
@@ -307,6 +430,8 @@ export default function MasterCreditosPage() {
                           <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary/20 to-accent/10 border border-primary/20 flex items-center justify-center">
                             {consumer.type === "agency" ? (
                               <Building2 className="h-3.5 w-3.5 text-primary" />
+                            ) : consumer.type === "client" ? (
+                              <Users className="h-3.5 w-3.5 text-primary" />
                             ) : (
                               <Users className="h-3.5 w-3.5 text-primary" />
                             )}
@@ -358,6 +483,85 @@ export default function MasterCreditosPage() {
           </div>
         </Card>
       </motion.div>
+
+      <Dialog open={grantOpen} onOpenChange={(open) => {
+        setGrantOpen(open)
+        if (!open) resetGrantForm()
+      }}>
+        <DialogContent className="border-white/10 bg-card/95 backdrop-blur-xl">
+          <DialogHeader>
+            <DialogTitle>Enviar creditos</DialogTitle>
+            <DialogDescription>
+              Conceda creditos manualmente para usuarios, agencias ou clientes.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-foreground">Destino</label>
+              <select
+                value={grantTargetId}
+                onChange={(event) => setGrantTargetId(event.target.value)}
+                className="h-10 w-full rounded-md border border-white/10 bg-black/40 px-3 text-sm text-foreground"
+              >
+                <option value="">Selecione uma entidade</option>
+                {grantTargets.map((target) => (
+                  <option key={target.id} value={target.id}>
+                    {target.name} • {target.description}
+                  </option>
+                ))}
+              </select>
+              {selectedGrantTarget ? (
+                <p className="text-xs text-muted-foreground">
+                  Saldo atual: {selectedGrantTarget.balance.toLocaleString()} creditos
+                </p>
+              ) : null}
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-foreground">Quantidade</label>
+              <Input
+                type="number"
+                min={1}
+                step={1}
+                value={grantAmount}
+                onChange={(event) => setGrantAmount(event.target.value)}
+                placeholder="100"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-foreground">Motivo</label>
+              <Textarea
+                value={grantReason}
+                onChange={(event) => setGrantReason(event.target.value)}
+                placeholder="Ex.: concessao manual aprovada pelo Master"
+                className="min-h-24 border-white/10 bg-black/40"
+              />
+            </div>
+
+            {grantError ? (
+              <div className="rounded-xl border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-300">{grantError}</div>
+            ) : null}
+            {grantSuccess ? (
+              <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-3 text-sm text-emerald-300">{grantSuccess}</div>
+            ) : null}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" className="border-white/10" onClick={() => setGrantOpen(false)} disabled={grantSubmitting}>
+              Cancelar
+            </Button>
+            <Button
+              className="bg-gradient-to-r from-primary to-accent text-white hover:opacity-90"
+              onClick={handleGrantCredits}
+              disabled={grantSubmitting}
+            >
+              {grantSubmitting ? "Enviando..." : "Confirmar envio"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </motion.div>
   )
 }

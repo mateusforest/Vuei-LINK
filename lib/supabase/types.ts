@@ -280,6 +280,7 @@ export interface Database {
           document: string | null
           notes: string | null
           status: "lead" | "active" | "inactive" | "archived"
+          credits_balance: number
           created_at: string
           updated_at: string
         }
@@ -292,6 +293,7 @@ export interface Database {
           document?: string | null
           notes?: string | null
           status?: "lead" | "active" | "inactive" | "archived"
+          credits_balance?: number
           created_at?: string
           updated_at?: string
         }
@@ -303,6 +305,7 @@ export interface Database {
           document?: string | null
           notes?: string | null
           status?: "lead" | "active" | "inactive" | "archived"
+          credits_balance?: number
           updated_at?: string
         }
       }
@@ -402,9 +405,10 @@ export interface Database {
       credit_transactions: {
         Row: {
           id: string
-          owner_type: "traveler" | "agency"
+          owner_type: "traveler" | "agency" | "client"
           owner_user_id: string | null
           agency_id: string | null
+          client_id: string | null
           type: "grant" | "consume" | "refund" | "adjustment" | "purchase"
           amount: number
           balance_after: number | null
@@ -416,9 +420,10 @@ export interface Database {
         }
         Insert: {
           id?: string
-          owner_type: "traveler" | "agency"
+          owner_type: "traveler" | "agency" | "client"
           owner_user_id?: string | null
           agency_id?: string | null
+          client_id?: string | null
           type: "grant" | "consume" | "refund" | "adjustment" | "purchase"
           amount: number
           balance_after?: number | null
@@ -429,9 +434,10 @@ export interface Database {
           created_by?: string | null
         }
         Update: {
-          owner_type?: "traveler" | "agency"
+          owner_type?: "traveler" | "agency" | "client"
           owner_user_id?: string | null
           agency_id?: string | null
+          client_id?: string | null
           type?: "grant" | "consume" | "refund" | "adjustment" | "purchase"
           amount?: number
           balance_after?: number | null

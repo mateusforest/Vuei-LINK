@@ -288,7 +288,7 @@ function mapAiSchemaError(error?: string | null) {
   }
 
   if (normalized.includes("ai_prompts")) {
-    return "A tabela de prompts de IA ainda nao esta disponivel no Supabase. Rode o schema consolidado da IA antes de usar este modulo."
+    return "Os prompts operacionais estao usando a configuracao padrao neste ambiente."
   }
 
   if (normalized.includes("relation") && normalized.includes("does not exist")) {
@@ -701,7 +701,17 @@ export async function listPrompts(params?: ListPromptsParams) {
 
       const { data, error } = await query
       if (error) {
-        return { source: "supabase" as const, data: [] as AiPrompt[], error: mapAiSchemaError(error.message) }
+        const mappedError = mapAiSchemaError(error.message)
+        if (mappedError === "Os prompts operacionais estao usando a configuracao padrao neste ambiente.") {
+          const fallbackPrompts = DEFAULT_PROMPTS.filter((prompt) => {
+            if (params?.module && prompt.module !== params.module) return false
+            if (!params?.includeInactive && !prompt.isActive) return false
+            return true
+          })
+
+          return { source: "supabase" as const, data: fallbackPrompts, error: null }
+        }
+        return { source: "supabase" as const, data: [] as AiPrompt[], error: mappedError }
       }
 
       return { source: "supabase" as const, data: (data ?? []).map((row) => mapPromptRow(row as PromptRowCompat)), error: null }

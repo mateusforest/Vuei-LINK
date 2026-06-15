@@ -284,6 +284,12 @@ export default function ClientsPage() {
   }
 
   const handleDeleteClient = async (id: string) => {
+    const linkedTrips = getTripsByClient(id)
+    if (linkedTrips.length > 0) {
+      window.alert("Este cliente possui viagens vinculadas e nao pode ser excluido agora.")
+      return
+    }
+
     if (confirm("Tem certeza que deseja remover este cliente?")) {
       const removed = await deleteClient(id)
       if (!removed && workspaceError) {

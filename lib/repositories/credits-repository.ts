@@ -83,8 +83,24 @@ const DEFAULT_PLANS: Plan[] = [
   },
 ]
 
+function mapCreditSchemaError(message?: string | null) {
+  const normalized = (message ?? "").toLowerCase()
+
+  if (normalized.includes("credits_balance") && normalized.includes("clients")) {
+    return "O saldo de creditos para clientes ainda precisa ser habilitado neste ambiente."
+  }
+
+  if (normalized.includes("credit_transactions_owner_type_check") || normalized.includes("credit_transactions_owner_target_check")) {
+    return "A concessao de creditos para este destino ainda nao esta habilitada neste ambiente."
+  }
+
+  return message ?? null
+}
+
 function mapOwnerTypeToRow(ownerType: CreditOwnerType) {
-  return ownerType === "agency" ? "agency" : "traveler"
+  if (ownerType === "agency") return "agency"
+  if (ownerType === "client") return "client"
+  return "traveler"
 }
 
 function mapRowTypeToTransactionType(type: CreditTransactionRow["type"]): CreditTransactionType {
@@ -93,8 +109,14 @@ function mapRowTypeToTransactionType(type: CreditTransactionRow["type"]): Credit
 }
 
 function mapTransactionRow(row: CreditTransactionRow): CreditTransaction {
-  const ownerType: CreditOwnerType = row.owner_type === "agency" ? "agency" : "profile"
-  const ownerId = ownerType === "agency" ? row.agency_id ?? "" : row.owner_user_id ?? ""
+  const ownerType: CreditOwnerType =
+    row.owner_type === "agency" ? "agency" : row.owner_type === "client" ? "client" : "profile"
+  const ownerId =
+    ownerType === "agency"
+      ? row.agency_id ?? ""
+      : ownerType === "client"
+        ? row.client_id ?? ""
+        : row.owner_user_id ?? ""
 
   return {
     id: row.id,
@@ -140,6 +162,32 @@ async function readBalanceFromSource({ ownerType, ownerId }: CreditOwnerInput) {
   if (ownerType === "agency") {
     const { data, error: balanceError } = await client
       .from("agencies")
+      .select("id, credits_balance, updated_at")
+      .eq("id", ownerId)
+      .maybeSingle()
+
+    if (balanceError) {
+      console.error("[CREDITS] balance error", balanceError.message)
+      return { source: "supabase" as const, data: null as CreditBalance | null, error: mapCreditSchemaError(balanceError.message) }
+    }
+
+    return {
+      source: "supabase" as const,
+      data: data
+        ? {
+            ownerType,
+            ownerId: data.id,
+            balance: data.credits_balance ?? 0,
+            updatedAt: data.updated_at,
+          }
+        : null,
+      error: null,
+    }
+  }
+
+  if (ownerType === "client") {
+    const { data, error: balanceError } = await client
+      .from("clients")
       .select("id, credits_balance, updated_at")
       .eq("id", ownerId)
       .maybeSingle()
@@ -227,6 +275,8 @@ export async function listCreditTransactions(ownerType: CreditOwnerType, ownerId
 
   if (ownerType === "agency") {
     query = query.eq("owner_type", "agency").eq("agency_id", ownerId)
+  } else if (ownerType === "client") {
+    query = query.eq("owner_type", "client").eq("client_id", ownerId)
   } else {
     query = query.eq("owner_type", "traveler").eq("owner_user_id", ownerId)
   }
@@ -305,9 +355,10 @@ export async function getCreditsOverview() {
   startOfMonth.setDate(1)
   startOfMonth.setHours(0, 0, 0, 0)
 
-  const [profilesResult, agenciesResult, transactionsResult, monthlyUsageResult] = await Promise.all([
+  const [profilesResult, agenciesResult, clientsResult, transactionsResult, monthlyUsageResult] = await Promise.all([
     client.from("profiles").select("credits_balance"),
     client.from("agencies").select("credits_balance"),
+    client.from("clients").select("credits_balance"),
     client.from("credit_transactions").select("amount"),
     client
       .from("credit_transactions")
@@ -316,9 +367,14 @@ export async function getCreditsOverview() {
       .gte("created_at", startOfMonth.toISOString()),
   ])
 
+  const clientsBalancesUnavailable =
+    Boolean(clientsResult.error?.message) &&
+    mapCreditSchemaError(clientsResult.error?.message) === "O saldo de creditos para clientes ainda precisa ser habilitado neste ambiente."
+
   const firstError =
     profilesResult.error?.message ??
     agenciesResult.error?.message ??
+    (clientsBalancesUnavailable ? null : clientsResult.error?.message) ??
     transactionsResult.error?.message ??
     monthlyUsageResult.error?.message ??
     null
@@ -330,6 +386,9 @@ export async function getCreditsOverview() {
 
   const totalProfiles = (profilesResult.data ?? []).reduce((sum, row) => sum + (row.credits_balance ?? 0), 0)
   const totalAgencies = (agenciesResult.data ?? []).reduce((sum, row) => sum + (row.credits_balance ?? 0), 0)
+  const totalClients = clientsBalancesUnavailable
+    ? 0
+    : (clientsResult.data ?? []).reduce((sum, row) => sum + (row.credits_balance ?? 0), 0)
   const totalConsumed = (transactionsResult.data ?? []).reduce((sum, row) => {
     return row.amount < 0 ? sum + Math.abs(row.amount) : sum
   }, 0)
@@ -338,7 +397,7 @@ export async function getCreditsOverview() {
   return {
     source: "supabase" as const,
     data: {
-      totalAvailable: totalProfiles + totalAgencies,
+      totalAvailable: totalProfiles + totalAgencies + totalClients,
       totalConsumed,
       monthlyUsage,
       transactionsCount: (transactionsResult.data ?? []).length,
@@ -410,8 +469,9 @@ export async function addTransaction(payload: CreditMutationPayload) {
 
   const insertPayload: Database["public"]["Tables"]["credit_transactions"]["Insert"] = {
     owner_type: mapOwnerTypeToRow(payload.ownerType),
-    owner_user_id: payload.ownerType === "agency" ? null : payload.ownerId,
+    owner_user_id: payload.ownerType === "profile" ? payload.ownerId : null,
     agency_id: payload.ownerType === "agency" ? payload.ownerId : null,
+    client_id: payload.ownerType === "client" ? payload.ownerId : null,
     type: payload.type === "usage_ai" ||
       payload.type === "usage_concierge" ||
       payload.type === "usage_document" ||
@@ -433,7 +493,7 @@ export async function addTransaction(payload: CreditMutationPayload) {
 
   if (insertError) {
     console.error("[CREDITS] add transaction error", insertError.message)
-    return { source: "supabase" as const, data: null as CreditTransaction | null, error: insertError.message }
+    return { source: "supabase" as const, data: null as CreditTransaction | null, error: mapCreditSchemaError(insertError.message) }
   }
 
   return { source: "supabase" as const, data: mapTransactionRow(data), error: null }

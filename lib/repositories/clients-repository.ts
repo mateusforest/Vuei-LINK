@@ -45,6 +45,7 @@ function mapClientRowToClient(row: Database["public"]["Tables"]["clients"]["Row"
     document: row.document,
     notes: row.notes,
     status: row.status,
+    creditsBalance: row.credits_balance,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }
@@ -295,6 +296,31 @@ export async function deleteClient(id: string) {
   if (shouldUseSupabase()) {
     const client = createSupabaseBrowserClient()
     if (client) {
+      const { data: linkedTrips, error: linkedTripsError } = await client
+        .from("trips")
+        .select("id, title, status")
+        .eq("client_id", id)
+        .limit(5)
+
+      if (linkedTripsError) {
+        console.error("[AUTH ERROR]", linkedTripsError.message)
+        return {
+          source: "supabase" as const,
+          config: createSupabaseBrowserClientPlaceholder(),
+          success: false,
+          error: linkedTripsError.message,
+        }
+      }
+
+      if ((linkedTrips ?? []).length > 0) {
+        return {
+          source: "supabase" as const,
+          config: createSupabaseBrowserClientPlaceholder(),
+          success: false,
+          error: "Este cliente possui viagens vinculadas e nao pode ser excluido agora.",
+        }
+      }
+
       const { error } = await client.from("clients").delete().eq("id", id)
       if (error) {
         console.error("[AUTH ERROR]", error.message)
