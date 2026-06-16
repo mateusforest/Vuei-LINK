@@ -230,6 +230,21 @@ async function updateDocumentExtractionData(
   return { data: data as DocumentRow | null, error: error?.message ?? null }
 }
 
+function isPartialFlightExtraction(payload: Record<string, unknown> | null | undefined) {
+  if (!payload) return false
+
+  const requiredFields = [
+    payload.airline,
+    payload.flight_number,
+    payload.origin_airport,
+    payload.destination_airport,
+    payload.departure_at,
+  ]
+
+  const filledRequiredFields = requiredFields.filter((value) => typeof value === "string" && value.trim().length > 0).length
+  return filledRequiredFields > 0 && filledRequiredFields < requiredFields.length
+}
+
 async function markFlightFailed(
   client: NonNullable<Awaited<ReturnType<typeof createSupabaseServerClient>>>,
   flightId: string,
@@ -477,7 +492,8 @@ export async function POST(request: Request) {
   const shouldChargeCredits = aiResult.calledModel
   const extractionPayload = aiResult.data
   const usefulFieldCount = countUsefulFlightFields(extractionPayload)
-  const completed = Boolean(extractionPayload?.is_ticket && usefulFieldCount > 0)
+  const partial = Boolean(extractionPayload?.is_ticket && isPartialFlightExtraction(extractionPayload))
+  const completed = Boolean(extractionPayload?.is_ticket && usefulFieldCount > 0 && !partial)
   const failureReason =
     aiResult.error ||
     extractionPayload?.failure_reason ||
@@ -490,6 +506,7 @@ export async function POST(request: Request) {
     raw_response: aiResult.rawText,
     structured_result: extractionPayload,
     useful_field_count: usefulFieldCount,
+    partial,
     confidence: extractionPayload?.confidence ?? null,
     notes: extractionPayload?.notes ?? [],
     failure_reason: failureReason,
@@ -513,7 +530,7 @@ export async function POST(request: Request) {
     baggage_info: completed ? extractionPayload?.baggage_info ?? null : null,
     qr_code_payload: completed ? extractionPayload?.qr_code_payload ?? null : null,
     extracted_data: metadata,
-    extraction_status: completed ? "completed" : "failed",
+    extraction_status: completed ? "completed" : partial ? "manual" : "failed",
   })
 
   const documentUpdate = await updateDocumentExtractionData(supabase, entityResult.document.id, metadata)

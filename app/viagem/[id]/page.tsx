@@ -949,32 +949,32 @@ function resolvePublicTripErrorMessage(error?: string | null) {
   return error || "Nao foi possivel concluir a operacao."
 }
 
-async function resolveCurrentDocumentUrl(document: any) {
-  if (document?.filePath) {
-    return getSignedDocumentUrl(document.filePath)
+function buildTripDocumentAccessHref(params: {
+  tripId: string
+  documentId: string
+  tripSlug: string
+  accessMode: "admin" | "public"
+  adminToken?: string | null
+  publicToken?: string | null
+  disposition?: "inline" | "download"
+}) {
+  const searchParams = new URLSearchParams({
+    tripId: params.tripId,
+    documentId: params.documentId,
+    tripSlug: params.tripSlug,
+    accessMode: params.accessMode,
+    disposition: params.disposition ?? "inline",
+  })
+
+  if (params.adminToken) {
+    searchParams.set("adminToken", params.adminToken)
   }
 
-  if (document?.fileUrl) {
-    return { data: document.fileUrl, error: null }
+  if (params.publicToken) {
+    searchParams.set("publicToken", params.publicToken)
   }
 
-  return { data: null, error: "Arquivo indisponivel para visualizacao." }
-}
-
-function openResolvedUrlOnDevice(url: string, onFailure?: () => void) {
-  const pendingWindow = typeof window !== "undefined" ? window.open("", "_blank", "noopener,noreferrer") : null
-  if (pendingWindow) {
-    pendingWindow.location.href = url
-    return true
-  }
-
-  const openedWindow = window.open(url, "_blank", "noopener,noreferrer")
-  if (openedWindow) {
-    return true
-  }
-
-  onFailure?.()
-  return false
+  return `/api/trip-documents?${searchParams.toString()}`
 }
 
 function logTripDocumentsDev(stage: string, details?: Record<string, unknown>) {
@@ -1783,6 +1783,7 @@ function FlightsSection({
   agencyId,
   routeSlug,
   tripAdminToken,
+  tripPublicToken,
   adminLinkMutationMode,
   ensureSensitiveAccess,
   onTrackExtraction,
@@ -1800,6 +1801,7 @@ function FlightsSection({
   agencyId: string | null
   routeSlug: string
   tripAdminToken: string | null
+  tripPublicToken: string | null
   adminLinkMutationMode: boolean
   ensureSensitiveAccess: () => boolean
   onTrackExtraction: (payload: { flightId: string; documentId: string }) => void
@@ -1828,16 +1830,22 @@ function FlightsSection({
       return
     }
 
-    const resolvedUrl = await resolveCurrentDocumentUrl(document)
-
-    if (resolvedUrl.error || !resolvedUrl.data) {
-      showToast(resolvedUrl.error || "Nao foi possivel abrir o anexo.", "error")
+    if (!document?.id) {
+      showToast("Nao foi possivel abrir este documento agora. Tente novamente.", "error")
       return
     }
 
-    if (!openResolvedUrlOnDevice(resolvedUrl.data, () => showToast("Nao foi possivel abrir o arquivo neste dispositivo.", "error"))) {
-      showToast("Nao foi possivel abrir o arquivo neste dispositivo.", "error")
-    }
+    const href = buildTripDocumentAccessHref({
+      tripId,
+      documentId: document.id,
+      tripSlug: routeSlug,
+      adminToken: tripAdminToken,
+      publicToken: tripPublicToken,
+      accessMode: adminLinkMutationMode ? "admin" : "public",
+      disposition: "inline",
+    })
+
+    window.open(href, "_blank", "noopener,noreferrer")
   }
 
   return (
@@ -2524,6 +2532,7 @@ function ItinerarySection({
   agencyId,
   routeSlug,
   tripAdminToken,
+  tripPublicToken,
   adminLinkMutationMode,
   ensureSensitiveAccess,
   onUpdateItinerary,
@@ -2542,6 +2551,7 @@ function ItinerarySection({
   agencyId: string | null
   routeSlug: string
   tripAdminToken: string | null
+  tripPublicToken: string | null
   adminLinkMutationMode: boolean
   ensureSensitiveAccess: () => boolean
   onUpdateItinerary: (data: any) => Promise<void> | void
@@ -2645,20 +2655,30 @@ function ItinerarySection({
       return
     }
 
-    const resolvedUrl = document
-      ? await resolveCurrentDocumentUrl(document)
-      : record.pdfUrl
-        ? await getSignedDocumentUrl(record.pdfUrl)
-        : { data: null, error: "Arquivo indisponivel para visualizacao." }
-
-    if (resolvedUrl.error || !resolvedUrl.data) {
-      showToast(resolvedUrl.error || "Nao foi possivel abrir o roteiro.", "error")
+    if (document?.id) {
+      const href = buildTripDocumentAccessHref({
+        tripId,
+        documentId: document.id,
+        tripSlug: routeSlug,
+        adminToken: tripAdminToken,
+        publicToken: tripPublicToken,
+        accessMode: adminLinkMutationMode ? "admin" : "public",
+        disposition: "inline",
+      })
+      window.open(href, "_blank", "noopener,noreferrer")
       return
     }
 
-    if (!openResolvedUrlOnDevice(resolvedUrl.data, () => showToast("Nao foi possivel abrir o roteiro neste dispositivo.", "error"))) {
+    const resolvedUrl = record.pdfUrl
+      ? await getSignedDocumentUrl(record.pdfUrl)
+      : { data: null, error: "Arquivo indisponivel para visualizacao." }
+
+    if (resolvedUrl.error || !resolvedUrl.data) {
       showToast("Nao foi possivel abrir o roteiro neste dispositivo.", "error")
+      return
     }
+
+    window.open(resolvedUrl.data, "_blank", "noopener,noreferrer")
   }
 
   return (
@@ -3142,6 +3162,7 @@ function DocumentsSection({
   agencyId,
   routeSlug,
   tripAdminToken,
+  tripPublicToken,
   adminLinkMutationMode,
   ensureSensitiveAccess,
   onSensitiveAccessGranted,
@@ -3157,6 +3178,7 @@ function DocumentsSection({
   agencyId: string | null
   routeSlug: string
   tripAdminToken: string | null
+  tripPublicToken: string | null
   adminLinkMutationMode: boolean
   ensureSensitiveAccess: () => boolean
   onSensitiveAccessGranted: () => void
@@ -3377,7 +3399,18 @@ function DocumentsSection({
           showToast("Documentos desbloqueados!", "success")
         }}
       />
-      <ViewDocumentModal open={!!viewingDoc} onClose={() => setViewingDoc(null)} document={viewingDoc} offlineReadOnly={offlineReadOnly} offlineDocumentContext={offlineDocumentContext} />
+      <ViewDocumentModal
+        open={!!viewingDoc}
+        onClose={() => setViewingDoc(null)}
+        document={viewingDoc}
+        tripId={tripId}
+        tripSlug={routeSlug}
+        adminToken={tripAdminToken}
+        publicToken={tripPublicToken}
+        accessMode={adminLinkMutationMode ? "admin" : "public"}
+        offlineReadOnly={offlineReadOnly}
+        offlineDocumentContext={offlineDocumentContext}
+      />
       <AddDocumentModal open={addingDoc} onClose={() => setAddingDoc(false)} tripId={tripId} ownerUserId={ownerUserId} agencyId={agencyId} tripSlug={routeSlug} adminToken={tripAdminToken} adminProxyMode={adminLinkMutationMode} ensureSensitiveAccess={ensureSensitiveAccess} onSave={(data) => { onAddDocument(data); showToast("Documento adicionado!", "success"); setAddingDoc(false) }} />
     </section>
   )
@@ -3535,12 +3568,22 @@ function ViewDocumentModal({
   open,
   onClose,
   document,
+  tripId,
+  tripSlug,
+  adminToken,
+  publicToken,
+  accessMode,
   offlineReadOnly = false,
   offlineDocumentContext = null,
 }: {
   open: boolean
   onClose: () => void
   document: any
+  tripId: string
+  tripSlug: string
+  adminToken: string | null
+  publicToken: string | null
+  accessMode: "admin" | "public"
   offlineReadOnly?: boolean
   offlineDocumentContext?: OfflineDocumentContext | null
 }) {
@@ -3571,6 +3614,30 @@ function ViewDocumentModal({
 
   if (!document) return null
 
+  const documentOpenHref = !offlineReadOnly && document?.id
+    ? buildTripDocumentAccessHref({
+        tripId,
+        documentId: document.id,
+        tripSlug,
+        adminToken,
+        publicToken,
+        accessMode,
+        disposition: "inline",
+      })
+    : null
+
+  const documentDownloadHref = !offlineReadOnly && document?.id
+    ? buildTripDocumentAccessHref({
+        tripId,
+        documentId: document.id,
+        tripSlug,
+        adminToken,
+        publicToken,
+        accessMode,
+        disposition: "download",
+      })
+    : null
+
   const openDocumentOnDevice = async () => {
     setOfflineMessage("")
 
@@ -3588,16 +3655,6 @@ function ViewDocumentModal({
         },
       })
       return
-    }
-
-    const urlResult = await resolveCurrentDocumentUrl(document)
-
-    if (!urlResult.data) {
-      return
-    }
-
-    if (!openResolvedUrlOnDevice(urlResult.data, () => setOfflineMessage("Nao foi possivel abrir o arquivo neste dispositivo."))) {
-      setOfflineMessage("Nao foi possivel abrir o arquivo neste dispositivo.")
     }
   }
 
@@ -3634,12 +3691,33 @@ function ViewDocumentModal({
 
         {offlineReadOnly && offlineMessage ? <p className="mt-3 text-sm text-amber-200">{offlineMessage}</p> : null}
 
-        <div className="flex gap-3 mt-6">
-          <Button className="flex-1 bg-gradient-to-r from-[#5de0e6] to-[#004aad] hover:opacity-90 text-white border-0 disabled:opacity-50" onClick={() => void openDocumentOnDevice()}>
-            <Download className="w-4 h-4 mr-2" />
-            {offlineReadOnly ? "Abrir offline" : "Baixar"}
-          </Button>
-          <Button variant="ghost" className="text-white/60 hover:bg-white/10">
+        <div className="mt-6 flex flex-wrap gap-3">
+          {offlineReadOnly ? (
+            <Button className="flex-1 bg-gradient-to-r from-[#5de0e6] to-[#004aad] hover:opacity-90 text-white border-0 disabled:opacity-50" onClick={() => void openDocumentOnDevice()}>
+              <Download className="w-4 h-4 mr-2" />
+              Abrir offline
+            </Button>
+          ) : (
+            <>
+              {documentOpenHref ? (
+                <Button asChild className="flex-1 bg-gradient-to-r from-[#5de0e6] to-[#004aad] hover:opacity-90 text-white border-0">
+                  <a href={documentOpenHref} target="_blank" rel="noopener noreferrer">
+                    <ExternalLink className="w-4 h-4 mr-2" />
+                    Abrir documento
+                  </a>
+                </Button>
+              ) : null}
+              {documentDownloadHref ? (
+                <Button asChild variant="outline" className="flex-1 border-white/[0.08] bg-white/[0.02] text-white hover:bg-white/10">
+                  <a href={documentDownloadHref} download target="_blank" rel="noopener noreferrer">
+                    <Download className="w-4 h-4 mr-2" />
+                    Baixar
+                  </a>
+                </Button>
+              ) : null}
+            </>
+          )}
+          <Button variant="ghost" className="text-white/60 hover:bg-white/10" disabled>
             <Share2 className="w-4 h-4" />
           </Button>
         </div>
@@ -3811,7 +3889,23 @@ function AddDocumentModal({ open, onClose, onSave, tripId, ownerUserId, agencyId
 }
 
 // Concierge Section
-function ConciergeSection({ tripData, onOpenCredits, offlineReadOnly = false }: { tripData: any; onOpenCredits: () => void; offlineReadOnly?: boolean }) {
+function ConciergeSection({
+  tripData,
+  onOpenCredits,
+  offlineReadOnly = false,
+  tripSlug,
+  adminToken,
+  publicToken,
+  accessMode,
+}: {
+  tripData: any
+  onOpenCredits: () => void
+  offlineReadOnly?: boolean
+  tripSlug: string
+  adminToken: string | null
+  publicToken: string | null
+  accessMode: "admin" | "public"
+}) {
   const [open, setOpen] = useState(false)
   const [message, setMessage] = useState("")
   const [messages, setMessages] = useState([
@@ -3911,6 +4005,10 @@ function ConciergeSection({ tripData, onOpenCredits, offlineReadOnly = false }: 
       },
       body: JSON.stringify({
         tripId: tripData?.id,
+        tripSlug,
+        adminToken,
+        publicToken,
+        accessMode,
         conversationId,
         message: userMessage,
         origin: isAdmin ? "trip-admin-link" : "trip-public-link",
@@ -5154,6 +5252,7 @@ export default function TripPage() {
   const [creditsOpen, setCreditsOpen] = useState(false)
   const [tripOwnerUserId, setTripOwnerUserId] = useState<string | null>(null)
   const [tripAdminToken, setTripAdminToken] = useState<string | null>(null)
+  const [tripPublicToken, setTripPublicToken] = useState<string | null>(null)
   const [tripItineraryRecords, setTripItineraryRecords] = useState<TripItineraryRecord[]>([])
   const [sensitiveAccessGranted, setSensitiveAccessGranted] = useState(false)
   const [securityModalOpen, setSecurityModalOpen] = useState(false)
@@ -5238,6 +5337,7 @@ export default function TripPage() {
     setIsAdmin(false)
     setCanWrite(false)
     setTripAdminToken(adminToken)
+    setTripPublicToken(publicToken)
     setAdminLinkMutationMode(false)
     setOfflineModeEnabled(false)
     setOfflinePackageStatus(null)
@@ -5341,6 +5441,7 @@ export default function TripPage() {
           })
           setTripOwnerUserId(null)
           setTripAdminToken(null)
+          setTripPublicToken(null)
           setAdminLinkMutationMode(false)
           setQuickAccessGateRequired(false)
           setSensitiveAccessGranted(false)
@@ -5426,6 +5527,7 @@ export default function TripPage() {
           if (loadRequestRef.current !== requestId) return
           setTripOwnerUserId(repositoryTrip.data.ownerUserId ?? null)
           setTripAdminToken(repositoryTrip.data.adminToken ?? adminToken ?? null)
+          setTripPublicToken(repositoryTrip.data.publicToken ?? publicToken ?? null)
           const isOwner = Boolean(user?.id && repositoryTrip.data.ownerUserId && user.id === repositoryTrip.data.ownerUserId)
           const isPublicLinkRequest = isPublicRoute || Boolean(publicToken)
           const adminLinkAccessMode = isAdminRoute && !isOwner
@@ -5809,12 +5911,19 @@ export default function TripPage() {
   }
 
   const handleNavigate = (section: string) => {
-    if (section === "concierge") {
-      document.getElementById("concierge")?.scrollIntoView({ behavior: "smooth" })
-    } else if (section === "credits") {
+    const scrollToSection = () => {
+      document.getElementById(section)?.scrollIntoView({ behavior: "smooth" })
+    }
+
+    if (section === "documents" || section === "flights" || section === "hotel" || section === "concierge") {
+      requireSensitiveAccess(scrollToSection)
+      return
+    }
+
+    if (section === "credits") {
       setCreditsOpen(true)
     } else {
-      document.getElementById(section)?.scrollIntoView({ behavior: "smooth" })
+      scrollToSection()
     }
   }
 
@@ -5976,6 +6085,9 @@ export default function TripPage() {
         const extractionStatus = latestFlightRecord?.extractionStatus ?? null
         if (extractionStatus === "completed" || extractionStatus === "manual" || extractionStatus === "failed") {
           flightPollingTimersRef.current.delete(pollingKey)
+          if (extractionStatus === "manual") {
+            showToast("Alguns dados nao foram identificados. Revise a passagem manualmente.", "info")
+          }
           if (extractionStatus === "failed") {
             showToast("Nao foi possivel identificar esta passagem.", "info")
           }
@@ -6546,7 +6658,7 @@ export default function TripPage() {
           {offlineModeEnabled && offlinePackageStatus ? <OfflineModeBanner status={offlinePackageStatus} /> : null}
           <TripHero tripData={tripData} onEditTrip={() => setEditTripOpen(true)} />
           <QuickAccessCards tripData={tripData} onNavigate={handleNavigate} />
-          <FlightsSection loading={sectionsLoading.flights} tripData={tripData} onUpdateFlight={handleUpdateFlight} onAddFlight={handleAddFlight} onDeleteFlight={handleDeleteFlight} onDeleteDocument={handleDeleteDocument} tripId={tripData.id} ownerUserId={tripOwnerUserId} agencyId={profile?.agencyId ?? null} routeSlug={routeSlug} tripAdminToken={tripAdminToken} adminLinkMutationMode={adminLinkMutationMode} ensureSensitiveAccess={ensureSensitiveAccess} onTrackExtraction={startFlightExtractionPolling} offlineReadOnly={offlineModeEnabled} offlineDocumentContext={offlineDocumentContext} />
+          <FlightsSection loading={sectionsLoading.flights} tripData={tripData} onUpdateFlight={handleUpdateFlight} onAddFlight={handleAddFlight} onDeleteFlight={handleDeleteFlight} onDeleteDocument={handleDeleteDocument} tripId={tripData.id} ownerUserId={tripOwnerUserId} agencyId={profile?.agencyId ?? null} routeSlug={routeSlug} tripAdminToken={tripAdminToken} tripPublicToken={tripPublicToken} adminLinkMutationMode={adminLinkMutationMode} ensureSensitiveAccess={ensureSensitiveAccess} onTrackExtraction={startFlightExtractionPolling} offlineReadOnly={offlineModeEnabled} offlineDocumentContext={offlineDocumentContext} />
           <HotelSection loading={sectionsLoading.hotels} tripData={tripData} onSaveHotel={handleSaveHotel} onDeleteHotel={handleDeleteHotel} />
           <ItinerarySection
             loading={sectionsLoading.itineraries}
@@ -6559,6 +6671,7 @@ export default function TripPage() {
             agencyId={profile?.agencyId ?? null}
             routeSlug={routeSlug}
             tripAdminToken={tripAdminToken}
+            tripPublicToken={tripPublicToken}
             adminLinkMutationMode={adminLinkMutationMode}
             ensureSensitiveAccess={ensureSensitiveAccess}
             onUpdateItinerary={handleUpdateItinerary}
@@ -6567,8 +6680,16 @@ export default function TripPage() {
             onSaveUploadedItinerary={handleSaveUploadedItinerary}
             onDeleteItinerary={handleDeleteItinerary}
           />
-          <DocumentsSection loading={sectionsLoading.documents} tripData={tripData} onAddDocument={handleAddDocument} onDeleteDocument={handleDeleteDocument} tripId={tripData.id} ownerUserId={tripOwnerUserId} agencyId={profile?.agencyId ?? null} routeSlug={routeSlug} tripAdminToken={tripAdminToken} adminLinkMutationMode={adminLinkMutationMode} ensureSensitiveAccess={ensureSensitiveAccess} onSensitiveAccessGranted={() => setSensitiveAccessGranted(true)} offlineReadOnly={offlineModeEnabled} offlineDocumentContext={offlineDocumentContext} />
-          <ConciergeSection tripData={tripData} onOpenCredits={() => setCreditsOpen(true)} offlineReadOnly={offlineModeEnabled} />
+          <DocumentsSection loading={sectionsLoading.documents} tripData={tripData} onAddDocument={handleAddDocument} onDeleteDocument={handleDeleteDocument} tripId={tripData.id} ownerUserId={tripOwnerUserId} agencyId={profile?.agencyId ?? null} routeSlug={routeSlug} tripAdminToken={tripAdminToken} tripPublicToken={tripPublicToken} adminLinkMutationMode={adminLinkMutationMode} ensureSensitiveAccess={ensureSensitiveAccess} onSensitiveAccessGranted={() => setSensitiveAccessGranted(true)} offlineReadOnly={offlineModeEnabled} offlineDocumentContext={offlineDocumentContext} />
+          <ConciergeSection
+            tripData={tripData}
+            onOpenCredits={() => setCreditsOpen(true)}
+            offlineReadOnly={offlineModeEnabled}
+            tripSlug={routeSlug}
+            adminToken={tripAdminToken}
+            publicToken={tripPublicToken}
+            accessMode={adminRouteActive ? "admin" : "public"}
+          />
           <OfflineSection tripData={tripData} tripItineraryRecords={tripItineraryRecords} isAdmin={isAdmin} sensitiveAccessGranted={sensitiveAccessGranted} agencyBranding={agencyBranding} routeSlug={routeSlug} currentPathname={pathname || `/viagem/${routeSlug}`} />
           <QuickInfoSection tripData={tripData} />
           <TripFooter agencyBranding={agencyBranding} />

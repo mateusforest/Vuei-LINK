@@ -19,6 +19,10 @@ interface ConciergeRequestBody {
   conversationId?: string | null
   message?: string
   origin?: string
+  tripSlug?: string | null
+  adminToken?: string | null
+  publicToken?: string | null
+  accessMode?: "admin" | "public" | "authenticated"
 }
 
 type TripRow = Database["public"]["Tables"]["trips"]["Row"]
@@ -111,6 +115,44 @@ async function getAccessibleTrip(
   return { trip, membership: membershipResult.data as AgencyMemberRow, error: null }
 }
 
+async function getTripByLinkAccess(payload: {
+  tripId: string
+  tripSlug?: string | null
+  adminToken?: string | null
+  publicToken?: string | null
+  accessMode: "admin" | "public"
+}) {
+  const adminClient = createSupabaseAdminClient()
+  const tripResult = await adminClient.from("trips").select("*").eq("id", payload.tripId).maybeSingle()
+
+  if (tripResult.error) {
+    return { trip: null as TripRow | null, membership: null as AgencyMemberRow | null, error: tripResult.error.message }
+  }
+
+  const trip = tripResult.data as TripRow | null
+  if (!trip) {
+    return { trip: null as TripRow | null, membership: null as AgencyMemberRow | null, error: "Viagem nao encontrada." }
+  }
+
+  if (payload.accessMode === "admin") {
+    const tokenMatches = Boolean(payload.adminToken && trip.admin_token === payload.adminToken)
+    const slugMatches = Boolean(payload.tripSlug && trip.slug === payload.tripSlug)
+
+    if (!tokenMatches && !slugMatches) {
+      return { trip: null as TripRow | null, membership: null as AgencyMemberRow | null, error: "Voce nao tem permissao para usar o concierge desta viagem." }
+    }
+  } else {
+    const tokenMatches = Boolean(payload.publicToken && trip.public_token === payload.publicToken)
+    const slugMatches = Boolean(payload.tripSlug && trip.slug === payload.tripSlug && trip.visibility === "public")
+
+    if (trip.visibility !== "public" || (!tokenMatches && !slugMatches)) {
+      return { trip: null as TripRow | null, membership: null as AgencyMemberRow | null, error: "Voce nao tem permissao para usar o concierge desta viagem." }
+    }
+  }
+
+  return { trip, membership: null as AgencyMemberRow | null, error: null }
+}
+
 async function getCreditsBalance(
   client: NonNullable<Awaited<ReturnType<typeof createSupabaseServerClient>>>,
   ownerType: "traveler" | "agency",
@@ -166,6 +208,7 @@ async function createOrReuseConversation(
   agencyId: string | null,
   clientId: string | null,
   origin: string,
+  accessMode: "admin" | "public" | "authenticated",
   conversationId?: string | null,
 ) {
   if (conversationId) {
@@ -209,7 +252,7 @@ async function createOrReuseConversation(
       client_id: clientId,
       source: "concierge",
       title: trip.title,
-      metadata: { origin },
+      metadata: { origin, accessMode },
     })
     .select("id")
     .single()
@@ -250,6 +293,10 @@ export async function POST(request: Request) {
   const tripId = body?.tripId?.trim?.()
   const message = body?.message?.trim?.()
   const origin = body?.origin?.trim?.() || "unknown"
+  const tripSlug = body?.tripSlug?.trim?.() ?? null
+  const adminToken = body?.adminToken?.trim?.() ?? null
+  const publicToken = body?.publicToken?.trim?.() ?? null
+  const accessMode = body?.accessMode === "admin" || body?.accessMode === "public" ? body.accessMode : "authenticated"
 
   if (!tripId || !message) {
     return NextResponse.json({ error: "Trip e mensagem sao obrigatorios para o concierge." }, { status: 400 })
@@ -260,34 +307,43 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Supabase server client indisponivel." }, { status: 503 })
   }
 
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser()
+  const authResult = await supabase.auth.getUser()
+  const user = authResult.data.user
+  const authError = authResult.error
 
-  if (authError) {
-    return NextResponse.json({ error: authError.message }, { status: 401 })
+  let actingUserId: string | null = null
+  let accessResult:
+    | Awaited<ReturnType<typeof getAccessibleTrip>>
+    | Awaited<ReturnType<typeof getTripByLinkAccess>>
+
+  if (user) {
+    const profileResult = await getProfile(supabase, user.id)
+    if (!profileResult.data) {
+      return NextResponse.json({ error: profileResult.error ?? "Perfil do usuario nao encontrado." }, { status: 403 })
+    }
+
+    accessResult = await getAccessibleTrip(supabase, user.id, tripId, profileResult.data)
+    actingUserId = user.id
+  } else {
+    if (authError && accessMode === "authenticated") {
+      return NextResponse.json({ error: "Faça login novamente para continuar." }, { status: 401 })
+    }
+
+    accessResult = await getTripByLinkAccess({
+      tripId,
+      tripSlug,
+      adminToken,
+      publicToken,
+      accessMode: accessMode === "admin" ? "admin" : "public",
+    })
+    actingUserId = accessResult.trip?.owner_user_id ?? null
   }
-
-  if (!user) {
-    return NextResponse.json(
-      { error: "Entre para usar o concierge real e salvar o historico desta viagem." },
-      { status: 401 }
-    )
-  }
-
-  const profileResult = await getProfile(supabase, user.id)
-  if (!profileResult.data) {
-    return NextResponse.json({ error: profileResult.error ?? "Perfil do usuario nao encontrado." }, { status: 403 })
-  }
-
-  const accessResult = await getAccessibleTrip(supabase, user.id, tripId, profileResult.data)
   if (!accessResult.trip) {
     return NextResponse.json({ error: accessResult.error ?? "Viagem nao encontrada." }, { status: 403 })
   }
 
   const ownerType = accessResult.membership ? "agency" : "traveler"
-  const ownerId = accessResult.membership ? accessResult.trip.agency_id : user.id
+  const ownerId = accessResult.membership ? accessResult.trip.agency_id : actingUserId
 
   if (!ownerId) {
     return NextResponse.json({ error: "Nao foi possivel identificar o saldo responsavel por esta chamada de IA." }, { status: 400 })
@@ -327,10 +383,11 @@ export async function POST(request: Request) {
   const conversationResult = await createOrReuseConversation(
     supabase,
     accessResult.trip,
-    ownerType === "traveler" ? user.id : null,
+    ownerType === "traveler" ? actingUserId : null,
     ownerType === "agency" ? accessResult.trip.agency_id : null,
     accessResult.trip.client_id,
     origin,
+    accessMode,
     body?.conversationId ?? null,
   )
 
@@ -357,7 +414,7 @@ export async function POST(request: Request) {
   if (!aiResult.ok) {
     if (aiResult.calledModel) {
       const usageResult = await createAiUsageLog(supabase, {
-        ownerUserId: ownerType === "traveler" ? user.id : null,
+        ownerUserId: ownerType === "traveler" ? actingUserId : null,
         agencyId: accessResult.trip.agency_id,
         tripId: accessResult.trip.id,
         conversationId: conversationResult.conversationId,
@@ -370,6 +427,7 @@ export async function POST(request: Request) {
         status: "failed",
         metadata: {
           origin,
+          accessMode,
           promptCode: promptResult.prompt.code,
           promptFallback: promptResult.error ? true : false,
           error: aiResult.error,
@@ -391,7 +449,7 @@ export async function POST(request: Request) {
     conversation_id: conversationResult.conversationId,
     role: "user",
     content: message,
-    metadata: { origin, promptCode: promptResult.prompt.code, promptSourceError: promptResult.error },
+    metadata: { origin, accessMode, promptCode: promptResult.prompt.code, promptSourceError: promptResult.error },
   })
 
   const assistantInsert = await supabase.from("ai_messages").insert({
@@ -400,6 +458,7 @@ export async function POST(request: Request) {
     content: assistantMessage,
     metadata: {
       origin,
+      accessMode,
       model: aiResult.model,
       promptCode: promptResult.prompt.code,
     },
@@ -428,7 +487,7 @@ export async function POST(request: Request) {
   }
 
   const usageInsert = await createAiUsageLog(supabase, {
-    ownerUserId: ownerType === "traveler" ? user.id : null,
+    ownerUserId: ownerType === "traveler" ? actingUserId : null,
     agencyId: accessResult.trip.agency_id,
     tripId: accessResult.trip.id,
     conversationId: conversationResult.conversationId,
@@ -441,6 +500,7 @@ export async function POST(request: Request) {
     status: "completed",
     metadata: {
       origin,
+      accessMode,
       promptCode: promptResult.prompt.code,
       promptFallback: promptResult.error ? true : false,
       estimatedCostUsd: estimateCostUsd(aiResult.usage.inputTokens, aiResult.usage.outputTokens),
@@ -454,10 +514,10 @@ export async function POST(request: Request) {
     warning = "A resposta foi gerada, mas o log operacional da IA ainda nao foi salvo. Revise o schema de ai_usage_logs."
   }
 
-  if (ownerType === "traveler") {
+  if (ownerType === "traveler" && actingUserId) {
     const adminClient = createSupabaseAdminClient()
     const consumeResult = await consumeTravelerCredits(adminClient, {
-      userId: user.id,
+      userId: actingUserId,
       amount: creditsToCharge,
       reason: `Consumo do concierge IA para ${accessResult.trip.title}`,
       source: "ai_concierge",
@@ -466,7 +526,7 @@ export async function POST(request: Request) {
         trip_id: accessResult.trip.id,
         conversation_id: conversationResult.conversationId,
       },
-      createdBy: user.id,
+      createdBy: actingUserId,
     })
 
     if (!consumeResult.success) {
@@ -476,7 +536,7 @@ export async function POST(request: Request) {
   } else {
     const creditsInsert = await supabase.from("credit_transactions").insert({
       owner_type: ownerType,
-      owner_user_id: ownerType === "traveler" ? user.id : null,
+      owner_user_id: ownerType === "traveler" ? actingUserId : null,
       agency_id: ownerType === "agency" ? accessResult.trip.agency_id : null,
       type: "consume",
       amount: -creditsToCharge,
@@ -487,7 +547,7 @@ export async function POST(request: Request) {
         trip_id: accessResult.trip.id,
         conversation_id: conversationResult.conversationId,
       },
-      created_by: user.id,
+      created_by: actingUserId,
     })
 
     if (creditsInsert.error) {
