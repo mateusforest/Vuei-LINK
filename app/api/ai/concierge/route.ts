@@ -10,6 +10,7 @@ import { buildFallbackConciergePrompt, buildPromptInput } from "@/lib/ai/prompts
 import { buildTripContextSummary } from "@/lib/ai/trip-context"
 import { createAiUsageLog } from "@/lib/ai/usage-logs"
 import { consumeTravelerCredits, getTravelerCreditBalance } from "@/lib/billing/traveler-billing"
+import { getAgencyCreditBalance } from "@/lib/billing/agency-billing"
 
 type JsonObject = Record<string, unknown>
 
@@ -122,8 +123,9 @@ async function getCreditsBalance(
   }
 
   if (ownerType === "agency") {
-    const { data, error } = await client.from("agencies").select("credits_balance").eq("id", ownerId).maybeSingle()
-    return { balance: data?.credits_balance ?? 0, error: error?.message ?? null }
+    const adminClient = createSupabaseAdminClient()
+    const result = await getAgencyCreditBalance(adminClient, ownerId)
+    return { balance: result.data?.totalAvailable ?? 0, error: result.error }
   }
 
   const { data, error } = await client.from("profiles").select("credits_balance").eq("id", ownerId).maybeSingle()

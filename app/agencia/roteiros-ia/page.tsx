@@ -38,6 +38,7 @@ import type { Document, TripItineraryRecord } from "@/types"
 import { deleteTripItinerary, listTripItineraries, requestAiItineraryGeneration } from "@/lib/repositories/trip-itineraries-repository"
 import { getSignedDocumentUrl, listDocumentsByTrip } from "@/lib/repositories/documents-repository"
 import { getAiCreditCost } from "@/lib/ai/credit-costs"
+import { getAgencyBillingStatusFromApi } from "@/lib/repositories/agency-billing-repository"
 
 type PreviewState = {
   itinerary: TripItineraryRecord
@@ -102,6 +103,7 @@ export default function RoteirosIAPage() {
   const [loadError, setLoadError] = useState<string | null>(null)
   const [generatedMessage, setGeneratedMessage] = useState<string | null>(null)
   const [insufficientCreditsNotice, setInsufficientCreditsNotice] = useState(false)
+  const [availableCredits, setAvailableCredits] = useState(credits.balance)
   const [formData, setFormData] = useState({
     destination: "",
     duration: "",
@@ -115,6 +117,21 @@ export default function RoteirosIAPage() {
     () => trips.find((trip) => trip.id === selectedTripId) ?? null,
     [selectedTripId, trips],
   )
+
+  const refreshAvailableCredits = useCallback(async () => {
+    if (!isRealMode) {
+      setAvailableCredits(credits.balance)
+      return
+    }
+
+    const result = await getAgencyBillingStatusFromApi()
+    if (result.data) {
+      setAvailableCredits(result.data.totalAvailable)
+      return
+    }
+
+    setAvailableCredits(credits.balance)
+  }, [credits.balance, isRealMode])
 
   const hydrateTripFields = useCallback((tripId: string) => {
     const trip = trips.find((entry) => entry.id === tripId)
@@ -213,6 +230,10 @@ export default function RoteirosIAPage() {
     void loadSavedItineraries()
   }, [loadSavedItineraries])
 
+  useEffect(() => {
+    void refreshAvailableCredits()
+  }, [refreshAvailableCredits])
+
   const showInsufficientCredits = useCallback(() => {
     setLoadError(null)
     setInsufficientCreditsNotice(true)
@@ -233,7 +254,7 @@ export default function RoteirosIAPage() {
       ? getAiCreditCost("itinerary_generation_simple")
       : getAiCreditCost("itinerary_generation_complete")
 
-    if (credits.balance < creditCost) {
+    if (availableCredits < creditCost) {
       showInsufficientCredits()
       return
     }
@@ -252,7 +273,7 @@ export default function RoteirosIAPage() {
 
       if (!result.data?.itinerary) {
         const normalizedError = (result.error ?? "").toLowerCase()
-        if (normalizedError.includes("premium") || normalizedError.includes("saldo insuficiente")) {
+        if (normalizedError.includes("saldo insuficiente") || normalizedError.includes("créditos insuficientes") || normalizedError.includes("creditos insuficientes")) {
           showInsufficientCredits()
           return
         }
@@ -270,6 +291,7 @@ export default function RoteirosIAPage() {
           ? "Roteiro completo gerado e salvo na viagem."
           : "Roteiro simples gerado e salvo na viagem.",
       )
+      await refreshAvailableCredits()
       setActiveTab("saved")
 
       if (result.data.document) {
@@ -340,7 +362,7 @@ export default function RoteirosIAPage() {
         </div>
         <Badge className="bg-primary/20 text-primary border-primary/30 w-fit">
           <Sparkles className="w-3 h-3 mr-1" />
-          {credits.balance} creditos disponiveis
+          {availableCredits} créditos disponíveis
         </Badge>
       </div>
 
@@ -354,9 +376,9 @@ export default function RoteirosIAPage() {
         <Card className="border-amber-500/20 bg-amber-500/10">
           <CardContent className="flex flex-col gap-4 p-4">
             <div>
-              <p className="text-sm font-semibold text-amber-200">Creditos insuficientes</p>
+              <p className="text-sm font-semibold text-amber-200">Créditos insuficientes</p>
               <p className="mt-1 text-sm text-amber-100/80">
-                Voce nao possui creditos suficientes para gerar este roteiro. Veja os planos e pacotes de creditos da agencia.
+                Você não possui créditos suficientes para gerar este roteiro. Veja os planos e pacotes de créditos da agência.
               </p>
             </div>
             <Button asChild className="w-full sm:w-fit bg-gradient-to-r from-primary to-accent text-white">
@@ -375,7 +397,7 @@ export default function RoteirosIAPage() {
       {!isRealMode ? (
         <Card className="bg-card border-border">
           <CardContent className="p-4 text-sm text-muted-foreground">
-            Ative o Supabase neste ambiente para gerar e persistir roteiros reais da agencia.
+            Ative o Supabase neste ambiente para gerar e persistir roteiros reais da agência.
           </CardContent>
         </Card>
       ) : null}

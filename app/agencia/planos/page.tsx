@@ -116,9 +116,9 @@ export default function AgencyPlansPage() {
         </Button>
 
         <div>
-          <h1 className="text-3xl font-bold">Planos, Limites e Creditos</h1>
+          <h1 className="text-3xl font-bold">Planos, Limites e Créditos</h1>
           <p className="text-sm text-muted-foreground">
-            Compare a capacidade operacional da sua agencia, os creditos mensais inclusos e os limites de equipe e viagens.
+            Compare a capacidade operacional da sua agência, os créditos mensais inclusos e os limites de equipe e viagens.
           </p>
         </div>
 
@@ -127,7 +127,7 @@ export default function AgencyPlansPage() {
             {activeTripsCount} viagens ativas em uso
           </Badge>
           <Badge variant="secondary" className="border-border/50 bg-card/60 text-muted-foreground">
-            {teamSeatsUsed} usuarios ativos na equipe
+            {teamSeatsUsed} usuários ativos na equipe
           </Badge>
           {canManageSubscription ? (
             <Button variant="outline" className="rounded-xl" onClick={handleOpenPortal} disabled={portalLoading}>
@@ -174,12 +174,12 @@ export default function AgencyPlansPage() {
           const isPaidPlan = plan.code === "start" || plan.code === "pro" || plan.code === "business"
           const paidPlanCode = isPaidPlan ? (plan.code as "start" | "pro" | "business") : null
           const highlights = plan.code === "free"
-            ? ["Sistema completo", "1 usuario", "1 viagem ativa", "40 creditos/mes"]
+            ? ["Sistema completo", "1 usuário", "1 viagem ativa", "40 créditos/mês"]
             : plan.code === "start"
-              ? ["3 usuarios", "20 viagens ativas", "350 creditos/mes"]
+              ? ["3 usuários", "20 viagens ativas", "350 créditos/mês"]
               : plan.code === "pro"
-                ? ["5 usuarios", "100 viagens ativas", "600 creditos/mes"]
-                : ["15 usuarios", "220 viagens ativas", "1.500 creditos/mes", "Atendimento prioritario"]
+                ? ["5 usuários", "100 viagens ativas", "600 créditos/mês"]
+                : ["15 usuários", "220 viagens ativas", "1.500 créditos/mês", "Atendimento prioritário"]
 
           return (
             <Card
@@ -188,40 +188,40 @@ export default function AgencyPlansPage() {
                 plan.code === "pro"
                   ? "border-amber-500/30 bg-gradient-to-br from-amber-500/10 via-card/70 to-secondary/10"
                   : "border-border/50 bg-card/50"
-              } flex min-h-[34rem] flex-col`}
+              } flex min-h-[36rem] flex-col`}
             >
               {plan.code === "pro" ? (
                 <div className="absolute right-0 top-0 h-32 w-32 rounded-full bg-amber-500/15 blur-3xl" />
               ) : null}
 
-              <div className="relative flex items-start justify-between gap-4">
-                <div>
+              <div className="relative flex min-h-[5.5rem] items-start justify-between gap-4">
+                <div className="min-w-0">
                   <p className="text-sm text-muted-foreground">Plano {plan.name}</p>
                   <h2 className="mt-2 text-3xl font-bold">{plan.priceLabel}</h2>
                 </div>
                 {isCurrent ? (
-                  <Badge className="border-primary/20 bg-primary/15 text-primary">Plano atual</Badge>
+                  <Badge className="shrink-0 whitespace-nowrap border-primary/20 bg-primary/15 text-primary">Plano atual</Badge>
                 ) : plan.badge ? (
-                  <Badge className="bg-amber-500 text-black">{plan.badge}</Badge>
+                  <Badge className="shrink-0 whitespace-nowrap bg-amber-500 px-3 py-1 text-black">{plan.badge}</Badge>
                 ) : null}
               </div>
 
               <div className="mt-5 grid grid-cols-3 gap-2 text-center">
-                <div className="rounded-xl border border-white/10 bg-background/50 p-3">
-                  <p className="text-lg font-semibold">{plan.maxUsers}</p>
-                  <p className="text-[11px] text-muted-foreground">usuarios</p>
+                <div className="flex min-w-0 flex-col justify-center rounded-xl border border-white/10 bg-background/50 p-3">
+                  <p className="text-lg font-semibold leading-none">{plan.maxUsers}</p>
+                  <p className="mt-2 break-words text-[11px] leading-4 text-muted-foreground">usuários</p>
                 </div>
-                <div className="rounded-xl border border-white/10 bg-background/50 p-3">
-                  <p className="text-lg font-semibold">{plan.maxActiveTrips}</p>
-                  <p className="text-[11px] text-muted-foreground">viagens ativas</p>
+                <div className="flex min-w-0 flex-col justify-center rounded-xl border border-white/10 bg-background/50 p-3">
+                  <p className="text-lg font-semibold leading-none">{plan.maxActiveTrips}</p>
+                  <p className="mt-2 break-words text-[11px] leading-4 text-muted-foreground">viagens ativas</p>
                 </div>
-                <div className="rounded-xl border border-white/10 bg-background/50 p-3">
-                  <p className="text-lg font-semibold">{plan.monthlyCredits}</p>
-                  <p className="text-[11px] text-muted-foreground">creditos/mes</p>
+                <div className="flex min-w-0 flex-col justify-center rounded-xl border border-white/10 bg-background/50 p-3">
+                  <p className="text-lg font-semibold leading-none">{plan.monthlyCredits}</p>
+                  <p className="mt-2 break-words text-[11px] leading-4 text-muted-foreground">créditos/mês</p>
                 </div>
               </div>
 
-              <div className="mt-6 space-y-3">
+              <div className="mt-6 min-h-[8.5rem] space-y-3">
                 {highlights.map((feature) => (
                   <div key={feature} className="flex items-start gap-3 text-sm">
                     <Check size={16} className="mt-0.5 shrink-0 text-emerald-400" />
@@ -232,7 +232,7 @@ export default function AgencyPlansPage() {
 
               <button
                 type="button"
-                className="mt-5 flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
+                className="mt-5 flex min-h-6 items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
                 onClick={() => setExpandedPlan(isExpanded ? null : plan.code)}
               >
                 <span>Ver funcionalidades</span>
@@ -252,7 +252,7 @@ export default function AgencyPlansPage() {
 
               <div className="mt-auto pt-8">
                 <Button
-                  className="w-full rounded-xl"
+                  className="w-full rounded-xl whitespace-normal text-center"
                   variant={plan.code === "pro" ? "default" : "outline"}
                   disabled={isCurrent || Boolean(planLoading) || !isPaidPlan}
                   onClick={() => {
@@ -262,7 +262,7 @@ export default function AgencyPlansPage() {
                   }}
                 >
                   {planLoading === plan.code ? <Loader2 size={16} className="mr-2 animate-spin" /> : null}
-                  {isCurrent ? "Plano atual" : isPaidPlan ? "Fazer upgrade" : "Disponivel por padrao"}
+                  {isCurrent ? "Plano atual" : isPaidPlan ? "Fazer upgrade" : "Disponível por padrão"}
                 </Button>
               </div>
             </Card>

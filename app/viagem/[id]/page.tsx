@@ -23,6 +23,7 @@ import { useAuth } from "@/contexts/auth-context"
 import { buildAdminTripUrl, buildPublicTripUrl, isAdminLinkMode } from "@/lib/security/link-tokens"
 import { resolveTravelerPlan, resolveTravelerPlanFromBillingStatus } from "@/lib/billing/traveler-plans"
 import { getTravelerBillingStatus } from "@/lib/repositories/traveler-billing-repository"
+import { TRAVELER_CREDIT_PACKAGES } from "@/lib/billing/traveler-plans"
 import type { TripFlightRecord } from "@/types/flight"
 import type { TripItineraryRecord, TripItineraryContent } from "@/types"
 import type { OfflineStoredTripPackage, OfflineTripPackageAudience, OfflineTripPackageStatus } from "@/lib/offline/types"
@@ -910,6 +911,10 @@ async function openOfflineDocumentFromPackage(params: {
 function resolveProtectedWriteError(error?: string | null) {
   const normalized = (error ?? "").toLowerCase()
 
+  if (normalized.includes("auth session missing")) {
+    return "Nao foi possivel concluir a operacao. Atualize a pagina e tente novamente."
+  }
+
   if (
     normalized.includes("row-level security") ||
     normalized.includes("permission denied") ||
@@ -922,6 +927,26 @@ function resolveProtectedWriteError(error?: string | null) {
   }
 
   return error || "Nao foi possivel concluir esta acao."
+}
+
+function resolvePublicTripErrorMessage(error?: string | null) {
+  const normalized = (error ?? "").toLowerCase()
+
+  if (normalized.includes("auth session missing")) {
+    return "Nao foi possivel concluir a operacao. Atualize a pagina e tente novamente."
+  }
+
+  if (
+    normalized.includes("row-level security") ||
+    normalized.includes("permission denied") ||
+    normalized.includes("unauthorized") ||
+    normalized.includes("not authenticated") ||
+    normalized.includes("jwt")
+  ) {
+    return "Faca login novamente para continuar."
+  }
+
+  return error || "Nao foi possivel concluir a operacao."
 }
 
 async function resolveCurrentDocumentUrl(document: any) {
@@ -3928,7 +3953,7 @@ function ConciergeSection({ tripData, onOpenCredits, offlineReadOnly = false }: 
 
         if (!result.ok) {
           console.error("[CONCIERGE] real response error", result.error)
-          showToast(result.error, "info")
+          showToast(resolvePublicTripErrorMessage(result.error), "info")
           setTyping(false)
           return
         }
@@ -4149,7 +4174,7 @@ function MenuModal({
       { icon: Settings, label: "Configuracoes", action: onOpenSettings },
       { icon: Shield, label: "Seguranca", action: onOpenSecurity },
     ] : []),
-    { icon: CreditCard, label: "Credito", action: onOpenCredits },
+    { icon: CreditCard, label: "Créditos", action: onOpenCredits },
   ]
 
   return (
@@ -4645,7 +4670,7 @@ function OfflineSection({
       )
     } catch (error) {
       console.error("[OFFLINE] save failed", error)
-      showToast(error instanceof Error ? error.message : "Nao foi possivel salvar esta viagem offline.", "error")
+      showToast(resolvePublicTripErrorMessage(error instanceof Error ? error.message : "Nao foi possivel salvar esta viagem offline."), "error")
     } finally {
       setDownloading(false)
     }
@@ -4795,20 +4820,17 @@ function QuickInfoSection({ tripData }: { tripData: any }) {
 function CreditsModal({ open, onClose, credits }: { open: boolean; onClose: () => void; credits: any }) {
   const { showToast } = useToast()
 
-  const plans = [
-    { name: "Pacote Basico", credits: 50, price: "R$ 19,90", popular: false, mode: "Compra" },
-    { name: "Pacote Viajante", credits: 150, price: "R$ 39,90", popular: true, mode: "Compra" },
-    { name: "Plano Premium", credits: 500, price: "R$ 99,90", popular: false, mode: "Upgrade" },
-  ]
+  const totalCredits = Math.max(credits.total || credits.balance || 0, 1)
+  const usagePercentage = Math.min((credits.balance / totalCredits) * 100, 100)
 
   return (
-    <Modal open={open} onClose={onClose} title="Creditos">
+    <Modal open={open} onClose={onClose} title="Créditos">
       <div className="space-y-6">
         <div className="text-center p-6 rounded-2xl bg-gradient-to-br from-[#5de0e6]/10 to-[#004aad]/10 border border-[#5de0e6]/20">
           <p className="text-4xl font-bold text-white">{credits.balance}</p>
-          <p className="text-sm text-white/60 mt-1">creditos disponiveis</p>
+          <p className="text-sm text-white/60 mt-1">créditos disponíveis</p>
           <div className="w-full h-2 bg-white/10 rounded-full mt-4">
-            <div className="h-full bg-gradient-to-r from-[#5de0e6] to-[#004aad] rounded-full" style={{ width: `${(credits.balance / credits.total) * 100}%` }} />
+            <div className="h-full bg-gradient-to-r from-[#5de0e6] to-[#004aad] rounded-full" style={{ width: `${usagePercentage}%` }} />
           </div>
           <p className="text-xs text-white/40 mt-2">{credits.used} usados de {credits.total}</p>
         </div>
@@ -4825,50 +4847,39 @@ function CreditsModal({ open, onClose, credits }: { open: boolean; onClose: () =
         </div>
 
         <div>
-          <p className="text-sm text-white font-medium mb-3">Comprar mais ou fazer upgrade</p>
+          <p className="text-sm text-white font-medium mb-3">Pacotes oficiais de créditos</p>
           <div className="space-y-3">
-            {plans.map((plan) => (
+            {TRAVELER_CREDIT_PACKAGES.map((pkg) => (
               <button
-                key={plan.name}
-                onClick={() => showToast(`Compra de creditos para ${plan.name} ainda nao esta integrada.`, "info")}
+                key={pkg.code}
+                onClick={() => showToast("Compra de créditos em breve no link da viagem.", "info")}
                 className={cn(
                   "w-full p-4 rounded-xl border transition-all flex items-center justify-between",
-                  plan.popular
+                  pkg.code === "popular"
                     ? "bg-gradient-to-br from-[#5de0e6]/10 to-[#004aad]/10 border-[#5de0e6]/30"
                     : "bg-white/[0.02] border-white/[0.06] hover:border-white/10"
                 )}
                 >
                 <div className="flex items-center gap-3">
                   <div className="text-left">
-                    <p className="text-white font-medium">{plan.name}</p>
-                    <p className="text-xs text-white/40">{plan.credits} creditos • {plan.mode}</p>
+                    <p className="text-white font-medium">{pkg.name}</p>
+                    <p className="text-xs text-white/40">{pkg.credits} créditos • Compra avulsa</p>
                   </div>
-                  {plan.popular && (
+                  {pkg.code === "popular" && (
                     <span className="px-2 py-0.5 text-[10px] font-bold bg-[#5de0e6] text-black rounded-full">POPULAR</span>
                   )}
                 </div>
-                <p className="text-[#5de0e6] font-semibold">{plan.price}</p>
+                <p className="text-[#5de0e6] font-semibold">{pkg.priceLabel}</p>
               </button>
             ))}
           </div>
         </div>
 
         <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4">
-          <p className="mb-3 text-sm font-medium text-white">Historico resumido</p>
-          <div className="space-y-2 text-sm text-white/60">
-            <div className="flex items-center justify-between">
-              <span>Roteiro com IA</span>
-              <span>-2 creditos</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span>Concierge da viagem</span>
-              <span>-1 credito</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span>Ajuste do link</span>
-              <span>-0 credito</span>
-            </div>
-          </div>
+          <p className="mb-2 text-sm font-medium text-white">Compras no link da viagem</p>
+          <p className="text-sm text-white/60">
+            A compra real de créditos ainda não está ativa neste ambiente do link. Quando estiver disponível, os pacotes aparecerão aqui com histórico real.
+          </p>
         </div>
       </div>
     </Modal>

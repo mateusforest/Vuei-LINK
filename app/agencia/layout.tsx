@@ -45,9 +45,9 @@ const navItems = [
   { href: "/agencia/documentos", icon: FileText, label: "Documentos" },
   { href: "/agencia/roteiros-ia", icon: Map, label: "Roteiros IA" },
   { href: "/agencia/equipe", icon: UserCog, label: "Equipe" },
-  { href: "/agencia/creditos", icon: Coins, label: "Creditos" },
+  { href: "/agencia/creditos", icon: Coins, label: "Créditos" },
   { href: "/agencia/analytics", icon: BarChart3, label: "Analytics" },
-  { href: "/agencia/configuracoes", icon: Settings, label: "Configuracoes" },
+  { href: "/agencia/configuracoes", icon: Settings, label: "Configurações" },
 ]
 
 export default function AgencyLayout({ children }: { children: React.ReactNode }) {
@@ -67,36 +67,18 @@ function AgencyLayoutInner({ children }: { children: React.ReactNode }) {
   const [notificationsOpen, setNotificationsOpen] = useState(false)
   const { profile } = useAuth()
   const { credits, conciergeRequests, agency, workspaceLoading, subscription, limitDialog, clearLimitDialog } = useAgency()
-  const [agencyNotifications, setAgencyNotifications] = useState([
-    {
-      id: "agency-notification-1",
-      title: "Nova solicitacao do concierge",
-      message: "Maria Silva pediu apoio para o roteiro de Paris.",
-      type: "info",
-      read: false,
-      href: "/agencia/concierge",
-    },
-    {
-      id: "agency-notification-2",
-      title: "Credito em nivel de atencao",
-      message: "Seu saldo atual merece acompanhamento antes da proxima campanha.",
-      type: "warning",
-      read: false,
-      href: "/agencia/planos",
-    },
-    {
-      id: "agency-notification-3",
-      title: "Nova viagem criada",
-      message: "Uma nova viagem foi adicionada ao portal da agencia.",
-      type: "success",
-      read: true,
-      href: "/agencia/viagens",
-    },
-  ])
+  const [agencyNotifications, setAgencyNotifications] = useState<Array<{
+    id: string
+    title: string
+    message: string
+    type: "info" | "warning" | "success"
+    read: boolean
+    href: string
+  }>>([])
   
   const pendingRequests = conciergeRequests.filter(r => r.status === "pending").length
   const unreadNotifications = agencyNotifications.filter((notification) => !notification.read).length
-  const displayName = agency?.name || profile?.name || "Agencia"
+  const displayName = agency?.name || profile?.name || "Agência"
   const displayPlan = subscription.definition.name
   const headerImageUrl = agency?.logo || profile?.avatarUrl || undefined
   const initials = displayName
@@ -130,7 +112,7 @@ function AgencyLayoutInner({ children }: { children: React.ReactNode }) {
   const renderNotificationsMenu = () => (
     <div className="absolute right-0 top-full z-50 mt-3 w-80 overflow-hidden rounded-2xl border border-white/10 bg-card/95 shadow-2xl backdrop-blur-xl">
       <div className="flex items-center justify-between border-b border-white/5 px-4 py-3">
-        <span className="text-sm font-semibold text-foreground">Notificacoes</span>
+        <span className="text-sm font-semibold text-foreground">Notificações</span>
         <div className="flex items-center gap-2">
           {agencyNotifications.length > 0 ? (
             <button
@@ -150,7 +132,12 @@ function AgencyLayoutInner({ children }: { children: React.ReactNode }) {
       </div>
       <div className="max-h-64 overflow-y-auto">
         {agencyNotifications.length === 0 ? (
-          <p className="py-8 text-center text-sm text-muted-foreground">Sem notificacoes</p>
+          <div className="px-6 py-8 text-center">
+            <p className="text-sm font-medium text-foreground">Nenhuma notificação</p>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Quando houver atualizações importantes da sua agência, elas aparecerão aqui.
+            </p>
+          </div>
         ) : (
           agencyNotifications.map((notification) => (
             <div
@@ -197,7 +184,7 @@ function AgencyLayoutInner({ children }: { children: React.ReactNode }) {
             }}
             className="text-xs text-primary hover:underline"
           >
-            Limpar notificacoes
+            Limpar notificações
           </button>
         </div>
       ) : null}
