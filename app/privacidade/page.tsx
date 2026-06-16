@@ -13,13 +13,13 @@ export default function PrivacidadePage() {
             </div>
             <div>
               <h1 className="text-2xl font-semibold">Privacidade</h1>
-              <p className="text-sm text-muted-foreground">Resumo visual da politica de privacidade do Vuei.</p>
+              <p className="text-sm text-muted-foreground">Resumo visual da política de privacidade do Vuei.</p>
             </div>
           </div>
           <div className="space-y-4 text-sm text-muted-foreground">
-            <p>Os dados exibidos neste frontend ficam restritos ao ambiente mockado atual e sao usados apenas para demonstracao da experiencia do produto.</p>
-            <p>Informacoes da viagem, documentos e preferencias permanecem protegidos na interface e so aparecem conforme o nivel de acesso do link.</p>
-            <p>Antes da etapa de backend, storage e autenticacao real, este espaco funciona como referencia de navegacao e transparencia para o usuario.</p>
+            <p>Informações da viagem, documentos e preferências permanecem protegidos na interface e só aparecem conforme o nível de acesso do portal ou do link.</p>
+            <p>Os dados exibidos para cada usuário dependem das permissões ativas, das regras do produto e da disponibilidade real de cada recurso.</p>
+            <p>Esta página funciona como referência pública de transparência enquanto a versão jurídica completa é consolidada.</p>
           </div>
         </div>
       </div>

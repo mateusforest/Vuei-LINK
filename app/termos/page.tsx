@@ -13,13 +13,13 @@ export default function TermosPage() {
             </div>
             <div>
               <h1 className="text-2xl font-semibold">Termos</h1>
-              <p className="text-sm text-muted-foreground">Condicoes mockadas de uso da experiencia Vuei.</p>
+              <p className="text-sm text-muted-foreground">Condições gerais de uso da experiência Vuei.</p>
             </div>
           </div>
           <div className="space-y-4 text-sm text-muted-foreground">
-            <p>O ambiente atual e uma camada de frontend validada para navegacao, consistencia visual e fluxo de produto.</p>
-            <p>Recursos como autenticacao real, pagamentos, armazenamento externo e integracoes operacionais ainda nao foram ativados nesta fase.</p>
-            <p>Os CTAs desta tela existem para fechar a jornada e evitar pontos mortos enquanto a plataforma evolui para a proxima etapa.</p>
+            <p>Esta página reúne um resumo institucional do uso da plataforma Vuei enquanto a versão jurídica definitiva é consolidada.</p>
+            <p>Os fluxos operacionais do produto continuam sujeitos às permissões, validações e regras ativas em cada portal e em cada link da viagem.</p>
+            <p>Quando a versão jurídica final estiver pronta, este conteúdo será substituído sem afetar as rotas já publicadas.</p>
           </div>
         </div>
       </div>

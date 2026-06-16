@@ -39,7 +39,7 @@ import { useRouter } from "next/navigation"
 import { updateAgency as updateAgencyRepository } from "@/lib/repositories/agencies-repository"
 import { shouldUseSupabase } from "@/lib/data-source"
 import { createSupabaseBrowserClient } from "@/lib/supabase/client"
-import { mapCommercialPlanToLegacyAgencyPlan } from "@/lib/billing/agency-plans"
+import { AGENCY_PLAN_DEFINITIONS, mapCommercialPlanToLegacyAgencyPlan } from "@/lib/billing/agency-plans"
 import type { AgencyCommercialPlanCode } from "@/types"
 
 const settingsSections = [
@@ -50,32 +50,16 @@ const settingsSections = [
   { id: "plan", label: "Plano", icon: CreditCard },
 ]
 
-const mockPlans = [
-  {
-    id: "free",
-    name: "Free",
-    price: "R$ 0",
-    benefits: ["40 creditos por mes", "1 usuario", "1 viagem ativa"],
-  },
-  {
-    id: "start",
-    name: "Start",
-    price: "R$ 69,90/mes",
-    benefits: ["350 creditos por mes", "3 usuarios", "20 viagens ativas"],
-  },
-  {
-    id: "pro",
-    name: "Pro",
-    price: "R$ 109,90/mes",
-    benefits: ["600 creditos por mes", "5 usuarios", "100 viagens ativas"],
-  },
-  {
-    id: "business",
-    name: "Business",
-    price: "R$ 249,90/mes",
-    benefits: ["1.500 creditos por mes", "15 usuarios", "220 viagens ativas"],
-  },
-]
+const availablePlans = Object.values(AGENCY_PLAN_DEFINITIONS).map((plan) => ({
+  id: plan.code,
+  name: plan.name,
+  price: plan.priceLabel,
+  benefits: [
+    `${plan.monthlyCredits} créditos por mês`,
+    `${plan.maxUsers} ${plan.maxUsers === 1 ? "usuário" : "usuários"}`,
+    `${plan.maxActiveTrips} ${plan.maxActiveTrips === 1 ? "viagem ativa" : "viagens ativas"}`,
+  ],
+}))
 
 const STORAGE_KEY = "vuei_agencia_configuracoes_frontend"
 
@@ -773,7 +757,7 @@ export default function SettingsPage() {
               <p className="text-lg font-semibold text-foreground">{subscription.definition.name}</p>
             </div>
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-              {mockPlans.map((plan) => (
+              {availablePlans.map((plan) => (
                 <div key={plan.id} className={`rounded-xl border p-4 ${subscription.code === plan.id ? "border-primary/40 bg-primary/5" : "border-white/10 bg-white/[0.02]"}`}>
                   <p className="font-semibold text-foreground">{plan.name}</p>
                   <p className="mt-1 text-sm text-muted-foreground">{plan.price}</p>

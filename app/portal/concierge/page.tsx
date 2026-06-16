@@ -79,7 +79,7 @@ function buildTripAwareResponse(
       attachment: {
         type: "document",
         title: "Documentos da viagem",
-        description: "Nenhum documento fake e exibido. So aparecem anexos reais.",
+        description: "Só aparecem anexos reais adicionados à viagem.",
       },
     }
   }
