@@ -50,20 +50,20 @@ function Modal({ open, onClose, title, children }: { open: boolean; onClose: () 
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+        className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/24 backdrop-blur-sm p-4"
         onClick={onClose}
       >
         <motion.div
           initial={{ opacity: 0, scale: 0.95, y: 20 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 20 }}
-          className="w-full max-w-md rounded-2xl border border-white/10 bg-[#0a0a0a] p-6 shadow-2xl"
+          className="agency-modal w-full max-w-md rounded-2xl border p-6"
           onClick={(e) => e.stopPropagation()}
         >
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-white">{title}</h2>
-            <button onClick={onClose} className="p-1 rounded-lg hover:bg-white/10 transition-colors">
-              <X className="w-5 h-5 text-white/60" />
+            <h2 className="text-lg font-semibold text-foreground">{title}</h2>
+            <button onClick={onClose} className="rounded-lg p-1 transition-colors hover:bg-slate-100">
+              <X className="w-5 h-5 text-muted-foreground" />
             </button>
           </div>
           {children}

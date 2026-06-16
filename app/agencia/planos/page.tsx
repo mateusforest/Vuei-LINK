@@ -123,10 +123,10 @@ export default function AgencyPlansPage() {
         </div>
 
         <div className="flex flex-wrap gap-3">
-          <Badge variant="secondary" className="border-border/50 bg-card/60 text-muted-foreground">
+          <Badge variant="secondary" className="border-border/60 bg-white/90 text-muted-foreground">
             {activeTripsCount} viagens ativas em uso
           </Badge>
-          <Badge variant="secondary" className="border-border/50 bg-card/60 text-muted-foreground">
+          <Badge variant="secondary" className="border-border/60 bg-white/90 text-muted-foreground">
             {teamSeatsUsed} usuários ativos na equipe
           </Badge>
           {canManageSubscription ? (
@@ -136,7 +136,7 @@ export default function AgencyPlansPage() {
             </Button>
           ) : null}
           {currentPeriodEnd ? (
-            <Badge variant="secondary" className="border-border/50 bg-card/60 text-muted-foreground">
+            <Badge variant="secondary" className="border-border/60 bg-white/90 text-muted-foreground">
               Ciclo atual ate {new Date(currentPeriodEnd).toLocaleDateString("pt-BR")}
             </Badge>
           ) : null}
@@ -184,11 +184,11 @@ export default function AgencyPlansPage() {
           return (
             <Card
               key={plan.code}
-              className={`relative overflow-hidden p-6 vuei-glass ${
+              className={`relative flex min-h-[36rem] flex-col overflow-hidden p-6 vuei-glass ${
                 plan.code === "pro"
-                  ? "border-amber-500/30 bg-gradient-to-br from-amber-500/10 via-card/70 to-secondary/10"
-                  : "border-border/50 bg-card/50"
-              } flex min-h-[36rem] flex-col`}
+                  ? "border-amber-500/30 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(255,251,235,0.96))]"
+                  : "border-border/60 bg-white/88"
+              }`}
             >
               {plan.code === "pro" ? (
                 <div className="absolute right-0 top-0 h-32 w-32 rounded-full bg-amber-500/15 blur-3xl" />
@@ -207,15 +207,15 @@ export default function AgencyPlansPage() {
               </div>
 
               <div className="mt-5 grid grid-cols-3 gap-2 text-center">
-                <div className="flex min-w-0 flex-col justify-center rounded-xl border border-white/10 bg-background/50 p-3">
+                <div className="flex min-w-0 flex-col justify-center rounded-2xl border border-border/60 bg-[#fbfbfc] p-3">
                   <p className="text-lg font-semibold leading-none">{plan.maxUsers}</p>
                   <p className="mt-2 break-words text-[11px] leading-4 text-muted-foreground">usuários</p>
                 </div>
-                <div className="flex min-w-0 flex-col justify-center rounded-xl border border-white/10 bg-background/50 p-3">
+                <div className="flex min-w-0 flex-col justify-center rounded-2xl border border-border/60 bg-[#fbfbfc] p-3">
                   <p className="text-lg font-semibold leading-none">{plan.maxActiveTrips}</p>
                   <p className="mt-2 break-words text-[11px] leading-4 text-muted-foreground">viagens ativas</p>
                 </div>
-                <div className="flex min-w-0 flex-col justify-center rounded-xl border border-white/10 bg-background/50 p-3">
+                <div className="flex min-w-0 flex-col justify-center rounded-2xl border border-border/60 bg-[#fbfbfc] p-3">
                   <p className="text-lg font-semibold leading-none">{plan.monthlyCredits}</p>
                   <p className="mt-2 break-words text-[11px] leading-4 text-muted-foreground">créditos/mês</p>
                 </div>
@@ -240,7 +240,7 @@ export default function AgencyPlansPage() {
               </button>
 
               <div className={`overflow-hidden transition-all duration-300 ${isExpanded ? "mt-4 max-h-80" : "max-h-0"}`}>
-                <div className="space-y-3 border-t border-white/10 pt-4">
+                <div className="space-y-3 border-t border-border/60 pt-4">
                   {plan.features.map((feature) => (
                     <div key={feature} className="flex items-start gap-3 text-sm">
                       <Check size={16} className="mt-0.5 shrink-0 text-emerald-400" />
@@ -252,7 +252,7 @@ export default function AgencyPlansPage() {
 
               <div className="mt-auto pt-8">
                 <Button
-                  className="w-full rounded-xl whitespace-normal text-center"
+                  className="w-full rounded-xl whitespace-normal text-center shadow-none"
                   variant={plan.code === "pro" ? "default" : "outline"}
                   disabled={isCurrent || Boolean(planLoading) || !isPaidPlan}
                   onClick={() => {
@@ -271,7 +271,7 @@ export default function AgencyPlansPage() {
       </motion.div>
 
       <motion.div {...fadeInUp}>
-        <Card className="border-border/50 bg-card/50 p-6 vuei-glass">
+          <Card className="border-border/60 bg-white/88 p-6 vuei-glass">
           <div className="mb-5 flex items-start gap-3">
             <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/10">
               <Coins size={20} className="text-primary" />
@@ -286,7 +286,7 @@ export default function AgencyPlansPage() {
 
           <div className="grid gap-4 md:grid-cols-3">
             {TRAVELER_CREDIT_PACKAGES.map((pkg) => (
-              <Card key={pkg.code} className="border-border/50 bg-background/60 p-5">
+              <Card key={pkg.code} className="border-border/60 bg-[#fbfbfc] p-5 shadow-none">
                 <div className="mb-4 flex items-center justify-between">
                   <p className="font-semibold">{pkg.name}</p>
                   {pkg.code === "popular" ? <Badge className="bg-primary text-primary-foreground">Popular</Badge> : null}
@@ -310,7 +310,7 @@ export default function AgencyPlansPage() {
       </motion.div>
 
       <motion.div {...fadeInUp}>
-        <Card className="border-border/50 bg-card/50 p-6 vuei-glass">
+          <Card className="border-border/60 bg-white/88 p-6 vuei-glass">
           <div className="mb-4 flex items-center gap-2">
             <Crown size={18} className="text-primary" />
             <h2 className="text-xl font-semibold">FAQ</h2>
@@ -351,7 +351,7 @@ export default function AgencyPlansPage() {
       </motion.div>
 
       <motion.div {...fadeInUp}>
-        <Card className="border-border/50 bg-card/50 p-5 vuei-glass">
+          <Card className="border-border/60 bg-white/88 p-5 vuei-glass">
           <div className="flex flex-col gap-2 text-sm text-muted-foreground md:flex-row md:items-center md:justify-between">
             <span>
               Plano atual: <span className="font-medium text-foreground">{currentPlanDefinition.name}</span>

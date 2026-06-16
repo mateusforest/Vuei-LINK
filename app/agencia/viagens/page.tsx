@@ -56,20 +56,20 @@ function Modal({ open, onClose, title, children }: { open: boolean; onClose: () 
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+        className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/24 backdrop-blur-sm p-4"
         onClick={onClose}
       >
         <motion.div
           initial={{ opacity: 0, scale: 0.95, y: 20 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 20 }}
-          className="w-full max-w-md rounded-2xl border border-white/10 bg-[#0a0a0a] p-6 shadow-2xl"
+          className="agency-modal w-full max-w-md rounded-2xl border p-6"
           onClick={(e) => e.stopPropagation()}
         >
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-white">{title}</h2>
-            <button onClick={onClose} className="p-1 rounded-lg hover:bg-white/10 transition-colors">
-              <X className="w-5 h-5 text-white/60" />
+            <h2 className="text-lg font-semibold text-foreground">{title}</h2>
+            <button onClick={onClose} className="rounded-lg p-1 transition-colors hover:bg-slate-100">
+              <X className="w-5 h-5 text-muted-foreground" />
             </button>
           </div>
           {children}
@@ -100,18 +100,18 @@ function LinksModal({ open, onClose, trip }: { open: boolean; onClose: () => voi
   return (
     <Modal open={open} onClose={onClose} title="Links da Viagem">
       <div className="space-y-4">
-        <div className="p-4 rounded-xl border border-white/10 bg-white/5">
+        <div className="rounded-xl border border-border/60 bg-[#fbfbfc] p-4">
           <div className="flex items-center gap-3 mb-3">
             <div className="p-2 rounded-lg bg-primary/10">
               <Link2 className="w-4 h-4 text-primary" />
             </div>
             <div>
-              <p className="text-sm font-medium text-white">Link Admin</p>
-              <p className="text-xs text-white/50">Acesso completo para editar</p>
+              <p className="text-sm font-medium text-foreground">Link Admin</p>
+              <p className="text-xs text-muted-foreground">Acesso completo para editar</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <code className="flex-1 p-2 rounded-lg bg-black/30 text-xs text-white/70 truncate">
+            <code className="flex-1 truncate rounded-lg bg-slate-100 p-2 text-xs text-muted-foreground">
               {trip.adminLink}
             </code>
             <Button 
@@ -133,18 +133,18 @@ function LinksModal({ open, onClose, trip }: { open: boolean; onClose: () => voi
           </div>
         </div>
 
-        <div className="p-4 rounded-xl border border-white/10 bg-white/5">
+        <div className="rounded-xl border border-border/60 bg-[#fbfbfc] p-4">
           <div className="flex items-center gap-3 mb-3">
             <div className="p-2 rounded-lg bg-accent/10">
               <Share2 className="w-4 h-4 text-accent" />
             </div>
             <div>
-              <p className="text-sm font-medium text-white">Link Compartilhavel</p>
-              <p className="text-xs text-white/50">Para o cliente/familia</p>
+              <p className="text-sm font-medium text-foreground">Link Compartilhavel</p>
+              <p className="text-xs text-muted-foreground">Para o cliente/familia</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <code className="flex-1 p-2 rounded-lg bg-black/30 text-xs text-white/70 truncate">
+            <code className="flex-1 truncate rounded-lg bg-slate-100 p-2 text-xs text-muted-foreground">
               {trip.shareLink}
             </code>
             <Button 
@@ -247,7 +247,7 @@ export default function TripsPage() {
             placeholder="Buscar viagens ou clientes..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="h-10 w-full rounded-xl border border-white/5 bg-white/5 pl-10 pr-4 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary/50 focus:outline-none focus:ring-1 focus:ring-primary/50"
+            className="h-10 w-full rounded-xl border border-border/70 bg-white pl-10 pr-4 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary/40 focus:outline-none focus:ring-1 focus:ring-primary/40"
           />
         </div>
         <div className="flex gap-2">
@@ -262,10 +262,10 @@ export default function TripsPage() {
               variant="outline"
               size="sm"
               onClick={() => setFilter(item.value as typeof filter)}
-              className={`border-white/10 ${
+              className={`border-border/70 bg-white ${
                 filter === item.value
                   ? "bg-primary/20 text-primary"
-                  : "bg-transparent text-muted-foreground hover:bg-white/5"
+                  : "text-muted-foreground hover:bg-slate-50"
               }`}
             >
               {item.label}
@@ -304,7 +304,7 @@ export default function TripsPage() {
             
             return (
               <motion.div key={trip.id} variants={itemVariants}>
-                <Card className="group overflow-hidden border-white/5 bg-card/50 transition-all hover:border-primary/20 hover:bg-card/80">
+                <Card className="group overflow-hidden border-border/60 bg-white/88 transition-all hover:border-primary/20 hover:bg-white">
                   <CardContent className="p-0">
                     {/* Header with image */}
                     <div className="relative h-24 bg-gradient-to-br from-primary/20 via-accent/10 to-transparent p-4">
@@ -315,7 +315,7 @@ export default function TripsPage() {
                       <div className="absolute inset-0 bg-gradient-to-t from-card/80 to-transparent" />
                       <div className="relative flex items-start justify-between">
                         <div className="flex items-center gap-3">
-                          <Avatar className="h-10 w-10 border-2 border-white/20">
+                          <Avatar className="h-10 w-10 border-2 border-white/70">
                             <AvatarImage src={trip.coverImage} />
                             <AvatarFallback className="bg-primary/30 text-white">
                               {trip.clientName.split(" ").map(n => n[0]).join("")}
@@ -374,14 +374,14 @@ export default function TripsPage() {
                             {conciergeCount} pendentes
                           </Badge>
                         )}
-                        <Badge variant="outline" className="border-white/10 bg-white/5 text-[10px] text-muted-foreground">
+                        <Badge variant="outline" className="border-border/60 bg-white text-[10px] text-muted-foreground">
                           <FileText className="mr-1 h-3 w-3" />
                           {docsCount} docs
                         </Badge>
                       </div>
 
                       {/* Actions */}
-                      <div className="mt-4 flex items-center justify-between border-t border-white/5 pt-4">
+                      <div className="mt-4 flex items-center justify-between border-t border-border/60 pt-4">
                         <div className="flex gap-1">
                           <Button 
                             variant="ghost" 
@@ -414,7 +414,7 @@ export default function TripsPage() {
                               <MoreHorizontal className="h-4 w-4" />
                             </Button>
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="border-white/10 bg-card">
+                          <DropdownMenuContent align="end" className="agency-dropdown">
                             <DropdownMenuItem asChild>
                               <Link href="/agencia/concierge">
                                 <MessageSquare className="mr-2 h-4 w-4" />
@@ -431,7 +431,7 @@ export default function TripsPage() {
                               <Copy className="mr-2 h-4 w-4" />
                               Copiar link
                             </DropdownMenuItem>
-                            <DropdownMenuSeparator className="bg-white/10" />
+                            <DropdownMenuSeparator className="bg-border/70" />
                             <DropdownMenuItem 
                               onClick={() => handleDelete(trip.id)}
                               className="text-red-400 focus:text-red-400"

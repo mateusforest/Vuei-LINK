@@ -51,20 +51,20 @@ function Modal({ open, onClose, title, children }: { open: boolean; onClose: () 
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+        className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/24 backdrop-blur-sm p-4"
         onClick={onClose}
       >
         <motion.div
           initial={{ opacity: 0, scale: 0.95, y: 20 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 20 }}
-          className="w-full max-w-md rounded-2xl border border-white/10 bg-[#0a0a0a] p-6 shadow-2xl"
+          className="agency-modal w-full max-w-md rounded-2xl border p-6"
           onClick={(e) => e.stopPropagation()}
         >
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-white">{title}</h2>
-            <button onClick={onClose} className="p-1 rounded-lg hover:bg-white/10 transition-colors">
-              <X className="w-5 h-5 text-white/60" />
+            <h2 className="text-lg font-semibold text-foreground">{title}</h2>
+            <button onClick={onClose} className="rounded-lg p-1 transition-colors hover:bg-slate-100">
+              <X className="w-5 h-5 text-muted-foreground" />
             </button>
           </div>
           {children}
@@ -102,53 +102,53 @@ function NewClientModal({ open, onClose, onSave, editClient }: {
     <Modal open={open} onClose={onClose} title={editClient ? "Editar Cliente" : "Novo Cliente"}>
       <div className="space-y-4">
         <div>
-          <label className="text-xs text-white/50 uppercase tracking-wider">Nome *</label>
+          <label className="text-xs uppercase tracking-wider text-muted-foreground">Nome *</label>
           <input
             type="text"
             value={formData.name}
             onChange={(e) => setFormData({ ...formData, name: e.target.value })}
             placeholder="Nome completo"
-            className="w-full mt-1 px-4 py-3 rounded-xl bg-white/[0.05] border border-white/[0.08] text-white placeholder:text-white/30 focus:outline-none focus:border-[#5de0e6]/50"
+            className="mt-1 w-full rounded-xl border border-border/70 bg-white px-4 py-3 text-foreground placeholder:text-muted-foreground focus:border-primary/40 focus:outline-none"
           />
         </div>
         <div>
-          <label className="text-xs text-white/50 uppercase tracking-wider">E-mail *</label>
+          <label className="text-xs uppercase tracking-wider text-muted-foreground">E-mail *</label>
           <input
             type="email"
             value={formData.email}
             onChange={(e) => setFormData({ ...formData, email: e.target.value })}
             placeholder="email@exemplo.com"
-            className="w-full mt-1 px-4 py-3 rounded-xl bg-white/[0.05] border border-white/[0.08] text-white placeholder:text-white/30 focus:outline-none focus:border-[#5de0e6]/50"
+            className="mt-1 w-full rounded-xl border border-border/70 bg-white px-4 py-3 text-foreground placeholder:text-muted-foreground focus:border-primary/40 focus:outline-none"
           />
         </div>
         <div>
-          <label className="text-xs text-white/50 uppercase tracking-wider">Telefone</label>
+          <label className="text-xs uppercase tracking-wider text-muted-foreground">Telefone</label>
           <input
             type="text"
             value={formData.phone}
             onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
             placeholder="(00) 00000-0000"
-            className="w-full mt-1 px-4 py-3 rounded-xl bg-white/[0.05] border border-white/[0.08] text-white placeholder:text-white/30 focus:outline-none focus:border-[#5de0e6]/50"
+            className="mt-1 w-full rounded-xl border border-border/70 bg-white px-4 py-3 text-foreground placeholder:text-muted-foreground focus:border-primary/40 focus:outline-none"
           />
         </div>
         <div>
-          <label className="text-xs text-white/50 uppercase tracking-wider">Documento (CPF/RG)</label>
+          <label className="text-xs uppercase tracking-wider text-muted-foreground">Documento (CPF/RG)</label>
           <input
             type="text"
             value={formData.document}
             onChange={(e) => setFormData({ ...formData, document: e.target.value })}
             placeholder="000.000.000-00"
-            className="w-full mt-1 px-4 py-3 rounded-xl bg-white/[0.05] border border-white/[0.08] text-white placeholder:text-white/30 focus:outline-none focus:border-[#5de0e6]/50"
+            className="mt-1 w-full rounded-xl border border-border/70 bg-white px-4 py-3 text-foreground placeholder:text-muted-foreground focus:border-primary/40 focus:outline-none"
           />
         </div>
         <div>
-          <label className="text-xs text-white/50 uppercase tracking-wider">Observacoes</label>
+          <label className="text-xs uppercase tracking-wider text-muted-foreground">Observacoes</label>
           <textarea
             value={formData.notes}
             onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
             placeholder="Notas sobre o cliente..."
             rows={2}
-            className="w-full mt-1 px-4 py-3 rounded-xl bg-white/[0.05] border border-white/[0.08] text-white placeholder:text-white/30 focus:outline-none focus:border-[#5de0e6]/50 resize-none"
+            className="mt-1 w-full resize-none rounded-xl border border-border/70 bg-white px-4 py-3 text-foreground placeholder:text-muted-foreground focus:border-primary/40 focus:outline-none"
           />
         </div>
         <Button 
@@ -184,33 +184,33 @@ function ClientProfileModal({ open, onClose, client, trips, onEdit, onNewTrip }:
             </AvatarFallback>
           </Avatar>
           <div>
-            <h3 className="text-lg font-semibold text-white">{client.name}</h3>
-            <p className="text-sm text-white/50">{client.email}</p>
-            {client.phone && <p className="text-sm text-white/50">{client.phone}</p>}
+            <h3 className="text-lg font-semibold text-foreground">{client.name}</h3>
+            <p className="text-sm text-muted-foreground">{client.email}</p>
+            {client.phone && <p className="text-sm text-muted-foreground">{client.phone}</p>}
           </div>
         </div>
 
         {client.notes && (
-          <div className="p-3 rounded-xl bg-white/5 border border-white/10">
-            <p className="text-xs text-white/50 uppercase tracking-wider mb-1">Observacoes</p>
-            <p className="text-sm text-white/80">{client.notes}</p>
+          <div className="rounded-xl border border-border/60 bg-[#fbfbfc] p-3">
+            <p className="mb-1 text-xs uppercase tracking-wider text-muted-foreground">Observacoes</p>
+            <p className="text-sm text-foreground/80">{client.notes}</p>
           </div>
         )}
 
         <div>
-          <p className="text-xs text-white/50 uppercase tracking-wider mb-3">Viagens ({trips.length})</p>
+          <p className="mb-3 text-xs uppercase tracking-wider text-muted-foreground">Viagens ({trips.length})</p>
           {trips.length === 0 ? (
-            <div className="p-4 rounded-xl border border-dashed border-white/10 text-center">
-              <Plane className="w-6 h-6 mx-auto text-white/30 mb-2" />
-              <p className="text-sm text-white/50">Nenhuma viagem ainda</p>
+            <div className="rounded-xl border border-dashed border-border/60 bg-[#fbfbfc] p-4 text-center">
+              <Plane className="mx-auto mb-2 h-6 w-6 text-muted-foreground" />
+              <p className="text-sm text-muted-foreground">Nenhuma viagem ainda</p>
             </div>
           ) : (
             <div className="space-y-2 max-h-48 overflow-y-auto">
               {trips.map((trip, i) => (
-                <div key={i} className="p-3 rounded-xl bg-white/5 border border-white/10 flex items-center justify-between">
+                <div key={i} className="flex items-center justify-between rounded-xl border border-border/60 bg-[#fbfbfc] p-3">
                   <div>
-                    <p className="text-sm font-medium text-white">{trip.name}</p>
-                    <div className="flex items-center gap-1 text-xs text-white/50">
+                    <p className="text-sm font-medium text-foreground">{trip.name}</p>
+                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
                       <MapPin className="w-3 h-3" />
                       {trip.destination}
                     </div>
@@ -347,7 +347,7 @@ export default function ClientsPage() {
             placeholder="Buscar clientes..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="h-10 w-full rounded-xl border border-white/5 bg-white/5 pl-10 pr-4 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary/50 focus:outline-none focus:ring-1 focus:ring-primary/50"
+            className="h-10 w-full rounded-xl border border-border/70 bg-white pl-10 pr-4 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary/40 focus:outline-none focus:ring-1 focus:ring-primary/40"
           />
         </div>
         <div className="flex gap-2">
@@ -361,10 +361,10 @@ export default function ClientsPage() {
               variant="outline"
               size="sm"
               onClick={() => setFilter(item.value as typeof filter)}
-              className={`border-white/10 ${
+              className={`border-border/70 bg-white ${
                 filter === item.value
                   ? "bg-primary/20 text-primary"
-                  : "bg-transparent text-muted-foreground hover:bg-white/5"
+                  : "text-muted-foreground hover:bg-slate-50"
               }`}
             >
               {item.label}
@@ -401,11 +401,11 @@ export default function ClientsPage() {
             
             return (
               <motion.div key={client.id} variants={itemVariants}>
-                <Card className="group overflow-hidden border-white/5 bg-card/50 transition-all hover:border-primary/20 hover:bg-card/80">
+                <Card className="group overflow-hidden border-border/60 bg-white/88 transition-all hover:border-primary/20 hover:bg-white">
                   <CardContent className="p-4">
                     <div className="flex items-start justify-between">
                       <div className="flex items-center gap-3">
-                        <Avatar className="h-12 w-12 border-2 border-white/10">
+                        <Avatar className="h-12 w-12 border-2 border-border/60">
                           <AvatarFallback className="bg-primary/20 text-primary">
                             {client.name.split(" ").map(n => n[0]).join("")}
                           </AvatarFallback>
@@ -421,7 +421,7 @@ export default function ClientsPage() {
                             <MoreHorizontal className="h-4 w-4" />
                           </Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="border-white/10 bg-card">
+                        <DropdownMenuContent align="end" className="agency-dropdown">
                           <DropdownMenuItem onClick={() => setProfileClient(client)}>
                             <User className="w-4 h-4 mr-2" />
                             Ver perfil
@@ -475,7 +475,7 @@ export default function ClientsPage() {
                               ? "border-green-500/30 bg-green-500/10 text-green-400"
                               : status === "preparation"
                                 ? "border-yellow-500/30 bg-yellow-500/10 text-yellow-400"
-                                : "border-white/10 bg-white/5 text-muted-foreground"
+                                : "border-border/60 bg-white text-muted-foreground"
                           }`}
                         >
                           {status === "traveling"

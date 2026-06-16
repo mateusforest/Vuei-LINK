@@ -224,7 +224,7 @@ function CreateTripPageContent() {
 
           <div className="mt-8 space-y-4 text-left">
             {/* Trip Summary */}
-            <Card className="border-white/5 bg-card/50 overflow-hidden">
+            <Card className="overflow-hidden border-border/60 bg-white/88">
               <div 
                 className="h-32 bg-cover bg-center relative"
                 style={{ backgroundImage: `url(${createdTrip.coverImage})` }}
@@ -241,7 +241,7 @@ function CreateTripPageContent() {
             </Card>
 
             {/* Admin Link */}
-            <Card className="border-white/5 bg-card/50">
+            <Card className="border-border/60 bg-white/88">
               <CardContent className="p-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
@@ -254,7 +254,7 @@ function CreateTripPageContent() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <code className="rounded bg-white/5 px-2 py-1 text-xs text-muted-foreground max-w-[150px] truncate">
+                    <code className="max-w-[150px] truncate rounded bg-slate-100 px-2 py-1 text-xs text-muted-foreground">
                       {createdTrip.adminLink}
                     </code>
                     <Button 
@@ -271,7 +271,7 @@ function CreateTripPageContent() {
             </Card>
 
             {/* Share Link */}
-            <Card className="border-white/5 bg-card/50">
+            <Card className="border-border/60 bg-white/88">
               <CardContent className="p-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
@@ -284,7 +284,7 @@ function CreateTripPageContent() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <code className="rounded bg-white/5 px-2 py-1 text-xs text-muted-foreground max-w-[150px] truncate">
+                    <code className="max-w-[150px] truncate rounded bg-slate-100 px-2 py-1 text-xs text-muted-foreground">
                       {createdTrip.shareLink}
                     </code>
                     <Button 
@@ -303,20 +303,20 @@ function CreateTripPageContent() {
             {/* Quick Actions */}
             <div className="grid grid-cols-3 gap-3 pt-4">
               <Link href="/agencia/concierge">
-                <Button variant="outline" className="h-auto w-full flex-col gap-2 border-white/10 py-4 hover:bg-white/5">
+                <Button variant="outline" className="h-auto w-full flex-col gap-2 border-border/70 bg-white py-4 hover:bg-slate-50">
                   <MessageSquare className="h-5 w-5 text-primary" />
                   <span className="text-xs">Concierge</span>
                 </Button>
               </Link>
               <Link href="/agencia/roteiros-ia">
-                <Button variant="outline" className="h-auto w-full flex-col gap-2 border-white/10 py-4 hover:bg-white/5">
+                <Button variant="outline" className="h-auto w-full flex-col gap-2 border-border/70 bg-white py-4 hover:bg-slate-50">
                   <Sparkles className="h-5 w-5 text-accent" />
                   <span className="text-xs">Gerar Roteiro</span>
                 </Button>
               </Link>
               <Button 
                 variant="outline" 
-                className="h-auto flex-col gap-2 border-white/10 py-4 hover:bg-white/5"
+                className="h-auto flex-col gap-2 border-border/70 bg-white py-4 hover:bg-slate-50"
                 onClick={() => window.open(`/viagem/${createdTrip.slug}/admin`, "_blank")}
               >
                 <ExternalLink className="h-5 w-5 text-primary" />
@@ -413,7 +413,7 @@ function CreateTripPageContent() {
       </div>
 
       {/* Step Content */}
-      <Card className="border-white/5 bg-card/50">
+      <Card className="border-border/60 bg-white/88">
         <CardContent className="p-6">
           <AnimatePresence mode="wait">
             {currentStep === 1 && (
@@ -442,12 +442,12 @@ function CreateTripPageContent() {
                           })
                         }
                       }}
-                      className="w-full mt-1.5 px-4 py-2.5 rounded-xl border border-white/10 bg-[#0a0a0a] text-white focus:outline-none focus:border-primary/50 appearance-none"
+                      className="mt-1.5 w-full appearance-none rounded-xl border border-border/70 bg-white px-4 py-2.5 text-foreground focus:border-primary/50 focus:outline-none"
                       style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='rgba(255,255,255,0.4)'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center', backgroundSize: '16px' }}
                     >
-                      <option value="" className="bg-[#0a0a0a]">Novo cliente</option>
+                      <option value="">Novo cliente</option>
                       {clients.map(c => (
-                        <option key={c.id} value={c.id} className="bg-[#0a0a0a]">{c.name}</option>
+                        <option key={c.id} value={c.id}>{c.name}</option>
                       ))}
                     </select>
                   </div>
@@ -460,7 +460,7 @@ function CreateTripPageContent() {
                       value={formData.clientName}
                       onChange={(e) => setFormData({ ...formData, clientName: e.target.value })}
                       placeholder="Ex: Maria Silva"
-                      className="mt-1.5 border-white/10 bg-white/5"
+                      className="mt-1.5 border-border/70 bg-white"
                     />
                   </div>
                   <div>
@@ -470,7 +470,7 @@ function CreateTripPageContent() {
                       value={formData.clientEmail}
                       onChange={(e) => setFormData({ ...formData, clientEmail: e.target.value })}
                       placeholder="Ex: maria@email.com"
-                      className="mt-1.5 border-white/10 bg-white/5"
+                      className="mt-1.5 border-border/70 bg-white"
                     />
                   </div>
                 </div>
@@ -497,15 +497,15 @@ function CreateTripPageContent() {
                         window.setTimeout(() => setDestinationMenuOpen(false), 120)
                       }}
                       placeholder="Ex: Paris, Franca"
-                      className="mt-1.5 border-white/10 bg-white/5"
+                      className="mt-1.5 border-border/70 bg-white"
                     />
                     {destinationMenuOpen && destinationSuggestions.length > 0 ? (
-                      <div className="absolute left-0 right-0 top-[calc(100%+0.5rem)] z-20 overflow-hidden rounded-2xl border border-white/10 bg-card/95 shadow-2xl backdrop-blur">
+                      <div className="agency-dropdown absolute left-0 right-0 top-[calc(100%+0.5rem)] z-20 overflow-hidden rounded-2xl border backdrop-blur">
                         {destinationSuggestions.map((option) => (
                           <button
                             key={option.id}
                             type="button"
-                            className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors hover:bg-white/5"
+                            className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors hover:bg-slate-50"
                             onMouseDown={(event) => event.preventDefault()}
                             onClick={() => handleDestinationSelect(option)}
                           >
@@ -513,7 +513,7 @@ function CreateTripPageContent() {
                               <p className="font-medium text-foreground">{option.label}</p>
                               <p className="text-xs text-muted-foreground">{option.city} • {option.countryCode}</p>
                             </div>
-                            <Badge variant="outline" className="border-white/10 bg-white/[0.03]">
+                            <Badge variant="outline" className="border-border/60 bg-white">
                               Canonico
                             </Badge>
                           </button>
@@ -556,8 +556,9 @@ function CreateTripPageContent() {
                       open={activeDateField === "start"}
                       onOpenChange={(open) => setActiveDateField(open ? "start" : null)}
                       onSelect={handleStartDateChange}
-                      className="mt-1.5 border-white/10 bg-white/5"
+                      className="mt-1.5 border-border/70 bg-white"
                       labelClassName="text-muted-foreground"
+                      popoverClassName="agency-popover"
                     />
                   </div>
                   <div>
@@ -568,8 +569,9 @@ function CreateTripPageContent() {
                       open={activeDateField === "end"}
                       onOpenChange={(open) => setActiveDateField(open ? "end" : null)}
                       onSelect={handleEndDateChange}
-                      className="mt-1.5 border-white/10 bg-white/5"
+                      className="mt-1.5 border-border/70 bg-white"
                       labelClassName="text-muted-foreground"
+                      popoverClassName="agency-popover"
                     />
                   </div>
                 </div>
@@ -652,10 +654,10 @@ function CreateTripPageContent() {
                   {travelStyles.map((style) => (
                     <motion.div
                       key={style.id}
-                      className={`cursor-pointer rounded-xl border p-4 transition-all ${
+                      className={`cursor-pointer rounded-2xl border p-4 transition-all ${
                         formData.travelStyle === style.id
                           ? "border-primary bg-primary/10"
-                          : "border-white/10 bg-white/[0.02] hover:border-white/20"
+                          : "border-border/60 bg-[#fbfbfc] hover:border-primary/20"
                       }`}
                       onClick={() => setFormData({ ...formData, travelStyle: style.id })}
                       whileHover={{ scale: 1.02 }}
@@ -682,7 +684,7 @@ function CreateTripPageContent() {
               variant="outline"
               onClick={handleBack}
               disabled={currentStep === 1}
-              className="gap-2 border-white/10"
+              className="gap-2 border-border/70 bg-white"
             >
               <ArrowLeft className="h-4 w-4" />
               Voltar
@@ -704,7 +706,7 @@ function CreateTripPageContent() {
 
 export default function CreateTripPage() {
   return (
-    <Suspense fallback={<div className="mx-auto max-w-2xl"><Card className="border-white/5 bg-card/50"><CardContent className="p-6">Carregando criacao da viagem...</CardContent></Card></div>}>
+    <Suspense fallback={<div className="mx-auto max-w-2xl"><Card className="border-border/60 bg-white/88"><CardContent className="p-6">Carregando criacao da viagem...</CardContent></Card></div>}>
       <CreateTripPageContent />
     </Suspense>
   )

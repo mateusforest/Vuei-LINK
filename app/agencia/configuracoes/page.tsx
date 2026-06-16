@@ -433,14 +433,14 @@ export default function SettingsPage() {
         <div className="lg:col-span-3">
           {activeSection === "agency" && (
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
-              <Card className="border-white/5 bg-card/50">
+                <Card className="border-border/60 bg-white/88">
                 <CardHeader>
                   <CardTitle className="text-base">Dados da Agencia</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="flex items-center gap-4">
                     <div className="relative">
-                      <Avatar className="h-20 w-20 border-2 border-white/10">
+                      <Avatar className="h-20 w-20 border-2 border-border/60">
                         <AvatarImage src={agencyData.logo || "/placeholder-logo.svg"} />
                         <AvatarFallback className="bg-primary/20 text-xl text-primary">V+</AvatarFallback>
                       </Avatar>
@@ -456,7 +456,7 @@ export default function SettingsPage() {
                       <p className="font-medium text-foreground">Branding da Agencia</p>
                       <p className="text-xs text-muted-foreground">Este logo aparece nos links da viagem. O avatar do usuario continua separado no perfil.</p>
                     </div>
-                    <Button variant="outline" className="border-white/10" onClick={() => setShowPhotoModal(true)}>
+                    <Button variant="outline" className="border-border/70 bg-white" onClick={() => setShowPhotoModal(true)}>
                       Gerenciar logo
                     </Button>
                   </div>
@@ -464,25 +464,25 @@ export default function SettingsPage() {
                   <div className="grid gap-4 sm:grid-cols-2">
                     <div>
                       <Label className="text-muted-foreground">Nome da Agencia</Label>
-                      <Input value={agencyData.name} onChange={(e) => setAgencyData({ ...agencyData, name: e.target.value })} className="mt-1.5 border-white/10 bg-white/5" />
+                      <Input value={agencyData.name} onChange={(e) => setAgencyData({ ...agencyData, name: e.target.value })} className="mt-1.5 border-border/70 bg-white" />
                     </div>
                     <div>
                       <Label className="text-muted-foreground">CNPJ</Label>
-                      <Input value={agencyData.cnpj} onChange={(e) => setAgencyData({ ...agencyData, cnpj: e.target.value })} className="mt-1.5 border-white/10 bg-white/5" />
+                      <Input value={agencyData.cnpj} onChange={(e) => setAgencyData({ ...agencyData, cnpj: e.target.value })} className="mt-1.5 border-border/70 bg-white" />
                     </div>
                     <div>
                       <Label className="text-muted-foreground">Email</Label>
-                      <Input value={agencyData.email} onChange={(e) => setAgencyData({ ...agencyData, email: e.target.value })} className="mt-1.5 border-white/10 bg-white/5" />
+                      <Input value={agencyData.email} onChange={(e) => setAgencyData({ ...agencyData, email: e.target.value })} className="mt-1.5 border-border/70 bg-white" />
                     </div>
                     <div>
                       <Label className="text-muted-foreground">Telefone</Label>
-                      <Input value={agencyData.phone} onChange={(e) => setAgencyData({ ...agencyData, phone: e.target.value })} className="mt-1.5 border-white/10 bg-white/5" />
+                      <Input value={agencyData.phone} onChange={(e) => setAgencyData({ ...agencyData, phone: e.target.value })} className="mt-1.5 border-border/70 bg-white" />
                     </div>
                   </div>
 
                   <div>
                     <Label className="text-muted-foreground">Endereco</Label>
-                    <Input value={agencyData.address} onChange={(e) => setAgencyData({ ...agencyData, address: e.target.value })} className="mt-1.5 border-white/10 bg-white/5" />
+                    <Input value={agencyData.address} onChange={(e) => setAgencyData({ ...agencyData, address: e.target.value })} className="mt-1.5 border-border/70 bg-white" />
                   </div>
 
                   <Button className="gap-2 bg-gradient-to-r from-primary to-accent text-white" onClick={() => handleSave()} disabled={saving}>
@@ -510,7 +510,7 @@ export default function SettingsPage() {
 
           {activeSection === "branding" && (
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-              <Card className="border-white/5 bg-card/50">
+              <Card className="border-border/60 bg-white/88">
                 <CardHeader>
                   <CardTitle className="text-base">Branding do Link</CardTitle>
                 </CardHeader>
@@ -518,9 +518,9 @@ export default function SettingsPage() {
                   <p className="text-sm text-muted-foreground">
                     Personalize o logo exibido nos links compartilhaveis sem alterar a foto de perfil do usuario.
                   </p>
-                  <div className="rounded-xl border border-white/5 bg-white/[0.02] p-4">
+                  <div className="rounded-2xl border border-border/60 bg-[#fbfbfc] p-4">
                     <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-                      <div className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-muted/20">
+                      <div className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-2xl border border-border/60 bg-muted/20">
                         {brandingData.linkLogo ? (
                           <img src={brandingData.linkLogo} alt="Logo da agencia" className="h-full w-full object-cover" />
                         ) : (
@@ -529,7 +529,7 @@ export default function SettingsPage() {
                       </div>
                       <div className="flex-1">
                         <Label className="text-muted-foreground">Logo da agencia</Label>
-                        <Input type="file" accept="image/*" onChange={(e) => handleBrandingLogoSelected(e.target.files?.[0])} className="mt-1.5 border-white/10 bg-white/5" />
+                        <Input type="file" accept="image/*" onChange={(e) => handleBrandingLogoSelected(e.target.files?.[0])} className="mt-1.5 border-border/70 bg-white" />
                       </div>
                     </div>
                   </div>
@@ -544,12 +544,12 @@ export default function SettingsPage() {
 
           {activeSection === "security" && (
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
-              <Card className="border-white/5 bg-card/50">
+              <Card className="border-border/60 bg-white/88">
                 <CardHeader>
                   <CardTitle className="text-base">Seguranca</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="rounded-lg border border-white/5 p-4">
+                  <div className="rounded-2xl border border-border/60 bg-[#fbfbfc] p-4">
                     <div className="flex items-center justify-between gap-4">
                       <div className="flex items-center gap-3">
                         <div className="rounded-lg bg-primary/10 p-2">
@@ -560,13 +560,13 @@ export default function SettingsPage() {
                           <p className="text-xs text-muted-foreground">Atualize sua senha de acesso quando precisar.</p>
                         </div>
                       </div>
-                      <Button variant="outline" className="border-white/10" onClick={() => setShowPasswordModal(true)}>
+                      <Button variant="outline" className="border-border/70 bg-white" onClick={() => setShowPasswordModal(true)}>
                         Alterar senha
                       </Button>
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between rounded-lg border border-white/5 p-4">
+                  <div className="flex items-center justify-between rounded-2xl border border-border/60 bg-[#fbfbfc] p-4">
                     <div>
                       <p className="font-medium text-foreground">Autenticacao 2FA</p>
                       <p className="text-xs text-muted-foreground">Adicione uma camada extra de seguranca</p>
@@ -600,7 +600,7 @@ export default function SettingsPage() {
 
           {activeSection === "notifications" && (
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-              <Card className="border-white/5 bg-card/50">
+              <Card className="border-border/60 bg-white/88">
                 <CardHeader>
                   <CardTitle className="text-base">Notificacoes</CardTitle>
                 </CardHeader>
@@ -611,7 +611,7 @@ export default function SettingsPage() {
                     { key: "credits", label: "Creditos baixos", desc: "Aviso quando creditos acabarem" },
                     { key: "newClients", label: "Novos clientes", desc: "Notificar cadastros" },
                   ].map((item) => (
-                    <div key={item.key} className="flex items-center justify-between rounded-lg border border-white/5 p-4">
+                    <div key={item.key} className="flex items-center justify-between rounded-2xl border border-border/60 bg-[#fbfbfc] p-4">
                       <div>
                         <p className="font-medium text-foreground">{item.label}</p>
                         <p className="text-xs text-muted-foreground">{item.desc}</p>
@@ -637,15 +637,15 @@ export default function SettingsPage() {
                       </p>
                     </div>
                     <div className="flex flex-col gap-2 sm:flex-row">
-                      <Button asChild variant="outline" className="border-white/10">
+                      <Button asChild variant="outline" className="border-border/70 bg-white">
                         <Link href="/agencia/planos">Conhecer planos</Link>
                       </Button>
-                      <Button variant="outline" className="border-white/10" onClick={() => setShowPlanModal(true)}>
+                      <Button variant="outline" className="border-border/70 bg-white" onClick={() => setShowPlanModal(true)}>
                         Ajustar plano interno
                       </Button>
                     </div>
                   </div>
-                  <hr className="my-4 border-white/10" />
+                  <hr className="my-4 border-border/60" />
                   <div className="grid gap-2 text-sm">
                     <div className="flex items-center gap-2 text-muted-foreground">
                       <div className="h-1.5 w-1.5 rounded-full bg-primary" />
@@ -672,14 +672,14 @@ export default function SettingsPage() {
       </div>
 
       <Dialog open={showPhotoModal} onOpenChange={setShowPhotoModal}>
-        <DialogContent className="border-white/10 bg-card sm:max-w-md">
+        <DialogContent className="agency-dialog sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Atualizar branding</DialogTitle>
             <DialogDescription>Envie o logo da agencia que sera exibido no link da viagem.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="flex justify-center">
-              <div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-muted/20">
+              <div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-2xl border border-border/60 bg-muted/20">
                 {agencyData.logo ? (
                   <img src={agencyData.logo} alt="Preview da agencia" className="h-full w-full object-cover" />
                 ) : (
@@ -687,9 +687,9 @@ export default function SettingsPage() {
                 )}
               </div>
             </div>
-            <Input type="file" accept="image/*" onChange={(e) => handleAgencyLogoSelected(e.target.files?.[0])} className="border-white/10 bg-white/5" />
+            <Input type="file" accept="image/*" onChange={(e) => handleAgencyLogoSelected(e.target.files?.[0])} className="border-border/70 bg-white" />
             <div className="flex gap-3">
-              <Button variant="outline" className="flex-1 border-white/10" onClick={() => setShowPhotoModal(false)}>
+              <Button variant="outline" className="flex-1 border-border/70 bg-white" onClick={() => setShowPhotoModal(false)}>
                 Cancelar
               </Button>
               <Button
@@ -711,7 +711,7 @@ export default function SettingsPage() {
       </Dialog>
 
       <Dialog open={showPasswordModal} onOpenChange={setShowPasswordModal}>
-        <DialogContent className="border-white/10 bg-card sm:max-w-md">
+        <DialogContent className="agency-dialog sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Alterar senha</DialogTitle>
             <DialogDescription>Atualize sua senha de acesso da agencia.</DialogDescription>
@@ -719,18 +719,18 @@ export default function SettingsPage() {
           <div className="space-y-4">
             <div>
               <Label className="text-muted-foreground">Senha atual</Label>
-              <Input type="password" value={passwordForm.currentPassword} onChange={(e) => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })} className="mt-1.5 border-white/10 bg-white/5" />
+              <Input type="password" value={passwordForm.currentPassword} onChange={(e) => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })} className="mt-1.5 border-border/70 bg-white" />
             </div>
             <div>
               <Label className="text-muted-foreground">Nova senha</Label>
-              <Input type="password" value={passwordForm.newPassword} onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })} className="mt-1.5 border-white/10 bg-white/5" />
+              <Input type="password" value={passwordForm.newPassword} onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })} className="mt-1.5 border-border/70 bg-white" />
             </div>
             <div>
               <Label className="text-muted-foreground">Confirmar nova senha</Label>
-              <Input type="password" value={passwordForm.confirmPassword} onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })} className="mt-1.5 border-white/10 bg-white/5" />
+              <Input type="password" value={passwordForm.confirmPassword} onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })} className="mt-1.5 border-border/70 bg-white" />
             </div>
             <div className="flex gap-3">
-              <Button variant="outline" className="flex-1 border-white/10" onClick={() => setShowPasswordModal(false)}>
+              <Button variant="outline" className="flex-1 border-border/70 bg-white" onClick={() => setShowPasswordModal(false)}>
                 Cancelar
               </Button>
               <Button
@@ -746,7 +746,7 @@ export default function SettingsPage() {
       </Dialog>
 
       <Dialog open={showPlanModal} onOpenChange={setShowPlanModal}>
-        <DialogContent className="border-white/10 bg-card sm:max-w-2xl">
+        <DialogContent className="agency-dialog sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>Alterar plano</DialogTitle>
             <DialogDescription>Escolha um plano para a sua operacao sem integrar pagamento nesta etapa.</DialogDescription>
@@ -758,7 +758,7 @@ export default function SettingsPage() {
             </div>
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
               {availablePlans.map((plan) => (
-                <div key={plan.id} className={`rounded-xl border p-4 ${subscription.code === plan.id ? "border-primary/40 bg-primary/5" : "border-white/10 bg-white/[0.02]"}`}>
+                <div key={plan.id} className={`rounded-2xl border p-4 ${subscription.code === plan.id ? "border-primary/30 bg-primary/5" : "border-border/60 bg-[#fbfbfc]"}`}>
                   <p className="font-semibold text-foreground">{plan.name}</p>
                   <p className="mt-1 text-sm text-muted-foreground">{plan.price}</p>
                   <div className="mt-3 space-y-2">
@@ -798,7 +798,7 @@ export default function SettingsPage() {
           }
         }}
       >
-        <DialogContent className="border-red-500/20 bg-card sm:max-w-md">
+        <DialogContent className="agency-dialog border-red-500/20 sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="text-red-400">Arquivar agencia</DialogTitle>
             <DialogDescription>
@@ -815,11 +815,11 @@ export default function SettingsPage() {
                 value={archiveConfirmation}
                 onChange={(e) => setArchiveConfirmation(e.target.value)}
                 placeholder="ARQUIVAR"
-                className="mt-1.5 border-red-500/20 bg-white/5"
+                className="mt-1.5 border-red-500/20 bg-white"
               />
             </div>
             <div className="flex gap-3">
-              <Button variant="outline" className="flex-1 border-white/10" onClick={() => setShowArchiveModal(false)} disabled={isArchivingAgency}>
+              <Button variant="outline" className="flex-1 border-border/70 bg-white" onClick={() => setShowArchiveModal(false)} disabled={isArchivingAgency}>
                 Cancelar
               </Button>
               <Button

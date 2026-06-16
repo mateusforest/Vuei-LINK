@@ -110,8 +110,8 @@ function AgencyLayoutInner({ children }: { children: React.ReactNode }) {
   }, [notificationsOpen])
 
   const renderNotificationsMenu = () => (
-    <div className="absolute right-0 top-full z-50 mt-3 w-80 overflow-hidden rounded-2xl border border-white/10 bg-card/95 shadow-2xl backdrop-blur-xl">
-      <div className="flex items-center justify-between border-b border-white/5 px-4 py-3">
+    <div className="agency-dropdown absolute right-0 top-full z-50 mt-3 w-80 overflow-hidden rounded-2xl border backdrop-blur-xl">
+      <div className="flex items-center justify-between border-b border-border/60 px-4 py-3">
         <span className="text-sm font-semibold text-foreground">Notificações</span>
         <div className="flex items-center gap-2">
           {agencyNotifications.length > 0 ? (
@@ -125,7 +125,7 @@ function AgencyLayoutInner({ children }: { children: React.ReactNode }) {
               Marcar lidas
             </button>
           ) : null}
-          <button onClick={() => setNotificationsOpen(false)} className="rounded-lg p-1 text-muted-foreground hover:bg-white/5 hover:text-foreground">
+          <button onClick={() => setNotificationsOpen(false)} className="rounded-lg p-1 text-muted-foreground hover:bg-slate-100 hover:text-foreground">
             <X className="h-4 w-4" />
           </button>
         </div>
@@ -143,7 +143,7 @@ function AgencyLayoutInner({ children }: { children: React.ReactNode }) {
             <div
               key={notification.id}
               className={cn(
-                "border-b border-white/5 px-4 py-3 transition-colors hover:bg-white/5",
+                "border-b border-border/60 px-4 py-3 transition-colors hover:bg-slate-50",
                 !notification.read && "bg-primary/5",
               )}
             >
@@ -176,7 +176,7 @@ function AgencyLayoutInner({ children }: { children: React.ReactNode }) {
         )}
       </div>
       {agencyNotifications.length > 0 ? (
-        <div className="border-t border-white/5 px-4 py-3">
+        <div className="border-t border-border/60 px-4 py-3">
           <button
             onClick={() => {
               clearAgencyNotifications()
@@ -192,17 +192,17 @@ function AgencyLayoutInner({ children }: { children: React.ReactNode }) {
   )
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="agency-shell min-h-screen bg-[radial-gradient(circle_at_top,_rgba(55,190,255,0.1),_transparent_35%),linear-gradient(180deg,#f7f7f8_0%,#f5f5f7_100%)] text-foreground">
       {/* Desktop Sidebar */}
       <motion.aside
         initial={false}
         animate={{ width: sidebarCollapsed ? 80 : 260 }}
         transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
-        className="fixed left-0 top-0 z-40 hidden h-screen border-r border-white/5 bg-card/50 backdrop-blur-xl lg:block"
+        className="fixed left-0 top-0 z-40 hidden h-screen border-r border-border/60 bg-white/82 shadow-[18px_0_48px_rgba(15,23,42,0.06)] backdrop-blur-2xl lg:block"
       >
         <div className="flex h-full flex-col">
           {/* Logo */}
-          <div className="flex h-16 items-center justify-between border-b border-white/5 px-4">
+          <div className="flex h-16 items-center justify-between border-b border-border/60 px-4">
             <Link href="/agencia" className="flex items-center gap-3">
               <div className="relative h-8 w-8 flex-shrink-0">
                 <Image src="/vuei-logo.png" alt="Vuei" fill className="object-contain" />
@@ -217,7 +217,7 @@ function AgencyLayoutInner({ children }: { children: React.ReactNode }) {
                     className="overflow-hidden"
                   >
                     <span className="text-lg font-semibold text-foreground">Vuei</span>
-                    <Badge variant="outline" className="ml-2 border-primary/30 bg-primary/10 text-[10px] text-primary">
+                    <Badge variant="outline" className="ml-2 border-primary/20 bg-primary/10 text-[10px] text-primary">
                       Agência
                     </Badge>
                   </motion.div>
@@ -228,7 +228,7 @@ function AgencyLayoutInner({ children }: { children: React.ReactNode }) {
               variant="ghost"
               size="icon"
               onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-              className="h-8 w-8 text-muted-foreground hover:text-foreground"
+              className="h-8 w-8 rounded-xl text-muted-foreground hover:bg-[#f8fafc] hover:text-foreground"
             >
               {sidebarCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
             </Button>
@@ -244,8 +244,8 @@ function AgencyLayoutInner({ children }: { children: React.ReactNode }) {
                     className={cn(
                       "group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200",
                       isActive
-                        ? "bg-gradient-to-r from-primary/20 to-accent/10 text-foreground"
-                        : "text-muted-foreground hover:bg-white/5 hover:text-foreground"
+                        ? "bg-gradient-to-r from-primary/16 via-primary/10 to-transparent text-foreground shadow-[0_12px_30px_rgba(11,86,216,0.08)]"
+                        : "text-muted-foreground hover:bg-[#f8fafc] hover:text-foreground"
                     )}
                     whileHover={{ x: 2 }}
                     whileTap={{ scale: 0.98 }}
@@ -296,15 +296,15 @@ function AgencyLayoutInner({ children }: { children: React.ReactNode }) {
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: "auto" }}
                 exit={{ opacity: 0, height: 0 }}
-                className="border-t border-white/5 p-4"
+                className="border-t border-border/60 p-4"
               >
-                <div className="rounded-xl bg-gradient-to-br from-primary/10 via-accent/5 to-transparent p-4">
+                <div className="agency-subtle-card rounded-2xl p-4">
                   <div className="mb-3 flex items-center gap-2">
                     <Sparkles className="h-4 w-4 text-primary" />
                     <span className="text-xs font-medium text-muted-foreground">Créditos IA</span>
                   </div>
                   <div className="mb-2 text-2xl font-bold text-foreground">{credits.balance}</div>
-                  <div className="mb-3 h-1.5 overflow-hidden rounded-full bg-white/10">
+                  <div className="mb-3 h-1.5 overflow-hidden rounded-full bg-slate-200">
                     <motion.div
                       className="h-full rounded-full bg-gradient-to-r from-primary to-accent"
                       initial={{ width: 0 }}
@@ -313,7 +313,7 @@ function AgencyLayoutInner({ children }: { children: React.ReactNode }) {
                     />
                   </div>
                   <Link href="/agencia/planos">
-                    <Button size="sm" className="w-full bg-primary/20 text-primary hover:bg-primary/30">
+                    <Button size="sm" className="w-full rounded-xl border border-primary/15 bg-white text-primary hover:bg-primary/5">
                       Ver planos
                     </Button>
                   </Link>
@@ -325,7 +325,7 @@ function AgencyLayoutInner({ children }: { children: React.ReactNode }) {
       </motion.aside>
 
       {/* Mobile Header */}
-      <header className="fixed left-0 right-0 top-0 z-50 border-b border-white/5 bg-card/80 backdrop-blur-xl lg:hidden">
+      <header className="fixed left-0 right-0 top-0 z-50 border-b border-border/60 bg-white/88 backdrop-blur-xl lg:hidden">
         <div className="flex h-14 items-center justify-between px-4">
           <div className="flex items-center gap-3">
             <Button variant="ghost" size="icon" onClick={() => setMobileMenuOpen(true)} className="h-9 w-9">
@@ -346,7 +346,7 @@ function AgencyLayoutInner({ children }: { children: React.ReactNode }) {
               </Button>
               {notificationsOpen ? renderNotificationsMenu() : null}
             </div>
-            <Avatar className="h-8 w-8 border border-white/10">
+            <Avatar className="h-8 w-8 border border-border/60">
               <AvatarImage src={headerImageUrl} />
               <AvatarFallback className="bg-primary/20 text-xs text-primary">{initials}</AvatarFallback>
             </Avatar>
@@ -362,7 +362,7 @@ function AgencyLayoutInner({ children }: { children: React.ReactNode }) {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm lg:hidden"
+              className="fixed inset-0 z-50 bg-slate-900/24 backdrop-blur-sm lg:hidden"
               onClick={() => setMobileMenuOpen(false)}
             />
             <motion.div
@@ -370,9 +370,9 @@ function AgencyLayoutInner({ children }: { children: React.ReactNode }) {
               animate={{ x: 0 }}
               exit={{ x: "-100%" }}
               transition={{ type: "spring", damping: 25, stiffness: 300 }}
-              className="fixed left-0 top-0 z-50 h-full w-72 border-r border-white/5 bg-card lg:hidden"
+              className="fixed left-0 top-0 z-50 h-full w-72 border-r border-border/60 bg-white lg:hidden"
             >
-              <div className="flex h-14 items-center justify-between border-b border-white/5 px-4">
+              <div className="flex h-14 items-center justify-between border-b border-border/60 px-4">
                 <Link href="/agencia" className="flex items-center gap-2">
                   <div className="relative h-7 w-7">
                     <Image src="/vuei-logo.png" alt="Vuei" fill className="object-contain" />
@@ -395,8 +395,8 @@ function AgencyLayoutInner({ children }: { children: React.ReactNode }) {
                         className={cn(
                           "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all",
                           isActive
-                            ? "bg-gradient-to-r from-primary/20 to-accent/10 text-foreground"
-                            : "text-muted-foreground hover:bg-white/5 hover:text-foreground"
+                            ? "bg-gradient-to-r from-primary/16 via-primary/10 to-transparent text-foreground"
+                            : "text-muted-foreground hover:bg-[#f8fafc] hover:text-foreground"
                         )}
                       >
                         <item.icon className={cn("h-5 w-5", isActive ? "text-primary" : "")} />
@@ -414,7 +414,7 @@ function AgencyLayoutInner({ children }: { children: React.ReactNode }) {
       {/* Desktop Header */}
       <header
         className={cn(
-          "fixed right-0 top-0 z-30 hidden h-16 border-b border-white/5 bg-card/50 backdrop-blur-xl transition-all duration-300 lg:block",
+          "fixed right-0 top-0 z-30 hidden h-16 border-b border-border/60 bg-white/74 backdrop-blur-2xl transition-all duration-300 lg:block",
           sidebarCollapsed ? "left-20" : "left-[260px]"
         )}
       >
@@ -425,7 +425,7 @@ function AgencyLayoutInner({ children }: { children: React.ReactNode }) {
               <input
                 type="text"
                 placeholder="Buscar clientes, viagens..."
-                className="h-10 w-80 rounded-xl border border-white/5 bg-white/5 pl-10 pr-4 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary/50 focus:outline-none focus:ring-1 focus:ring-primary/50"
+                className="h-10 w-80 rounded-xl border border-border/70 bg-[#fbfbfc] pl-10 pr-4 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary/50 focus:outline-none focus:ring-1 focus:ring-primary/40"
               />
             </div>
           </div>
@@ -447,12 +447,12 @@ function AgencyLayoutInner({ children }: { children: React.ReactNode }) {
               </Button>
               {notificationsOpen ? renderNotificationsMenu() : null}
             </div>
-            <div className="flex items-center gap-3 border-l border-white/10 pl-3">
+            <div className="flex items-center gap-3 border-l border-border/60 pl-3">
               <div className="text-right">
                 <div className="text-sm font-medium text-foreground">{displayName}</div>
                 <div className="text-xs text-muted-foreground">{displayPlan}</div>
               </div>
-              <Avatar className="h-10 w-10 border-2 border-primary/30">
+              <Avatar className="h-10 w-10 border-2 border-primary/20">
                 <AvatarImage src={headerImageUrl} />
                 <AvatarFallback className="bg-primary/20 text-primary">{initials}</AvatarFallback>
               </Avatar>
@@ -478,7 +478,7 @@ function AgencyLayoutInner({ children }: { children: React.ReactNode }) {
       >
         <div className="p-4 lg:p-6">
           {workspaceLoading ? (
-            <div className="rounded-2xl border border-white/5 bg-card/40 p-6 text-sm text-muted-foreground">
+            <div className="agency-subtle-card rounded-2xl p-6 text-sm text-muted-foreground">
               Carregando workspace da agencia...
             </div>
           ) : (
@@ -488,7 +488,7 @@ function AgencyLayoutInner({ children }: { children: React.ReactNode }) {
       </main>
 
       {/* Mobile Bottom Navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-white/5 bg-card/90 backdrop-blur-xl lg:hidden">
+      <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-border/60 bg-white/92 backdrop-blur-xl lg:hidden">
         <div className="flex items-center justify-around py-2">
           {[navItems[0], navItems[1], navItems[2], navItems[4], navItems[10]].map((item) => {
             const isActive = pathname === item.href || (item.href !== "/agencia" && pathname.startsWith(item.href))
@@ -496,12 +496,12 @@ function AgencyLayoutInner({ children }: { children: React.ReactNode }) {
               <Link key={item.href} href={item.href}>
                 <motion.div
                   className={cn(
-                    "flex flex-col items-center gap-1 rounded-xl px-4 py-2 transition-colors",
-                    isActive ? "text-primary" : "text-muted-foreground"
+                    "relative flex flex-col items-center gap-1 rounded-xl px-4 py-2 transition-colors",
+                    isActive ? "bg-primary/8 text-primary" : "text-muted-foreground"
                   )}
                   whileTap={{ scale: 0.95 }}
                 >
-                  <item.icon className={cn("h-5 w-5", isActive && "drop-shadow-[0_0_8px_rgba(93,224,230,0.5)]")} />
+                  <item.icon className="h-5 w-5" />
                   <span className="text-[10px] font-medium">{item.label}</span>
                   {isActive && (
                     <motion.div
@@ -517,7 +517,7 @@ function AgencyLayoutInner({ children }: { children: React.ReactNode }) {
       </nav>
 
       <Dialog open={Boolean(limitDialog)} onOpenChange={(open) => { if (!open) clearLimitDialog() }}>
-        <DialogContent className="border-white/10 bg-card sm:max-w-md">
+        <DialogContent className="agency-dialog sm:max-w-md">
           <DialogHeader>
             <DialogTitle>{limitDialog?.title}</DialogTitle>
             <DialogDescription>{limitDialog?.description}</DialogDescription>
