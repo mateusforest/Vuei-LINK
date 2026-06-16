@@ -271,7 +271,7 @@ export default function ViagemListPage() {
                           <MoreHorizontal size={18} />
                         </Button>
                       </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="bg-[#0a0a0a] border-white/10">
+                      <DropdownMenuContent align="end" className="portal-dropdown border-border/50">
                         <DropdownMenuItem onClick={() => { setActiveTrip(trip.id); router.push("/portal") }} className="cursor-pointer">
                           <Plane size={14} className="mr-2" />
                           Definir como ativa
@@ -280,7 +280,7 @@ export default function ViagemListPage() {
                           <Share2 size={14} className="mr-2" />
                           Compartilhar
                         </DropdownMenuItem>
-                        <DropdownMenuSeparator className="bg-white/10" />
+                        <DropdownMenuSeparator className="bg-border/70" />
                         <DropdownMenuItem onClick={() => void handleDeleteTrip(trip.id)} className="cursor-pointer text-red-400 focus:text-red-400">
                           <Trash2 size={14} className="mr-2" />
                           Excluir

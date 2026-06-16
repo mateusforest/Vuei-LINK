@@ -19,6 +19,7 @@ type TripDatePickerFieldProps = {
   className?: string
   labelClassName?: string
   iconClassName?: string
+  popoverClassName?: string
 }
 
 export function TripDatePickerField(props: TripDatePickerFieldProps) {
@@ -50,7 +51,10 @@ export function TripDatePickerField(props: TripDatePickerFieldProps) {
           align="start"
           side="bottom"
           sideOffset={8}
-          className="z-[70] w-[min(22rem,calc(100vw-2rem))] rounded-2xl border border-border/60 bg-card/95 p-0 shadow-2xl backdrop-blur"
+          className={cn(
+            "z-[70] w-[min(22rem,calc(100vw-2rem))] rounded-2xl border border-border/60 bg-card/95 p-0 shadow-2xl backdrop-blur",
+            props.popoverClassName
+          )}
         >
           <Calendar
             mode="single"

@@ -21,9 +21,9 @@ export function QuickActionCard({ action, index }: { action: QuickAction; index:
       transition={{ duration: 0.3, delay: index * 0.1 }}
     >
       <Link href={action.href}>
-        <Card className="p-4 md:p-5 bg-card/50 border-border/50 vuei-glass group cursor-pointer hover:border-primary/30 transition-all duration-300 h-full">
-          <div className={`w-10 h-10 md:w-12 md:h-12 rounded-xl bg-gradient-to-br ${action.gradient} flex items-center justify-center mb-3`}>
-            <action.icon size={20} className="text-primary" />
+        <Card className="group h-full cursor-pointer border-border/50 bg-card/50 p-4 transition-all duration-300 hover:border-primary/20 md:p-5 vuei-glass">
+          <div className={`mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br ${action.gradient} md:h-12 md:w-12`}>
+            <action.icon size={20} className="text-white" />
           </div>
           <div className="space-y-1">
             <div className="flex items-center justify-between">

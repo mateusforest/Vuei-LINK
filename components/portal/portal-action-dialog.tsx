@@ -32,7 +32,7 @@ export function PortalActionDialog({
 }: PortalActionDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="vuei-glass max-w-md border-border/50">
+      <DialogContent className="portal-dialog max-w-md border-border/50">
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>{description}</DialogDescription>
@@ -40,12 +40,12 @@ export function PortalActionDialog({
         {actionLabel ? (
           <DialogFooter>
             {actionHref ? (
-              <Button asChild className="rounded-xl bg-gradient-to-r from-[#5de0e6] to-[#004aad] text-white border-0">
+              <Button asChild className="rounded-xl border-0 bg-gradient-to-r from-[#37beff] to-[#0b56d8] text-white shadow-[0_18px_36px_rgba(11,86,216,0.18)]">
                 <Link href={actionHref}>{actionLabel}</Link>
               </Button>
             ) : (
               <Button
-                className="rounded-xl bg-gradient-to-r from-[#5de0e6] to-[#004aad] text-white border-0"
+                className="rounded-xl border-0 bg-gradient-to-r from-[#37beff] to-[#0b56d8] text-white shadow-[0_18px_36px_rgba(11,86,216,0.18)]"
                 onClick={onAction}
               >
                 {actionLabel}

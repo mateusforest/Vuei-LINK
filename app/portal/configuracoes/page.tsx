@@ -745,7 +745,7 @@ export default function ConfiguracoesPage() {
       </motion.div>
 
       <Dialog open={showPhotoModal} onOpenChange={setShowPhotoModal}>
-        <DialogContent className="vuei-glass max-w-md border-border/50">
+        <DialogContent className="portal-dialog max-w-md border-border/50">
           <DialogHeader>
             <DialogTitle>Alterar foto</DialogTitle>
             <DialogDescription>Escolha uma nova imagem para o seu perfil.</DialogDescription>
@@ -777,7 +777,7 @@ export default function ConfiguracoesPage() {
       </Dialog>
 
       <Dialog open={showProfileModal} onOpenChange={setShowProfileModal}>
-        <DialogContent className="vuei-glass max-w-md border-border/50">
+        <DialogContent className="portal-dialog max-w-md border-border/50">
           <DialogHeader>
             <DialogTitle>Editar perfil</DialogTitle>
             <DialogDescription>Atualize seus dados principais do portal.</DialogDescription>
@@ -808,7 +808,7 @@ export default function ConfiguracoesPage() {
       </Dialog>
 
       <Dialog open={showBiometricModal} onOpenChange={setShowBiometricModal}>
-        <DialogContent className="vuei-glass max-w-md border-border/50">
+        <DialogContent className="portal-dialog max-w-md border-border/50">
           <DialogHeader>
             <DialogTitle>Biometria / Face ID</DialogTitle>
             <DialogDescription>
@@ -845,7 +845,7 @@ export default function ConfiguracoesPage() {
       </Dialog>
 
       <Dialog open={showPinModal} onOpenChange={setShowPinModal}>
-        <DialogContent className="vuei-glass max-w-sm border-border/50">
+        <DialogContent className="portal-dialog max-w-sm border-border/50">
           <DialogHeader>
             <DialogTitle>Configurar PIN</DialogTitle>
             <DialogDescription>Crie ou altere um PIN de 4 digitos para areas privadas.</DialogDescription>
@@ -898,7 +898,7 @@ export default function ConfiguracoesPage() {
       </Dialog>
 
       <Dialog open={showDeleteModal} onOpenChange={setShowDeleteModal}>
-        <DialogContent className="vuei-glass max-w-sm border-border/50">
+        <DialogContent className="portal-dialog max-w-sm border-border/50">
           <DialogHeader>
             <DialogTitle className="text-destructive">Excluir conta</DialogTitle>
             <DialogDescription>
@@ -923,7 +923,7 @@ export default function ConfiguracoesPage() {
       </Dialog>
 
       <Dialog open={Boolean(infoModal)} onOpenChange={(open) => !open && setInfoModal(null)}>
-        <DialogContent className="vuei-glass max-w-sm border-border/50">
+        <DialogContent className="portal-dialog max-w-sm border-border/50">
           <DialogHeader>
             <DialogTitle>{infoModal?.title}</DialogTitle>
             <DialogDescription>{infoModal?.description}</DialogDescription>

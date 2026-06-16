@@ -373,7 +373,7 @@ export default function CriarViagemPage() {
                   className="h-14 text-lg rounded-xl bg-muted/30 border-border/50 pl-12"
                 />
                 {destinationMenuOpen && destinationSuggestions.length > 0 ? (
-                  <div className="absolute left-0 right-0 top-[calc(100%+0.5rem)] z-20 overflow-hidden rounded-2xl border border-border/50 bg-card/95 shadow-2xl backdrop-blur">
+                  <div className="portal-dropdown absolute left-0 right-0 top-[calc(100%+0.5rem)] z-20 overflow-hidden rounded-2xl border border-border/50 bg-card/95 shadow-2xl backdrop-blur">
                     {destinationSuggestions.map((option) => (
                       <button
                         key={option.id}
@@ -431,6 +431,7 @@ export default function CriarViagemPage() {
                     onOpenChange={(open) => setActiveDateField(open ? "start" : null)}
                     onSelect={handleStartDateChange}
                     className="h-12 rounded-xl bg-muted/30 border-border/50"
+                    popoverClassName="portal-popover"
                   />
                 </div>
                 <div className="space-y-2">
@@ -443,6 +444,7 @@ export default function CriarViagemPage() {
                     onSelect={handleEndDateChange}
                     className="h-12 rounded-xl bg-muted/30 border-border/50"
                     iconClassName="rotate-180 text-primary"
+                    popoverClassName="portal-popover"
                   />
                 </div>
               </div>

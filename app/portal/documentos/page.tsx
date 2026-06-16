@@ -450,7 +450,7 @@ export default function DocumentosPage() {
                           <MoreVertical size={14} />
                         </Button>
                       </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="vuei-glass">
+                      <DropdownMenuContent align="end" className="portal-dropdown">
                         <DropdownMenuItem onClick={() => void handleDownload(doc)}>
                           <Download size={14} className="mr-2" />
                           Baixar
@@ -492,7 +492,7 @@ export default function DocumentosPage() {
       </motion.div>
 
       <Dialog open={showPinModal} onOpenChange={setShowPinModal}>
-        <DialogContent className="vuei-glass border-border/50 max-w-sm">
+        <DialogContent className="portal-dialog border-border/50 max-w-sm">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Fingerprint size={20} className="text-primary" />
@@ -549,7 +549,7 @@ export default function DocumentosPage() {
       </Dialog>
 
       <Dialog open={showUploadModal} onOpenChange={setShowUploadModal}>
-        <DialogContent className="vuei-glass border-border/50">
+        <DialogContent className="portal-dialog border-border/50">
           <DialogHeader>
             <DialogTitle>Adicionar documento</DialogTitle>
             <DialogDescription>Selecione um arquivo real para esta viagem. Sem preenchimento automatico falso.</DialogDescription>
@@ -614,7 +614,7 @@ export default function DocumentosPage() {
       </Dialog>
 
       <Dialog open={!!selectedDoc} onOpenChange={(open) => !open && setSelectedDoc(null)}>
-        <DialogContent className="vuei-glass border-border/50 max-w-md">
+        <DialogContent className="portal-dialog border-border/50 max-w-md">
           <DialogHeader>
             <DialogTitle>{selectedDoc?.name}</DialogTitle>
             <DialogDescription>Gerencie o documento selecionado.</DialogDescription>

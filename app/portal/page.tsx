@@ -44,26 +44,26 @@ function NoTripModal({ open, onClose }: { open: boolean; onClose: () => void }) 
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="absolute inset-0 bg-[rgba(15,23,42,0.28)] backdrop-blur-sm" onClick={onClose} />
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
-        className="relative w-full max-w-md rounded-2xl border border-white/10 bg-[#0a0a0a] p-6"
+        className="portal-dialog relative w-full max-w-md rounded-[28px] border border-black/8 bg-white p-6 shadow-[0_30px_90px_rgba(15,23,42,0.12)]"
       >
         <div className="space-y-4 text-center">
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-[#5de0e6]/20 to-[#004aad]/20">
-            <Plane size={28} className="text-[#5de0e6]" />
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-[#37beff]/16 to-[#0b56d8]/14">
+            <Plane size={28} className="text-[#0b56d8]" />
           </div>
-          <h3 className="text-xl font-bold text-white">Crie sua primeira viagem</h3>
-          <p className="text-sm text-white/60">
+          <h3 className="text-xl font-bold text-[#101828]">Crie sua primeira viagem</h3>
+          <p className="text-sm text-[#667085]">
             Para acessar o link da viagem e os documentos vinculados, voce precisa criar uma viagem primeiro.
           </p>
           <div className="flex gap-3 pt-2">
-            <Button variant="outline" className="flex-1 border-white/10" onClick={onClose}>
+            <Button variant="outline" className="flex-1 border-black/8 bg-white text-[#344054]" onClick={onClose}>
               Voltar
             </Button>
             <Button
-              className="flex-1 border-0 bg-gradient-to-r from-[#5de0e6] to-[#004aad] text-white"
+              className="flex-1 border-0 bg-gradient-to-r from-[#37beff] to-[#0b56d8] text-white shadow-[0_18px_36px_rgba(11,86,216,0.18)]"
               onClick={() => router.push("/portal/criar-viagem")}
             >
               Criar Viagem
