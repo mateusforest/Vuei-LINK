@@ -36,7 +36,16 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
-const BOOTSTRAP_TIMEOUT_MS = 10_000
+const BOOTSTRAP_TIMEOUT_MS = 20_000
+
+function reportAuthBootstrapIssue(message: string) {
+  if (message.toLowerCase().includes("timeout")) {
+    console.warn("[AUTH WARN]", message)
+    return
+  }
+
+  console.error("[AUTH ERROR]", message)
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const supabaseEnabled = shouldUseSupabase()
@@ -82,7 +91,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return ensuredProfile
       } catch (error) {
         const message = error instanceof Error ? error.message : "Falha ao carregar profile."
-        console.error("[AUTH ERROR]", message)
+        reportAuthBootstrapIssue(message)
         devLog("boot.profile.loaded", profileRef.current?.id ?? null)
         return profileRef.current
       }
@@ -162,7 +171,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await syncAuthState(sessionResult.data.session ?? null)
       } catch (error) {
         const message = error instanceof Error ? error.message : "Falha ao inicializar sessao."
-        console.error("[AUTH ERROR]", message)
+        reportAuthBootstrapIssue(message)
 
         if (mounted && bootstrapRunRef.current === currentRun) {
           setSession(null)
