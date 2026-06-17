@@ -97,13 +97,21 @@ function Toast({ message, type = "success", onClose }: { message: string; type?:
   )
 }
 
+function resolveTripShellTone(explicitTone?: "dark" | "light") {
+  if (explicitTone) return explicitTone
+  if (typeof document !== "undefined" && document.body.getAttribute("data-trip-link-theme") === "light") {
+    return "light" as const
+  }
+  return "dark" as const
+}
+
 // Modal wrapper
 function Modal({
   open,
   onClose,
   children,
   title,
-  tone = "dark",
+  tone,
 }: {
   open: boolean
   onClose: () => void
@@ -111,6 +119,8 @@ function Modal({
   title?: string
   tone?: "dark" | "light"
 }) {
+  const resolvedTone = resolveTripShellTone(tone)
+
   useEffect(() => {
     if (open) {
       document.body.style.overflow = "hidden"
@@ -129,7 +139,7 @@ function Modal({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className={cn("fixed inset-0 z-50 backdrop-blur-sm", tone === "light" ? "bg-[rgba(148,163,184,0.18)]" : "bg-black/80")}
+            className={cn("fixed inset-0 z-50 backdrop-blur-sm", resolvedTone === "light" ? "bg-[rgba(148,163,184,0.18)]" : "bg-black/80")}
           />
           <motion.div
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
@@ -137,7 +147,7 @@ function Modal({
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
             className={cn(
               "fixed inset-4 z-50 max-h-[90vh] overflow-auto rounded-3xl sm:inset-auto sm:left-1/2 sm:w-full sm:max-w-lg sm:-translate-x-1/2 sm:-translate-y-1/2 sm:top-1/2",
-              tone === "light"
+              resolvedTone === "light"
                 ? "border border-slate-200 bg-[linear-gradient(180deg,#ffffff_0%,#f7f4ee_100%)] shadow-[0_24px_60px_rgba(148,163,184,0.26)]"
                 : "border border-white/10 bg-[#0a0a0a] shadow-2xl",
             )}
@@ -146,12 +156,12 @@ function Modal({
               <div
                 className={cn(
                   "sticky top-0 z-10 flex items-center justify-between p-5 backdrop-blur-xl",
-                  tone === "light" ? "border-b border-slate-200 bg-[rgba(255,255,255,0.92)]" : "border-b border-white/[0.06] bg-[#0a0a0a]/95",
+                  resolvedTone === "light" ? "border-b border-slate-200 bg-[rgba(255,255,255,0.92)]" : "border-b border-white/[0.06] bg-[#0a0a0a]/95",
                 )}
               >
-                <h3 className={cn("text-lg font-semibold", tone === "light" ? "text-slate-950" : "text-white")}>{title}</h3>
-                <button onClick={onClose} className={cn("rounded-xl p-2 transition-colors", tone === "light" ? "hover:bg-slate-100" : "hover:bg-white/10")}>
-                  <X className={cn("w-5 h-5", tone === "light" ? "text-slate-500" : "text-white/60")} />
+                <h3 className={cn("text-lg font-semibold", resolvedTone === "light" ? "text-slate-950" : "text-white")}>{title}</h3>
+                <button onClick={onClose} className={cn("rounded-xl p-2 transition-colors", resolvedTone === "light" ? "hover:bg-slate-100" : "hover:bg-white/10")}>
+                  <X className={cn("w-5 h-5", resolvedTone === "light" ? "text-slate-500" : "text-white/60")} />
                 </button>
               </div>
             )}
@@ -169,7 +179,7 @@ function BottomSheet({
   onClose,
   children,
   title,
-  tone = "dark",
+  tone,
   contentClassName,
 }: {
   open: boolean
@@ -179,6 +189,8 @@ function BottomSheet({
   tone?: "dark" | "light"
   contentClassName?: string
 }) {
+  const resolvedTone = resolveTripShellTone(tone)
+
   useEffect(() => {
     if (open) {
       document.body.style.overflow = "hidden"
@@ -197,7 +209,7 @@ function BottomSheet({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className={cn("fixed inset-0 z-50 backdrop-blur-sm", tone === "light" ? "bg-[rgba(148,163,184,0.18)]" : "bg-black/80")}
+            className={cn("fixed inset-0 z-50 backdrop-blur-sm", resolvedTone === "light" ? "bg-[rgba(148,163,184,0.18)]" : "bg-black/80")}
           />
           <motion.div
             initial={{ y: "100%" }}
@@ -206,7 +218,7 @@ function BottomSheet({
             transition={{ type: "spring", damping: 30, stiffness: 300 }}
             className={cn(
               "fixed bottom-0 left-0 right-0 z-50 max-h-[85vh] overflow-auto rounded-t-3xl",
-              tone === "light"
+              resolvedTone === "light"
                 ? "border-t border-slate-200 bg-[linear-gradient(180deg,#fdfdfc_0%,#f7f4ee_100%)] shadow-[0_-24px_60px_rgba(148,163,184,0.24)]"
                 : "border-t border-white/10 bg-[#0a0a0a]",
               contentClassName,
@@ -215,23 +227,23 @@ function BottomSheet({
             <div
               className={cn(
                 "sticky top-0 z-10 pt-3 pb-4 px-5",
-                tone === "light" ? "bg-[rgba(253,253,252,0.94)] backdrop-blur-xl" : "bg-[#0a0a0a]",
+                resolvedTone === "light" ? "bg-[rgba(253,253,252,0.94)] backdrop-blur-xl" : "bg-[#0a0a0a]",
               )}
             >
-              <div className={cn("mx-auto mb-4 h-1 w-12 rounded-full", tone === "light" ? "bg-slate-300" : "bg-white/20")} />
+              <div className={cn("mx-auto mb-4 h-1 w-12 rounded-full", resolvedTone === "light" ? "bg-slate-300" : "bg-white/20")} />
               {title && (
                 <div className="flex items-center justify-between">
-                  <h3 className={cn("text-lg font-semibold", tone === "light" ? "text-slate-950" : "text-white")}>{title}</h3>
+                  <h3 className={cn("text-lg font-semibold", resolvedTone === "light" ? "text-slate-950" : "text-white")}>{title}</h3>
                   <button
                     onClick={onClose}
-                    className={cn("rounded-xl p-2 transition-colors", tone === "light" ? "hover:bg-slate-100" : "hover:bg-white/10")}
+                    className={cn("rounded-xl p-2 transition-colors", resolvedTone === "light" ? "hover:bg-slate-100" : "hover:bg-white/10")}
                   >
-                    <X className={cn("h-5 w-5", tone === "light" ? "text-slate-500" : "text-white/60")} />
+                    <X className={cn("h-5 w-5", resolvedTone === "light" ? "text-slate-500" : "text-white/60")} />
                   </button>
                 </div>
               )}
             </div>
-            <div className={cn("px-4 pb-[calc(env(safe-area-inset-bottom)+20px)] sm:px-5", tone === "light" ? "traveler-public-sheet" : "")}>{children}</div>
+            <div className={cn("px-4 pb-[calc(env(safe-area-inset-bottom)+20px)] sm:px-5", resolvedTone === "light" ? "trip-link-light-shell" : "")}>{children}</div>
           </motion.div>
         </>
       )}
@@ -1338,7 +1350,6 @@ function QuickAccessCards({ tripData, onNavigate }: { tripData: any; onNavigate:
     { id: "concierge", icon: MessageCircle, label: "Concierge", color: "from-[#5de0e6] to-[#5de0e6]/50", badge: "IA" },
     { id: "offline", icon: WifiOff, label: "Offline", color: "from-[#004aad] to-[#004aad]/50" },
   ]
-
   return (
     <section className="relative py-8 px-4 -mt-16 z-20">
       <div className="max-w-6xl mx-auto">
@@ -1373,6 +1384,45 @@ function QuickAccessCards({ tripData, onNavigate }: { tripData: any; onNavigate:
 }
 
 type TravelerPublicPanel = "flights" | "hotel" | "itinerary" | "documents" | "concierge" | "offline" | null
+
+function TripLinkLightThemeStyles() {
+  return (
+    <style jsx global>{`
+      html,
+      body {
+        background: #f4f1ea;
+        color: #0f172a;
+      }
+      .trip-link-light-shell section[id] {
+        padding: 0 !important;
+      }
+      .trip-link-light-shell [class*="text-white"] {
+        color: #0f172a !important;
+      }
+      .trip-link-light-shell [class*="text-white/"] {
+        color: #64748b !important;
+      }
+      .trip-link-light-shell [class*="bg-[#0a0a0a]"],
+      .trip-link-light-shell [class*="bg-black"],
+      .trip-link-light-shell [class*="bg-white/[0.02]"],
+      .trip-link-light-shell [class*="bg-white/[0.03]"],
+      .trip-link-light-shell [class*="bg-white/[0.04]"],
+      .trip-link-light-shell [class*="bg-white/[0.05]"] {
+        background: rgba(255, 255, 255, 0.92) !important;
+      }
+      .trip-link-light-shell [class*="border-white"] {
+        border-color: rgba(148, 163, 184, 0.18) !important;
+      }
+      .trip-link-light-shell [class*="text-[#5de0e6]"] {
+        color: #2563eb !important;
+      }
+      .trip-link-light-shell [class*="from-[#5de0e6]"],
+      .trip-link-light-shell [class*="to-[#004aad]"] {
+        box-shadow: none !important;
+      }
+    `}</style>
+  )
+}
 
 function buildTravelerCardSummaries(tripData: any) {
   const flights = Array.isArray(tripData?.flights) ? tripData.flights : []
@@ -4574,6 +4624,9 @@ function MenuModal({
   onOpenSecurity,
   onOpenCredits,
   publicView = false,
+  onOpenEditTrip,
+  onOpenShare,
+  onOpenOffline,
 }: {
   open: boolean
   onClose: () => void
@@ -4582,13 +4635,20 @@ function MenuModal({
   onOpenSecurity: () => void
   onOpenCredits: () => void
   publicView?: boolean
+  onOpenEditTrip?: () => void
+  onOpenShare?: () => void
+  onOpenOffline?: () => void
 }) {
   const { isAdmin } = useContext(PermissionContext)
   const menuItems = [
     ...(isAdmin ? [
-      { icon: User, label: "Viajantes", action: onOpenTravelers },
-      { icon: Settings, label: "Configuracoes", action: onOpenSettings },
+      ...(onOpenEditTrip ? [{ icon: Edit3, label: "Editar viagem", action: onOpenEditTrip }] : []),
+      ...(onOpenShare ? [{ icon: Share2, label: "Compartilhar link", action: onOpenShare }] : []),
+      { icon: CreditCard, label: "Creditos", action: onOpenCredits },
       { icon: Shield, label: "Seguranca", action: onOpenSecurity },
+      ...(onOpenOffline ? [{ icon: WifiOff, label: "Offline", action: onOpenOffline }] : []),
+      { icon: Settings, label: "Configuracoes", action: onOpenSettings },
+      { icon: User, label: "Viajantes", action: onOpenTravelers },
     ] : []),
     { icon: CreditCard, label: "Créditos", action: onOpenCredits },
   ]
@@ -4596,7 +4656,7 @@ function MenuModal({
   return (
     <BottomSheet tone={publicView ? "light" : "dark"} open={open} onClose={onClose} title="Menu da Viagem">
       <div className="space-y-2">
-        {menuItems.map((item, i) => (
+        {(isAdmin ? menuItems.slice(0, -1) : menuItems).map((item, i) => (
           <button
             key={i}
             onClick={() => { item.action(); onClose() }}
@@ -5758,6 +5818,7 @@ export default function TripPage() {
   const { user, profile, loading: authLoading } = useAuth()
   const [travelerPlan, setTravelerPlan] = useState(() => resolveTravelerPlan(profile))
   const adminRouteActive = Boolean(pathname?.startsWith("/viagem/") && pathname?.endsWith("/admin"))
+  const isTripLinkRoute = Boolean((pathname?.startsWith("/viagem/") ?? false) || (pathname?.startsWith("/v/") ?? false))
   const routeSlug =
     typeof params?.id === "string"
       ? params.id
@@ -6365,27 +6426,31 @@ export default function TripPage() {
     const previousViewport = viewportMeta?.getAttribute("content")
     const previousAppleCapable = appleCapableMeta?.getAttribute("content")
     const previousAppleStatusBar = appleStatusBarMeta?.getAttribute("content")
-    const isPublicTravelerView = !adminRouteActive
+    const isTripLinkLightView = (pathname?.startsWith("/viagem/") ?? false) || (pathname?.startsWith("/v/") ?? false)
     const previousHtmlBackground = document.documentElement.style.backgroundColor
     const previousBodyBackground = document.body.style.backgroundColor
     const previousBodyColor = document.body.style.color
 
     if (themeColorMeta) {
-      themeColorMeta.setAttribute("content", isPublicTravelerView ? "#f4f1ea" : "#050505")
+      themeColorMeta.setAttribute("content", isTripLinkLightView ? "#f4f1ea" : "#050505")
     }
 
-    if (isPublicTravelerView) {
+    if (isTripLinkLightView) {
       viewportMeta?.setAttribute("content", "width=device-width, initial-scale=1, viewport-fit=cover")
       appleCapableMeta?.setAttribute("content", "yes")
       appleStatusBarMeta?.setAttribute("content", "default")
       document.documentElement.setAttribute("data-trip-public-theme", "light")
       document.body.setAttribute("data-trip-public-theme", "light")
+      document.documentElement.setAttribute("data-trip-link-theme", "light")
+      document.body.setAttribute("data-trip-link-theme", "light")
       document.documentElement.style.backgroundColor = "#f4f1ea"
       document.body.style.backgroundColor = "#f4f1ea"
       document.body.style.color = "#0f172a"
     } else {
       document.documentElement.removeAttribute("data-trip-public-theme")
       document.body.removeAttribute("data-trip-public-theme")
+      document.documentElement.removeAttribute("data-trip-link-theme")
+      document.body.removeAttribute("data-trip-link-theme")
     }
 
     return () => {
@@ -6403,6 +6468,8 @@ export default function TripPage() {
       }
       document.documentElement.removeAttribute("data-trip-public-theme")
       document.body.removeAttribute("data-trip-public-theme")
+      document.documentElement.removeAttribute("data-trip-link-theme")
+      document.body.removeAttribute("data-trip-link-theme")
       document.documentElement.style.backgroundColor = previousHtmlBackground
       document.body.style.backgroundColor = previousBodyBackground
       document.body.style.color = previousBodyColor
@@ -7203,8 +7270,8 @@ export default function TripPage() {
 
   if (isLoadingTrip) {
     return (
-      <main className="min-h-screen bg-black text-white flex items-center justify-center px-4">
-        <div className="rounded-3xl border border-white/[0.06] bg-white/[0.02] px-6 py-5 text-sm text-white/60">
+      <main className={cn("min-h-screen flex items-center justify-center px-4", isTripLinkRoute ? "bg-[#f4f1ea] text-slate-900" : "bg-black text-white")}>
+        <div className={cn("rounded-3xl px-6 py-5 text-sm", isTripLinkRoute ? "border border-slate-200 bg-white/92 text-slate-500 shadow-[0_24px_60px_rgba(148,163,184,0.16)]" : "border border-white/[0.06] bg-white/[0.02] text-white/60")}>
           Carregando viagem...
         </div>
       </main>
@@ -7213,13 +7280,13 @@ export default function TripPage() {
 
   if (loadError) {
     return (
-      <main className="min-h-screen bg-black text-white flex items-center justify-center px-4">
-        <div className="max-w-md rounded-3xl border border-white/[0.06] bg-white/[0.02] p-8 text-center">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-white/[0.04]">
+      <main className={cn("min-h-screen flex items-center justify-center px-4", isTripLinkRoute ? "bg-[#f4f1ea] text-slate-900" : "bg-black text-white")}>
+        <div className={cn("max-w-md rounded-3xl p-8 text-center", isTripLinkRoute ? "border border-slate-200 bg-white/92 shadow-[0_24px_60px_rgba(148,163,184,0.16)]" : "border border-white/[0.06] bg-white/[0.02]")}>
+          <div className={cn("mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl", isTripLinkRoute ? "bg-[#eef4ff]" : "bg-white/[0.04]")}>
             <AlertCircle className="h-6 w-6 text-[#5de0e6]" />
           </div>
-          <h1 className="text-xl font-semibold text-white">{loadError}</h1>
-          <p className="mt-3 text-sm text-white/50">
+          <h1 className={cn("text-xl font-semibold", isTripLinkRoute ? "text-slate-950" : "text-white")}>{loadError}</h1>
+          <p className={cn("mt-3 text-sm", isTripLinkRoute ? "text-slate-500" : "text-white/50")}>
             {loadError === "Voce nao tem permissao para editar esta viagem."
               ? "Entre com a conta proprietaria da viagem para acessar o modo administrador."
               : "Confira se o link esta correto ou peca um novo compartilhamento."}
@@ -7231,13 +7298,13 @@ export default function TripPage() {
 
   if (adminRouteActive && !user && quickAccessGateRequired && !sensitiveAccessGranted) {
     return (
-      <main className="min-h-screen bg-black text-white flex items-center justify-center px-4">
-        <div className="max-w-md rounded-3xl border border-white/[0.06] bg-white/[0.02] p-8 text-center">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-white/[0.04]">
+      <main className="min-h-screen bg-[#f4f1ea] text-slate-900 flex items-center justify-center px-4">
+        <div className="max-w-md rounded-3xl border border-slate-200 bg-white/92 p-8 text-center shadow-[0_24px_60px_rgba(148,163,184,0.16)]">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#eef4ff]">
             <Lock className="h-6 w-6 text-[#5de0e6]" />
           </div>
-          <h1 className="text-xl font-semibold text-white">Desbloqueie para editar esta viagem</h1>
-          <p className="mt-3 text-sm text-white/50">
+          <h1 className="text-xl font-semibold text-slate-950">Desbloqueie para editar esta viagem</h1>
+          <p className="mt-3 text-sm text-slate-500">
             Use PIN ou biometria configurados neste dispositivo para abrir o modo administrador sem login tradicional.
           </p>
           <SensitiveAccessModal
@@ -7264,43 +7331,10 @@ export default function TripPage() {
 
   if (!adminRouteActive) {
     return (
-      <PermissionContext.Provider value={{ isAdmin, canWrite, setIsAdmin }}>
-        <ToastContext.Provider value={{ showToast }}>
-          <main className="min-h-screen bg-[#f4f1ea] text-slate-900">
-            <style jsx global>{`
-              html,
-              body {
-                background: #f4f1ea;
-                color: #0f172a;
-              }
-              .traveler-public-sheet section[id] {
-                padding: 0 !important;
-              }
-              .traveler-public-sheet [class*="text-white"] {
-                color: #0f172a !important;
-              }
-              .traveler-public-sheet [class*="text-white/"] {
-                color: #64748b !important;
-              }
-              .traveler-public-sheet [class*="bg-[#0a0a0a]"],
-              .traveler-public-sheet [class*="bg-black"],
-              .traveler-public-sheet [class*="bg-white/[0.02]"],
-              .traveler-public-sheet [class*="bg-white/[0.03]"],
-              .traveler-public-sheet [class*="bg-white/[0.04]"],
-              .traveler-public-sheet [class*="bg-white/[0.05]"] {
-                background: rgba(255, 255, 255, 0.92) !important;
-              }
-              .traveler-public-sheet [class*="border-white"] {
-                border-color: rgba(148, 163, 184, 0.18) !important;
-              }
-              .traveler-public-sheet [class*="text-[#5de0e6]"] {
-                color: #2563eb !important;
-              }
-              .traveler-public-sheet [class*="from-[#5de0e6]"],
-              .traveler-public-sheet [class*="to-[#004aad]"] {
-                box-shadow: none !important;
-              }
-            `}</style>
+        <PermissionContext.Provider value={{ isAdmin, canWrite, setIsAdmin }}>
+          <ToastContext.Provider value={{ showToast }}>
+            <main className="min-h-screen bg-[#f4f1ea] text-slate-900">
+              <TripLinkLightThemeStyles />
             <TravelerPublicShell
               tripData={tripData}
               agencyBranding={agencyBranding}
@@ -7444,6 +7478,190 @@ export default function TripPage() {
               <div className="space-y-5">
                 <p className="text-sm text-white/60">
                   Assine o Premium para gerar roteiros inteligentes, criar viagens ilimitadas e receber crÃ©ditos mensais inclusos.
+                </p>
+                <Button
+                  className="w-full rounded-2xl border-0 bg-gradient-to-r from-[#5de0e6] to-[#004aad] text-white"
+                  onClick={() => {
+                    setPremiumGateModalOpen(false)
+                    router.push("/portal/planos")
+                  }}
+                >
+                  Conhecer Premium
+                </Button>
+              </div>
+            </Modal>
+
+            <AnimatePresence>
+              {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+            </AnimatePresence>
+          </main>
+        </ToastContext.Provider>
+      </PermissionContext.Provider>
+    )
+  }
+
+  if (adminRouteActive) {
+    return (
+      <PermissionContext.Provider value={{ isAdmin, canWrite, setIsAdmin }}>
+        <ToastContext.Provider value={{ showToast }}>
+          <main className="min-h-screen bg-[#f4f1ea] text-slate-900">
+            <TripLinkLightThemeStyles />
+            <TravelerPublicShell
+              tripData={tripData}
+              agencyBranding={agencyBranding}
+              offlineModeEnabled={offlineModeEnabled}
+              offlinePackageStatus={offlinePackageStatus}
+              onOpenShare={() => setShareOpen(true)}
+              onOpenMenu={() => setMenuOpen(true)}
+              onOpenPanel={handleOpenTravelerPanel}
+            />
+
+            <BottomSheet tone="light" open={travelerPanel === "flights"} onClose={() => setTravelerPanel(null)} title="Passagens">
+              <FlightsSection
+                loading={sectionsLoading.flights}
+                tripData={tripData}
+                onUpdateFlight={handleUpdateFlight}
+                onAddFlight={handleAddFlight}
+                onDeleteFlight={handleDeleteFlight}
+                onDeleteDocument={handleDeleteDocument}
+                tripId={tripData.id}
+                ownerUserId={tripOwnerUserId}
+                agencyId={profile?.agencyId ?? null}
+                routeSlug={routeSlug}
+                tripAdminToken={tripAdminToken}
+                tripPublicToken={tripPublicToken}
+                adminLinkMutationMode={adminLinkMutationMode}
+                ensureSensitiveAccess={ensureSensitiveAccess}
+                onTrackExtraction={startFlightExtractionPolling}
+                offlineReadOnly={offlineModeEnabled}
+                offlineDocumentContext={offlineDocumentContext}
+              />
+            </BottomSheet>
+            <BottomSheet tone="light" open={travelerPanel === "hotel"} onClose={() => setTravelerPanel(null)} title="Hospedagem">
+              <HotelSection loading={sectionsLoading.hotels} tripData={tripData} onSaveHotel={handleSaveHotel} onDeleteHotel={handleDeleteHotel} />
+            </BottomSheet>
+            <BottomSheet tone="light" open={travelerPanel === "itinerary"} onClose={() => setTravelerPanel(null)} title="Roteiro">
+              <ItinerarySection
+                loading={sectionsLoading.itineraries}
+                tripData={tripData}
+                itineraryRecords={tripItineraryRecords}
+                offlineReadOnly={offlineModeEnabled}
+                offlineDocumentContext={offlineDocumentContext}
+                tripId={tripData.id}
+                ownerUserId={tripOwnerUserId}
+                agencyId={profile?.agencyId ?? null}
+                routeSlug={routeSlug}
+                tripAdminToken={tripAdminToken}
+                tripPublicToken={tripPublicToken}
+                adminLinkMutationMode={adminLinkMutationMode}
+                ensureSensitiveAccess={ensureSensitiveAccess}
+                onUpdateItinerary={handleUpdateItinerary}
+                onGenerateSimple={() => handleGenerateItinerary("simple")}
+                onGenerateComplete={() => handleGenerateItinerary("complete_pdf")}
+                onSaveUploadedItinerary={handleSaveUploadedItinerary}
+                onDeleteItinerary={handleDeleteItinerary}
+              />
+            </BottomSheet>
+            <BottomSheet tone="light" open={travelerPanel === "documents"} onClose={() => setTravelerPanel(null)} title="Documentos">
+              <DocumentsSection
+                loading={sectionsLoading.documents}
+                tripData={tripData}
+                onAddDocument={handleAddDocument}
+                onDeleteDocument={handleDeleteDocument}
+                tripId={tripData.id}
+                ownerUserId={tripOwnerUserId}
+                agencyId={profile?.agencyId ?? null}
+                routeSlug={routeSlug}
+                tripAdminToken={tripAdminToken}
+                tripPublicToken={tripPublicToken}
+                adminLinkMutationMode={adminLinkMutationMode}
+                ensureSensitiveAccess={ensureSensitiveAccess}
+                onSensitiveAccessGranted={() => setSensitiveAccessGranted(true)}
+                offlineReadOnly={offlineModeEnabled}
+                offlineDocumentContext={offlineDocumentContext}
+              />
+            </BottomSheet>
+            <BottomSheet tone="light" open={travelerPanel === "concierge"} onClose={() => setTravelerPanel(null)} title="Concierge">
+              <ConciergeSection
+                tripData={tripData}
+                onOpenCredits={() => setCreditsOpen(true)}
+                offlineReadOnly={offlineModeEnabled}
+                tripSlug={routeSlug}
+                adminToken={tripAdminToken}
+                publicToken={tripPublicToken}
+                accessMode="admin"
+              />
+            </BottomSheet>
+            <BottomSheet tone="light" open={travelerPanel === "offline"} onClose={() => setTravelerPanel(null)} title="Offline">
+              <OfflineSection
+                tripData={tripData}
+                tripItineraryRecords={tripItineraryRecords}
+                isAdmin={isAdmin}
+                sensitiveAccessGranted={sensitiveAccessGranted}
+                agencyBranding={agencyBranding}
+                routeSlug={routeSlug}
+                currentPathname={pathname || `/viagem/${routeSlug}/admin`}
+              />
+            </BottomSheet>
+
+            <ShareModal open={shareOpen} onClose={() => setShareOpen(false)} tripData={tripData} />
+            <SensitiveAccessModal
+              open={securityModalOpen}
+              onClose={handleCloseSensitiveAccessModal}
+              tripId={tripData.id}
+              onSuccess={() => {
+                setSensitiveAccessGranted(true)
+                setSecurityModalOpen(false)
+                const pendingAction = pendingSensitiveActionRef.current
+                pendingSensitiveActionRef.current = null
+                setToast({ message: "Acesso liberado", type: "success" })
+                pendingAction?.()
+              }}
+              onLogin={handleRequireAuthenticatedAdmin}
+              onConfigureQuickAccess={handleConfigureQuickAccess}
+            />
+            <MenuModal
+              open={menuOpen}
+              onClose={() => setMenuOpen(false)}
+              publicView
+              onOpenEditTrip={() => {
+                setMenuOpen(false)
+                setEditTripOpen(true)
+              }}
+              onOpenShare={() => {
+                setMenuOpen(false)
+                setShareOpen(true)
+              }}
+              onOpenOffline={() => {
+                setMenuOpen(false)
+                setTravelerPanel("offline")
+              }}
+              onOpenTravelers={() => {
+                setMenuOpen(false)
+                setTravelersOpen(true)
+              }}
+              onOpenSettings={() => {
+                setMenuOpen(false)
+                setTripSettingsOpen(true)
+              }}
+              onOpenSecurity={() => {
+                setMenuOpen(false)
+                setSecuritySettingsOpen(true)
+              }}
+              onOpenCredits={() => {
+                setMenuOpen(false)
+                setCreditsOpen(true)
+              }}
+            />
+            <EditTripModal open={editTripOpen} onClose={() => setEditTripOpen(false)} tripData={tripData} onSave={handleUpdateTrip} />
+            <TravelersModal open={travelersOpen} onClose={() => setTravelersOpen(false)} travelers={tripData.travelers} onUpdateTravelers={handleUpdateTravelers} />
+            <TripSettingsModal open={tripSettingsOpen} onClose={() => setTripSettingsOpen(false)} tripData={tripData} onSave={handleSaveTripSettings} />
+            <TripSecurityModal open={securitySettingsOpen} onClose={() => setSecuritySettingsOpen(false)} tripId={tripData.id} tripTitle={tripData.destination} onSecurityUpdated={() => setToast({ message: "Seguranca do dispositivo atualizada.", type: "success" })} />
+            <CreditsModal open={creditsOpen} onClose={() => setCreditsOpen(false)} credits={tripData.credits} />
+            <Modal open={premiumGateModalOpen} onClose={() => setPremiumGateModalOpen(false)} title="Disponivel no Premium">
+              <div className="space-y-5">
+                <p className="text-sm text-slate-600">
+                  Assine o Premium para gerar roteiros inteligentes, criar viagens ilimitadas e receber creditos mensais inclusos.
                 </p>
                 <Button
                   className="w-full rounded-2xl border-0 bg-gradient-to-r from-[#5de0e6] to-[#004aad] text-white"
