@@ -337,10 +337,9 @@ function formatTravelerHeroDateRange(startDate?: string | null, endDate?: string
   const endLabel = end.toLocaleDateString("pt-BR", {
     day: "2-digit",
     month: "short",
-    year: "numeric",
   })
 
-  return `${startLabel} - ${endLabel}`
+  return `${startLabel} - ${endLabel} ${end.getFullYear()}`
 }
 
 function calculateDaysUntil(dateString?: string) {
@@ -1461,12 +1460,12 @@ function TravelerPublicShell({
       data-ui-version="traveler-link-v2"
       data-route-mode="public-b2c"
       data-render-file="app/viagem/[id]/page.tsx"
-      className="relative mx-auto flex min-h-screen w-full max-w-[460px] flex-col overflow-hidden bg-[#fbfaf7] md:my-5 md:min-h-[880px] md:rounded-[38px] md:border md:border-black/5 md:shadow-[0_32px_90px_rgba(15,23,42,0.12)]"
+      className="relative mx-auto flex min-h-screen w-full max-w-[460px] flex-col overflow-hidden bg-[#fbfaf7] md:my-5 md:min-h-[868px] md:rounded-[38px] md:border md:border-black/5 md:shadow-[0_32px_90px_rgba(15,23,42,0.12)]"
     >
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.98),_rgba(247,243,235,0.94)_48%,_rgba(241,237,230,0.92)_100%)]" />
       <div className="absolute inset-x-0 top-0 h-80 bg-[linear-gradient(180deg,rgba(255,255,255,0.95),rgba(255,255,255,0))]" />
-      <div className="relative flex flex-1 flex-col px-5 pb-[calc(env(safe-area-inset-bottom)+74px)] pt-[calc(env(safe-area-inset-top)+12px)]">
-        <header className="flex items-center justify-between">
+      <div className="relative flex flex-1 flex-col px-4 pb-[calc(env(safe-area-inset-bottom)+108px)] pt-[calc(env(safe-area-inset-top)+11px)]">
+          <header className="flex items-center justify-between">
           <div className="flex min-w-0 items-center gap-3">
             {agencyBranding.isAgency ? (
               <div className="rounded-[20px] bg-white/90 px-3 py-2 shadow-[0_16px_40px_rgba(15,23,42,0.08)] ring-1 ring-black/5">
@@ -1479,21 +1478,21 @@ function TravelerPublicShell({
                 />
               </div>
             ) : (
-                <Image src="/vuei-logo.png" alt="Vuei" width={164} height={48} className="h-11 w-auto object-contain" priority />
+                <Image src="/vuei-logo.png" alt="Vuei" width={160} height={46} className="h-[42px] w-auto object-contain" priority />
             )}
           </div>
 
-          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2.5">
             <button
               onClick={onOpenShare}
-              className="flex h-11 w-11 items-center justify-center rounded-full bg-white/88 text-slate-700 shadow-[0_12px_30px_rgba(15,23,42,0.08)] ring-1 ring-black/5 transition hover:bg-white"
+                className="flex h-[42px] w-[42px] items-center justify-center rounded-full bg-white/88 text-slate-700 shadow-[0_12px_30px_rgba(15,23,42,0.08)] ring-1 ring-black/5 transition hover:bg-white"
               aria-label="Compartilhar viagem"
             >
               <Share2 className="h-5 w-5" />
             </button>
             <button
               onClick={onOpenMenu}
-              className="flex h-11 w-11 items-center justify-center rounded-full bg-[linear-gradient(135deg,#3b82f6,#1d4ed8)] text-sm font-semibold text-white shadow-[0_16px_30px_rgba(37,99,235,0.24)]"
+                className="flex h-[42px] w-[42px] items-center justify-center rounded-full bg-[linear-gradient(135deg,#3b82f6,#1d4ed8)] text-sm font-semibold text-white shadow-[0_16px_30px_rgba(37,99,235,0.24)]"
               aria-label="Abrir menu"
             >
               {avatarLetter}
@@ -1501,59 +1500,59 @@ function TravelerPublicShell({
           </div>
         </header>
 
-        <section className="relative mt-3 min-h-[268px] overflow-hidden rounded-[36px] px-1 pb-2 pt-3">
+        <section className="relative mt-2.5 min-h-[252px] overflow-hidden rounded-[36px] px-0 pb-1 pt-2">
           <div className="absolute inset-0">
-            <div className="absolute left-0 top-0 z-[1] h-full w-[62%] bg-[linear-gradient(90deg,rgba(251,250,247,0.985)_0%,rgba(251,250,247,0.95)_38%,rgba(251,250,247,0.42)_72%,rgba(251,250,247,0.02)_100%)]" />
-            <div className="absolute inset-x-0 top-0 z-[1] h-20 bg-[linear-gradient(180deg,rgba(251,250,247,0.9)_0%,rgba(251,250,247,0)_100%)]" />
-            <div className="absolute inset-x-0 bottom-0 z-[1] h-28 bg-[linear-gradient(180deg,rgba(251,250,247,0)_0%,rgba(251,250,247,0.97)_100%)]" />
+            <div className="absolute left-0 top-0 z-[1] h-full w-[58%] bg-[linear-gradient(90deg,rgba(251,250,247,0.99)_0%,rgba(251,250,247,0.955)_34%,rgba(251,250,247,0.36)_70%,rgba(251,250,247,0.04)_100%)]" />
+            <div className="absolute inset-x-0 top-0 z-[1] h-16 bg-[linear-gradient(180deg,rgba(251,250,247,0.88)_0%,rgba(251,250,247,0)_100%)]" />
+            <div className="absolute inset-x-0 bottom-0 z-[1] h-20 bg-[linear-gradient(180deg,rgba(251,250,247,0)_0%,rgba(251,250,247,0.9)_62%,rgba(251,250,247,0.98)_100%)]" />
             <Image
               src={tripData.heroImage}
               alt={tripData.destination}
               fill
-                className="object-cover object-[74%_58%] opacity-[0.99]"
+                className="object-cover object-[68%_56%] opacity-[0.99] scale-[1.02]"
                 priority
               />
             </div>
 
-          <div className="relative z-10 max-w-[62%] px-2 pt-8">
-            <h1 className="text-[3.7rem] font-semibold leading-[0.88] tracking-[-0.07em] text-slate-950">
+          <div className="relative z-10 max-w-[58%] px-4 pt-8">
+            <h1 className="text-[3.45rem] font-semibold leading-[0.88] tracking-[-0.07em] text-slate-950">
               {parsedDestination.city}
             </h1>
-            <div className="mt-2 flex items-center gap-2 text-[1.16rem] text-slate-500">
-              <span className="text-[1.7rem]">{tripData.countryFlag}</span>
+            <div className="mt-1.5 flex items-center gap-2 text-[1.12rem] text-slate-500">
+              <span className="text-[1.6rem]">{tripData.countryFlag}</span>
               <span className="truncate">{countryLabel}</span>
             </div>
-            <div className="mt-4 inline-flex max-w-full items-center gap-2 rounded-full bg-white/94 px-4 py-2.5 text-[0.92rem] font-medium text-slate-600 shadow-[0_12px_28px_rgba(15,23,42,0.08)] ring-1 ring-black/5">
-              <Calendar className="h-4 w-4 text-slate-500" />
-              <span className="whitespace-nowrap">{heroDateLabel}</span>
+            <div className="mt-4 inline-flex max-w-full items-center justify-center gap-2 overflow-hidden rounded-full bg-white/94 px-3.5 py-2 text-[0.84rem] font-medium text-slate-600 shadow-[0_12px_28px_rgba(15,23,42,0.08)] ring-1 ring-black/5">
+              <Calendar className="h-3.5 w-3.5 shrink-0 text-slate-500" />
+              <span className="block max-w-full overflow-hidden text-ellipsis whitespace-nowrap">{heroDateLabel}</span>
             </div>
           </div>
         </section>
 
-        <section className="mt-1 space-y-2">
+        <section className="mt-1 space-y-1.5">
           {cards.map((card) => (
             <button
               key={card.id}
               onClick={() => onOpenPanel(card.id)}
-              className="flex w-full items-center gap-3 rounded-[24px] bg-white/94 px-3.5 py-2.5 text-left shadow-[0_14px_32px_rgba(148,163,184,0.11)] ring-1 ring-black/5 transition hover:bg-white"
+              className="flex w-full items-center gap-3 rounded-[24px] bg-white/94 px-3.5 py-2 text-left shadow-[0_14px_32px_rgba(148,163,184,0.11)] ring-1 ring-black/5 transition hover:bg-white"
             >
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[16px] bg-[linear-gradient(180deg,#f3f7ff,#e9eefb)] text-[#2563eb]">
-                <card.icon className="h-5 w-5" />
+              <div className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-[15px] bg-[linear-gradient(180deg,#f3f7ff,#e9eefb)] text-[#2563eb]">
+                <card.icon className="h-[18px] w-[18px]" />
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center justify-between gap-3">
                   <p className="truncate text-[1rem] font-semibold tracking-[-0.03em] text-slate-950">{card.title}</p>
                   <span className={cn("shrink-0 text-[0.85rem] font-medium", card.statusClassName)}>{card.status}</span>
                 </div>
-                <p className="mt-0.5 truncate text-[0.92rem] text-slate-600">{card.summary}</p>
-                <p className="truncate text-[0.82rem] text-slate-400">{card.detail}</p>
+                <p className="truncate text-[0.9rem] text-slate-600">{card.summary}</p>
+                <p className="truncate text-[0.8rem] leading-[1.1] text-slate-400">{card.detail}</p>
               </div>
               <ChevronRight className="h-4 w-4 shrink-0 text-slate-400" />
             </button>
           ))}
         </section>
 
-        <section className="mt-2">
+        <section className="mt-3">
           <button
             onClick={() => onOpenPanel("offline")}
             className="flex w-full items-center gap-3 rounded-[24px] bg-white/92 px-3.5 py-2.5 shadow-[0_14px_32px_rgba(148,163,184,0.11)] ring-1 ring-black/5 transition hover:bg-white"
@@ -1563,9 +1562,9 @@ function TravelerPublicShell({
             </div>
             <div className="min-w-0 flex-1 text-left">
               <p className="truncate text-[0.96rem] font-semibold tracking-[-0.03em] text-slate-950">Disponivel offline</p>
-              <p className="truncate text-[0.84rem] text-slate-500">{offlineReady ? "Salvo neste dispositivo" : "Baixe os docs"}</p>
+              <p className="truncate text-[0.84rem] text-slate-500">{offlineReady ? "Baixado neste dispositivo" : "Baixe os documentos"}</p>
             </div>
-            <div className="flex shrink-0 items-center gap-1.5 rounded-full border border-slate-200 px-2.5 py-1.5 text-[0.82rem] text-slate-500">
+            <div className="flex shrink-0 items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[0.82rem] font-medium text-[#2563eb] shadow-[0_8px_20px_rgba(148,163,184,0.12)]">
               <Download className="h-3.5 w-3.5" />
               <span className="whitespace-nowrap">Baixar docs</span>
             </div>
@@ -1596,7 +1595,7 @@ function TravelerPublicShell({
               key={item.id}
               onClick={() => onOpenPanel(item.id as Exclude<TravelerPublicPanel, null> | "more" | "home")}
               className={cn(
-                "relative flex flex-col items-center justify-center gap-0.5 rounded-[20px] px-2 py-1.5 text-center transition",
+                "relative flex flex-col items-center justify-center gap-0.5 rounded-[20px] px-2 py-1 text-center transition",
                 item.id === "home" ? "text-[#2563eb]" : "text-slate-500 hover:text-slate-700",
               )}
             >
