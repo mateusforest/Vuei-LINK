@@ -1504,6 +1504,7 @@ function TravelerPublicShell({
   const avatarLetter = travelers[0]?.name?.charAt(0)?.toUpperCase() || parsedDestination.city.charAt(0).toUpperCase()
   const countryLabel = tripData.country || parsedDestination.country || "Destino"
   const heroDateLabel = formatTravelerHeroDateRange(tripData?.startDate, tripData?.endDate)
+  const showAgencyBranding = agencyBranding.isAgency && Boolean(agencyBranding.logoUrl || agencyBranding.name)
 
   return (
     <div
@@ -1515,34 +1516,44 @@ function TravelerPublicShell({
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.98),_rgba(247,243,235,0.94)_48%,_rgba(241,237,230,0.92)_100%)]" />
       <div className="absolute inset-x-0 top-0 h-80 bg-[linear-gradient(180deg,rgba(255,255,255,0.95),rgba(255,255,255,0))]" />
       <div className="relative flex flex-1 flex-col px-4 pb-[calc(env(safe-area-inset-bottom)+108px)] pt-[calc(env(safe-area-inset-top)+11px)]">
-          <header className="flex items-center justify-between">
+        <header className="flex items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
-            {agencyBranding.isAgency ? (
-              <div className="rounded-[20px] bg-white/90 px-3 py-2 shadow-[0_16px_40px_rgba(15,23,42,0.08)] ring-1 ring-black/5">
-                <Image
-                  src={agencyBranding.logoUrl || "/vuei-logo.png"}
-                  alt={agencyBranding.name || "Vuei"}
-                  width={148}
-                  height={46}
-                  className="h-8 w-auto max-w-[132px] object-contain"
-                />
+            {showAgencyBranding ? (
+              <div className="flex min-w-0 items-center gap-3 rounded-[22px] bg-white/88 px-3.5 py-2.5 shadow-[0_16px_40px_rgba(15,23,42,0.08)] ring-1 ring-black/5 backdrop-blur-sm">
+                {agencyBranding.logoUrl ? (
+                  <Image
+                    src={agencyBranding.logoUrl}
+                    alt={agencyBranding.name || "Agencia"}
+                    width={156}
+                    height={46}
+                    className="h-7 w-auto max-w-[124px] shrink-0 object-contain sm:h-8 sm:max-w-[144px]"
+                  />
+                ) : (
+                  <span className="truncate text-base font-semibold tracking-[-0.03em] text-slate-900">
+                    {agencyBranding.name}
+                  </span>
+                )}
+                <span aria-hidden="true" className="h-6 w-px shrink-0 bg-slate-200" />
+                <span className="min-w-0 text-[0.7rem] font-medium leading-tight text-slate-400 sm:text-xs">
+                  Desenvolvido por Vuei
+                </span>
               </div>
             ) : (
-                <Image src="/vuei-logo.png" alt="Vuei" width={160} height={46} className="h-[42px] w-auto object-contain" priority />
+              <Image src="/vuei-logo.png" alt="Vuei" width={160} height={46} className="h-[42px] w-auto object-contain" priority />
             )}
           </div>
 
-            <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2.5">
             <button
               onClick={onOpenShare}
-                className="flex h-[42px] w-[42px] items-center justify-center rounded-full bg-white/88 text-slate-700 shadow-[0_12px_30px_rgba(15,23,42,0.08)] ring-1 ring-black/5 transition hover:bg-white"
+              className="flex h-[42px] w-[42px] items-center justify-center rounded-full bg-white/88 text-slate-700 shadow-[0_12px_30px_rgba(15,23,42,0.08)] ring-1 ring-black/5 transition hover:bg-white"
               aria-label="Compartilhar viagem"
             >
               <Share2 className="h-5 w-5" />
             </button>
             <button
               onClick={onOpenMenu}
-                className="flex h-[42px] w-[42px] items-center justify-center rounded-full bg-[linear-gradient(135deg,#3b82f6,#1d4ed8)] text-sm font-semibold text-white shadow-[0_16px_30px_rgba(37,99,235,0.24)]"
+              className="flex h-[42px] w-[42px] items-center justify-center rounded-full bg-[linear-gradient(135deg,#3b82f6,#1d4ed8)] text-sm font-semibold text-white shadow-[0_16px_30px_rgba(37,99,235,0.24)]"
               aria-label="Abrir menu"
             >
               {avatarLetter}
