@@ -12,7 +12,7 @@ export const metadata: Metadata = {
   title: 'Vuei | Sua viagem inteligente',
   description: 'Roteiros, documentos, concierge IA, compartilhamento e acesso offline em um único link.',
   generator: 'v0.app',
-  manifest: '/manifest.webmanifest?v=20260611b',
+  manifest: '/manifest.webmanifest?v=20260617c',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
@@ -25,7 +25,7 @@ export const metadata: Metadata = {
       { url: '/favicon-32x32.png', sizes: '32x32', type: 'image/png' },
     ],
     shortcut: ['/favicon.ico'],
-    apple: [{ url: '/apple-touch-icon-20260611b.png', sizes: '180x180', type: 'image/png' }],
+    apple: [{ url: '/apple-touch-icon-20260611b.png?v=20260617c', sizes: '180x180', type: 'image/png' }],
   },
 }
 

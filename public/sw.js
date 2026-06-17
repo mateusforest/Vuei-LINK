@@ -1,16 +1,16 @@
 const SHELL_CACHE_PREFIX = "vuei-shell"
-const SHELL_CACHE_VERSION = "20260614b"
+const SHELL_CACHE_VERSION = "20260617c"
 const CACHE_NAME = `${SHELL_CACHE_PREFIX}-${SHELL_CACHE_VERSION}`
 const SHELL_FALLBACK_URL = "/"
 const SHELL_URLS = [
   SHELL_FALLBACK_URL,
-  "/manifest.webmanifest?v=20260611b",
+  "/manifest.webmanifest?v=20260617c",
   "/favicon.ico",
   "/favicon-16x16.png",
   "/favicon-32x32.png",
-  "/apple-touch-icon-20260611b.png",
-  "/android-chrome-192x192-20260611b.png",
-  "/android-chrome-512x512-20260611b.png",
+  "/apple-touch-icon-20260611b.png?v=20260617c",
+  "/android-chrome-192x192-20260611b.png?v=20260617c",
+  "/android-chrome-512x512-20260611b.png?v=20260617c",
 ]
 
 function createTripOfflineFallbackResponse() {

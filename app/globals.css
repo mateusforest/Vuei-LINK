@@ -69,6 +69,29 @@
   }
 }
 
+html[data-trip-public-theme="light"],
+body[data-trip-public-theme="light"] {
+  --background: #f4f1ea;
+  --foreground: #0f172a;
+  --card: #ffffff;
+  --card-foreground: #0f172a;
+  --popover: #ffffff;
+  --popover-foreground: #0f172a;
+  --primary: #2563eb;
+  --primary-foreground: #ffffff;
+  --secondary: #dbeafe;
+  --secondary-foreground: #0f172a;
+  --muted: #f8fafc;
+  --muted-foreground: #64748b;
+  --accent: #eff6ff;
+  --accent-foreground: #0f172a;
+  --border: rgba(15, 23, 42, 0.08);
+  --input: #ffffff;
+  --ring: #93c5fd;
+  background: #f4f1ea;
+  color: #0f172a;
+}
+
 /* Smooth Scroll */
 html {
   scroll-behavior: smooth;

@@ -1382,7 +1382,12 @@ function TravelerPublicShell({
   const avatarLetter = travelers[0]?.name?.charAt(0)?.toUpperCase() || parsedDestination.city.charAt(0).toUpperCase()
 
   return (
-    <div className="relative mx-auto flex min-h-screen w-full max-w-[460px] flex-col overflow-hidden bg-[#fbfaf7] md:my-6 md:min-h-[920px] md:rounded-[38px] md:border md:border-black/5 md:shadow-[0_32px_90px_rgba(15,23,42,0.12)]">
+    <div
+      data-ui-version="traveler-link-v2"
+      data-route-mode="public-b2c"
+      data-render-file="app/viagem/[id]/page.tsx"
+      className="relative mx-auto flex min-h-screen w-full max-w-[460px] flex-col overflow-hidden bg-[#fbfaf7] md:my-6 md:min-h-[920px] md:rounded-[38px] md:border md:border-black/5 md:shadow-[0_32px_90px_rgba(15,23,42,0.12)]"
+    >
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.98),_rgba(247,243,235,0.94)_48%,_rgba(241,237,230,0.92)_100%)]" />
       <div className="absolute inset-x-0 top-0 h-56 bg-[linear-gradient(180deg,rgba(255,255,255,0.95),rgba(255,255,255,0))]" />
       <div className="relative flex flex-1 flex-col px-5 pb-[calc(env(safe-area-inset-bottom)+92px)] pt-[calc(env(safe-area-inset-top)+18px)]">
@@ -6067,18 +6072,34 @@ export default function TripPage() {
     const themeColorMeta = document.querySelector('meta[name="theme-color"]')
     const previousThemeColor = themeColorMeta?.getAttribute("content")
     const isPublicTravelerView = !adminRouteActive
+    const previousHtmlBackground = document.documentElement.style.backgroundColor
+    const previousBodyBackground = document.body.style.backgroundColor
+    const previousBodyColor = document.body.style.color
 
     if (themeColorMeta) {
       themeColorMeta.setAttribute("content", isPublicTravelerView ? "#f4f1ea" : "#050505")
     }
 
-    document.body.style.backgroundColor = isPublicTravelerView ? "#f4f1ea" : ""
+    if (isPublicTravelerView) {
+      document.documentElement.setAttribute("data-trip-public-theme", "light")
+      document.body.setAttribute("data-trip-public-theme", "light")
+      document.documentElement.style.backgroundColor = "#f4f1ea"
+      document.body.style.backgroundColor = "#f4f1ea"
+      document.body.style.color = "#0f172a"
+    } else {
+      document.documentElement.removeAttribute("data-trip-public-theme")
+      document.body.removeAttribute("data-trip-public-theme")
+    }
 
     return () => {
       if (themeColorMeta && previousThemeColor) {
         themeColorMeta.setAttribute("content", previousThemeColor)
       }
-      document.body.style.backgroundColor = ""
+      document.documentElement.removeAttribute("data-trip-public-theme")
+      document.body.removeAttribute("data-trip-public-theme")
+      document.documentElement.style.backgroundColor = previousHtmlBackground
+      document.body.style.backgroundColor = previousBodyBackground
+      document.body.style.color = previousBodyColor
     }
   }, [adminRouteActive])
 
@@ -6940,6 +6961,13 @@ export default function TripPage() {
       <PermissionContext.Provider value={{ isAdmin, canWrite, setIsAdmin }}>
         <ToastContext.Provider value={{ showToast }}>
           <main className="min-h-screen bg-[#f4f1ea] text-slate-900">
+            <style jsx global>{`
+              html,
+              body {
+                background: #f4f1ea;
+                color: #0f172a;
+              }
+            `}</style>
             <TravelerPublicShell
               tripData={tripData}
               agencyBranding={agencyBranding}
