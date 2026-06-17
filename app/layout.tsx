@@ -1,4 +1,4 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import { Geist, Geist_Mono } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import { AuthProvider } from "@/contexts/auth-context"
@@ -13,6 +13,11 @@ export const metadata: Metadata = {
   description: 'Roteiros, documentos, concierge IA, compartilhamento e acesso offline em um único link.',
   generator: 'v0.app',
   manifest: '/manifest.webmanifest?v=20260611b',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black-translucent',
+    title: 'Vuei',
+  },
   icons: {
     icon: [
       { url: '/favicon.ico' },
@@ -22,6 +27,10 @@ export const metadata: Metadata = {
     shortcut: ['/favicon.ico'],
     apple: [{ url: '/apple-touch-icon-20260611b.png', sizes: '180x180', type: 'image/png' }],
   },
+}
+
+export const viewport: Viewport = {
+  themeColor: '#050505',
 }
 
 export default function RootLayout({
