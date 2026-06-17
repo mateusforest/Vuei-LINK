@@ -7,9 +7,22 @@ import {
   createAgencySubscriptionCheckout,
   getOrCreateAgencyStripeCustomer,
 } from "@/lib/billing/agency-stripe"
+import { getStripePriceIdForAgencyPlan } from "@/lib/billing/stripe"
 
 interface AgencyCheckoutBody {
   planCode?: "start" | "pro" | "business"
+}
+
+function getAgencyPlanCheckoutUnavailableMessage(planCode: AgencyCheckoutBody["planCode"]) {
+  if (planCode === "start") {
+    return "Pagamentos ainda nao configurados para o plano Start."
+  }
+
+  if (planCode === "pro") {
+    return "Pagamentos ainda nao configurados para o plano Pro."
+  }
+
+  return "Pagamentos ainda nao configurados para o plano Business."
 }
 
 export async function POST(request: Request) {
@@ -42,6 +55,9 @@ export async function POST(request: Request) {
   }
 
   try {
+    // Valida o price antes de criar customer/session para devolver um erro claro por plano.
+    getStripePriceIdForAgencyPlan(body.planCode)
+
     const customerResult = await getOrCreateAgencyStripeCustomer(adminClient, {
       agencyId: actorResult.data.agencyId,
       agencyName: actorResult.data.agencyName,
@@ -67,11 +83,22 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ url: session.url })
   } catch (error) {
-    const message = error instanceof Error && error.message.startsWith("Missing required env:")
-      ? "Pagamentos ainda nao configurados."
-      : error instanceof Error
-        ? error.message
-        : "Nao foi possivel iniciar o checkout da agencia."
+    const technicalMessage = error instanceof Error ? error.message : "Nao foi possivel iniciar o checkout da agencia."
+    const normalizedMessage = technicalMessage.toLowerCase()
+    const priceIssue =
+      normalizedMessage.startsWith("missing required env:") ||
+      normalizedMessage.includes("no such price") ||
+      normalizedMessage.includes("price") ||
+      normalizedMessage.includes("inactive")
+
+    console.error("[AGENCY BILLING] checkout error", {
+      planCode: body.planCode,
+      error: technicalMessage,
+    })
+
+    const message = priceIssue
+      ? getAgencyPlanCheckoutUnavailableMessage(body.planCode)
+      : technicalMessage
 
     return NextResponse.json({ error: message }, { status: 503 })
   }
