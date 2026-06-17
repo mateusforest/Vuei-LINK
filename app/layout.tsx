@@ -15,7 +15,7 @@ export const metadata: Metadata = {
   manifest: '/manifest.webmanifest?v=20260617c',
   appleWebApp: {
     capable: true,
-    statusBarStyle: 'black-translucent',
+    statusBarStyle: 'default',
     title: 'Vuei',
   },
   icons: {
@@ -30,7 +30,8 @@ export const metadata: Metadata = {
 }
 
 export const viewport: Viewport = {
-  themeColor: '#050505',
+  themeColor: '#f4f1ea',
+  viewportFit: 'cover',
 }
 
 export default function RootLayout({

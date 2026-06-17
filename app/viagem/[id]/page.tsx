@@ -23,7 +23,6 @@ import { useAuth } from "@/contexts/auth-context"
 import { buildAdminTripUrl, buildPublicTripUrl, isAdminLinkMode } from "@/lib/security/link-tokens"
 import { resolveTravelerPlan, resolveTravelerPlanFromBillingStatus } from "@/lib/billing/traveler-plans"
 import { getTravelerBillingStatus } from "@/lib/repositories/traveler-billing-repository"
-import { TRAVELER_CREDIT_PACKAGES } from "@/lib/billing/traveler-plans"
 import type { TripFlightRecord } from "@/types/flight"
 import type { TripItineraryRecord, TripItineraryContent } from "@/types"
 import type { OfflineStoredTripPackage, OfflineTripPackageAudience, OfflineTripPackageStatus } from "@/lib/offline/types"
@@ -50,6 +49,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { cn } from "@/lib/utils"
 import { devLog, startPerfMeasure } from "@/lib/dev/perf"
+import { TRAVELER_CREDIT_PACKAGES } from "@/lib/billing/traveler-plans"
 
 const TRIPS_STORAGE_KEY = "vuei_trips"
 const AGENCY_STORAGE_KEY = "vuei_agency"
@@ -83,22 +83,34 @@ function Toast({ message, type = "success", onClose }: { message: string; type?:
       animate={{ opacity: 1, y: 0, scale: 1 }}
       exit={{ opacity: 0, y: 20, scale: 0.95 }}
       className={cn(
-        "fixed bottom-6 left-1/2 -translate-x-1/2 z-[100] px-5 py-3 rounded-2xl backdrop-blur-xl border flex items-center gap-3 shadow-2xl",
-        type === "success" && "bg-emerald-500/20 border-emerald-500/30 text-emerald-300",
-        type === "error" && "bg-red-500/20 border-red-500/30 text-red-300",
-        type === "info" && "bg-[#5de0e6]/20 border-[#5de0e6]/30 text-[#5de0e6]"
+        "fixed bottom-[calc(env(safe-area-inset-bottom)+84px)] left-1/2 z-[100] flex -translate-x-1/2 items-center gap-3 rounded-2xl border px-5 py-3 shadow-2xl backdrop-blur-xl",
+        type === "success" && "border-emerald-700/40 bg-emerald-600/92 text-white",
+        type === "error" && "border-red-700/30 bg-red-600/92 text-white",
+        type === "info" && "border-sky-700/30 bg-sky-600/92 text-white"
       )}
     >
       {type === "success" && <CheckCircle2 className="w-5 h-5" />}
       {type === "error" && <XCircle className="w-5 h-5" />}
       {type === "info" && <AlertCircle className="w-5 h-5" />}
-      <span className="text-sm font-medium">{message}</span>
+      <span className="text-sm font-medium leading-none">{message}</span>
     </motion.div>
   )
 }
 
 // Modal wrapper
-function Modal({ open, onClose, children, title }: { open: boolean; onClose: () => void; children: React.ReactNode; title?: string }) {
+function Modal({
+  open,
+  onClose,
+  children,
+  title,
+  tone = "dark",
+}: {
+  open: boolean
+  onClose: () => void
+  children: React.ReactNode
+  title?: string
+  tone?: "dark" | "light"
+}) {
   useEffect(() => {
     if (open) {
       document.body.style.overflow = "hidden"
@@ -117,19 +129,29 @@ function Modal({ open, onClose, children, title }: { open: boolean; onClose: () 
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm"
+            className={cn("fixed inset-0 z-50 backdrop-blur-sm", tone === "light" ? "bg-[rgba(148,163,184,0.18)]" : "bg-black/80")}
           />
           <motion.div
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            className="fixed inset-4 sm:inset-auto sm:left-1/2 sm:top-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 z-50 sm:max-w-lg sm:w-full max-h-[90vh] overflow-auto rounded-3xl bg-[#0a0a0a] border border-white/10 shadow-2xl"
+            className={cn(
+              "fixed inset-4 z-50 max-h-[90vh] overflow-auto rounded-3xl sm:inset-auto sm:left-1/2 sm:w-full sm:max-w-lg sm:-translate-x-1/2 sm:-translate-y-1/2 sm:top-1/2",
+              tone === "light"
+                ? "border border-slate-200 bg-[linear-gradient(180deg,#ffffff_0%,#f7f4ee_100%)] shadow-[0_24px_60px_rgba(148,163,184,0.26)]"
+                : "border border-white/10 bg-[#0a0a0a] shadow-2xl",
+            )}
           >
             {title && (
-              <div className="sticky top-0 z-10 flex items-center justify-between p-5 border-b border-white/[0.06] bg-[#0a0a0a]/95 backdrop-blur-xl">
-                <h3 className="text-lg font-semibold text-white">{title}</h3>
-                <button onClick={onClose} className="p-2 rounded-xl hover:bg-white/10 transition-colors">
-                  <X className="w-5 h-5 text-white/60" />
+              <div
+                className={cn(
+                  "sticky top-0 z-10 flex items-center justify-between p-5 backdrop-blur-xl",
+                  tone === "light" ? "border-b border-slate-200 bg-[rgba(255,255,255,0.92)]" : "border-b border-white/[0.06] bg-[#0a0a0a]/95",
+                )}
+              >
+                <h3 className={cn("text-lg font-semibold", tone === "light" ? "text-slate-950" : "text-white")}>{title}</h3>
+                <button onClick={onClose} className={cn("rounded-xl p-2 transition-colors", tone === "light" ? "hover:bg-slate-100" : "hover:bg-white/10")}>
+                  <X className={cn("w-5 h-5", tone === "light" ? "text-slate-500" : "text-white/60")} />
                 </button>
               </div>
             )}
@@ -296,6 +318,29 @@ function formatTripDate(dateString?: string) {
     month: "short",
     year: "numeric",
   })
+}
+
+function formatTravelerHeroDateRange(startDate?: string | null, endDate?: string | null) {
+  if (!startDate || !endDate) return "Datas a definir"
+
+  const start = new Date(`${startDate}T12:00:00`)
+  const end = new Date(`${endDate}T12:00:00`)
+
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+    return "Datas a definir"
+  }
+
+  const startLabel = start.toLocaleDateString("pt-BR", {
+    day: "2-digit",
+    month: "short",
+  })
+  const endLabel = end.toLocaleDateString("pt-BR", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  })
+
+  return `${startLabel} - ${endLabel}`
 }
 
 function calculateDaysUntil(dateString?: string) {
@@ -1346,11 +1391,11 @@ function buildTravelerCardSummaries(tripData: any) {
       summary: flight
         ? `${flight.origin?.city || "---"} -> ${flight.destination?.city || "---"}`
         : documents.filter((document: any) => document.type === "ticket").length > 0
-          ? `${documents.filter((document: any) => document.type === "ticket").length} documento(s) anexado(s)`
-          : "Nenhuma passagem adicionada",
+          ? `${documents.filter((document: any) => document.type === "ticket").length} bilhete(s)`
+          : "Nenhuma passagem",
       detail: flight
         ? `${flight.date || "Data pendente"}${flight.origin?.time ? ` • ${flight.origin.time}` : ""}${flight.destination?.time ? ` - ${flight.destination.time}` : ""}`
-        : "Abra para ver os detalhes da viagem",
+        : "Abra para ver",
       status: flight ? "Confirmado" : "Pendente",
       statusClassName: flight ? "text-emerald-600" : "text-slate-400",
     },
@@ -1358,10 +1403,10 @@ function buildTravelerCardSummaries(tripData: any) {
       id: "hotel" as const,
       icon: Hotel,
       title: "Hospedagem",
-      summary: hotel?.name || "Nenhuma hospedagem cadastrada",
+      summary: hotel?.name || "Nenhuma hospedagem",
       detail: hotel
         ? `${hotel.checkIn || "Check-in pendente"}${hotel.checkOut ? ` • ${hotel.checkOut}` : ""}`
-        : "Abra para ver os detalhes da estadia",
+        : "Abra para ver",
       status: hotel ? "Confirmado" : "Pendente",
       statusClassName: hotel ? "text-emerald-600" : "text-slate-400",
     },
@@ -1369,18 +1414,18 @@ function buildTravelerCardSummaries(tripData: any) {
       id: "documents" as const,
       icon: FileText,
       title: "Documentos",
-      summary: documents.length > 0 ? `${documents.length} documento(s)` : "Nenhum documento adicionado",
-      detail: documents.length > 0 ? "Abra para consultar os arquivos da viagem" : "Documentos aparecerao aqui quando forem adicionados",
-      status: documents.length > 0 ? "Tudo pronto" : "Vazio",
+      summary: documents.length > 0 ? `${documents.length} documento(s)` : "Nenhum documento",
+      detail: documents.length > 0 ? "Abra para ver" : "Adicione depois",
+      status: documents.length > 0 ? "Pronto" : "Vazio",
       statusClassName: documents.length > 0 ? "text-[#2563eb]" : "text-slate-400",
     },
     {
       id: "itinerary" as const,
       icon: MapPin,
       title: "Roteiro",
-      summary: itinerary.length > 0 ? `${itinerary.length} dia(s) planejado(s)` : "Nenhum roteiro criado",
-      detail: itinerary.length > 0 ? "Abra para ver o planejamento da viagem" : "Monte e acompanhe o roteiro da viagem",
-      status: itinerary.length > 0 ? "Ver roteiro" : "Explorar",
+      summary: itinerary.length > 0 ? `${itinerary.length} dia(s) planejado(s)` : "Nenhum roteiro",
+      detail: itinerary.length > 0 ? "Abra para ver" : "Monte depois",
+      status: itinerary.length > 0 ? "Ver" : "Vazio",
       statusClassName: itinerary.length > 0 ? "text-[#2563eb]" : "text-slate-400",
     },
   ]
@@ -1409,17 +1454,18 @@ function TravelerPublicShell({
   const offlineReady = offlineModeEnabled || tripData?.offlineEnabled || Boolean(offlinePackageStatus)
   const avatarLetter = travelers[0]?.name?.charAt(0)?.toUpperCase() || parsedDestination.city.charAt(0).toUpperCase()
   const countryLabel = tripData.country || parsedDestination.country || "Destino"
+  const heroDateLabel = formatTravelerHeroDateRange(tripData?.startDate, tripData?.endDate)
 
   return (
     <div
       data-ui-version="traveler-link-v2"
       data-route-mode="public-b2c"
       data-render-file="app/viagem/[id]/page.tsx"
-      className="relative mx-auto flex min-h-screen w-full max-w-[460px] flex-col overflow-hidden bg-[#fbfaf7] md:my-5 md:min-h-[900px] md:rounded-[38px] md:border md:border-black/5 md:shadow-[0_32px_90px_rgba(15,23,42,0.12)]"
+      className="relative mx-auto flex min-h-screen w-full max-w-[460px] flex-col overflow-hidden bg-[#fbfaf7] md:my-5 md:min-h-[880px] md:rounded-[38px] md:border md:border-black/5 md:shadow-[0_32px_90px_rgba(15,23,42,0.12)]"
     >
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.98),_rgba(247,243,235,0.94)_48%,_rgba(241,237,230,0.92)_100%)]" />
-      <div className="absolute inset-x-0 top-0 h-72 bg-[linear-gradient(180deg,rgba(255,255,255,0.95),rgba(255,255,255,0))]" />
-      <div className="relative flex flex-1 flex-col px-5 pb-[calc(env(safe-area-inset-bottom)+78px)] pt-[calc(env(safe-area-inset-top)+14px)]">
+      <div className="absolute inset-x-0 top-0 h-80 bg-[linear-gradient(180deg,rgba(255,255,255,0.95),rgba(255,255,255,0))]" />
+      <div className="relative flex flex-1 flex-col px-5 pb-[calc(env(safe-area-inset-bottom)+74px)] pt-[calc(env(safe-area-inset-top)+12px)]">
         <header className="flex items-center justify-between">
           <div className="flex min-w-0 items-center gap-3">
             {agencyBranding.isAgency ? (
@@ -1433,7 +1479,7 @@ function TravelerPublicShell({
                 />
               </div>
             ) : (
-              <Image src="/vuei-logo.png" alt="Vuei" width={148} height={42} className="h-10 w-auto object-contain" priority />
+                <Image src="/vuei-logo.png" alt="Vuei" width={164} height={48} className="h-11 w-auto object-contain" priority />
             )}
           </div>
 
@@ -1455,71 +1501,71 @@ function TravelerPublicShell({
           </div>
         </header>
 
-        <section className="relative mt-4 min-h-[280px] overflow-hidden rounded-[36px] px-1 pb-4 pt-4">
+        <section className="relative mt-3 min-h-[268px] overflow-hidden rounded-[36px] px-1 pb-2 pt-3">
           <div className="absolute inset-0">
-            <div className="absolute left-0 top-0 z-[1] h-full w-[64%] bg-[linear-gradient(90deg,rgba(251,250,247,0.98)_0%,rgba(251,250,247,0.94)_38%,rgba(251,250,247,0.38)_75%,rgba(251,250,247,0.02)_100%)]" />
-            <div className="absolute inset-x-0 top-0 z-[1] h-16 bg-[linear-gradient(180deg,rgba(251,250,247,0.88)_0%,rgba(251,250,247,0)_100%)]" />
-            <div className="absolute inset-x-0 bottom-0 z-[1] h-24 bg-[linear-gradient(180deg,rgba(251,250,247,0)_0%,rgba(251,250,247,0.96)_100%)]" />
+            <div className="absolute left-0 top-0 z-[1] h-full w-[62%] bg-[linear-gradient(90deg,rgba(251,250,247,0.985)_0%,rgba(251,250,247,0.95)_38%,rgba(251,250,247,0.42)_72%,rgba(251,250,247,0.02)_100%)]" />
+            <div className="absolute inset-x-0 top-0 z-[1] h-20 bg-[linear-gradient(180deg,rgba(251,250,247,0.9)_0%,rgba(251,250,247,0)_100%)]" />
+            <div className="absolute inset-x-0 bottom-0 z-[1] h-28 bg-[linear-gradient(180deg,rgba(251,250,247,0)_0%,rgba(251,250,247,0.97)_100%)]" />
             <Image
               src={tripData.heroImage}
               alt={tripData.destination}
               fill
-              className="object-cover object-[72%_58%] opacity-[0.98]"
-              priority
-            />
-          </div>
+                className="object-cover object-[74%_58%] opacity-[0.99]"
+                priority
+              />
+            </div>
 
-          <div className="relative z-10 max-w-[61%] px-2 pt-8">
-            <h1 className="text-[3.45rem] font-semibold leading-[0.9] tracking-[-0.06em] text-slate-950">
+          <div className="relative z-10 max-w-[62%] px-2 pt-8">
+            <h1 className="text-[3.7rem] font-semibold leading-[0.88] tracking-[-0.07em] text-slate-950">
               {parsedDestination.city}
             </h1>
-            <div className="mt-2.5 flex items-center gap-2 text-[1.2rem] text-slate-500">
+            <div className="mt-2 flex items-center gap-2 text-[1.16rem] text-slate-500">
               <span className="text-[1.7rem]">{tripData.countryFlag}</span>
               <span className="truncate">{countryLabel}</span>
             </div>
-            <div className="mt-5 inline-flex max-w-full items-center gap-2.5 rounded-full bg-white/92 px-4 py-3 text-[0.98rem] font-medium text-slate-600 shadow-[0_12px_28px_rgba(15,23,42,0.08)] ring-1 ring-black/5">
+            <div className="mt-4 inline-flex max-w-full items-center gap-2 rounded-full bg-white/94 px-4 py-2.5 text-[0.92rem] font-medium text-slate-600 shadow-[0_12px_28px_rgba(15,23,42,0.08)] ring-1 ring-black/5">
               <Calendar className="h-4 w-4 text-slate-500" />
-              <span className="truncate">{tripData.dates.start} - {tripData.dates.end}</span>
+              <span className="whitespace-nowrap">{heroDateLabel}</span>
             </div>
           </div>
         </section>
 
-        <section className="mt-1.5 space-y-2.5">
+        <section className="mt-1 space-y-2">
           {cards.map((card) => (
             <button
               key={card.id}
               onClick={() => onOpenPanel(card.id)}
-              className="flex w-full items-center gap-3.5 rounded-[26px] bg-white/94 px-4 py-3 text-left shadow-[0_16px_36px_rgba(148,163,184,0.12)] ring-1 ring-black/5 transition hover:bg-white"
+              className="flex w-full items-center gap-3 rounded-[24px] bg-white/94 px-3.5 py-2.5 text-left shadow-[0_14px_32px_rgba(148,163,184,0.11)] ring-1 ring-black/5 transition hover:bg-white"
             >
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[18px] bg-[linear-gradient(180deg,#f3f7ff,#e9eefb)] text-[#2563eb]">
-                <card.icon className="h-5.5 w-5.5" />
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[16px] bg-[linear-gradient(180deg,#f3f7ff,#e9eefb)] text-[#2563eb]">
+                <card.icon className="h-5 w-5" />
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center justify-between gap-3">
-                  <p className="truncate text-[1.08rem] font-semibold tracking-[-0.03em] text-slate-950">{card.title}</p>
-                  <span className={cn("shrink-0 text-[0.92rem] font-medium", card.statusClassName)}>{card.status}</span>
+                  <p className="truncate text-[1rem] font-semibold tracking-[-0.03em] text-slate-950">{card.title}</p>
+                  <span className={cn("shrink-0 text-[0.85rem] font-medium", card.statusClassName)}>{card.status}</span>
                 </div>
-                <p className="mt-0.5 truncate text-[0.98rem] text-slate-600">{card.summary}</p>
-                <p className="truncate text-[0.9rem] text-slate-400">{card.detail}</p>
+                <p className="mt-0.5 truncate text-[0.92rem] text-slate-600">{card.summary}</p>
+                <p className="truncate text-[0.82rem] text-slate-400">{card.detail}</p>
               </div>
-              <ChevronRight className="h-4.5 w-4.5 shrink-0 text-slate-400" />
+              <ChevronRight className="h-4 w-4 shrink-0 text-slate-400" />
             </button>
           ))}
         </section>
 
-        <section className="mt-2.5">
+        <section className="mt-2">
           <button
             onClick={() => onOpenPanel("offline")}
-            className="flex w-full items-center gap-3 rounded-[26px] bg-white/92 px-4 py-3 shadow-[0_16px_36px_rgba(148,163,184,0.12)] ring-1 ring-black/5 transition hover:bg-white"
+            className="flex w-full items-center gap-3 rounded-[24px] bg-white/92 px-3.5 py-2.5 shadow-[0_14px_32px_rgba(148,163,184,0.11)] ring-1 ring-black/5 transition hover:bg-white"
           >
-            <div className={cn("flex h-11 w-11 shrink-0 items-center justify-center rounded-[16px]", offlineReady ? "bg-[#edf8ef] text-emerald-600" : "bg-[#f1f5f9] text-slate-500")}>
-              {offlineReady ? <CheckCircle2 className="h-5 w-5" /> : <Download className="h-5 w-5" />}
+            <div className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px]", offlineReady ? "bg-[#edf8ef] text-emerald-600" : "bg-[#f1f5f9] text-slate-500")}>
+              {offlineReady ? <CheckCircle2 className="h-4.5 w-4.5" /> : <Download className="h-4.5 w-4.5" />}
             </div>
             <div className="min-w-0 flex-1 text-left">
-              <p className="truncate text-[1rem] font-semibold tracking-[-0.03em] text-slate-950">Disponivel offline</p>
-              <p className="truncate text-[0.92rem] text-slate-500">{offlineReady ? "Salvo neste dispositivo" : "Baixe os docs da viagem"}</p>
+              <p className="truncate text-[0.96rem] font-semibold tracking-[-0.03em] text-slate-950">Disponivel offline</p>
+              <p className="truncate text-[0.84rem] text-slate-500">{offlineReady ? "Salvo neste dispositivo" : "Baixe os docs"}</p>
             </div>
-            <div className="flex shrink-0 items-center gap-1.5 rounded-full border border-slate-200 px-3 py-2 text-[0.9rem] text-slate-500">
+            <div className="flex shrink-0 items-center gap-1.5 rounded-full border border-slate-200 px-2.5 py-1.5 text-[0.82rem] text-slate-500">
               <Download className="h-3.5 w-3.5" />
               <span className="whitespace-nowrap">Baixar docs</span>
             </div>
@@ -1527,7 +1573,7 @@ function TravelerPublicShell({
         </section>
 
         {offlineModeEnabled && offlinePackageStatus ? (
-          <div className="mt-3 rounded-[24px] border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          <div className="mt-2.5 rounded-[20px] border border-amber-200 bg-amber-50 px-4 py-2.5 text-[0.82rem] text-amber-800">
             {offlinePackageStatus === "partial"
               ? "Modo offline ativo com disponibilidade parcial."
               : offlinePackageStatus === "legacy_snapshot"
@@ -4428,7 +4474,7 @@ function ConciergeSection({
               <span className="text-xs text-white/40">{tripData.credits.balance} creditos restantes</span>
             </div>
             <Button size="sm" variant="ghost" onClick={onOpenCredits} className="text-[#5de0e6] text-xs">
-              Comprar mais
+              Ver saldo
             </Button>
           </div>
         </motion.div>
@@ -4528,6 +4574,7 @@ function MenuModal({
   onOpenSettings,
   onOpenSecurity,
   onOpenCredits,
+  publicView = false,
 }: {
   open: boolean
   onClose: () => void
@@ -4535,6 +4582,7 @@ function MenuModal({
   onOpenSettings: () => void
   onOpenSecurity: () => void
   onOpenCredits: () => void
+  publicView?: boolean
 }) {
   const { isAdmin } = useContext(PermissionContext)
   const menuItems = [
@@ -4547,18 +4595,23 @@ function MenuModal({
   ]
 
   return (
-    <BottomSheet open={open} onClose={onClose} title="Menu da Viagem">
+    <BottomSheet tone={publicView ? "light" : "dark"} open={open} onClose={onClose} title="Menu da Viagem">
       <div className="space-y-2">
         {menuItems.map((item, i) => (
           <button
             key={i}
             onClick={() => { item.action(); onClose() }}
-            className="w-full flex items-center gap-4 p-4 rounded-xl bg-white/[0.02] hover:bg-white/[0.05] border border-white/[0.06] transition-colors text-left"
+            className={cn(
+              "w-full flex items-center gap-4 rounded-xl p-4 text-left transition-colors",
+              publicView
+                ? "border border-slate-200/80 bg-white/90 hover:bg-white"
+                : "border border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.05]"
+            )}
           >
-            <div className="w-10 h-10 rounded-xl bg-white/[0.05] flex items-center justify-center">
-              <item.icon className="w-5 h-5 text-white/60" />
+            <div className={cn("flex h-10 w-10 items-center justify-center rounded-xl", publicView ? "bg-[#eef4ff]" : "bg-white/[0.05]")}>
+              <item.icon className={cn("h-5 w-5", publicView ? "text-[#2563eb]" : "text-white/60")} />
             </div>
-            <span className="text-white font-medium">{item.label}</span>
+            <span className={cn("font-medium", publicView ? "text-slate-900" : "text-white")}>{item.label}</span>
           </button>
         ))}
       </div>
@@ -5186,11 +5239,20 @@ function QuickInfoSection({ tripData }: { tripData: any }) {
 }
 
 // Credits Modal
-function CreditsModal({ open, onClose, credits }: { open: boolean; onClose: () => void; credits: any }) {
+function CreditsModal({
+  open,
+  onClose,
+  credits,
+  publicView = false,
+}: {
+  open: boolean
+  onClose: () => void
+  credits: any
+  publicView?: boolean
+}) {
   const { showToast } = useToast()
-
   const totalCredits = Math.max(credits.total || credits.balance || 0, 1)
-  const usagePercentage = Math.min((credits.balance / totalCredits) * 100, 100)
+  const usagePercentage = Math.min(((credits.balance || 0) / totalCredits) * 100, 100)
 
   return (
     <Modal open={open} onClose={onClose} title="Créditos">
@@ -5249,6 +5311,63 @@ function CreditsModal({ open, onClose, credits }: { open: boolean; onClose: () =
           <p className="text-sm text-white/60">
             A compra real de créditos ainda não está ativa neste ambiente do link. Quando estiver disponível, os pacotes aparecerão aqui com histórico real.
           </p>
+        </div>
+      </div>
+    </Modal>
+  )
+}
+
+function TravelerPublicCreditsModal({
+  open,
+  onClose,
+  credits,
+}: {
+  open: boolean
+  onClose: () => void
+  credits: any
+}) {
+  const totalCredits = Math.max(credits?.total || credits?.balance || 0, 1)
+  const usagePercentage = Math.min(((credits?.balance || 0) / totalCredits) * 100, 100)
+
+  return (
+    <Modal tone="light" open={open} onClose={onClose} title="Creditos">
+      <div className="space-y-5">
+        <div className="rounded-[26px] border border-[#dbe5f4] bg-[linear-gradient(180deg,#ffffff_0%,#eef5ff_100%)] p-5">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-sm text-slate-500">Creditos disponiveis</p>
+              <p className="mt-1 text-4xl font-semibold tracking-[-0.04em] text-slate-950">{credits?.balance ?? 0}</p>
+            </div>
+            <div className="rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-600 ring-1 ring-slate-200">
+              {credits?.used ?? 0} usados de {credits?.total ?? 0}
+            </div>
+          </div>
+          <div className="mt-4 h-2 rounded-full bg-slate-200">
+            <div className="h-full rounded-full bg-gradient-to-r from-[#5de0e6] to-[#004aad]" style={{ width: `${usagePercentage}%` }} />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div className="rounded-2xl border border-slate-200 bg-white/92 p-4">
+            <p className="text-xs text-slate-500">Consumo da viagem</p>
+            <p className="mt-2 text-2xl font-semibold text-slate-950">{credits?.used ?? 0}</p>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-white/92 p-4">
+            <p className="text-xs text-slate-500">Saldo atual</p>
+            <p className="mt-2 text-2xl font-semibold text-slate-950">{credits?.balance ?? 0}</p>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-white/92 p-4">
+            <p className="text-xs text-slate-500">Total da viagem</p>
+            <p className="mt-2 text-2xl font-semibold text-slate-950">{credits?.total ?? 0}</p>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-white/92 p-4">
+            <p className="text-xs text-slate-500">Disponivel agora</p>
+            <p className="mt-2 text-2xl font-semibold text-slate-950">{credits?.balance ?? 0}</p>
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-slate-200 bg-white/92 p-4 text-sm text-slate-600">
+          Recargas e compras sao feitas pelo portal.
         </div>
       </div>
     </Modal>
@@ -5488,6 +5607,144 @@ function SensitiveAccessModal({
           className="mt-3 w-full text-[#5de0e6] hover:bg-white/[0.04] hover:text-[#5de0e6]"
         >
           Gerenciar seguranca neste dispositivo
+        </Button>
+      </div>
+    </Modal>
+  )
+}
+
+function TravelerPublicSensitiveAccessModal({
+  open,
+  tripId,
+  onClose,
+  onSuccess,
+  onLogin,
+}: {
+  open: boolean
+  tripId: string
+  onClose: () => void
+  onSuccess: () => void
+  onLogin: () => void
+}) {
+  const [pin, setPin] = useState("")
+  const [error, setError] = useState("")
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const quickAccessMethods = getTripLinkQuickAccessMethods(tripId)
+
+  useEffect(() => {
+    if (!open) {
+      setPin("")
+      setError("")
+      setIsSubmitting(false)
+    }
+  }, [open])
+
+  const handlePinUnlock = async () => {
+    setIsSubmitting(true)
+    setError("")
+
+    try {
+      const isValid = await verifyTripLinkPin(tripId, pin)
+      if (!isValid) {
+        setError("PIN invalido.")
+        return
+      }
+
+      onSuccess()
+    } catch (unlockError) {
+      const message = unlockError instanceof Error ? unlockError.message : "PIN indisponivel neste dispositivo."
+      setError(message)
+    } finally {
+      setIsSubmitting(false)
+      setPin("")
+    }
+  }
+
+  const handleBiometricUnlock = async () => {
+    setIsSubmitting(true)
+    setError("")
+
+    try {
+      const success = await authenticateTripLinkBiometric(tripId)
+      if (!success) {
+        setError("Nao foi possivel validar a biometria neste dispositivo.")
+        return
+      }
+
+      onSuccess()
+    } catch (unlockError) {
+      const message = unlockError instanceof Error ? unlockError.message : "Biometria indisponivel neste dispositivo."
+      setError(message)
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  return (
+    <Modal tone="light" open={open} onClose={onClose} title="Desbloquear areas sensiveis">
+      <div className="w-full">
+        <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-[linear-gradient(180deg,#eff6ff,#dbeafe)]">
+          <Lock className="h-8 w-8 text-[#2563eb]" />
+        </div>
+        <p className="text-center text-sm leading-6 text-slate-600">
+          {quickAccessMethods.pinEnabled || quickAccessMethods.biometricEnabled
+            ? "Use o PIN ou a biometria ja configurados para abrir documentos, passagens, hospedagens e concierge."
+            : "O PIN e configurado pelo responsavel no portal/admin. Neste link voce apenas desbloqueia com um acesso ja existente."}
+        </p>
+
+        <div className="mt-6 space-y-3">
+          {quickAccessMethods.biometricEnabled ? (
+            <Button
+              onClick={() => void handleBiometricUnlock()}
+              disabled={isSubmitting}
+              className="w-full rounded-2xl border-0 bg-gradient-to-r from-[#5de0e6] to-[#004aad] text-white hover:opacity-90"
+            >
+              <Fingerprint className="mr-2 h-4 w-4" />
+              Usar Face ID / biometria
+            </Button>
+          ) : null}
+
+          {quickAccessMethods.pinEnabled ? (
+            <div className="space-y-3 rounded-2xl border border-slate-200 bg-white/92 p-4">
+              <Label className="text-slate-600">Usar PIN</Label>
+              <Input
+                type="password"
+                inputMode="numeric"
+                maxLength={4}
+                placeholder="PIN"
+                value={pin}
+                onChange={(event) => setPin(event.target.value.replace(/\D/g, "").slice(0, 4))}
+                className="h-12 border-slate-200 bg-white text-center text-lg font-semibold tracking-[0.28em] text-slate-950 placeholder:tracking-normal placeholder:text-slate-400"
+              />
+              <Button
+                onClick={() => void handlePinUnlock()}
+                disabled={isSubmitting || pin.length !== 4}
+                className="w-full rounded-2xl border-0 bg-[#2563eb] text-white hover:bg-[#1d4ed8]"
+              >
+                Desbloquear com PIN
+              </Button>
+            </div>
+          ) : null}
+
+          {!quickAccessMethods.pinEnabled && !quickAccessMethods.biometricEnabled ? (
+            <div className="rounded-2xl border border-slate-200 bg-white/92 p-4 text-sm text-slate-600">
+              Nenhum acesso rapido foi configurado para este dispositivo.
+            </div>
+          ) : null}
+
+          {error ? (
+            <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+              {error}
+            </div>
+          ) : null}
+        </div>
+
+        <Button
+          variant="outline"
+          onClick={onLogin}
+          className="mt-5 w-full border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+        >
+          Entrar com login
         </Button>
       </div>
     </Modal>
@@ -6093,7 +6350,22 @@ export default function TripPage() {
     if (typeof document === "undefined") return
 
     const themeColorMeta = document.querySelector('meta[name="theme-color"]')
+    const ensureNamedMeta = (name: string) => {
+      let element = document.querySelector(`meta[name="${name}"]`) as HTMLMetaElement | null
+      if (!element) {
+        element = document.createElement("meta")
+        element.setAttribute("name", name)
+        document.head.appendChild(element)
+      }
+      return element
+    }
+    const viewportMeta = ensureNamedMeta("viewport")
+    const appleCapableMeta = ensureNamedMeta("apple-mobile-web-app-capable")
+    const appleStatusBarMeta = ensureNamedMeta("apple-mobile-web-app-status-bar-style")
     const previousThemeColor = themeColorMeta?.getAttribute("content")
+    const previousViewport = viewportMeta?.getAttribute("content")
+    const previousAppleCapable = appleCapableMeta?.getAttribute("content")
+    const previousAppleStatusBar = appleStatusBarMeta?.getAttribute("content")
     const isPublicTravelerView = !adminRouteActive
     const previousHtmlBackground = document.documentElement.style.backgroundColor
     const previousBodyBackground = document.body.style.backgroundColor
@@ -6104,6 +6376,9 @@ export default function TripPage() {
     }
 
     if (isPublicTravelerView) {
+      viewportMeta?.setAttribute("content", "width=device-width, initial-scale=1, viewport-fit=cover")
+      appleCapableMeta?.setAttribute("content", "yes")
+      appleStatusBarMeta?.setAttribute("content", "default")
       document.documentElement.setAttribute("data-trip-public-theme", "light")
       document.body.setAttribute("data-trip-public-theme", "light")
       document.documentElement.style.backgroundColor = "#f4f1ea"
@@ -6117,6 +6392,15 @@ export default function TripPage() {
     return () => {
       if (themeColorMeta && previousThemeColor) {
         themeColorMeta.setAttribute("content", previousThemeColor)
+      }
+      if (viewportMeta) {
+        viewportMeta.setAttribute("content", previousViewport || "width=device-width, initial-scale=1")
+      }
+      if (appleCapableMeta) {
+        appleCapableMeta.setAttribute("content", previousAppleCapable || "yes")
+      }
+      if (appleStatusBarMeta) {
+        appleStatusBarMeta.setAttribute("content", previousAppleStatusBar || "default")
       }
       document.documentElement.removeAttribute("data-trip-public-theme")
       document.body.removeAttribute("data-trip-public-theme")
@@ -7117,7 +7401,7 @@ export default function TripPage() {
             </BottomSheet>
 
             <ShareModal open={shareOpen} onClose={() => setShareOpen(false)} tripData={tripData} />
-            <SensitiveAccessModal
+            <TravelerPublicSensitiveAccessModal
               open={securityModalOpen}
               onClose={handleCloseSensitiveAccessModal}
               tripId={tripData.id}
@@ -7126,15 +7410,15 @@ export default function TripPage() {
                 setSecurityModalOpen(false)
                 const pendingAction = pendingSensitiveActionRef.current
                 pendingSensitiveActionRef.current = null
-                setToast({ message: "Acesso rapido liberado para acoes sensiveis.", type: "success" })
+                setToast({ message: "Acesso liberado", type: "success" })
                 pendingAction?.()
               }}
               onLogin={handleRequireAuthenticatedAdmin}
-              onConfigureQuickAccess={handleConfigureQuickAccess}
             />
             <MenuModal
               open={menuOpen}
               onClose={() => setMenuOpen(false)}
+              publicView
               onOpenTravelers={() => {
                 setMenuOpen(false)
                 setTravelersOpen(true)
@@ -7156,7 +7440,7 @@ export default function TripPage() {
             <TravelersModal open={travelersOpen} onClose={() => setTravelersOpen(false)} travelers={tripData.travelers} onUpdateTravelers={handleUpdateTravelers} />
             <TripSettingsModal open={tripSettingsOpen} onClose={() => setTripSettingsOpen(false)} tripData={tripData} onSave={handleSaveTripSettings} />
             <TripSecurityModal open={securitySettingsOpen} onClose={() => setSecuritySettingsOpen(false)} tripId={tripData.id} tripTitle={tripData.destination} onSecurityUpdated={() => setToast({ message: "Seguranca do dispositivo atualizada.", type: "success" })} />
-            <CreditsModal open={creditsOpen} onClose={() => setCreditsOpen(false)} credits={tripData.credits} />
+            <TravelerPublicCreditsModal open={creditsOpen} onClose={() => setCreditsOpen(false)} credits={tripData.credits} />
             <Modal open={premiumGateModalOpen} onClose={() => setPremiumGateModalOpen(false)} title="DisponÃ­vel no Premium">
               <div className="space-y-5">
                 <p className="text-sm text-white/60">
