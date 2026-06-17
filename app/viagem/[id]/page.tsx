@@ -43,7 +43,7 @@ import {
   Globe, Phone, AlertCircle, CreditCard, QrCode, Navigation,
   ChevronDown, Play, Pause, Volume2, Star, Heart, ExternalLink,
   X, Edit3, Plus, Trash2, Upload, Eye, EyeOff, Settings, User,
-  ArrowLeft, MoreVertical, CheckCircle2, XCircle, Camera, Pencil
+  ArrowLeft, MoreVertical, CheckCircle2, XCircle, Camera, Pencil, Briefcase
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -1297,6 +1297,249 @@ function QuickAccessCards({ tripData, onNavigate }: { tripData: any; onNavigate:
         </div>
       </div>
     </section>
+  )
+}
+
+type TravelerPublicPanel = "flights" | "hotel" | "itinerary" | "documents" | "concierge" | "offline" | null
+
+function buildTravelerCardSummaries(tripData: any) {
+  const flights = Array.isArray(tripData?.flights) ? tripData.flights : []
+  const hotels = Array.isArray(tripData?.hotels) ? tripData.hotels : tripData?.hotel ? [tripData.hotel] : []
+  const documents = Array.isArray(tripData?.documents) ? tripData.documents : []
+  const itinerary = Array.isArray(tripData?.itinerary) ? tripData.itinerary : []
+  const flight = flights[0]
+  const hotel = hotels[0]
+
+  return [
+    {
+      id: "flights" as const,
+      icon: Plane,
+      title: "Passagens",
+      summary: flight
+        ? `${flight.origin?.city || "---"} -> ${flight.destination?.city || "---"}`
+        : documents.filter((document: any) => document.type === "ticket").length > 0
+          ? `${documents.filter((document: any) => document.type === "ticket").length} documento(s) anexado(s)`
+          : "Nenhuma passagem adicionada",
+      detail: flight
+        ? `${flight.date || "Data pendente"}${flight.origin?.time ? ` • ${flight.origin.time}` : ""}${flight.destination?.time ? ` - ${flight.destination.time}` : ""}`
+        : "Abra para ver os detalhes da viagem",
+      status: flight ? "Confirmado" : "Pendente",
+      statusClassName: flight ? "text-emerald-600" : "text-slate-400",
+    },
+    {
+      id: "hotel" as const,
+      icon: Hotel,
+      title: "Hospedagem",
+      summary: hotel?.name || "Nenhuma hospedagem cadastrada",
+      detail: hotel
+        ? `${hotel.checkIn || "Check-in pendente"}${hotel.checkOut ? ` • ${hotel.checkOut}` : ""}`
+        : "Abra para ver os detalhes da estadia",
+      status: hotel ? "Confirmado" : "Pendente",
+      statusClassName: hotel ? "text-emerald-600" : "text-slate-400",
+    },
+    {
+      id: "documents" as const,
+      icon: FileText,
+      title: "Documentos",
+      summary: documents.length > 0 ? `${documents.length} documento(s)` : "Nenhum documento adicionado",
+      detail: documents.length > 0 ? "Abra para consultar os arquivos da viagem" : "Documentos aparecerao aqui quando forem adicionados",
+      status: documents.length > 0 ? "Tudo pronto" : "Vazio",
+      statusClassName: documents.length > 0 ? "text-[#2563eb]" : "text-slate-400",
+    },
+    {
+      id: "itinerary" as const,
+      icon: MapPin,
+      title: "Roteiro",
+      summary: itinerary.length > 0 ? `${itinerary.length} dia(s) planejado(s)` : "Nenhum roteiro criado",
+      detail: itinerary.length > 0 ? "Abra para ver o planejamento da viagem" : "Monte e acompanhe o roteiro da viagem",
+      status: itinerary.length > 0 ? "Ver roteiro" : "Explorar",
+      statusClassName: itinerary.length > 0 ? "text-[#2563eb]" : "text-slate-400",
+    },
+  ]
+}
+
+function TravelerPublicShell({
+  tripData,
+  agencyBranding,
+  offlineModeEnabled,
+  offlinePackageStatus,
+  onOpenShare,
+  onOpenMenu,
+  onOpenPanel,
+}: {
+  tripData: any
+  agencyBranding: { name: string | null; logoUrl: string | null; isAgency: boolean }
+  offlineModeEnabled: boolean
+  offlinePackageStatus: OfflineTripPackageStatus | null
+  onOpenShare: () => void
+  onOpenMenu: () => void
+  onOpenPanel: (panel: Exclude<TravelerPublicPanel, null> | "more" | "home") => void
+}) {
+  const travelers = Array.isArray(tripData?.travelers) ? tripData.travelers : []
+  const cards = buildTravelerCardSummaries(tripData)
+  const parsedDestination = parseTripDestination(tripData?.destination)
+  const offlineReady = offlineModeEnabled || tripData?.offlineEnabled || Boolean(offlinePackageStatus)
+  const avatarLetter = travelers[0]?.name?.charAt(0)?.toUpperCase() || parsedDestination.city.charAt(0).toUpperCase()
+
+  return (
+    <div className="relative mx-auto flex min-h-screen w-full max-w-[460px] flex-col overflow-hidden bg-[#fbfaf7] md:my-6 md:min-h-[920px] md:rounded-[38px] md:border md:border-black/5 md:shadow-[0_32px_90px_rgba(15,23,42,0.12)]">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.98),_rgba(247,243,235,0.94)_48%,_rgba(241,237,230,0.92)_100%)]" />
+      <div className="absolute inset-x-0 top-0 h-56 bg-[linear-gradient(180deg,rgba(255,255,255,0.95),rgba(255,255,255,0))]" />
+      <div className="relative flex flex-1 flex-col px-5 pb-[calc(env(safe-area-inset-bottom)+92px)] pt-[calc(env(safe-area-inset-top)+18px)]">
+        <header className="flex items-center justify-between">
+          <div className="flex min-w-0 items-center gap-3">
+            {agencyBranding.isAgency ? (
+              <div className="rounded-[20px] bg-white/90 px-3 py-2 shadow-[0_16px_40px_rgba(15,23,42,0.08)] ring-1 ring-black/5">
+                <Image
+                  src={agencyBranding.logoUrl || "/vuei-logo.png"}
+                  alt={agencyBranding.name || "Vuei"}
+                  width={128}
+                  height={40}
+                  className="h-7 w-auto max-w-[116px] object-contain"
+                />
+              </div>
+            ) : (
+              <Image src="/vuei-logo.png" alt="Vuei" width={112} height={32} className="h-8 w-auto object-contain" priority />
+            )}
+          </div>
+
+          <div className="flex items-center gap-3">
+            <button
+              onClick={onOpenShare}
+              className="flex h-11 w-11 items-center justify-center rounded-full bg-white/88 text-slate-700 shadow-[0_12px_30px_rgba(15,23,42,0.08)] ring-1 ring-black/5 transition hover:bg-white"
+              aria-label="Compartilhar viagem"
+            >
+              <Share2 className="h-5 w-5" />
+            </button>
+            <button
+              onClick={onOpenMenu}
+              className="flex h-11 w-11 items-center justify-center rounded-full bg-[linear-gradient(135deg,#3b82f6,#1d4ed8)] text-sm font-semibold text-white shadow-[0_16px_30px_rgba(37,99,235,0.24)]"
+              aria-label="Abrir menu"
+            >
+              {avatarLetter}
+            </button>
+          </div>
+        </header>
+
+        <section className="relative mt-5 overflow-hidden rounded-[34px] bg-[linear-gradient(160deg,rgba(255,255,255,0.96),rgba(246,242,235,0.82))] px-5 pb-5 pt-6 shadow-[0_24px_60px_rgba(148,163,184,0.18)] ring-1 ring-black/5">
+          <div className="relative z-10 max-w-[68%]">
+            <h1 className="text-[3rem] font-semibold leading-[0.92] tracking-[-0.05em] text-slate-950">
+              {parsedDestination.city}
+            </h1>
+            <div className="mt-3 flex items-center gap-2 text-lg text-slate-500">
+              <span className="text-2xl">{tripData.countryFlag}</span>
+              <span>{tripData.country || parsedDestination.country || "Destino"}</span>
+            </div>
+            <div className="mt-5 inline-flex max-w-full items-center gap-3 rounded-full bg-white/90 px-4 py-3 text-sm font-medium text-slate-600 shadow-[0_12px_28px_rgba(15,23,42,0.08)] ring-1 ring-black/5">
+              <Calendar className="h-4 w-4 text-slate-500" />
+              <span className="truncate">{tripData.dates.start} - {tripData.dates.end}</span>
+            </div>
+          </div>
+
+          <div className="pointer-events-none absolute inset-y-0 right-0 w-[63%]">
+            <Image
+              src={tripData.heroImage}
+              alt={tripData.destination}
+              fill
+              className="object-cover object-right-bottom opacity-95"
+              priority
+            />
+            <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(251,250,247,0.96)_8%,rgba(251,250,247,0.62)_34%,rgba(251,250,247,0.08)_72%)]" />
+            <div className="absolute inset-x-0 bottom-0 h-20 bg-[linear-gradient(180deg,rgba(251,250,247,0)_0%,rgba(251,250,247,0.92)_100%)]" />
+          </div>
+        </section>
+
+        <section className="mt-4 space-y-3">
+          {cards.map((card) => (
+            <button
+              key={card.id}
+              onClick={() => onOpenPanel(card.id)}
+              className="flex w-full items-center gap-4 rounded-[28px] bg-white/92 px-4 py-4 text-left shadow-[0_18px_40px_rgba(148,163,184,0.14)] ring-1 ring-black/5 transition hover:bg-white"
+            >
+              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[20px] bg-[linear-gradient(180deg,#f2f6ff,#e9eefb)] text-[#2563eb]">
+                <card.icon className="h-6 w-6" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="truncate text-[1.35rem] font-semibold tracking-[-0.03em] text-slate-950">{card.title}</p>
+                  <span className={cn("shrink-0 text-sm font-medium", card.statusClassName)}>{card.status}</span>
+                </div>
+                <p className="truncate text-[1rem] text-slate-600">{card.summary}</p>
+                <p className="truncate text-sm text-slate-400">{card.detail}</p>
+              </div>
+              <ChevronRight className="h-5 w-5 shrink-0 text-slate-400" />
+            </button>
+          ))}
+        </section>
+
+        <section className="mt-4">
+          <button
+            onClick={() => onOpenPanel("offline")}
+            className="flex w-full items-center gap-4 rounded-[28px] bg-white/90 px-4 py-4 text-left shadow-[0_18px_40px_rgba(148,163,184,0.14)] ring-1 ring-black/5 transition hover:bg-white"
+          >
+            <div className={cn("flex h-14 w-14 shrink-0 items-center justify-center rounded-[20px]", offlineReady ? "bg-[#edf8ef] text-emerald-600" : "bg-[#f1f5f9] text-slate-500")}>
+              {offlineReady ? <CheckCircle2 className="h-6 w-6" /> : <Download className="h-6 w-6" />}
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-[1.2rem] font-semibold tracking-[-0.03em] text-slate-950">Disponivel offline</p>
+                <span className={cn("text-sm font-medium", offlineReady ? "text-emerald-600" : "text-slate-400")}>
+                  {offlineReady ? "Pronto" : "Baixar"}
+                </span>
+              </div>
+              <p className="text-[1rem] text-slate-600">
+                {offlineReady ? "Salvo neste dispositivo" : "Mantenha seus docs e roteiro disponiveis sem internet"}
+              </p>
+            </div>
+            <div className="flex items-center gap-2 rounded-full border border-slate-200 px-3 py-2 text-sm text-slate-500">
+              <Download className="h-4 w-4" />
+              <span>Baixar docs</span>
+            </div>
+          </button>
+        </section>
+
+        {offlineModeEnabled && offlinePackageStatus ? (
+          <div className="mt-3 rounded-[24px] border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+            {offlinePackageStatus === "partial"
+              ? "Modo offline ativo com disponibilidade parcial."
+              : offlinePackageStatus === "legacy_snapshot"
+                ? "Modo offline ativo com pacote salvo anterior."
+                : "Modo offline ativo neste dispositivo."}
+          </div>
+        ) : null}
+      </div>
+
+      <nav className="absolute inset-x-0 bottom-0 z-20 border-t border-black/5 bg-[rgba(255,255,255,0.82)] px-3 pb-[calc(env(safe-area-inset-bottom)+10px)] pt-3 backdrop-blur-xl">
+        <div className="grid grid-cols-5 gap-1">
+          {[
+            { id: "home", label: "Viagem", icon: Briefcase },
+            { id: "itinerary", label: "Roteiro", icon: MapPin },
+            { id: "concierge", label: "Concierge", icon: MessageCircle, badge: "IA" },
+            { id: "documents", label: "Documentos", icon: FileText },
+            { id: "more", label: "Mais", icon: MoreVertical },
+          ].map((item) => (
+            <button
+              key={item.id}
+              onClick={() => onOpenPanel(item.id as Exclude<TravelerPublicPanel, null> | "more" | "home")}
+              className={cn(
+                "relative flex flex-col items-center justify-center gap-1 rounded-[20px] px-2 py-2 text-center transition",
+                item.id === "home" ? "text-[#2563eb]" : "text-slate-500 hover:text-slate-700",
+              )}
+            >
+              <div className={cn("relative flex h-10 w-10 items-center justify-center rounded-full", item.id === "home" ? "bg-[#eff6ff]" : "bg-transparent")}>
+                <item.icon className="h-5 w-5" />
+                {item.badge ? (
+                  <span className="absolute -right-1 top-0 rounded-full bg-white px-1.5 py-0.5 text-[9px] font-semibold text-slate-700 shadow-sm ring-1 ring-black/5">
+                    {item.badge}
+                  </span>
+                ) : null}
+              </div>
+              <span className="text-[11px] font-medium">{item.label}</span>
+            </button>
+          ))}
+        </div>
+      </nav>
+    </div>
   )
 }
 
@@ -5250,6 +5493,7 @@ export default function TripPage() {
   const [tripSettingsOpen, setTripSettingsOpen] = useState(false)
   const [securitySettingsOpen, setSecuritySettingsOpen] = useState(false)
   const [creditsOpen, setCreditsOpen] = useState(false)
+  const [travelerPanel, setTravelerPanel] = useState<TravelerPublicPanel>(null)
   const [tripOwnerUserId, setTripOwnerUserId] = useState<string | null>(null)
   const [tripAdminToken, setTripAdminToken] = useState<string | null>(null)
   const [tripPublicToken, setTripPublicToken] = useState<string | null>(null)
@@ -5324,6 +5568,10 @@ export default function TripPage() {
     pendingSensitiveActionRef.current = null
     setQuickAccessGateRequired(false)
   }, [tripOwnerUserId, user?.id, params?.id, params?.slug])
+
+  useEffect(() => {
+    setTravelerPanel(null)
+  }, [routeSlug, pathname])
 
   useEffect(() => {
     if (typeof window === "undefined") return
@@ -5813,6 +6061,27 @@ export default function TripPage() {
     })
   }, [params?.id, params?.slug, pathname, user?.id, authLoading])
 
+  useEffect(() => {
+    if (typeof document === "undefined") return
+
+    const themeColorMeta = document.querySelector('meta[name="theme-color"]')
+    const previousThemeColor = themeColorMeta?.getAttribute("content")
+    const isPublicTravelerView = !adminRouteActive
+
+    if (themeColorMeta) {
+      themeColorMeta.setAttribute("content", isPublicTravelerView ? "#f4f1ea" : "#050505")
+    }
+
+    document.body.style.backgroundColor = isPublicTravelerView ? "#f4f1ea" : ""
+
+    return () => {
+      if (themeColorMeta && previousThemeColor) {
+        themeColorMeta.setAttribute("content", previousThemeColor)
+      }
+      document.body.style.backgroundColor = ""
+    }
+  }, [adminRouteActive])
+
   const showToast = (message: string, type: "success" | "error" | "info" = "success") => {
     setToast({ message, type })
   }
@@ -5925,6 +6194,26 @@ export default function TripPage() {
     } else {
       scrollToSection()
     }
+  }
+
+  const handleOpenTravelerPanel = (panel: Exclude<TravelerPublicPanel, null> | "more" | "home") => {
+    if (panel === "home") {
+      setTravelerPanel(null)
+      window.scrollTo({ top: 0, behavior: "smooth" })
+      return
+    }
+
+    if (panel === "more") {
+      setMenuOpen(true)
+      return
+    }
+
+    if (panel === "documents" || panel === "flights" || panel === "hotel" || panel === "concierge") {
+      requireSensitiveAccess(() => setTravelerPanel(panel))
+      return
+    }
+
+    setTravelerPanel(panel)
   }
 
   const handleUpdateTrip = (data: any) => {
@@ -6643,6 +6932,176 @@ export default function TripPage() {
           />
         </div>
       </main>
+    )
+  }
+
+  if (!adminRouteActive) {
+    return (
+      <PermissionContext.Provider value={{ isAdmin, canWrite, setIsAdmin }}>
+        <ToastContext.Provider value={{ showToast }}>
+          <main className="min-h-screen bg-[#f4f1ea] text-slate-900">
+            <TravelerPublicShell
+              tripData={tripData}
+              agencyBranding={agencyBranding}
+              offlineModeEnabled={offlineModeEnabled}
+              offlinePackageStatus={offlinePackageStatus}
+              onOpenShare={() => setShareOpen(true)}
+              onOpenMenu={() => setMenuOpen(true)}
+              onOpenPanel={handleOpenTravelerPanel}
+            />
+
+            <BottomSheet open={travelerPanel === "flights"} onClose={() => setTravelerPanel(null)} title="Passagens">
+              <FlightsSection
+                loading={sectionsLoading.flights}
+                tripData={tripData}
+                onUpdateFlight={handleUpdateFlight}
+                onAddFlight={handleAddFlight}
+                onDeleteFlight={handleDeleteFlight}
+                onDeleteDocument={handleDeleteDocument}
+                tripId={tripData.id}
+                ownerUserId={tripOwnerUserId}
+                agencyId={profile?.agencyId ?? null}
+                routeSlug={routeSlug}
+                tripAdminToken={tripAdminToken}
+                tripPublicToken={tripPublicToken}
+                adminLinkMutationMode={adminLinkMutationMode}
+                ensureSensitiveAccess={ensureSensitiveAccess}
+                onTrackExtraction={startFlightExtractionPolling}
+                offlineReadOnly={offlineModeEnabled}
+                offlineDocumentContext={offlineDocumentContext}
+              />
+            </BottomSheet>
+            <BottomSheet open={travelerPanel === "hotel"} onClose={() => setTravelerPanel(null)} title="Hospedagem">
+              <HotelSection loading={sectionsLoading.hotels} tripData={tripData} onSaveHotel={handleSaveHotel} onDeleteHotel={handleDeleteHotel} />
+            </BottomSheet>
+            <BottomSheet open={travelerPanel === "itinerary"} onClose={() => setTravelerPanel(null)} title="Roteiro">
+              <ItinerarySection
+                loading={sectionsLoading.itineraries}
+                tripData={tripData}
+                itineraryRecords={tripItineraryRecords}
+                offlineReadOnly={offlineModeEnabled}
+                offlineDocumentContext={offlineDocumentContext}
+                tripId={tripData.id}
+                ownerUserId={tripOwnerUserId}
+                agencyId={profile?.agencyId ?? null}
+                routeSlug={routeSlug}
+                tripAdminToken={tripAdminToken}
+                tripPublicToken={tripPublicToken}
+                adminLinkMutationMode={adminLinkMutationMode}
+                ensureSensitiveAccess={ensureSensitiveAccess}
+                onUpdateItinerary={handleUpdateItinerary}
+                onGenerateSimple={() => handleGenerateItinerary("simple")}
+                onGenerateComplete={() => handleGenerateItinerary("complete_pdf")}
+                onSaveUploadedItinerary={handleSaveUploadedItinerary}
+                onDeleteItinerary={handleDeleteItinerary}
+              />
+            </BottomSheet>
+            <BottomSheet open={travelerPanel === "documents"} onClose={() => setTravelerPanel(null)} title="Documentos">
+              <DocumentsSection
+                loading={sectionsLoading.documents}
+                tripData={tripData}
+                onAddDocument={handleAddDocument}
+                onDeleteDocument={handleDeleteDocument}
+                tripId={tripData.id}
+                ownerUserId={tripOwnerUserId}
+                agencyId={profile?.agencyId ?? null}
+                routeSlug={routeSlug}
+                tripAdminToken={tripAdminToken}
+                tripPublicToken={tripPublicToken}
+                adminLinkMutationMode={adminLinkMutationMode}
+                ensureSensitiveAccess={ensureSensitiveAccess}
+                onSensitiveAccessGranted={() => setSensitiveAccessGranted(true)}
+                offlineReadOnly={offlineModeEnabled}
+                offlineDocumentContext={offlineDocumentContext}
+              />
+            </BottomSheet>
+            <BottomSheet open={travelerPanel === "concierge"} onClose={() => setTravelerPanel(null)} title="Concierge">
+              <ConciergeSection
+                tripData={tripData}
+                onOpenCredits={() => setCreditsOpen(true)}
+                offlineReadOnly={offlineModeEnabled}
+                tripSlug={routeSlug}
+                adminToken={tripAdminToken}
+                publicToken={tripPublicToken}
+                accessMode="public"
+              />
+            </BottomSheet>
+            <BottomSheet open={travelerPanel === "offline"} onClose={() => setTravelerPanel(null)} title="Offline">
+              <OfflineSection
+                tripData={tripData}
+                tripItineraryRecords={tripItineraryRecords}
+                isAdmin={isAdmin}
+                sensitiveAccessGranted={sensitiveAccessGranted}
+                agencyBranding={agencyBranding}
+                routeSlug={routeSlug}
+                currentPathname={pathname || `/viagem/${routeSlug}`}
+              />
+            </BottomSheet>
+
+            <ShareModal open={shareOpen} onClose={() => setShareOpen(false)} tripData={tripData} />
+            <SensitiveAccessModal
+              open={securityModalOpen}
+              onClose={handleCloseSensitiveAccessModal}
+              tripId={tripData.id}
+              onSuccess={() => {
+                setSensitiveAccessGranted(true)
+                setSecurityModalOpen(false)
+                const pendingAction = pendingSensitiveActionRef.current
+                pendingSensitiveActionRef.current = null
+                setToast({ message: "Acesso rapido liberado para acoes sensiveis.", type: "success" })
+                pendingAction?.()
+              }}
+              onLogin={handleRequireAuthenticatedAdmin}
+              onConfigureQuickAccess={handleConfigureQuickAccess}
+            />
+            <MenuModal
+              open={menuOpen}
+              onClose={() => setMenuOpen(false)}
+              onOpenTravelers={() => {
+                setMenuOpen(false)
+                setTravelersOpen(true)
+              }}
+              onOpenSettings={() => {
+                setMenuOpen(false)
+                setTripSettingsOpen(true)
+              }}
+              onOpenSecurity={() => {
+                setMenuOpen(false)
+                setSecuritySettingsOpen(true)
+              }}
+              onOpenCredits={() => {
+                setMenuOpen(false)
+                setCreditsOpen(true)
+              }}
+            />
+            <EditTripModal open={editTripOpen} onClose={() => setEditTripOpen(false)} tripData={tripData} onSave={handleUpdateTrip} />
+            <TravelersModal open={travelersOpen} onClose={() => setTravelersOpen(false)} travelers={tripData.travelers} onUpdateTravelers={handleUpdateTravelers} />
+            <TripSettingsModal open={tripSettingsOpen} onClose={() => setTripSettingsOpen(false)} tripData={tripData} onSave={handleSaveTripSettings} />
+            <TripSecurityModal open={securitySettingsOpen} onClose={() => setSecuritySettingsOpen(false)} tripId={tripData.id} tripTitle={tripData.destination} onSecurityUpdated={() => setToast({ message: "Seguranca do dispositivo atualizada.", type: "success" })} />
+            <CreditsModal open={creditsOpen} onClose={() => setCreditsOpen(false)} credits={tripData.credits} />
+            <Modal open={premiumGateModalOpen} onClose={() => setPremiumGateModalOpen(false)} title="DisponÃ­vel no Premium">
+              <div className="space-y-5">
+                <p className="text-sm text-white/60">
+                  Assine o Premium para gerar roteiros inteligentes, criar viagens ilimitadas e receber crÃ©ditos mensais inclusos.
+                </p>
+                <Button
+                  className="w-full rounded-2xl border-0 bg-gradient-to-r from-[#5de0e6] to-[#004aad] text-white"
+                  onClick={() => {
+                    setPremiumGateModalOpen(false)
+                    router.push("/portal/planos")
+                  }}
+                >
+                  Conhecer Premium
+                </Button>
+              </div>
+            </Modal>
+
+            <AnimatePresence>
+              {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+            </AnimatePresence>
+          </main>
+        </ToastContext.Provider>
+      </PermissionContext.Provider>
     )
   }
 
