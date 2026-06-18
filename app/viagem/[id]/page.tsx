@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, createContext, useContext } from "react"
 import Image from "next/image"
-import { useParams, usePathname, useRouter } from "next/navigation"
+import { useParams, usePathname, useRouter, useSearchParams } from "next/navigation"
 import { motion, AnimatePresence, useScroll, useTransform } from "framer-motion"
 import { extractAgencyStorageState } from "@/lib/mappers/agency-mappers"
 import { extractTripsStoragePayload } from "@/lib/mappers/trip-mappers"
@@ -5825,6 +5825,7 @@ function TravelerPublicSensitiveAccessModal({
 export default function TripPage() {
   const params = useParams<{ id?: string; slug?: string }>()
   const pathname = usePathname()
+  const searchParams = useSearchParams()
   const router = useRouter()
   const { user, profile, loading: authLoading } = useAuth()
   const [travelerPlan, setTravelerPlan] = useState(() => resolveTravelerPlan(profile))
@@ -5836,6 +5837,9 @@ export default function TripPage() {
       : typeof params?.slug === "string"
         ? params.slug
         : initialTripData.id
+  const searchParamsKey = searchParams?.toString() ?? ""
+  const adminRouteLoadActive = isAdminLinkMode(new URLSearchParams(searchParamsKey), pathname)
+  const adminAuthLoading = adminRouteLoadActive ? authLoading : false
   const [tripData, setTripData] = useState(() => normalizeTripViewData(initialTripData))
   const [isAdmin, setIsAdmin] = useState(false)
   const [canWrite, setCanWrite] = useState(false)
@@ -5932,11 +5936,15 @@ export default function TripPage() {
   useEffect(() => {
     if (typeof window === "undefined") return
 
-    const searchParams = new URLSearchParams(window.location.search)
-    const adminToken = searchParams.get("adminToken")
-    const publicToken = searchParams.get("token") || searchParams.get("publicToken")
+    const routeSearchParams = new URLSearchParams(searchParamsKey)
+    const adminToken = routeSearchParams.get("adminToken")
+    const publicToken = routeSearchParams.get("token") || routeSearchParams.get("publicToken")
     const isPublicRoute = pathname?.startsWith("/v/") ?? false
-    const isAdminRoute = isAdminLinkMode(searchParams, pathname)
+    const isAdminRoute = isAdminLinkMode(routeSearchParams, pathname)
+
+    if (isAdminRoute && authLoading) {
+      return
+    }
 
     setIsAdmin(false)
     setCanWrite(false)
@@ -6150,10 +6158,6 @@ export default function TripPage() {
             console.error("[TRIP] erro ao carregar link", "Esta viagem nao esta publicada para acesso publico.")
             setLoadError("Esta viagem nao esta disponivel publicamente.")
             setIsLoadingTrip(false)
-            return
-          }
-
-          if (isAdminRoute && authLoading) {
             return
           }
 
@@ -6415,7 +6419,7 @@ export default function TripPage() {
         setIsLoadingTrip(false)
       }
     })
-  }, [params?.id, params?.slug, pathname, user?.id, authLoading])
+  }, [params?.id, params?.slug, pathname, searchParamsKey, user?.id, adminAuthLoading])
 
   useEffect(() => {
     if (typeof document === "undefined") return

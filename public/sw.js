@@ -1,16 +1,17 @@
 const SHELL_CACHE_PREFIX = "vuei-shell"
-const SHELL_CACHE_VERSION = "20260617c"
+const SHELL_CACHE_VERSION = "20260618a"
 const CACHE_NAME = `${SHELL_CACHE_PREFIX}-${SHELL_CACHE_VERSION}`
 const SHELL_FALLBACK_URL = "/"
+const NAVIGATION_NETWORK_TIMEOUT_MS = 2500
 const SHELL_URLS = [
   SHELL_FALLBACK_URL,
-  "/manifest.webmanifest?v=20260617c",
+  "/manifest.webmanifest?v=20260618a",
   "/favicon.ico",
   "/favicon-16x16.png",
   "/favicon-32x32.png",
-  "/apple-touch-icon-20260611b.png?v=20260617c",
-  "/android-chrome-192x192-20260611b.png?v=20260617c",
-  "/android-chrome-512x512-20260611b.png?v=20260617c",
+  "/apple-touch-icon-20260611b.png?v=20260618a",
+  "/android-chrome-192x192-20260611b.png?v=20260618a",
+  "/android-chrome-512x512-20260611b.png?v=20260618a",
 ]
 
 function createTripOfflineFallbackResponse() {
@@ -83,9 +84,28 @@ self.addEventListener("fetch", (event) => {
       url.pathname.startsWith("/v/") ||
       url.pathname.startsWith("/viagem/")
 
+    const fallbackToCache = async () => {
+      const cache = await caches.open(CACHE_NAME)
+      const cachedNavigation = await cache.match(url.pathname)
+      if (cachedNavigation) {
+        return cachedNavigation
+      }
+
+      if (!isTripRoute) {
+        const cachedShell = await caches.match(SHELL_FALLBACK_URL)
+        if (cachedShell) {
+          return cachedShell
+        }
+
+        return Response.error()
+      }
+
+      return createTripOfflineFallbackResponse()
+    }
+
     event.respondWith(
-      fetch(request)
-        .then(async (response) => {
+      Promise.race([
+        fetch(request).then(async (response) => {
           if (response && response.ok) {
             const responseClone = response.clone()
             void caches.open(CACHE_NAME).then((cache) => cache.put(url.pathname, responseClone))
@@ -93,24 +113,13 @@ self.addEventListener("fetch", (event) => {
 
           return response
         })
-        .catch(async () => {
-          const cache = await caches.open(CACHE_NAME)
-          const cachedNavigation = await cache.match(url.pathname)
-          if (cachedNavigation) {
-            return cachedNavigation
-          }
-
-          if (!isTripRoute) {
-            const cachedShell = await caches.match(SHELL_FALLBACK_URL)
-            if (cachedShell) {
-              return cachedShell
-            }
-
-            return Response.error()
-          }
-
-          return createTripOfflineFallbackResponse()
+        .catch(() => fallbackToCache()),
+        new Promise((resolve) => {
+          setTimeout(() => {
+            resolve(null)
+          }, NAVIGATION_NETWORK_TIMEOUT_MS)
         }),
+      ]).then((response) => response || fallbackToCache()),
     )
     return
   }

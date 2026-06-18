@@ -37,6 +37,19 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 const BOOTSTRAP_TIMEOUT_MS = 20_000
+const DEFAULT_PROFILE_SETTINGS = {
+  language: "pt-BR",
+  darkMode: true,
+  notificationsEnabled: true,
+  biometricEnabled: false,
+  pinEnabled: false,
+  quickAccess: {
+    enabled: false,
+    pinHash: null,
+    pinSalt: null,
+    pinIterations: null,
+  },
+} as const
 
 function reportAuthBootstrapIssue(message: string) {
   if (message.toLowerCase().includes("timeout")) {
@@ -45,6 +58,35 @@ function reportAuthBootstrapIssue(message: string) {
   }
 
   console.error("[AUTH ERROR]", message)
+}
+
+function resolveOptimisticRole(user: User): UserRole {
+  const role = user.user_metadata?.role
+  return role === "agency_owner" || role === "agency_member" || role === "master" ? role : "traveler"
+}
+
+function buildOptimisticProfile(user: User, currentProfile: Profile | null): Profile {
+  const now = new Date().toISOString()
+  const fallbackName =
+    (typeof user.user_metadata?.full_name === "string" && user.user_metadata.full_name) ||
+    (typeof user.user_metadata?.name === "string" && user.user_metadata.name) ||
+    currentProfile?.name ||
+    user.email?.split("@")[0] ||
+    "Viajante"
+
+  return {
+    id: user.id,
+    email: user.email ?? currentProfile?.email ?? "",
+    name: fallbackName,
+    phone: typeof user.user_metadata?.phone === "string" ? user.user_metadata.phone : currentProfile?.phone ?? null,
+    avatarUrl: typeof user.user_metadata?.avatar_url === "string" ? user.user_metadata.avatar_url : currentProfile?.avatarUrl ?? null,
+    role: currentProfile?.role ?? resolveOptimisticRole(user),
+    agencyId: currentProfile?.agencyId ?? null,
+    creditsBalance: currentProfile?.creditsBalance ?? 0,
+    settings: currentProfile?.settings ?? DEFAULT_PROFILE_SETTINGS,
+    createdAt: currentProfile?.createdAt ?? now,
+    updatedAt: now,
+  }
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -118,6 +160,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return null
       }
 
+      const optimisticProfile = buildOptimisticProfile(nextUser, profileRef.current)
+      if (!isSameSession || profileRef.current?.id !== nextUser.id) {
+        setProfile(optimisticProfile)
+        profileRef.current = optimisticProfile
+      }
+
       if (isSameSession && profileRef.current?.id === nextUser.id) {
         devLog("boot.profile.loaded", profileRef.current.id)
         return profileRef.current
@@ -126,7 +174,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       sessionSignatureRef.current = nextSignature
       if (options?.deferProfile) {
         void loadProfile(nextUser)
-        return profileRef.current
+        return optimisticProfile
       }
 
       return loadProfile(nextUser)
@@ -168,7 +216,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         if (!mounted || bootstrapRunRef.current !== currentRun) return
 
-        await syncAuthState(sessionResult.data.session ?? null)
+        await syncAuthState(sessionResult.data.session ?? null, { deferProfile: true })
       } catch (error) {
         const message = error instanceof Error ? error.message : "Falha ao inicializar sessao."
         reportAuthBootstrapIssue(message)
@@ -191,14 +239,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, nextSession) => {
+    } = supabase.auth.onAuthStateChange(async (event, nextSession) => {
       if (!mounted) return
+
+      if (event === "INITIAL_SESSION") {
+        return
+      }
+
+      if (event === "TOKEN_REFRESHED") {
+        const nextUser = nextSession?.user ?? null
+        setSession(nextSession)
+        setUser(nextUser)
+        devLog("boot.session.loaded", nextUser?.id ?? null)
+        return
+      }
 
       setLoading(true)
       setInitialized(false)
 
       try {
-        await syncAuthState(nextSession ?? null)
+        await syncAuthState(nextSession ?? null, { deferProfile: true })
       } finally {
         if (!mounted) return
         setLoading(false)

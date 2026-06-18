@@ -1,6 +1,7 @@
 import type { SupabaseClient, User } from "@supabase/supabase-js"
 import type { Database } from "@/lib/supabase/types"
 import { getCurrentProfile } from "@/lib/auth/get-current-profile"
+import { mapProfileRowToProfile } from "@/lib/auth/get-current-profile"
 
 const DEFAULT_TRAVELER_CREDITS = 0
 type ProfileRole = Database["public"]["Tables"]["profiles"]["Row"]["role"]
@@ -54,14 +55,26 @@ export async function ensureProfile(user: User, client?: SupabaseClient<Database
       updates.role = nextRole
     }
 
-    if (Object.keys(updates).length > 0) {
-      const { error } = await (resolvedClient.from("profiles") as any).update(updates as any).eq("id", user.id)
-      if (error) {
-        console.error("[AUTH ERROR]", error.message)
-      }
+    if (Object.keys(updates).length === 0) {
+      return existingProfile
     }
 
-    return getCurrentProfile(user.id, resolvedClient)
+    const { data, error } = await (resolvedClient.from("profiles") as any)
+      .update(updates as any)
+      .eq("id", user.id)
+      .select("*")
+      .maybeSingle()
+
+    if (error) {
+      console.error("[AUTH ERROR]", error.message)
+      return existingProfile
+    }
+
+    if (data) {
+      return mapProfileRowToProfile(data)
+    }
+
+    return existingProfile
   }
 
   const payload: Database["public"]["Tables"]["profiles"]["Insert"] = {
@@ -84,11 +97,15 @@ export async function ensureProfile(user: User, client?: SupabaseClient<Database
     },
   }
 
-  const { error } = await (resolvedClient.from("profiles") as any).insert(payload as any)
+  const { data, error } = await (resolvedClient.from("profiles") as any)
+    .insert(payload as any)
+    .select("*")
+    .maybeSingle()
+
   if (error) {
     console.error("[AUTH ERROR]", error.message)
     return null
   }
 
-  return getCurrentProfile(user.id, resolvedClient)
+  return data ? mapProfileRowToProfile(data) : getCurrentProfile(user.id, resolvedClient)
 }
