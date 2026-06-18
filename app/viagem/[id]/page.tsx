@@ -947,6 +947,65 @@ function resolveTripAgencyId(source: any) {
   return source.agencyId ?? source.agency_id ?? source.agency?.id ?? null
 }
 
+function readAgencyBrandingFromBrowserCache(agencyId: string | null) {
+  if (typeof window === "undefined" || !agencyId) return null
+
+  try {
+    for (let index = 0; index < window.sessionStorage.length; index += 1) {
+      const key = window.sessionStorage.key(index)
+      if (!key || !key.startsWith("vuei_agency_workspace_cache:")) continue
+
+      const rawValue = window.sessionStorage.getItem(key)
+      if (!rawValue) continue
+
+      const parsed = JSON.parse(rawValue) as {
+        agency?: {
+          id?: string | null
+          name?: string | null
+          logo?: string | null
+          branding?: {
+            logoUrl?: string | null
+            linkLogoUrl?: string | null
+          } | null
+        } | null
+        agencyId?: string | null
+      }
+
+      if (parsed.agency?.id !== agencyId && parsed.agencyId !== agencyId) continue
+
+      return {
+        name: typeof parsed.agency?.name === "string" ? parsed.agency.name : null,
+        logoUrl: resolveAgencyBrandLogo(
+          parsed.agency?.branding?.linkLogoUrl,
+          parsed.agency?.branding?.logoUrl,
+          parsed.agency?.logo,
+        ),
+      }
+    }
+  } catch (error) {
+    console.error("[TRIP] agency session cache read error", error)
+  }
+
+  try {
+    const rawSettings = window.localStorage.getItem("vuei_agencia_configuracoes_frontend")
+    if (!rawSettings) return null
+
+    const parsed = JSON.parse(rawSettings) as {
+      agencyData?: { name?: string | null } | null
+      brandingData?: { linkLogo?: string | null } | null
+    }
+
+    return {
+      name: typeof parsed.agencyData?.name === "string" ? parsed.agencyData.name : null,
+      logoUrl: resolveAgencyBrandLogo(parsed.brandingData?.linkLogo),
+    }
+  } catch (error) {
+    console.error("[TRIP] agency local settings read error", error)
+  }
+
+  return null
+}
+
 type OfflineDocumentContext = {
   tripId: string
   audience: "public" | "admin"
@@ -6202,12 +6261,17 @@ export default function TripPage() {
           }
           const resolvedAgencyId = resolveTripAgencyId(repositoryTrip.data)
           const preloadedAgencyResult = resolvedAgencyId ? await getAgencyById(resolvedAgencyId) : null
+          const cachedAgencyBranding = readAgencyBrandingFromBrowserCache(resolvedAgencyId)
           const preloadedAgencyLogo = resolveAgencyBrandLogo(
             preloadedAgencyResult?.data?.branding?.linkLogoUrl,
             preloadedAgencyResult?.data?.branding?.logoUrl,
             preloadedAgencyResult?.data?.logo,
+            cachedAgencyBranding?.logoUrl,
           )
-          const preloadedAgencyName = preloadedAgencyResult?.data?.name ?? (resolvedAgencyId ? "Agencia parceira" : null)
+          const preloadedAgencyName =
+            preloadedAgencyResult?.data?.name ??
+            cachedAgencyBranding?.name ??
+            (resolvedAgencyId ? "Agencia parceira" : null)
 
           setAgencyBranding({
             name: preloadedAgencyName,
