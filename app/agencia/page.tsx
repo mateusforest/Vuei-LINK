@@ -18,14 +18,13 @@ import {
   ChevronRight,
   TrendingUp,
   X,
-  Check,
   Copy,
 } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
-import { useAgency, type Client, type AgencyTrip } from "@/contexts/agency-context"
+import { useAgency, type Client } from "@/contexts/agency-context"
 import { useAuth } from "@/contexts/auth-context"
 
 const containerVariants = {
@@ -147,170 +146,11 @@ function NewClientModal({ open, onClose, onSave }: { open: boolean; onClose: () 
   )
 }
 
-// Generate Itinerary Modal
-function GenerateItineraryModal({ open, onClose, clients, trips, onGenerate }: { 
-  open: boolean
-  onClose: () => void
-  clients: Client[]
-  trips: AgencyTrip[]
-  onGenerate: () => void
-}) {
-  const [generating, setGenerating] = useState(false)
-  const [generated, setGenerated] = useState(false)
-  const [formData, setFormData] = useState({
-    clientId: "",
-    tripId: "",
-    destination: "",
-    days: "5",
-    style: "equilibrado",
-    budget: "medio",
-    preferences: ""
-  })
-
-  const handleGenerate = () => {
-    setGenerating(true)
-    setTimeout(() => {
-      setGenerating(false)
-      setGenerated(true)
-      onGenerate()
-    }, 3000)
-  }
-
-  return (
-    <Modal open={open} onClose={onClose} title="Gerar Roteiro com IA">
-      <div className="space-y-4">
-        {!generated ? (
-          <>
-            <div className="p-3 rounded-xl bg-gradient-to-br from-[#5de0e6]/10 to-[#004aad]/10 border border-[#5de0e6]/20 flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-[#5de0e6]" />
-              <p className="text-sm text-white/80">A IA criara um roteiro personalizado</p>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="text-xs text-white/50 uppercase tracking-wider">Cliente</label>
-                <select
-                  value={formData.clientId}
-                  onChange={(e) => setFormData({ ...formData, clientId: e.target.value })}
-                  className="w-full mt-1 px-4 py-3 rounded-xl bg-[#0a0a0a] border border-white/[0.08] text-white focus:outline-none focus:border-[#5de0e6]/50 appearance-none text-sm"
-                  style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='rgba(255,255,255,0.4)'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center', backgroundSize: '16px' }}
-                >
-                  <option value="" className="bg-[#0a0a0a]">Selecionar</option>
-                  {clients.map(c => (
-                    <option key={c.id} value={c.id} className="bg-[#0a0a0a]">{c.name}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="text-xs text-white/50 uppercase tracking-wider">Viagem</label>
-                <select
-                  value={formData.tripId}
-                  onChange={(e) => setFormData({ ...formData, tripId: e.target.value })}
-                  className="w-full mt-1 px-4 py-3 rounded-xl bg-[#0a0a0a] border border-white/[0.08] text-white focus:outline-none focus:border-[#5de0e6]/50 appearance-none text-sm"
-                  style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='rgba(255,255,255,0.4)'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center', backgroundSize: '16px' }}
-                >
-                  <option value="" className="bg-[#0a0a0a]">Selecionar</option>
-                  {trips.map(t => (
-                    <option key={t.id} value={t.id} className="bg-[#0a0a0a]">{t.name}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            <div>
-              <label className="text-xs text-white/50 uppercase tracking-wider">Destino</label>
-              <input
-                type="text"
-                value={formData.destination}
-                onChange={(e) => setFormData({ ...formData, destination: e.target.value })}
-                placeholder="Ex: Paris, Franca"
-                className="w-full mt-1 px-4 py-3 rounded-xl bg-white/[0.05] border border-white/[0.08] text-white placeholder:text-white/30 focus:outline-none focus:border-[#5de0e6]/50"
-              />
-            </div>
-
-            <div className="grid grid-cols-3 gap-4">
-              <div>
-                <label className="text-xs text-white/50 uppercase tracking-wider">Dias</label>
-                <select
-                  value={formData.days}
-                  onChange={(e) => setFormData({ ...formData, days: e.target.value })}
-                  className="w-full mt-1 px-4 py-3 rounded-xl bg-[#0a0a0a] border border-white/[0.08] text-white focus:outline-none focus:border-[#5de0e6]/50 appearance-none text-sm"
-                  style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='rgba(255,255,255,0.4)'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center', backgroundSize: '16px' }}
-                >
-                  {[1,2,3,4,5,6,7,10,14].map(d => (
-                    <option key={d} value={d} className="bg-[#0a0a0a]">{d} dias</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="text-xs text-white/50 uppercase tracking-wider">Estilo</label>
-                <select
-                  value={formData.style}
-                  onChange={(e) => setFormData({ ...formData, style: e.target.value })}
-                  className="w-full mt-1 px-4 py-3 rounded-xl bg-[#0a0a0a] border border-white/[0.08] text-white focus:outline-none focus:border-[#5de0e6]/50 appearance-none text-sm"
-                  style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='rgba(255,255,255,0.4)'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center', backgroundSize: '16px' }}
-                >
-                  <option value="relaxado" className="bg-[#0a0a0a]">Relaxado</option>
-                  <option value="equilibrado" className="bg-[#0a0a0a]">Equilibrado</option>
-                  <option value="intenso" className="bg-[#0a0a0a]">Intenso</option>
-                </select>
-              </div>
-              <div>
-                <label className="text-xs text-white/50 uppercase tracking-wider">Orcamento</label>
-                <select
-                  value={formData.budget}
-                  onChange={(e) => setFormData({ ...formData, budget: e.target.value })}
-                  className="w-full mt-1 px-4 py-3 rounded-xl bg-[#0a0a0a] border border-white/[0.08] text-white focus:outline-none focus:border-[#5de0e6]/50 appearance-none text-sm"
-                  style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='rgba(255,255,255,0.4)'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center', backgroundSize: '16px' }}
-                >
-                  <option value="baixo" className="bg-[#0a0a0a]">Economico</option>
-                  <option value="medio" className="bg-[#0a0a0a]">Moderado</option>
-                  <option value="alto" className="bg-[#0a0a0a]">Premium</option>
-                </select>
-              </div>
-            </div>
-
-            <Button 
-              onClick={handleGenerate} 
-              disabled={generating || !formData.destination}
-              className="w-full bg-gradient-to-r from-[#5de0e6] to-[#004aad] hover:opacity-90 text-white border-0 disabled:opacity-50"
-            >
-              {generating ? (
-                <div className="flex items-center gap-2">
-                  <Sparkles className="w-4 h-4 animate-pulse" />
-                  Gerando roteiro...
-                </div>
-              ) : (
-                <>
-                  <Sparkles className="w-4 h-4 mr-2" />
-                  Gerar com IA
-                </>
-              )}
-            </Button>
-          </>
-        ) : (
-          <div className="text-center py-4">
-            <div className="w-16 h-16 mx-auto rounded-full bg-green-500/20 flex items-center justify-center mb-4">
-              <Check className="w-8 h-8 text-green-400" />
-            </div>
-            <h3 className="text-lg font-semibold text-white mb-2">Roteiro Gerado!</h3>
-            <p className="text-sm text-white/60 mb-4">O roteiro foi salvo na viagem selecionada</p>
-            <Button onClick={onClose} variant="outline" className="border-white/10">
-              Fechar
-            </Button>
-          </div>
-        )}
-      </div>
-    </Modal>
-  )
-}
-
 export default function AgencyDashboard() {
   const router = useRouter()
   const { profile } = useAuth()
-  const { clients, trips, credits, activities, conciergeRequests, addClient, useCredits, setupIncomplete, workspaceError, agency, workspaceLoading, subscription, activeTripsCount } = useAgency()
+  const { clients, trips, credits, activities, conciergeRequests, addClient, setupIncomplete, workspaceError, agency, workspaceLoading, subscription, activeTripsCount } = useAgency()
   const [newClientOpen, setNewClientOpen] = useState(false)
-  const [generateItineraryOpen, setGenerateItineraryOpen] = useState(false)
   const agencyName = agency?.name || profile?.name || "Agencia"
 
   // Calculate stats from real data
@@ -332,10 +172,6 @@ export default function AgencyDashboard() {
       return false
     }
     return true
-  }
-
-  const handleGenerateItinerary = () => {
-    useCredits(10, "Roteiros IA", "Roteiro gerado com IA")
   }
 
   // Format date for display
@@ -582,7 +418,7 @@ export default function AgencyDashboard() {
             { icon: Plane, label: "Nova Viagem", action: () => router.push("/agencia/viagens/criar"), gradient: "from-primary to-accent" },
             { icon: Users, label: "Novo Cliente", action: () => setNewClientOpen(true), gradient: "from-accent to-primary" },
             { icon: FileText, label: "Upload Doc", action: () => router.push("/agencia/documentos"), gradient: "from-primary/80 to-accent/80" },
-            { icon: Sparkles, label: "Gerar Roteiro", action: () => setGenerateItineraryOpen(true), gradient: "from-accent/80 to-primary/80" },
+            { icon: Sparkles, label: "Gerar Roteiro", action: () => router.push("/agencia/roteiros-ia"), gradient: "from-accent/80 to-primary/80" },
             { icon: MessageSquare, label: "Concierge", action: () => router.push("/agencia/concierge"), gradient: "from-primary to-accent" },
           ].map((action, index) => (
             <motion.div
@@ -660,13 +496,6 @@ export default function AgencyDashboard() {
         open={newClientOpen} 
         onClose={() => setNewClientOpen(false)} 
         onSave={handleNewClient} 
-      />
-      <GenerateItineraryModal 
-        open={generateItineraryOpen} 
-        onClose={() => setGenerateItineraryOpen(false)} 
-        clients={clients}
-        trips={trips}
-        onGenerate={handleGenerateItinerary} 
       />
     </motion.div>
   )

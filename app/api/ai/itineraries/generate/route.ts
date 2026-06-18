@@ -321,7 +321,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Trip e modo valido sao obrigatorios para gerar o roteiro." }, { status: 400 })
   }
 
-  const adminAccessRequested = Boolean(adminToken || tripSlug)
+  const adminAccessRequested = Boolean(adminToken)
   if (adminAccessRequested && !hasSupabaseAdminEnv()) {
     console.error("[AI][ITINERARY] missing admin env", {
       tripId,

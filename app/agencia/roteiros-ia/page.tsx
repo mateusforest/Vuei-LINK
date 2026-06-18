@@ -268,7 +268,6 @@ export default function RoteirosIAPage() {
       const result = await requestAiItineraryGeneration({
         tripId: selectedTrip.id,
         mode,
-        tripSlug: selectedTrip.slug,
       })
 
       if (!result.data?.itinerary) {

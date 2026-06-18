@@ -49,7 +49,6 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { cn } from "@/lib/utils"
 import { devLog, startPerfMeasure } from "@/lib/dev/perf"
-import { TRAVELER_CREDIT_PACKAGES } from "@/lib/billing/traveler-plans"
 
 const TRIPS_STORAGE_KEY = "vuei_trips"
 const AGENCY_STORAGE_KEY = "vuei_agency"
@@ -165,7 +164,7 @@ function Modal({
                 </button>
               </div>
             )}
-            <div className="p-5">{children}</div>
+            <div className={cn("p-5", resolvedTone === "light" ? "trip-link-light-shell" : "")}>{children}</div>
           </motion.div>
         </>
       )}
@@ -1419,6 +1418,32 @@ function TripLinkLightThemeStyles() {
       .trip-link-light-shell [class*="from-[#5de0e6]"],
       .trip-link-light-shell [class*="to-[#004aad]"] {
         box-shadow: none !important;
+      }
+      .trip-link-light-shell label,
+      .trip-link-light-shell .text-xs.uppercase,
+      .trip-link-light-shell .text-xs.tracking-wider {
+        color: #64748b !important;
+      }
+      .trip-link-light-shell input,
+      .trip-link-light-shell textarea,
+      .trip-link-light-shell select {
+        background: #ffffff !important;
+        color: #0f172a !important;
+        border-color: rgba(148, 163, 184, 0.22) !important;
+      }
+      .trip-link-light-shell input::placeholder,
+      .trip-link-light-shell textarea::placeholder {
+        color: #94a3b8 !important;
+      }
+      .trip-link-light-shell option {
+        background: #ffffff !important;
+        color: #0f172a !important;
+      }
+      .trip-link-light-shell .text-muted-foreground,
+      .trip-link-light-shell [class*="text-slate-4"],
+      .trip-link-light-shell [class*="text-slate-5"],
+      .trip-link-light-shell [class*="text-slate-6"] {
+        color: #64748b !important;
       }
     `}</style>
   )
@@ -5308,86 +5333,64 @@ function QuickInfoSection({ tripData }: { tripData: any }) {
   )
 }
 
-// Credits Modal
-function CreditsModal({
+function TravelerPublicCreditsModal({
   open,
   onClose,
   credits,
-  publicView = false,
 }: {
   open: boolean
   onClose: () => void
   credits: any
-  publicView?: boolean
 }) {
-  const { showToast } = useToast()
-  const totalCredits = Math.max(credits.total || credits.balance || 0, 1)
-  const usagePercentage = Math.min(((credits.balance || 0) / totalCredits) * 100, 100)
+  const totalCredits = Math.max(credits?.total || credits?.balance || 0, 1)
+  const usagePercentage = Math.min(((credits?.balance || 0) / totalCredits) * 100, 100)
 
   return (
-    <Modal open={open} onClose={onClose} title="Créditos">
-      <div className="space-y-6">
-        <div className="text-center p-6 rounded-2xl bg-gradient-to-br from-[#5de0e6]/10 to-[#004aad]/10 border border-[#5de0e6]/20">
-          <p className="text-4xl font-bold text-white">{credits.balance}</p>
-          <p className="text-sm text-white/60 mt-1">créditos disponíveis</p>
-          <div className="w-full h-2 bg-white/10 rounded-full mt-4">
-            <div className="h-full bg-gradient-to-r from-[#5de0e6] to-[#004aad] rounded-full" style={{ width: `${usagePercentage}%` }} />
+    <Modal tone="light" open={open} onClose={onClose} title="Creditos">
+      <div className="space-y-5">
+        <div className="rounded-[26px] border border-[#dbe5f4] bg-[linear-gradient(180deg,#ffffff_0%,#eef5ff_100%)] p-5">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-sm text-slate-500">Creditos disponiveis</p>
+              <p className="mt-1 text-4xl font-semibold tracking-[-0.04em] text-slate-950">{credits?.balance ?? 0}</p>
+            </div>
+            <div className="rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-600 ring-1 ring-slate-200">
+              {credits?.used ?? 0} usados de {credits?.total ?? 0}
+            </div>
           </div>
-          <p className="text-xs text-white/40 mt-2">{credits.used} usados de {credits.total}</p>
+          <div className="mt-4 h-2 rounded-full bg-slate-200">
+            <div className="h-full rounded-full bg-gradient-to-r from-[#5de0e6] to-[#004aad]" style={{ width: `${usagePercentage}%` }} />
+          </div>
         </div>
 
         <div className="grid grid-cols-2 gap-3">
-          <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4">
-            <p className="text-xs text-white/40">Consumo da viagem</p>
-            <p className="mt-2 text-2xl font-semibold text-white">{credits.used}</p>
+          <div className="rounded-2xl border border-slate-200 bg-white/92 p-4">
+            <p className="text-xs text-slate-500">Consumo da viagem</p>
+            <p className="mt-2 text-2xl font-semibold text-slate-950">{credits?.used ?? 0}</p>
           </div>
-          <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4">
-            <p className="text-xs text-white/40">Saldo atual</p>
-            <p className="mt-2 text-2xl font-semibold text-white">{credits.balance}</p>
+          <div className="rounded-2xl border border-slate-200 bg-white/92 p-4">
+            <p className="text-xs text-slate-500">Saldo atual</p>
+            <p className="mt-2 text-2xl font-semibold text-slate-950">{credits?.balance ?? 0}</p>
           </div>
-        </div>
-
-        <div>
-          <p className="text-sm text-white font-medium mb-3">Pacotes oficiais de créditos</p>
-          <div className="space-y-3">
-            {TRAVELER_CREDIT_PACKAGES.map((pkg) => (
-              <button
-                key={pkg.code}
-                onClick={() => showToast("Compra de créditos em breve no link da viagem.", "info")}
-                className={cn(
-                  "w-full p-4 rounded-xl border transition-all flex items-center justify-between",
-                  pkg.code === "popular"
-                    ? "bg-gradient-to-br from-[#5de0e6]/10 to-[#004aad]/10 border-[#5de0e6]/30"
-                    : "bg-white/[0.02] border-white/[0.06] hover:border-white/10"
-                )}
-                >
-                <div className="flex items-center gap-3">
-                  <div className="text-left">
-                    <p className="text-white font-medium">{pkg.name}</p>
-                    <p className="text-xs text-white/40">{pkg.credits} créditos • Compra avulsa</p>
-                  </div>
-                  {pkg.code === "popular" && (
-                    <span className="px-2 py-0.5 text-[10px] font-bold bg-[#5de0e6] text-black rounded-full">POPULAR</span>
-                  )}
-                </div>
-                <p className="text-[#5de0e6] font-semibold">{pkg.priceLabel}</p>
-              </button>
-            ))}
+          <div className="rounded-2xl border border-slate-200 bg-white/92 p-4">
+            <p className="text-xs text-slate-500">Total da viagem</p>
+            <p className="mt-2 text-2xl font-semibold text-slate-950">{credits?.total ?? 0}</p>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-white/92 p-4">
+            <p className="text-xs text-slate-500">Disponivel agora</p>
+            <p className="mt-2 text-2xl font-semibold text-slate-950">{credits?.balance ?? 0}</p>
           </div>
         </div>
 
-        <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4">
-          <p className="mb-2 text-sm font-medium text-white">Compras no link da viagem</p>
-          <p className="text-sm text-white/60">
-            A compra real de créditos ainda não está ativa neste ambiente do link. Quando estiver disponível, os pacotes aparecerão aqui com histórico real.
-          </p>
+        <div className="rounded-2xl border border-slate-200 bg-white/92 p-4 text-sm text-slate-600">
+          Recargas e compras sao feitas pelo portal.
         </div>
       </div>
     </Modal>
   )
 }
 
-function TravelerPublicCreditsModal({
+function LinkCreditsSummaryModal({
   open,
   onClose,
   credits,
@@ -7361,91 +7364,101 @@ export default function TripPage() {
             />
 
             <BottomSheet tone="light" open={travelerPanel === "flights"} onClose={() => setTravelerPanel(null)} title="Passagens">
-              <FlightsSection
-                loading={sectionsLoading.flights}
-                tripData={tripData}
-                onUpdateFlight={handleUpdateFlight}
-                onAddFlight={handleAddFlight}
-                onDeleteFlight={handleDeleteFlight}
-                onDeleteDocument={handleDeleteDocument}
-                tripId={tripData.id}
-                ownerUserId={tripOwnerUserId}
-                agencyId={profile?.agencyId ?? null}
-                routeSlug={routeSlug}
-                tripAdminToken={tripAdminToken}
-                tripPublicToken={tripPublicToken}
-                adminLinkMutationMode={adminLinkMutationMode}
-                ensureSensitiveAccess={ensureSensitiveAccess}
-                onTrackExtraction={startFlightExtractionPolling}
-                offlineReadOnly={offlineModeEnabled}
-                offlineDocumentContext={offlineDocumentContext}
-              />
+              {travelerPanel === "flights" ? (
+                <FlightsSection
+                  loading={sectionsLoading.flights}
+                  tripData={tripData}
+                  onUpdateFlight={handleUpdateFlight}
+                  onAddFlight={handleAddFlight}
+                  onDeleteFlight={handleDeleteFlight}
+                  onDeleteDocument={handleDeleteDocument}
+                  tripId={tripData.id}
+                  ownerUserId={tripOwnerUserId}
+                  agencyId={profile?.agencyId ?? null}
+                  routeSlug={routeSlug}
+                  tripAdminToken={tripAdminToken}
+                  tripPublicToken={tripPublicToken}
+                  adminLinkMutationMode={adminLinkMutationMode}
+                  ensureSensitiveAccess={ensureSensitiveAccess}
+                  onTrackExtraction={startFlightExtractionPolling}
+                  offlineReadOnly={offlineModeEnabled}
+                  offlineDocumentContext={offlineDocumentContext}
+                />
+              ) : null}
             </BottomSheet>
             <BottomSheet tone="light" open={travelerPanel === "hotel"} onClose={() => setTravelerPanel(null)} title="Hospedagem">
-              <HotelSection loading={sectionsLoading.hotels} tripData={tripData} onSaveHotel={handleSaveHotel} onDeleteHotel={handleDeleteHotel} />
+              {travelerPanel === "hotel" ? <HotelSection loading={sectionsLoading.hotels} tripData={tripData} onSaveHotel={handleSaveHotel} onDeleteHotel={handleDeleteHotel} /> : null}
             </BottomSheet>
             <BottomSheet tone="light" open={travelerPanel === "itinerary"} onClose={() => setTravelerPanel(null)} title="Roteiro">
-              <ItinerarySection
-                loading={sectionsLoading.itineraries}
-                tripData={tripData}
-                itineraryRecords={tripItineraryRecords}
-                offlineReadOnly={offlineModeEnabled}
-                offlineDocumentContext={offlineDocumentContext}
-                tripId={tripData.id}
-                ownerUserId={tripOwnerUserId}
-                agencyId={profile?.agencyId ?? null}
-                routeSlug={routeSlug}
-                tripAdminToken={tripAdminToken}
-                tripPublicToken={tripPublicToken}
-                adminLinkMutationMode={adminLinkMutationMode}
-                ensureSensitiveAccess={ensureSensitiveAccess}
-                onUpdateItinerary={handleUpdateItinerary}
-                onGenerateSimple={() => handleGenerateItinerary("simple")}
-                onGenerateComplete={() => handleGenerateItinerary("complete_pdf")}
-                onSaveUploadedItinerary={handleSaveUploadedItinerary}
-                onDeleteItinerary={handleDeleteItinerary}
-              />
+              {travelerPanel === "itinerary" ? (
+                <ItinerarySection
+                  loading={sectionsLoading.itineraries}
+                  tripData={tripData}
+                  itineraryRecords={tripItineraryRecords}
+                  offlineReadOnly={offlineModeEnabled}
+                  offlineDocumentContext={offlineDocumentContext}
+                  tripId={tripData.id}
+                  ownerUserId={tripOwnerUserId}
+                  agencyId={profile?.agencyId ?? null}
+                  routeSlug={routeSlug}
+                  tripAdminToken={tripAdminToken}
+                  tripPublicToken={tripPublicToken}
+                  adminLinkMutationMode={adminLinkMutationMode}
+                  ensureSensitiveAccess={ensureSensitiveAccess}
+                  onUpdateItinerary={handleUpdateItinerary}
+                  onGenerateSimple={() => handleGenerateItinerary("simple")}
+                  onGenerateComplete={() => handleGenerateItinerary("complete_pdf")}
+                  onSaveUploadedItinerary={handleSaveUploadedItinerary}
+                  onDeleteItinerary={handleDeleteItinerary}
+                />
+              ) : null}
             </BottomSheet>
             <BottomSheet tone="light" open={travelerPanel === "documents"} onClose={() => setTravelerPanel(null)} title="Documentos">
-              <DocumentsSection
-                loading={sectionsLoading.documents}
-                tripData={tripData}
-                onAddDocument={handleAddDocument}
-                onDeleteDocument={handleDeleteDocument}
-                tripId={tripData.id}
-                ownerUserId={tripOwnerUserId}
-                agencyId={profile?.agencyId ?? null}
-                routeSlug={routeSlug}
-                tripAdminToken={tripAdminToken}
-                tripPublicToken={tripPublicToken}
-                adminLinkMutationMode={adminLinkMutationMode}
-                ensureSensitiveAccess={ensureSensitiveAccess}
-                onSensitiveAccessGranted={() => setSensitiveAccessGranted(true)}
-                offlineReadOnly={offlineModeEnabled}
-                offlineDocumentContext={offlineDocumentContext}
-              />
+              {travelerPanel === "documents" ? (
+                <DocumentsSection
+                  loading={sectionsLoading.documents}
+                  tripData={tripData}
+                  onAddDocument={handleAddDocument}
+                  onDeleteDocument={handleDeleteDocument}
+                  tripId={tripData.id}
+                  ownerUserId={tripOwnerUserId}
+                  agencyId={profile?.agencyId ?? null}
+                  routeSlug={routeSlug}
+                  tripAdminToken={tripAdminToken}
+                  tripPublicToken={tripPublicToken}
+                  adminLinkMutationMode={adminLinkMutationMode}
+                  ensureSensitiveAccess={ensureSensitiveAccess}
+                  onSensitiveAccessGranted={() => setSensitiveAccessGranted(true)}
+                  offlineReadOnly={offlineModeEnabled}
+                  offlineDocumentContext={offlineDocumentContext}
+                />
+              ) : null}
             </BottomSheet>
             <BottomSheet tone="light" open={travelerPanel === "concierge"} onClose={() => setTravelerPanel(null)} title="Concierge">
-              <ConciergeSection
-                tripData={tripData}
-                onOpenCredits={() => setCreditsOpen(true)}
-                offlineReadOnly={offlineModeEnabled}
-                tripSlug={routeSlug}
-                adminToken={tripAdminToken}
-                publicToken={tripPublicToken}
-                accessMode="public"
-              />
+              {travelerPanel === "concierge" ? (
+                <ConciergeSection
+                  tripData={tripData}
+                  onOpenCredits={() => setCreditsOpen(true)}
+                  offlineReadOnly={offlineModeEnabled}
+                  tripSlug={routeSlug}
+                  adminToken={tripAdminToken}
+                  publicToken={tripPublicToken}
+                  accessMode="public"
+                />
+              ) : null}
             </BottomSheet>
             <BottomSheet tone="light" open={travelerPanel === "offline"} onClose={() => setTravelerPanel(null)} title="Offline">
-              <OfflineSection
-                tripData={tripData}
-                tripItineraryRecords={tripItineraryRecords}
-                isAdmin={isAdmin}
-                sensitiveAccessGranted={sensitiveAccessGranted}
-                agencyBranding={agencyBranding}
-                routeSlug={routeSlug}
-                currentPathname={pathname || `/viagem/${routeSlug}`}
-              />
+              {travelerPanel === "offline" ? (
+                <OfflineSection
+                  tripData={tripData}
+                  tripItineraryRecords={tripItineraryRecords}
+                  isAdmin={isAdmin}
+                  sensitiveAccessGranted={sensitiveAccessGranted}
+                  agencyBranding={agencyBranding}
+                  routeSlug={routeSlug}
+                  currentPathname={pathname || `/viagem/${routeSlug}`}
+                />
+              ) : null}
             </BottomSheet>
 
             <ShareModal open={shareOpen} onClose={() => setShareOpen(false)} tripData={tripData} />
@@ -7532,91 +7545,101 @@ export default function TripPage() {
             />
 
             <BottomSheet tone="light" open={travelerPanel === "flights"} onClose={() => setTravelerPanel(null)} title="Passagens">
-              <FlightsSection
-                loading={sectionsLoading.flights}
-                tripData={tripData}
-                onUpdateFlight={handleUpdateFlight}
-                onAddFlight={handleAddFlight}
-                onDeleteFlight={handleDeleteFlight}
-                onDeleteDocument={handleDeleteDocument}
-                tripId={tripData.id}
-                ownerUserId={tripOwnerUserId}
-                agencyId={profile?.agencyId ?? null}
-                routeSlug={routeSlug}
-                tripAdminToken={tripAdminToken}
-                tripPublicToken={tripPublicToken}
-                adminLinkMutationMode={adminLinkMutationMode}
-                ensureSensitiveAccess={ensureSensitiveAccess}
-                onTrackExtraction={startFlightExtractionPolling}
-                offlineReadOnly={offlineModeEnabled}
-                offlineDocumentContext={offlineDocumentContext}
-              />
+              {travelerPanel === "flights" ? (
+                <FlightsSection
+                  loading={sectionsLoading.flights}
+                  tripData={tripData}
+                  onUpdateFlight={handleUpdateFlight}
+                  onAddFlight={handleAddFlight}
+                  onDeleteFlight={handleDeleteFlight}
+                  onDeleteDocument={handleDeleteDocument}
+                  tripId={tripData.id}
+                  ownerUserId={tripOwnerUserId}
+                  agencyId={profile?.agencyId ?? null}
+                  routeSlug={routeSlug}
+                  tripAdminToken={tripAdminToken}
+                  tripPublicToken={tripPublicToken}
+                  adminLinkMutationMode={adminLinkMutationMode}
+                  ensureSensitiveAccess={ensureSensitiveAccess}
+                  onTrackExtraction={startFlightExtractionPolling}
+                  offlineReadOnly={offlineModeEnabled}
+                  offlineDocumentContext={offlineDocumentContext}
+                />
+              ) : null}
             </BottomSheet>
             <BottomSheet tone="light" open={travelerPanel === "hotel"} onClose={() => setTravelerPanel(null)} title="Hospedagem">
-              <HotelSection loading={sectionsLoading.hotels} tripData={tripData} onSaveHotel={handleSaveHotel} onDeleteHotel={handleDeleteHotel} />
+              {travelerPanel === "hotel" ? <HotelSection loading={sectionsLoading.hotels} tripData={tripData} onSaveHotel={handleSaveHotel} onDeleteHotel={handleDeleteHotel} /> : null}
             </BottomSheet>
             <BottomSheet tone="light" open={travelerPanel === "itinerary"} onClose={() => setTravelerPanel(null)} title="Roteiro">
-              <ItinerarySection
-                loading={sectionsLoading.itineraries}
-                tripData={tripData}
-                itineraryRecords={tripItineraryRecords}
-                offlineReadOnly={offlineModeEnabled}
-                offlineDocumentContext={offlineDocumentContext}
-                tripId={tripData.id}
-                ownerUserId={tripOwnerUserId}
-                agencyId={profile?.agencyId ?? null}
-                routeSlug={routeSlug}
-                tripAdminToken={tripAdminToken}
-                tripPublicToken={tripPublicToken}
-                adminLinkMutationMode={adminLinkMutationMode}
-                ensureSensitiveAccess={ensureSensitiveAccess}
-                onUpdateItinerary={handleUpdateItinerary}
-                onGenerateSimple={() => handleGenerateItinerary("simple")}
-                onGenerateComplete={() => handleGenerateItinerary("complete_pdf")}
-                onSaveUploadedItinerary={handleSaveUploadedItinerary}
-                onDeleteItinerary={handleDeleteItinerary}
-              />
+              {travelerPanel === "itinerary" ? (
+                <ItinerarySection
+                  loading={sectionsLoading.itineraries}
+                  tripData={tripData}
+                  itineraryRecords={tripItineraryRecords}
+                  offlineReadOnly={offlineModeEnabled}
+                  offlineDocumentContext={offlineDocumentContext}
+                  tripId={tripData.id}
+                  ownerUserId={tripOwnerUserId}
+                  agencyId={profile?.agencyId ?? null}
+                  routeSlug={routeSlug}
+                  tripAdminToken={tripAdminToken}
+                  tripPublicToken={tripPublicToken}
+                  adminLinkMutationMode={adminLinkMutationMode}
+                  ensureSensitiveAccess={ensureSensitiveAccess}
+                  onUpdateItinerary={handleUpdateItinerary}
+                  onGenerateSimple={() => handleGenerateItinerary("simple")}
+                  onGenerateComplete={() => handleGenerateItinerary("complete_pdf")}
+                  onSaveUploadedItinerary={handleSaveUploadedItinerary}
+                  onDeleteItinerary={handleDeleteItinerary}
+                />
+              ) : null}
             </BottomSheet>
             <BottomSheet tone="light" open={travelerPanel === "documents"} onClose={() => setTravelerPanel(null)} title="Documentos">
-              <DocumentsSection
-                loading={sectionsLoading.documents}
-                tripData={tripData}
-                onAddDocument={handleAddDocument}
-                onDeleteDocument={handleDeleteDocument}
-                tripId={tripData.id}
-                ownerUserId={tripOwnerUserId}
-                agencyId={profile?.agencyId ?? null}
-                routeSlug={routeSlug}
-                tripAdminToken={tripAdminToken}
-                tripPublicToken={tripPublicToken}
-                adminLinkMutationMode={adminLinkMutationMode}
-                ensureSensitiveAccess={ensureSensitiveAccess}
-                onSensitiveAccessGranted={() => setSensitiveAccessGranted(true)}
-                offlineReadOnly={offlineModeEnabled}
-                offlineDocumentContext={offlineDocumentContext}
-              />
+              {travelerPanel === "documents" ? (
+                <DocumentsSection
+                  loading={sectionsLoading.documents}
+                  tripData={tripData}
+                  onAddDocument={handleAddDocument}
+                  onDeleteDocument={handleDeleteDocument}
+                  tripId={tripData.id}
+                  ownerUserId={tripOwnerUserId}
+                  agencyId={profile?.agencyId ?? null}
+                  routeSlug={routeSlug}
+                  tripAdminToken={tripAdminToken}
+                  tripPublicToken={tripPublicToken}
+                  adminLinkMutationMode={adminLinkMutationMode}
+                  ensureSensitiveAccess={ensureSensitiveAccess}
+                  onSensitiveAccessGranted={() => setSensitiveAccessGranted(true)}
+                  offlineReadOnly={offlineModeEnabled}
+                  offlineDocumentContext={offlineDocumentContext}
+                />
+              ) : null}
             </BottomSheet>
             <BottomSheet tone="light" open={travelerPanel === "concierge"} onClose={() => setTravelerPanel(null)} title="Concierge">
-              <ConciergeSection
-                tripData={tripData}
-                onOpenCredits={() => setCreditsOpen(true)}
-                offlineReadOnly={offlineModeEnabled}
-                tripSlug={routeSlug}
-                adminToken={tripAdminToken}
-                publicToken={tripPublicToken}
-                accessMode="admin"
-              />
+              {travelerPanel === "concierge" ? (
+                <ConciergeSection
+                  tripData={tripData}
+                  onOpenCredits={() => setCreditsOpen(true)}
+                  offlineReadOnly={offlineModeEnabled}
+                  tripSlug={routeSlug}
+                  adminToken={tripAdminToken}
+                  publicToken={tripPublicToken}
+                  accessMode="admin"
+                />
+              ) : null}
             </BottomSheet>
             <BottomSheet tone="light" open={travelerPanel === "offline"} onClose={() => setTravelerPanel(null)} title="Offline">
-              <OfflineSection
-                tripData={tripData}
-                tripItineraryRecords={tripItineraryRecords}
-                isAdmin={isAdmin}
-                sensitiveAccessGranted={sensitiveAccessGranted}
-                agencyBranding={agencyBranding}
-                routeSlug={routeSlug}
-                currentPathname={pathname || `/viagem/${routeSlug}/admin`}
-              />
+              {travelerPanel === "offline" ? (
+                <OfflineSection
+                  tripData={tripData}
+                  tripItineraryRecords={tripItineraryRecords}
+                  isAdmin={isAdmin}
+                  sensitiveAccessGranted={sensitiveAccessGranted}
+                  agencyBranding={agencyBranding}
+                  routeSlug={routeSlug}
+                  currentPathname={pathname || `/viagem/${routeSlug}/admin`}
+                />
+              ) : null}
             </BottomSheet>
 
             <ShareModal open={shareOpen} onClose={() => setShareOpen(false)} tripData={tripData} />
@@ -7672,7 +7695,7 @@ export default function TripPage() {
             <TravelersModal open={travelersOpen} onClose={() => setTravelersOpen(false)} travelers={tripData.travelers} onUpdateTravelers={handleUpdateTravelers} />
             <TripSettingsModal open={tripSettingsOpen} onClose={() => setTripSettingsOpen(false)} tripData={tripData} onSave={handleSaveTripSettings} />
             <TripSecurityModal open={securitySettingsOpen} onClose={() => setSecuritySettingsOpen(false)} tripId={tripData.id} tripTitle={tripData.destination} onSecurityUpdated={() => setToast({ message: "Seguranca do dispositivo atualizada.", type: "success" })} />
-            <CreditsModal open={creditsOpen} onClose={() => setCreditsOpen(false)} credits={tripData.credits} />
+            <LinkCreditsSummaryModal open={creditsOpen} onClose={() => setCreditsOpen(false)} credits={tripData.credits} />
             <Modal open={premiumGateModalOpen} onClose={() => setPremiumGateModalOpen(false)} title="Disponivel no Premium">
               <div className="space-y-5">
                 <p className="text-sm text-slate-600">
@@ -7787,7 +7810,7 @@ export default function TripPage() {
           <TravelersModal open={travelersOpen} onClose={() => setTravelersOpen(false)} travelers={tripData.travelers} onUpdateTravelers={handleUpdateTravelers} />
           <TripSettingsModal open={tripSettingsOpen} onClose={() => setTripSettingsOpen(false)} tripData={tripData} onSave={handleSaveTripSettings} />
           <TripSecurityModal open={securitySettingsOpen} onClose={() => setSecuritySettingsOpen(false)} tripId={tripData.id} tripTitle={tripData.destination} onSecurityUpdated={() => setToast({ message: "Seguranca do dispositivo atualizada.", type: "success" })} />
-          <CreditsModal open={creditsOpen} onClose={() => setCreditsOpen(false)} credits={tripData.credits} />
+          <LinkCreditsSummaryModal open={creditsOpen} onClose={() => setCreditsOpen(false)} credits={tripData.credits} />
           <Modal open={premiumGateModalOpen} onClose={() => setPremiumGateModalOpen(false)} title="Disponível no Premium">
             <div className="space-y-5">
               <p className="text-sm text-white/60">
