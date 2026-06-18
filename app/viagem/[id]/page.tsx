@@ -6060,8 +6060,6 @@ export default function TripPage() {
             const brandingObjectUrl = URL.createObjectURL(brandingImageBlob.blob)
             nextOfflineImageUrls.push(brandingObjectUrl)
             nextAgencyBranding.logoUrl = brandingObjectUrl
-          } else if (nextAgencyBranding.isAgency) {
-            nextAgencyBranding.logoUrl = null
           }
 
           if (offlineImageUrlsRef.current.length > 0) {
@@ -6135,6 +6133,8 @@ export default function TripPage() {
           | Awaited<ReturnType<typeof getTripByAdminToken>>
           | Awaited<ReturnType<typeof getTripByPublicToken>>
 
+        let hydratedFromOfflineTimeout = false
+
         if (shouldAttemptOfflineTimeoutFallback) {
           const lookupRace = await Promise.race([
             repositoryTripPromise.then((result) => ({ type: "result" as const, result })),
@@ -6150,9 +6150,7 @@ export default function TripPage() {
               lookupTimeoutMs,
             })
             const offlineLoaded = await loadOfflinePackage("network")
-            if (offlineLoaded) {
-              return
-            }
+            hydratedFromOfflineTimeout = offlineLoaded
             repositoryTrip = await repositoryTripPromise
           } else {
             repositoryTrip = lookupRace.result
@@ -6163,6 +6161,15 @@ export default function TripPage() {
 
         if (repositoryTrip.data) {
           if (loadRequestRef.current !== requestId) return
+          if (hydratedFromOfflineTimeout) {
+            if (offlineImageUrlsRef.current.length > 0) {
+              revokeOfflineObjectUrls(offlineImageUrlsRef.current)
+              offlineImageUrlsRef.current = []
+            }
+            setOfflineModeEnabled(false)
+            setOfflinePackageStatus(null)
+            setOfflineDocumentContext(null)
+          }
           setTripOwnerUserId(repositoryTrip.data.ownerUserId ?? null)
           setTripAdminToken(repositoryTrip.data.adminToken ?? adminToken ?? null)
           setTripPublicToken(repositoryTrip.data.publicToken ?? publicToken ?? null)
