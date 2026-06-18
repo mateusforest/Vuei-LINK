@@ -941,6 +941,12 @@ function buildTripDataFromOfflinePackage(pkg: OfflineStoredTripPackage, audience
   }
 }
 
+function resolveTripAgencyId(source: any) {
+  if (!source || typeof source !== "object") return null
+
+  return source.agencyId ?? source.agency_id ?? source.agency?.id ?? null
+}
+
 type OfflineDocumentContext = {
   tripId: string
   audience: "public" | "admin"
@@ -1225,13 +1231,19 @@ function TripHeader({
           {agencyBranding.isAgency ? (
             <div className="rounded-2xl border border-white/10 bg-white/92 px-3 py-2 shadow-[0_16px_48px_rgba(0,0,0,0.2)] backdrop-blur">
               <div className="flex flex-col gap-0.5">
-                <Image
-                  src={agencyBranding.logoUrl || "/vuei-logo.png"}
-                  alt={agencyBranding.name || "Vuei"}
-                  width={144}
-                  height={48}
-                  className="h-7 w-auto max-w-[120px] object-contain sm:h-8 sm:max-w-[150px]"
-                />
+                {agencyBranding.logoUrl ? (
+                  <Image
+                    src={agencyBranding.logoUrl}
+                    alt={agencyBranding.name || "Agencia"}
+                    width={144}
+                    height={48}
+                    className="h-7 w-auto max-w-[120px] object-contain sm:h-8 sm:max-w-[150px]"
+                  />
+                ) : (
+                  <span className="max-w-[150px] truncate text-sm font-semibold tracking-[-0.03em] text-slate-900">
+                    {agencyBranding.name || "Agencia parceira"}
+                  </span>
+                )}
                 <span className="text-[9px] uppercase tracking-[0.16em] text-black/40">
                   Powered by Vuei
                 </span>
@@ -6188,6 +6200,21 @@ export default function TripPage() {
             setOfflinePackageStatus(null)
             setOfflineDocumentContext(null)
           }
+          const resolvedAgencyId = resolveTripAgencyId(repositoryTrip.data)
+          const preloadedAgencyResult = resolvedAgencyId ? await getAgencyById(resolvedAgencyId) : null
+          const preloadedAgencyLogo = resolveAgencyBrandLogo(
+            preloadedAgencyResult?.data?.branding?.linkLogoUrl,
+            preloadedAgencyResult?.data?.branding?.logoUrl,
+            preloadedAgencyResult?.data?.logo,
+          )
+          const preloadedAgencyName = preloadedAgencyResult?.data?.name ?? (resolvedAgencyId ? "Agencia parceira" : null)
+
+          setAgencyBranding({
+            name: preloadedAgencyName,
+            logoUrl: preloadedAgencyLogo,
+            isAgency: Boolean(resolvedAgencyId),
+          })
+
           setTripOwnerUserId(repositoryTrip.data.ownerUserId ?? null)
           setTripAdminToken(repositoryTrip.data.adminToken ?? adminToken ?? null)
           setTripPublicToken(repositoryTrip.data.publicToken ?? publicToken ?? null)
@@ -6226,7 +6253,7 @@ export default function TripPage() {
               slug: repositoryTrip.data.slug,
               name: repositoryTrip.data.title,
               destination: repositoryTrip.data.destination,
-              agencyId: repositoryTrip.data.agencyId ?? null,
+              agencyId: resolvedAgencyId,
               clientId: repositoryTrip.data.clientId ?? null,
               country: repositoryTrip.data.country ?? undefined,
               city: repositoryTrip.data.city ?? undefined,
@@ -6273,7 +6300,7 @@ export default function TripPage() {
               adminSectionsPromise
                 ? adminSectionsPromise.then((data: any) => ({ source: "admin-api" as const, data: data?.hotels ?? [], error: null }))
                 : listTripHotels(repositoryTrip.data.id),
-              repositoryTrip.data.agencyId ? getAgencyById(repositoryTrip.data.agencyId) : Promise.resolve(null),
+              Promise.resolve(preloadedAgencyResult),
             ])
 
             if (loadRequestRef.current !== requestId) return
@@ -6326,13 +6353,14 @@ export default function TripPage() {
             const simpleItinerary = resolveSimpleTripItinerary(itinerariesResult.data ?? [])
             setTripItineraryRecords(itinerariesResult.data ?? [])
             setAgencyBranding({
-              name: agencyResult?.data?.name ?? null,
+              name: agencyResult?.data?.name ?? preloadedAgencyName,
               logoUrl: resolveAgencyBrandLogo(
                 agencyResult?.data?.branding?.linkLogoUrl,
                 agencyResult?.data?.branding?.logoUrl,
                 agencyResult?.data?.logo,
+                preloadedAgencyLogo,
               ),
-              isAgency: Boolean(repositoryTrip.data.agencyId),
+              isAgency: Boolean(resolvedAgencyId),
             })
 
             setTripData((prev) =>
@@ -6341,7 +6369,7 @@ export default function TripPage() {
                 slug: repositoryTrip.data.slug,
                 name: repositoryTrip.data.title,
                 destination: repositoryTrip.data.destination,
-                agencyId: repositoryTrip.data.agencyId ?? null,
+                agencyId: resolvedAgencyId,
                 clientId: repositoryTrip.data.clientId ?? null,
                 country: repositoryTrip.data.country ?? undefined,
                 city: repositoryTrip.data.city ?? undefined,
