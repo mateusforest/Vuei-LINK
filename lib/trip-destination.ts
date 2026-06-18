@@ -112,11 +112,27 @@ const destinationCoverMap: DestinationProfile[] = [
 
 const neutralCover = "https://images.unsplash.com/photo-1488646953014-85cb44e25828?w=1920&q=80"
 
+export const DEFAULT_TRIP_HERO_IMAGE = neutralCover
+
 function normalizeText(value?: string | null) {
   return (value ?? "")
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
+}
+
+export function normalizeImageUrl(value?: string | null) {
+  if (typeof value !== "string") return null
+
+  const normalized = value.trim()
+  if (!normalized) return null
+
+  const lowered = normalized.toLowerCase()
+  if (lowered === "null" || lowered === "undefined" || lowered === "nan") {
+    return null
+  }
+
+  return normalized
 }
 
 function resolveDestinationEntry(destination?: string | null, city?: string | null, country?: string | null) {
@@ -172,7 +188,25 @@ function buildEmbassyFallback(country?: string | null) {
 }
 
 export function getDestinationCoverImage(destination?: string | null, city?: string | null, country?: string | null) {
-  return resolveDestinationCoverEntry(destination, city)?.image ?? neutralCover
+  return resolveDestinationCoverEntry(destination, city)?.image ?? resolveCountryEntry(country)?.image ?? neutralCover
+}
+
+export function resolveTripHeroImage(params: {
+  coverImage?: string | null
+  destination?: string | null
+  city?: string | null
+  country?: string | null
+}) {
+  return normalizeImageUrl(params.coverImage) ?? getDestinationCoverImage(params.destination, params.city, params.country)
+}
+
+export function resolveAgencyBrandLogo(...candidates: Array<string | null | undefined>) {
+  for (const candidate of candidates) {
+    const normalized = normalizeImageUrl(candidate)
+    if (normalized) return normalized
+  }
+
+  return null
 }
 
 export function getDestinationMetadata(destination?: string | null, country?: string | null, city?: string | null) {

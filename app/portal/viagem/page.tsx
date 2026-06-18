@@ -25,6 +25,8 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { useTrips } from "@/contexts/trips-context"
 import { ensureTripIsPublic } from "@/lib/repositories/trips-repository"
+import { resolveTripHeroImage } from "@/lib/trip-destination"
+import { ImageWithFallback } from "@/components/system/image-with-fallback"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -182,10 +184,15 @@ export default function ViagemListPage() {
             >
               <div className="flex flex-col md:flex-row">
                 <div className="relative w-full md:w-48 h-40 md:h-auto shrink-0">
-                  <Image 
-                    src={trip.coverImage} 
-                    alt={trip.destination} 
-                    fill 
+                  <ImageWithFallback
+                    src={trip.coverImage}
+                    fallbackSrc={resolveTripHeroImage({
+                      destination: trip.destination,
+                      city: trip.city,
+                      country: trip.country,
+                    })}
+                    alt={trip.destination}
+                    fill
                     className="object-cover"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent md:bg-gradient-to-r" />

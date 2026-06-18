@@ -19,6 +19,8 @@ import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { useTrips } from "@/contexts/trips-context"
+import { resolveTripHeroImage } from "@/lib/trip-destination"
+import { ImageWithFallback } from "@/components/system/image-with-fallback"
 import { useAuth } from "@/contexts/auth-context"
 import { ensureTripIsPublic } from "@/lib/repositories/trips-repository"
 import { CreateTripButton } from "@/components/portal/create-trip-button"
@@ -163,8 +165,13 @@ export default function PortalHomePage() {
         ) : activeTrip ? (
           <Card className="relative overflow-hidden border-border/50 bg-card/50">
             <div className="absolute inset-0">
-              <Image
+              <ImageWithFallback
                 src={activeTrip.coverImage}
+                fallbackSrc={resolveTripHeroImage({
+                  destination: activeTrip.destination,
+                  city: activeTrip.city,
+                  country: activeTrip.country,
+                })}
                 alt={activeTrip.destination}
                 fill
                 className="object-cover opacity-30"
@@ -279,7 +286,17 @@ export default function PortalHomePage() {
                     className="relative h-20 w-full overflow-hidden rounded-xl md:h-16 md:w-24 md:shrink-0"
                     onClick={() => router.push(`/viagem/${trip.slug}/admin`)}
                   >
-                    <Image src={trip.coverImage} alt={trip.destination} fill className="object-cover" />
+                    <ImageWithFallback
+                      src={trip.coverImage}
+                      fallbackSrc={resolveTripHeroImage({
+                        destination: trip.destination,
+                        city: trip.city,
+                        country: trip.country,
+                      })}
+                      alt={trip.destination}
+                      fill
+                      className="object-cover"
+                    />
                   </div>
                   <div className="min-w-0 flex-1">
                     <h3 className="font-medium">{trip.name}</h3>

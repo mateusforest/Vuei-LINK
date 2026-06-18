@@ -7,7 +7,7 @@ import { extractAgencyStorageState } from "@/lib/mappers/agency-mappers"
 import { buildUniqueTripSlug, extractTripsStoragePayload, mapStoredTripToTrip, slugifyTripBase, type LegacyStoredTrip } from "@/lib/mappers/trip-mappers"
 import { buildAdminTripUrl, buildPublicTripUrl, generateSecureToken } from "@/lib/security/link-tokens"
 import type { Database } from "@/lib/supabase/types"
-import { getDestinationCoverImage } from "@/lib/trip-destination"
+import { getDestinationCoverImage, resolveTripHeroImage } from "@/lib/trip-destination"
 import { getTravelerBillingStatus } from "@/lib/repositories/traveler-billing-repository"
 import { AGENCY_PLAN_LIMIT_ERROR } from "@/lib/billing/agency-plans"
 import { countActiveAgencyTripsForClient, getAgencyBillingStatusForClient } from "@/lib/billing/agency-billing"
@@ -99,7 +99,12 @@ function mapTripRowToTrip(row: Database["public"]["Tables"]["trips"]["Row"]): Tr
     publicToken: row.public_token,
     adminLink: buildAdminTripUrl(row.slug),
     publicLink: buildPublicTripUrl(row.slug),
-    coverImage: row.cover_image || getDestinationCoverImage(row.destination, row.city, row.country),
+    coverImage: resolveTripHeroImage({
+      coverImage: row.cover_image,
+      destination: row.destination,
+      city: row.city,
+      country: row.country,
+    }),
     visibility: row.visibility,
     travelersCount: row.travelers_count,
     travelers: [],
@@ -561,8 +566,12 @@ export async function createTrip(payload: CreateTripPayload) {
         const adminLink = buildAdminTripUrl(trip.slug)
         const publicLink = buildPublicTripUrl(trip.slug)
         const parsedDestination = parseDestinationParts(trip.destination)
-        const resolvedCoverImage =
-          trip.coverImage || getDestinationCoverImage(trip.destination, trip.city ?? parsedDestination.city, trip.country ?? parsedDestination.country)
+        const resolvedCoverImage = resolveTripHeroImage({
+          coverImage: trip.coverImage,
+          destination: trip.destination,
+          city: trip.city ?? parsedDestination.city,
+          country: trip.country ?? parsedDestination.country,
+        })
 
         const insertPayload: Database["public"]["Tables"]["trips"]["Insert"] = {
           title: trip.title,

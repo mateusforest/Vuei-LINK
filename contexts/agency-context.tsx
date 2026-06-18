@@ -32,6 +32,7 @@ import { createTrip as createTripRecord, deleteTrip as deleteTripRecord, listTri
 import { getProfileByEmail } from "@/lib/repositories/profiles-repository"
 import { updateProfile as updateProfileRecord } from "@/lib/repositories/profiles-repository"
 import { startPerfMeasure } from "@/lib/dev/perf"
+import { resolveTripHeroImage } from "@/lib/trip-destination"
 import {
   addMessage as addAiMessage,
   listConversations,
@@ -354,7 +355,12 @@ function mapCanonicalTripToAgencyTrip(trip: CanonicalTrip, clientName = ""): Age
     style: trip.style || "",
     passengersCount: trip.travelersCount,
     status: trip.status === "ongoing" || trip.status === "completed" ? trip.status : "upcoming",
-    coverImage: trip.coverImage || getImageForDestination(trip.destination),
+    coverImage: resolveTripHeroImage({
+      coverImage: trip.coverImage,
+      destination: trip.destination,
+      city: trip.city,
+      country: trip.country,
+    }),
     adminLink: trip.adminLink,
     shareLink: trip.publicLink,
     createdAt: trip.createdAt,
@@ -1048,7 +1054,12 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
         ownerUserId: user?.id ?? null,
         agencyId,
         clientId: data.clientId || null,
-        coverImage: data.coverImage || getImageForDestination(data.destination),
+        coverImage: resolveTripHeroImage({
+          coverImage: data.coverImage,
+          destination: data.destination,
+          city: data.city,
+          country: data.country,
+        }),
         visibility: "public",
       })
 
@@ -1085,7 +1096,12 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
       slug,
       city,
       country,
-      coverImage: data.coverImage || getImageForDestination(data.destination),
+      coverImage: resolveTripHeroImage({
+        coverImage: data.coverImage,
+        destination: data.destination,
+        city: data.city,
+        country: data.country,
+      }),
       adminLink: buildAdminTripUrl(slug),
       shareLink: buildPublicTripUrl(slug),
       createdAt: new Date().toISOString(),

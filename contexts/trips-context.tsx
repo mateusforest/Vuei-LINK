@@ -25,6 +25,7 @@ import {
 } from "@/lib/mappers/credit-mappers"
 import { resolveTravelerPlan, resolveTravelerPlanFromBillingStatus, type TravelerPlanSnapshot } from "@/lib/billing/traveler-plans"
 import { getTravelerBillingStatus } from "@/lib/repositories/traveler-billing-repository"
+import { resolveTripHeroImage } from "@/lib/trip-destination"
 
 export interface Trip extends Pick<CanonicalTrip, "id" | "slug" | "destination" | "country" | "city" | "startDate" | "endDate" | "coverImage" | "createdAt"> {
   id: string
@@ -190,7 +191,12 @@ function mapCanonicalTripToLegacyTrip(trip: CanonicalTrip, companions = "sozinho
     companions,
     passengersCount: trip.travelersCount,
     status: trip.status === "ongoing" || trip.status === "completed" ? trip.status : "upcoming",
-    coverImage: trip.coverImage || getImageForDestination(trip.destination),
+    coverImage: resolveTripHeroImage({
+      coverImage: trip.coverImage,
+      destination: trip.destination,
+      city: trip.city,
+      country: trip.country,
+    }),
     adminLink: trip.adminLink,
     shareLink: trip.publicLink,
     createdAt: trip.createdAt,
@@ -442,7 +448,12 @@ export function TripsProvider({ children }: { children: ReactNode }) {
       city,
       country,
       passengersCount: getPassengersCount(tripData.companions),
-      coverImage: tripData.coverImage || getImageForDestination(tripData.destination),
+      coverImage: resolveTripHeroImage({
+        coverImage: tripData.coverImage,
+        destination: tripData.destination,
+        city: tripData.city,
+        country: tripData.country,
+      }),
       adminLink: buildAdminTripUrl(slug),
       shareLink: buildPublicTripUrl(slug),
       createdAt: new Date().toISOString(),

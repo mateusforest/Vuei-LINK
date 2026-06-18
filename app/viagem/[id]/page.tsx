@@ -15,13 +15,20 @@ import { createTripHotel, deleteTripHotel, listTripHotels, updateTripHotel } fro
 import { deleteTripItinerary, listTripItineraries, requestAiItineraryGeneration, upsertTripItinerary } from "@/lib/repositories/trip-itineraries-repository"
 import { listConversationsByTrip, listMessages } from "@/lib/repositories/ai-repository"
 import { validateDocumentFile } from "@/lib/files/file-validation"
-import { getDestinationCoverImage, getDestinationMetadata } from "@/lib/trip-destination"
+import {
+  DEFAULT_TRIP_HERO_IMAGE,
+  getDestinationCoverImage,
+  getDestinationMetadata,
+  resolveAgencyBrandLogo,
+  resolveTripHeroImage,
+} from "@/lib/trip-destination"
 import { getOfflineWarningMessage, prepareTripRoutesForOffline, saveTripOfflinePackage } from "@/lib/offline/trip-offline"
 import { getOfflineDocumentBlob, getOfflineImageBlob, loadTripOfflinePackage } from "@/lib/offline/offline-package-manager"
 import { isOfflineModeActive } from "@/lib/offline/offline-mode"
 import { useAuth } from "@/contexts/auth-context"
 import { buildAdminTripUrl, buildPublicTripUrl, isAdminLinkMode } from "@/lib/security/link-tokens"
 import { resolveTravelerPlan, resolveTravelerPlanFromBillingStatus } from "@/lib/billing/traveler-plans"
+import { ImageWithFallback } from "@/components/system/image-with-fallback"
 import { getTravelerBillingStatus } from "@/lib/repositories/traveler-billing-repository"
 import type { TripFlightRecord } from "@/types/flight"
 import type { TripItineraryRecord, TripItineraryContent } from "@/types"
@@ -250,7 +257,7 @@ function BottomSheet({
   )
 }
 
-const DEFAULT_HERO_IMAGE = getDestinationCoverImage()
+const DEFAULT_HERO_IMAGE = DEFAULT_TRIP_HERO_IMAGE
 
 const initialTripData = {
   id: "trip-default",
@@ -683,7 +690,12 @@ function normalizeTripViewData(tripData: any) {
     hotel: hotels[0] ?? tripData?.hotel ?? null,
     itinerary,
     documents,
-    heroImage: tripData?.heroImage || DEFAULT_HERO_IMAGE,
+    heroImage: resolveTripHeroImage({
+      coverImage: tripData?.heroImage,
+      destination: tripData?.destination,
+      city: tripData?.city,
+      country: tripData?.country,
+    }),
     weather: {
       temp: typeof tripData?.weather?.temp === "number" ? tripData.weather.temp : null,
       condition: tripData?.weather?.condition || "A definir",
@@ -737,7 +749,12 @@ function buildTripDataFromStoredTrip(storedTrip: any) {
       documents,
     )
   })
-  const heroImage = storedTrip.coverImage || getDestinationCoverImage(storedTrip.destination, storedTrip.city || city, storedTrip.country || country)
+  const heroImage = resolveTripHeroImage({
+    coverImage: storedTrip.coverImage,
+    destination: storedTrip.destination,
+    city: storedTrip.city || city,
+    country: storedTrip.country || country,
+  })
   const quickInfo = buildQuickInfo(storedTrip.destination, storedTrip.country || country, storedTrip.city || city)
 
   console.log("[LINK] cover resolved", heroImage)
@@ -1277,7 +1294,7 @@ function TripHero({ tripData, onEditTrip }: { tripData: any; onEditTrip: () => v
   return (
     <motion.section ref={ref} className="relative h-[85vh] min-h-[600px] overflow-hidden">
       <motion.div style={{ y }} className="absolute inset-0">
-        <Image src={tripData.heroImage} alt={tripData.destination} fill className="object-cover" priority />
+        <ImageWithFallback src={tripData.heroImage} fallbackSrc={DEFAULT_HERO_IMAGE} alt={tripData.destination} fill className="object-cover" priority />
         <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent" />
         <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-transparent to-black/60" />
         <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-gradient-to-t from-[#5de0e6]/10 via-[#004aad]/5 to-transparent blur-3xl" />
@@ -1614,13 +1631,14 @@ function TravelerPublicShell({
             <div className="absolute left-0 top-0 z-[1] h-full w-[58%] bg-[linear-gradient(90deg,rgba(251,250,247,0.99)_0%,rgba(251,250,247,0.955)_34%,rgba(251,250,247,0.36)_70%,rgba(251,250,247,0.04)_100%)]" />
             <div className="absolute inset-x-0 top-0 z-[1] h-16 bg-[linear-gradient(180deg,rgba(251,250,247,0.88)_0%,rgba(251,250,247,0)_100%)]" />
             <div className="absolute inset-x-0 bottom-0 z-[1] h-20 bg-[linear-gradient(180deg,rgba(251,250,247,0)_0%,rgba(251,250,247,0.9)_62%,rgba(251,250,247,0.98)_100%)]" />
-            <Image
+            <ImageWithFallback
               src={tripData.heroImage}
+              fallbackSrc={DEFAULT_HERO_IMAGE}
               alt={tripData.destination}
               fill
-                className="object-cover object-[68%_56%] opacity-[0.99] scale-[1.02]"
-                priority
-              />
+              className="object-cover object-[68%_56%] opacity-[0.99] scale-[1.02]"
+              priority
+            />
             </div>
 
           <div className="relative z-10 max-w-[58%] px-4 pt-8">
@@ -6309,7 +6327,11 @@ export default function TripPage() {
             setTripItineraryRecords(itinerariesResult.data ?? [])
             setAgencyBranding({
               name: agencyResult?.data?.name ?? null,
-              logoUrl: agencyResult?.data?.branding?.linkLogoUrl || agencyResult?.data?.logo || null,
+              logoUrl: resolveAgencyBrandLogo(
+                agencyResult?.data?.branding?.linkLogoUrl,
+                agencyResult?.data?.branding?.logoUrl,
+                agencyResult?.data?.logo,
+              ),
               isAgency: Boolean(repositoryTrip.data.agencyId),
             })
 
