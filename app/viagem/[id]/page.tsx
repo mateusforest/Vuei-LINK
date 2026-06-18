@@ -341,16 +341,20 @@ function formatTravelerHeroDateRange(startDate?: string | null, endDate?: string
     return "Datas a definir"
   }
 
-  const startLabel = start.toLocaleDateString("pt-BR", {
-    day: "2-digit",
-    month: "short",
-  })
-  const endLabel = end.toLocaleDateString("pt-BR", {
-    day: "2-digit",
-    month: "short",
-  })
+  const startDay = start.toLocaleDateString("pt-BR", { day: "2-digit" })
+  const endDay = end.toLocaleDateString("pt-BR", { day: "2-digit" })
+  const startMonth = start.toLocaleDateString("pt-BR", { month: "short" }).replace(/\.$/, ".")
+  const endMonth = end.toLocaleDateString("pt-BR", { month: "short" }).replace(/\.$/, ".")
 
-  return `${startLabel} - ${endLabel} ${end.getFullYear()}`
+  if (start.getFullYear() !== end.getFullYear()) {
+    return `${startDay} ${startMonth} ${start.getFullYear()} – ${endDay} ${endMonth} ${end.getFullYear()}`
+  }
+
+  if (startMonth === endMonth) {
+    return `${startDay}–${endDay} ${endMonth} ${end.getFullYear()}`
+  }
+
+  return `${startDay} ${startMonth} – ${endDay} ${endMonth} ${end.getFullYear()}`
 }
 
 function calculateDaysUntil(dateString?: string) {
@@ -445,6 +449,25 @@ function getFlightExtractedValue(flight: TripFlightRecord, key: string) {
 
   const value = structuredResult[key]
   return typeof value === "string" && value.trim() ? value.trim() : null
+}
+
+function hasMeaningfulFlightExtraction(flight?: TripFlightRecord | null) {
+  if (!flight) return false
+
+  return Boolean(
+    flight.airline ||
+      flight.flightNumber ||
+      flight.originAirport ||
+      flight.destinationAirport ||
+      flight.departureAt ||
+      flight.arrivalAt ||
+      getFlightExtractedValue(flight, "airline") ||
+      getFlightExtractedValue(flight, "flight_number") ||
+      getFlightExtractedValue(flight, "origin_airport") ||
+      getFlightExtractedValue(flight, "destination_airport") ||
+      getFlightExtractedValue(flight, "departure_at") ||
+      getFlightExtractedValue(flight, "arrival_at")
+  )
 }
 
 function mapFlightRecordToView(flight: TripFlightRecord, documents?: any[]) {
@@ -6784,12 +6807,13 @@ export default function TripPage() {
         }
 
         const extractionStatus = latestFlightRecord?.extractionStatus ?? null
+        const hasExtractedFlightData = hasMeaningfulFlightExtraction(latestFlightRecord)
         if (extractionStatus === "completed" || extractionStatus === "manual" || extractionStatus === "failed") {
           flightPollingTimersRef.current.delete(pollingKey)
-          if (extractionStatus === "manual") {
+          if (extractionStatus === "manual" && !hasExtractedFlightData) {
             showToast("Alguns dados nao foram identificados. Revise a passagem manualmente.", "info")
           }
-          if (extractionStatus === "failed") {
+          if (extractionStatus === "failed" && !hasExtractedFlightData) {
             showToast("Nao foi possivel identificar esta passagem.", "info")
           }
           return
@@ -6979,7 +7003,7 @@ export default function TripPage() {
   const handleGenerateItinerary = async (mode: "simple" | "complete_pdf") => {
     if (blockOfflineMutation()) return
 
-    const travelerTrip = !tripData.agencyId
+    const travelerTrip = !agencyBranding.isAgency && !tripData.agencyId && !profile?.agencyId
     const premiumLocked =
       travelerTrip &&
       ((mode === "simple" && !travelerPlan.definition.limits.simpleItinerary) ||

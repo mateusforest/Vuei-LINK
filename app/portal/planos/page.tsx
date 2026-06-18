@@ -129,16 +129,16 @@ export default function PortalPlanosPage() {
       </motion.div>
 
       <motion.div {...fadeInUp} className="grid gap-5 lg:grid-cols-2">
-        <Card className="border-border/50 bg-card/50 p-6 vuei-glass">
-          <div className="flex items-start justify-between gap-4">
+        <Card className="flex min-h-[31rem] flex-col border-border/50 bg-card/50 p-6 vuei-glass">
+          <div className="flex min-h-[5rem] items-start justify-between gap-4">
             <div>
               <p className="text-sm text-muted-foreground">Plano Free</p>
-              <h2 className="mt-2 text-3xl font-bold">{freePlan.priceLabel}</h2>
+              <h2 className="mt-2 text-[2rem] font-bold leading-none">{freePlan.priceLabel}</h2>
             </div>
             {subscription.code === "free" ? <Badge className="bg-primary/15 text-primary border-primary/20">Plano Atual</Badge> : null}
           </div>
 
-          <div className="mt-6 space-y-3">
+          <div className="mt-6 min-h-[11rem] space-y-3">
             {freePlan.features.map((feature) => (
               <div key={feature} className="flex items-start gap-3 text-sm">
                 <Check size={16} className="mt-0.5 shrink-0 text-emerald-400" />
@@ -153,22 +153,22 @@ export default function PortalPlanosPage() {
             ))}
           </div>
 
-          <Button disabled={subscription.code === "free"} className="mt-8 w-full rounded-xl bg-muted/50 text-foreground hover:bg-muted">
+          <Button disabled={subscription.code === "free"} className="mt-auto w-full rounded-xl bg-muted/50 text-foreground hover:bg-muted">
             Comecar gratis
           </Button>
         </Card>
 
-        <Card className="relative overflow-hidden border-amber-500/30 bg-gradient-to-br from-amber-500/10 via-card/70 to-secondary/10 p-6 vuei-glass">
+        <Card className="relative flex min-h-[31rem] flex-col overflow-hidden border-amber-500/30 bg-gradient-to-br from-amber-500/10 via-card/70 to-secondary/10 p-6 vuei-glass">
           <div className="absolute right-0 top-0 h-32 w-32 rounded-full bg-amber-500/15 blur-3xl" />
-          <div className="relative flex items-start justify-between gap-4">
+          <div className="relative flex min-h-[5rem] items-start justify-between gap-4">
             <div>
               <p className="text-sm text-muted-foreground">Plano Premium</p>
-              <h2 className="mt-2 text-3xl font-bold">{premiumPlan.priceLabel}</h2>
+              <h2 className="mt-2 text-[2rem] font-bold leading-none">{premiumPlan.priceLabel}</h2>
             </div>
             <Badge className="bg-amber-500 text-black">{premiumPlan.badge}</Badge>
           </div>
 
-          <div className="mt-6 space-y-3">
+          <div className="mt-6 min-h-[11rem] space-y-3">
             {premiumPlan.features.map((feature) => (
               <div key={feature} className="flex items-start gap-3 text-sm">
                 <Check size={16} className="mt-0.5 shrink-0 text-emerald-400" />
@@ -178,7 +178,7 @@ export default function PortalPlanosPage() {
           </div>
 
           <Button
-            className="mt-8 w-full rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 text-black font-semibold"
+            className="mt-auto w-full rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 text-black font-semibold"
             onClick={handlePremiumCheckout}
             disabled={premiumLoading}
           >
@@ -204,16 +204,16 @@ export default function PortalPlanosPage() {
 
           <div className="grid gap-4 md:grid-cols-3">
             {TRAVELER_CREDIT_PACKAGES.map((pkg) => (
-              <Card key={pkg.code} className="border-border/50 bg-background/60 p-5">
+              <Card key={pkg.code} className="flex min-h-[15.5rem] flex-col border-border/50 bg-background/60 p-5">
                 <div className="mb-4 flex items-center justify-between">
                   <p className="font-semibold">{pkg.name}</p>
                   {pkg.code === "popular" ? <Badge className="bg-primary text-primary-foreground">Popular</Badge> : null}
                 </div>
-                <p className="text-3xl font-bold">{pkg.credits}</p>
+                <p className="text-[2rem] font-bold leading-none">{pkg.credits}</p>
                 <p className="text-sm text-muted-foreground">creditos</p>
-                <p className="mt-4 text-xl font-semibold">{pkg.priceLabel}</p>
+                <p className="mt-3 text-lg font-semibold">{pkg.priceLabel}</p>
                 <Button
-                  className="mt-5 w-full rounded-xl"
+                  className="mt-auto w-full rounded-xl"
                   variant={pkg.code === "popular" ? "default" : "outline"}
                   onClick={() => handleCreditsCheckout(pkg.code)}
                   disabled={packageLoading !== null}

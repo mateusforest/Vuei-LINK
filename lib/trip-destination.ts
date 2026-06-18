@@ -124,6 +124,32 @@ function resolveDestinationEntry(destination?: string | null, city?: string | nu
   return destinationCoverMap.find((entry) => entry.matches.some((match) => target.includes(normalizeText(match)))) ?? null
 }
 
+function resolveDestinationCoverEntry(destination?: string | null, city?: string | null) {
+  const destinationTarget = normalizeText(destination)
+  const cityTarget = normalizeText(city)
+
+  if (cityTarget) {
+    const cityMatch = destinationCoverMap.find((entry) =>
+      entry.matches.some((match) => normalizeText(match) === cityTarget)
+    )
+    if (cityMatch) return cityMatch
+  }
+
+  if (destinationTarget) {
+    const exactDestinationMatch = destinationCoverMap.find((entry) =>
+      entry.matches.some((match) => normalizeText(match) === destinationTarget)
+    )
+    if (exactDestinationMatch) return exactDestinationMatch
+
+    const containedDestinationMatch = destinationCoverMap.find((entry) =>
+      entry.matches.some((match) => destinationTarget.includes(normalizeText(match)))
+    )
+    if (containedDestinationMatch) return containedDestinationMatch
+  }
+
+  return null
+}
+
 function resolveCountryEntry(country?: string | null) {
   const normalizedCountry = normalizeText(country)
   if (!normalizedCountry) return null
@@ -146,7 +172,7 @@ function buildEmbassyFallback(country?: string | null) {
 }
 
 export function getDestinationCoverImage(destination?: string | null, city?: string | null, country?: string | null) {
-  return resolveDestinationEntry(destination, city, country)?.image ?? neutralCover
+  return resolveDestinationCoverEntry(destination, city)?.image ?? neutralCover
 }
 
 export function getDestinationMetadata(destination?: string | null, country?: string | null, city?: string | null) {

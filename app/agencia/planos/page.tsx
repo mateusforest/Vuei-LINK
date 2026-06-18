@@ -184,7 +184,7 @@ export default function AgencyPlansPage() {
           return (
             <Card
               key={plan.code}
-              className={`relative flex min-h-[36rem] flex-col overflow-hidden p-6 vuei-glass ${
+              className={`relative flex min-h-[33rem] flex-col overflow-hidden p-6 vuei-glass ${
                 plan.code === "pro"
                   ? "border-amber-500/30 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(255,251,235,0.96))]"
                   : "border-border/60 bg-white/88"
@@ -194,10 +194,10 @@ export default function AgencyPlansPage() {
                 <div className="absolute right-0 top-0 h-32 w-32 rounded-full bg-amber-500/15 blur-3xl" />
               ) : null}
 
-              <div className="relative flex min-h-[5.5rem] items-start justify-between gap-4">
+              <div className="relative flex min-h-[5rem] items-start justify-between gap-4">
                 <div className="min-w-0">
                   <p className="text-sm text-muted-foreground">Plano {plan.name}</p>
-                  <h2 className="mt-2 text-3xl font-bold">{plan.priceLabel}</h2>
+                  <h2 className="mt-2 text-[2rem] font-bold leading-none">{plan.priceLabel}</h2>
                 </div>
                 {isCurrent ? (
                   <Badge className="shrink-0 whitespace-nowrap border-primary/20 bg-primary/15 text-primary">Plano atual</Badge>
@@ -208,20 +208,20 @@ export default function AgencyPlansPage() {
 
               <div className="mt-5 grid grid-cols-3 gap-2 text-center">
                 <div className="flex min-w-0 flex-col justify-center rounded-2xl border border-border/60 bg-[#fbfbfc] p-3">
-                  <p className="text-lg font-semibold leading-none">{plan.maxUsers}</p>
+                  <p className="text-base font-semibold leading-none">{plan.maxUsers}</p>
                   <p className="mt-2 break-words text-[11px] leading-4 text-muted-foreground">usuários</p>
                 </div>
                 <div className="flex min-w-0 flex-col justify-center rounded-2xl border border-border/60 bg-[#fbfbfc] p-3">
-                  <p className="text-lg font-semibold leading-none">{plan.maxActiveTrips}</p>
+                  <p className="text-base font-semibold leading-none">{plan.maxActiveTrips}</p>
                   <p className="mt-2 break-words text-[11px] leading-4 text-muted-foreground">viagens ativas</p>
                 </div>
                 <div className="flex min-w-0 flex-col justify-center rounded-2xl border border-border/60 bg-[#fbfbfc] p-3">
-                  <p className="text-lg font-semibold leading-none">{plan.monthlyCredits}</p>
+                  <p className="text-base font-semibold leading-none">{plan.monthlyCredits}</p>
                   <p className="mt-2 break-words text-[11px] leading-4 text-muted-foreground">créditos/mês</p>
                 </div>
               </div>
 
-              <div className="mt-6 min-h-[8.5rem] space-y-3">
+              <div className="mt-6 min-h-[7.5rem] space-y-3">
                 {highlights.map((feature) => (
                   <div key={feature} className="flex items-start gap-3 text-sm">
                     <Check size={16} className="mt-0.5 shrink-0 text-emerald-400" />
@@ -250,7 +250,7 @@ export default function AgencyPlansPage() {
                 </div>
               </div>
 
-              <div className="mt-auto pt-8">
+              <div className="mt-auto pt-6">
                 <Button
                   className="w-full rounded-xl whitespace-normal text-center shadow-none"
                   variant={plan.code === "pro" ? "default" : "outline"}
@@ -286,16 +286,16 @@ export default function AgencyPlansPage() {
 
           <div className="grid gap-4 md:grid-cols-3">
             {TRAVELER_CREDIT_PACKAGES.map((pkg) => (
-              <Card key={pkg.code} className="border-border/60 bg-[#fbfbfc] p-5 shadow-none">
+              <Card key={pkg.code} className="flex min-h-[15rem] flex-col border-border/60 bg-[#fbfbfc] p-5 shadow-none">
                 <div className="mb-4 flex items-center justify-between">
                   <p className="font-semibold">{pkg.name}</p>
                   {pkg.code === "popular" ? <Badge className="bg-primary text-primary-foreground">Popular</Badge> : null}
                 </div>
-                <p className="text-3xl font-bold">{pkg.credits}</p>
+                <p className="text-[2rem] font-bold leading-none">{pkg.credits}</p>
                 <p className="text-sm text-muted-foreground">creditos</p>
-                <p className="mt-4 text-xl font-semibold">{pkg.priceLabel}</p>
+                <p className="mt-3 text-lg font-semibold">{pkg.priceLabel}</p>
                 <Button
-                  className="mt-5 w-full rounded-xl"
+                  className="mt-auto w-full rounded-xl"
                   variant={pkg.code === "popular" ? "default" : "outline"}
                   onClick={() => handleCreditsCheckout(pkg.code)}
                   disabled={packageLoading !== null}

@@ -1,6 +1,6 @@
 "use client"
 
-import { Suspense, useState, useEffect, useMemo } from "react"
+import { Suspense, useState, useEffect, useMemo, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
@@ -61,9 +61,11 @@ function CreateTripPageContent() {
   const [copiedAdmin, setCopiedAdmin] = useState(false)
   const [copiedShare, setCopiedShare] = useState(false)
   const [submitError, setSubmitError] = useState("")
+  const [isCreating, setIsCreating] = useState(false)
   const [activeDateField, setActiveDateField] = useState<"start" | "end" | null>(null)
   const [destinationMenuOpen, setDestinationMenuOpen] = useState(false)
   const [selectedDestinationId, setSelectedDestinationId] = useState<string | null>(null)
+  const createTripRequestRef = useRef(false)
   
   const [formData, setFormData] = useState({
     clientId: clientIdParam || "",
@@ -97,30 +99,41 @@ function CreateTripPageContent() {
   )
 
   const handleNext = async () => {
+    if (isCreating || createTripRequestRef.current) {
+      return
+    }
+
     if (currentStep < steps.length) {
       setCurrentStep(currentStep + 1)
     } else {
       setSubmitError("")
+      createTripRequestRef.current = true
+      setIsCreating(true)
       const resolvedDestination = resolveDestinationInput(formData.destination, selectedDestinationId)
-      const newTrip = await addTrip({
-        clientId: formData.clientId || `temp-${Date.now()}`,
-        clientName: formData.clientName,
-        name: `Viagem para ${resolvedDestination.label}`,
-        destination: resolvedDestination.label,
-        country: resolvedDestination.country ?? "",
-        city: resolvedDestination.city ?? resolvedDestination.label,
-        startDate: formData.startDate,
-        endDate: formData.endDate,
-        style: formData.travelStyle,
-        passengersCount: formData.passengersCount,
-        status: "upcoming",
-        coverImage: resolvedDestination.coverImageUrl,
-      })
-      if (newTrip) {
-        setCreatedTrip(newTrip)
-        setCompleted(true)
-      } else {
-        setSubmitError(workspaceError || "")
+      try {
+        const newTrip = await addTrip({
+          clientId: formData.clientId || `temp-${Date.now()}`,
+          clientName: formData.clientName,
+          name: `Viagem para ${resolvedDestination.label}`,
+          destination: resolvedDestination.label,
+          country: resolvedDestination.country ?? "",
+          city: resolvedDestination.city ?? resolvedDestination.label,
+          startDate: formData.startDate,
+          endDate: formData.endDate,
+          style: formData.travelStyle,
+          passengersCount: formData.passengersCount,
+          status: "upcoming",
+          coverImage: resolvedDestination.coverImageUrl,
+        })
+        if (newTrip) {
+          setCreatedTrip(newTrip)
+          setCompleted(true)
+        } else {
+          setSubmitError(workspaceError || "")
+        }
+      } finally {
+        createTripRequestRef.current = false
+        setIsCreating(false)
       }
     }
   }
@@ -683,7 +696,7 @@ function CreateTripPageContent() {
             <Button
               variant="outline"
               onClick={handleBack}
-              disabled={currentStep === 1}
+              disabled={currentStep === 1 || isCreating}
               className="gap-2 border-border/70 bg-white"
             >
               <ArrowLeft className="h-4 w-4" />
@@ -691,10 +704,10 @@ function CreateTripPageContent() {
             </Button>
             <Button
               onClick={handleNext}
-              disabled={!canProceed()}
+              disabled={!canProceed() || isCreating}
               className="gap-2 bg-gradient-to-r from-primary to-accent text-white hover:opacity-90 disabled:opacity-50"
             >
-              {currentStep === steps.length ? "Criar Viagem" : "Proximo"}
+              {currentStep === steps.length ? (isCreating ? "Criando sua viagem..." : "Criar Viagem") : "Proximo"}
               {currentStep === steps.length ? <Check className="h-4 w-4" /> : <ArrowRight className="h-4 w-4" />}
             </Button>
           </div>

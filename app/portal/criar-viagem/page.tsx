@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { useRouter } from "next/navigation"
 import { 
@@ -103,6 +103,7 @@ export default function CriarViagemPage() {
   const [activeDateField, setActiveDateField] = useState<"start" | "end" | null>(null)
   const [destinationMenuOpen, setDestinationMenuOpen] = useState(false)
   const [selectedDestinationId, setSelectedDestinationId] = useState<string | null>(null)
+  const createTripRequestRef = useRef(false)
 
   const totalSteps = 5
   const progress = (step / totalSteps) * 100
@@ -184,10 +185,14 @@ export default function CriarViagemPage() {
   }
 
   const handleNext = () => {
+    if (isCreating || createTripRequestRef.current) {
+      return
+    }
+
     if (step < totalSteps) {
       setStep(step + 1)
     } else {
-      createTrip()
+      void createTrip()
     }
   }
 
@@ -200,11 +205,16 @@ export default function CriarViagemPage() {
   }
 
   const createTrip = async () => {
+    if (createTripRequestRef.current) {
+      return
+    }
+
     if (blockedByFreePlan) {
       setShowLimitDialog(true)
       return
     }
 
+    createTripRequestRef.current = true
     setIsCreating(true)
     setErrorMessage("")
 
@@ -279,6 +289,7 @@ export default function CriarViagemPage() {
       console.error("[TRIP] insert error", message)
       setErrorMessage(message)
     } finally {
+      createTripRequestRef.current = false
       setIsCreating(false)
     }
   }
@@ -674,9 +685,9 @@ export default function CriarViagemPage() {
             <Button 
               className="flex-1 rounded-xl bg-gradient-to-r from-[#5de0e6] to-[#004aad] text-white border-0 disabled:opacity-50"
               onClick={handleNext}
-              disabled={!canProceed()}
+              disabled={!canProceed() || isCreating}
             >
-              {step === totalSteps ? 'Criar Viagem' : 'Continuar'}
+              {step === totalSteps ? (isCreating ? 'Criando sua viagem...' : 'Criar Viagem') : 'Continuar'}
               <ChevronRight size={18} className="ml-1" />
             </Button>
           </div>
