@@ -47,16 +47,16 @@ import { useAuth } from "@/contexts/auth-context"
 
 const navItems = [
   { href: "/master", icon: LayoutDashboard, label: "Overview" },
-  { href: "/master/agencias", icon: Building2, label: "Agencias" },
-  { href: "/master/usuarios", icon: Users, label: "Usuarios" },
+  { href: "/master/agencias", icon: Building2, label: "Agências" },
+  { href: "/master/usuarios", icon: Users, label: "Usuários" },
   { href: "/master/viagens", icon: Plane, label: "Viagens" },
   { href: "/master/concierge", icon: MessageSquare, label: "Concierge" },
   { href: "/master/ia", icon: Brain, label: "Central IA" },
-  { href: "/master/creditos", icon: Coins, label: "Creditos" },
+  { href: "/master/creditos", icon: Coins, label: "Créditos" },
   { href: "/master/templates", icon: FileText, label: "Templates" },
   { href: "/master/analytics", icon: BarChart3, label: "Analytics" },
   { href: "/master/financeiro", icon: Wallet, label: "Financeiro" },
-  { href: "/master/configuracoes", icon: Settings, label: "Configuracoes" },
+  { href: "/master/configuracoes", icon: Settings, label: "Configurações" },
 ]
 
 export default function MasterLayout({ children }: { children: React.ReactNode }) {
@@ -163,7 +163,7 @@ function MasterLayoutInner({ children }: { children: React.ReactNode }) {
                   <Search className="h-5 w-5 text-muted-foreground" />
                   <input
                     type="text"
-                    placeholder="Buscar agencias, usuarios, viagens..."
+                    placeholder="Buscar agências, usuários, viagens..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     autoFocus
@@ -180,7 +180,7 @@ function MasterLayoutInner({ children }: { children: React.ReactNode }) {
                       <div className="space-y-4">
                         {searchResults.agencies.length > 0 && (
                           <div>
-                            <p className="text-xs text-muted-foreground px-2 mb-1">Agencias</p>
+                            <p className="text-xs text-muted-foreground px-2 mb-1">Agências</p>
                             {searchResults.agencies.slice(0, 3).map(agency => (
                               <button
                                 key={agency.id}
@@ -198,7 +198,7 @@ function MasterLayoutInner({ children }: { children: React.ReactNode }) {
                         )}
                         {searchResults.users.length > 0 && (
                           <div>
-                            <p className="text-xs text-muted-foreground px-2 mb-1">Usuarios</p>
+                            <p className="text-xs text-muted-foreground px-2 mb-1">Usuários</p>
                             {searchResults.users.slice(0, 3).map(user => (
                               <button
                                 key={user.id}
@@ -447,7 +447,7 @@ function MasterLayoutInner({ children }: { children: React.ReactNode }) {
             >
               <Coins className="h-3.5 w-3.5 text-primary" />
               <span className="text-xs font-semibold text-foreground">{(credits.totalAvailable / 1000).toFixed(1)}M</span>
-              <span className="text-[10px] text-muted-foreground">creditos</span>
+              <span className="text-[10px] text-muted-foreground">créditos</span>
             </Link>
 
             {/* Notifications */}
@@ -464,7 +464,7 @@ function MasterLayoutInner({ children }: { children: React.ReactNode }) {
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-80 bg-card/95 backdrop-blur-xl border-white/10">
                 <div className="flex items-center justify-between px-4 py-2 border-b border-white/5">
-                  <span className="text-sm font-semibold">Notificacoes</span>
+                    <span className="text-sm font-semibold">Notificações</span>
                   {unreadCount > 0 && (
                     <button onClick={markAllNotificationsRead} className="text-xs text-primary hover:underline">
                       Marcar todas como lidas
@@ -473,7 +473,7 @@ function MasterLayoutInner({ children }: { children: React.ReactNode }) {
                 </div>
                 <div className="max-h-64 overflow-y-auto">
                   {notifications.length === 0 ? (
-                    <p className="text-sm text-muted-foreground text-center py-8">Sem notificacoes</p>
+                    <p className="text-sm text-muted-foreground text-center py-8">Sem notificações</p>
                   ) : (
                     notifications.slice(0, 5).map(notification => (
                       <div
@@ -525,11 +525,11 @@ function MasterLayoutInner({ children }: { children: React.ReactNode }) {
                 </DropdownMenuItem>
                 <DropdownMenuItem className="text-xs gap-2" onClick={() => router.push("/master/configuracoes")}>
                   <Shield className="h-3.5 w-3.5" />
-                  Seguranca
+                  Segurança
                 </DropdownMenuItem>
                 <DropdownMenuItem className="text-xs gap-2" onClick={() => router.push("/master/configuracoes")}>
                   <Settings className="h-3.5 w-3.5" />
-                  Configuracoes
+                  Configurações
                 </DropdownMenuItem>
                 <DropdownMenuSeparator className="bg-white/5" />
                 <DropdownMenuItem className="text-xs text-red-400 gap-2" onClick={() => void handleSignOut()}>

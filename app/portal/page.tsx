@@ -56,7 +56,7 @@ function NoTripModal({ open, onClose }: { open: boolean; onClose: () => void }) 
           </div>
           <h3 className="text-xl font-bold text-[#101828]">Crie sua primeira viagem</h3>
           <p className="text-sm text-[#667085]">
-            Para acessar o link da viagem e os documentos vinculados, voce precisa criar uma viagem primeiro.
+            Para acessar o link da viagem e os documentos vinculados, você precisa criar uma viagem primeiro.
           </p>
           <div className="flex gap-3 pt-2">
             <Button variant="outline" className="flex-1 border-black/8 bg-white text-[#344054]" onClick={onClose}>
@@ -148,10 +148,10 @@ export default function PortalHomePage() {
     >
       <motion.div variants={fadeInUp} className="space-y-2">
         <h1 className="text-2xl font-bold md:text-3xl">
-          {loading || !firstName ? "Ola" : <>Ola, <span className="vuei-gradient-text">{firstName}</span></>}
+          {loading || !firstName ? "Olá" : <>Olá, <span className="vuei-gradient-text">{firstName}</span></>}
         </h1>
         <p className="text-muted-foreground">
-          {loadingTrips ? "Carregando suas viagens..." : trips.length > 0 ? "Seu link de viagem esta pronto para abrir, copiar e compartilhar." : "Crie sua primeira viagem para comecar."}
+          {loadingTrips ? "Carregando suas viagens..." : trips.length > 0 ? "Seu link de viagem está pronto para abrir, copiar e compartilhar." : "Crie sua primeira viagem para começar."}
         </p>
       </motion.div>
 
@@ -176,7 +176,7 @@ export default function PortalHomePage() {
               <div className="mb-4 flex items-start justify-between gap-4">
                 <div>
                   <Badge variant="secondary" className="mb-2 border-0 bg-primary/20 text-primary">
-                    {activeTrip.status === "upcoming" ? "Proxima viagem" : activeTrip.status === "ongoing" ? "Em andamento" : "Concluida"}
+                    {activeTrip.status === "upcoming" ? "Próxima viagem" : activeTrip.status === "ongoing" ? "Em andamento" : "Concluída"}
                   </Badge>
                   <h2 className="text-xl font-bold">{activeTrip.name}</h2>
                   <p className="mt-1 flex items-center gap-1 text-muted-foreground">
@@ -211,7 +211,7 @@ export default function PortalHomePage() {
                 <div className="rounded-xl border border-border/50 bg-background/40 p-4">
                   <div className="mb-2 flex items-center gap-2">
                     <Share2 size={16} className="text-primary" />
-                    <p className="text-sm font-medium">Link compartilhavel</p>
+                    <p className="text-sm font-medium">Link compartilhável</p>
                   </div>
                   <p className="truncate text-xs text-muted-foreground">{activeTrip.shareLink}</p>
                 </div>
@@ -251,7 +251,7 @@ export default function PortalHomePage() {
             </div>
             <h2 className="mb-2 text-xl font-bold">Nenhuma viagem criada ainda.</h2>
             <p className="mb-6 text-sm text-muted-foreground">
-              Organize tudo em um unico link: roteiro, documentos, passagens e mais.
+              Organize tudo em um único link: roteiro, documentos, passagens e mais.
             </p>
             <CreateTripButton className="border-0 bg-gradient-to-r from-[#5de0e6] to-[#004aad] text-white">
               <Plus size={18} className="mr-2" />
@@ -314,7 +314,7 @@ export default function PortalHomePage() {
 
       <NoTripModal open={showNoTripModal} onClose={() => setShowNoTripModal(false)} />
       <Toast
-        message={copiedLink === "admin" ? "Link administrador copiado!" : "Link compartilhavel copiado!"}
+        message={copiedLink === "admin" ? "Link administrador copiado!" : "Link compartilhável copiado!"}
         visible={!!copiedLink}
       />
     </motion.div>

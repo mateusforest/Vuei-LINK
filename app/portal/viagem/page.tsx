@@ -82,7 +82,7 @@ export default function ViagemListPage() {
   const handleDeleteTrip = async (tripId: string) => {
     const result = await deleteTrip(tripId)
     if (!result.success) {
-      setFeedback({ message: result.error || "Nao foi possivel excluir a viagem.", tone: "error" })
+      setFeedback({ message: result.error || "Não foi possível excluir a viagem.", tone: "error" })
       window.setTimeout(() => setFeedback(null), 2500)
       return
     }
@@ -117,9 +117,9 @@ export default function ViagemListPage() {
 
   const getStatusLabel = (status: string) => {
     switch (status) {
-      case "upcoming": return "Proxima"
+      case "upcoming": return "Próxima"
       case "ongoing": return "Em andamento"
-      case "completed": return "Concluida"
+      case "completed": return "Concluída"
       default: return status
     }
   }
@@ -157,9 +157,9 @@ export default function ViagemListPage() {
       <motion.div variants={fadeInUp} className="flex gap-2 overflow-x-auto pb-2">
         {[
           { value: "all", label: "Todas" },
-          { value: "upcoming", label: "Proximas" },
+          { value: "upcoming", label: "Próximas" },
           { value: "ongoing", label: "Em andamento" },
-          { value: "completed", label: "Concluidas" },
+          { value: "completed", label: "Concluídas" },
         ].map((f) => (
           <Button
             key={f.value}
@@ -238,7 +238,7 @@ export default function ViagemListPage() {
                     <div className="p-3 rounded-xl bg-primary/5 border border-primary/20">
                       <div className="flex items-center gap-2 mb-1">
                         <Link2 size={14} className="text-primary" />
-                        <span className="text-xs text-muted-foreground">Link Publico</span>
+                        <span className="text-xs text-muted-foreground">Link Público</span>
                       </div>
                       <div className="flex items-center gap-2">
                         <code className="text-xs truncate flex-1">{trip.shareLink}</code>
@@ -304,7 +304,7 @@ export default function ViagemListPage() {
             </h3>
             <p className="text-muted-foreground text-sm mb-6">
               {filter === "all" 
-                ? "Crie sua primeira viagem e organize tudo em um unico link."
+                ? "Crie sua primeira viagem e organize tudo em um único link."
                 : "Altere o filtro ou crie uma nova viagem."}
             </p>
             <Button 

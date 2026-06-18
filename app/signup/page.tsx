@@ -51,13 +51,13 @@ export default function SignupPage() {
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {}
-    if (!formData.name) newErrors.name = "Nome obrigatorio"
-    if (!formData.email) newErrors.email = "Email obrigatorio"
-    else if (!/\S+@\S+\.\S+/.test(formData.email)) newErrors.email = "Email invalido"
-    if (!formData.phone) newErrors.phone = "Telefone obrigatorio"
-    if (!formData.password) newErrors.password = "Senha obrigatoria"
-    else if (formData.password.length < 6) newErrors.password = "Minimo 6 caracteres"
-    if (formData.password !== formData.confirmPassword) newErrors.confirmPassword = "Senhas nao conferem"
+    if (!formData.name) newErrors.name = "Nome obrigatório"
+    if (!formData.email) newErrors.email = "Email obrigatório"
+    else if (!/\S+@\S+\.\S+/.test(formData.email)) newErrors.email = "Email inválido"
+    if (!formData.phone) newErrors.phone = "Telefone obrigatório"
+    if (!formData.password) newErrors.password = "Senha obrigatória"
+    else if (formData.password.length < 6) newErrors.password = "Mínimo 6 caracteres"
+    if (formData.password !== formData.confirmPassword) newErrors.confirmPassword = "Senhas não conferem"
     if (!acceptTerms) newErrors.terms = "Aceite os termos"
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
@@ -85,7 +85,7 @@ export default function SignupPage() {
         console.error("Cadastro Vuei - erro recebido da camada auth:", result.error)
         const authMessage = result.error.includes("429")
           ? "Muitas tentativas. Aguarde um momento e tente novamente."
-          : result.error || "Nao foi possivel criar a conta com esses dados."
+          : result.error || "Não foi possível criar a conta com esses dados."
         setErrors((prev) => ({ ...prev, auth: authMessage }))
         return
       }
@@ -96,7 +96,7 @@ export default function SignupPage() {
       console.log("[AUTH] redirect target", redirectPath)
       router.replace(redirectPath)
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Nao foi possivel concluir o cadastro."
+      const message = error instanceof Error ? error.message : "Não foi possível concluir o cadastro."
       console.error("[AUTH ERROR]", message)
       setErrors((prev) => ({ ...prev, auth: message }))
     } finally {
@@ -149,7 +149,7 @@ export default function SignupPage() {
                   <Check className="h-5 w-5" />
                 </div>
                 <div>
-                  <p className="text-sm font-semibold text-[#0f172a]">Sua conta Vuei comeca aqui</p>
+                  <p className="text-sm font-semibold text-[#0f172a]">Sua conta Vuei começa aqui</p>
                   <p className="text-xs text-[#667085]">Cadastre-se para centralizar a viagem em uma experiencia leve.</p>
                 </div>
               </div>
@@ -158,7 +158,7 @@ export default function SignupPage() {
                 {[
                   "Organize roteiros, documentos e hospedagens",
                   "Compartilhe a viagem com quem importa",
-                  "Tenha suporte do concierge em um unico fluxo",
+                  "Tenha suporte do concierge em um único fluxo",
                 ].map((item) => (
                   <div key={item} className="rounded-2xl border border-black/6 bg-[#f8fafc] px-4 py-3 text-sm text-[#475467]">
                     {item}
@@ -174,9 +174,9 @@ export default function SignupPage() {
               className="max-w-[32rem]"
             >
               <h1 className="mb-6 text-4xl font-semibold leading-tight tracking-[-0.05em] text-[#101828] xl:text-5xl">
-                Sua proxima viagem
+                Sua próxima viagem
                 <span className="block bg-gradient-to-r from-[#38c8ff] to-[#0b56d8] bg-clip-text text-transparent">
-                  comeca aqui.
+                  começa aqui.
                 </span>
               </h1>
               <p className="text-lg leading-relaxed text-[#667085]">
@@ -336,7 +336,7 @@ export default function SignupPage() {
                       </Link>
                       {" "}e{" "}
                       <Link href="/privacy" className="text-[#0b56d8] hover:underline">
-                        politica de privacidade
+                        política de privacidade
                       </Link>
                     </label>
                   </div>
@@ -369,6 +369,9 @@ export default function SignupPage() {
                 <div className="space-y-3">
                   <Button
                     variant="outline"
+                    type="button"
+                    disabled
+                    title="Cadastro social indisponível neste momento."
                     className="h-12 w-full rounded-2xl border border-black/8 bg-white text-[#344054] transition-all hover:bg-[#f8fafc] hover:text-[#101828]"
                   >
                     <svg className="mr-3 h-5 w-5" viewBox="0 0 24 24">
@@ -382,6 +385,9 @@ export default function SignupPage() {
 
                   <Button
                     variant="outline"
+                    type="button"
+                    disabled
+                    title="Cadastro social indisponível neste momento."
                     className="h-12 w-full rounded-2xl border border-black/8 bg-white text-[#344054] transition-all hover:bg-[#f8fafc] hover:text-[#101828]"
                   >
                     <svg className="mr-3 h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
@@ -392,11 +398,12 @@ export default function SignupPage() {
                 </div>
 
                 <p className="mt-8 text-center text-sm text-[#667085]">
-                  Ja possui uma conta?{" "}
+                  Já possui uma conta?{" "}
                   <Link href="/login" className="font-medium text-[#0b56d8] hover:underline">
                     Entrar
                   </Link>
                 </p>
+                <p className="text-center text-xs text-[#98a2b3]">Cadastro social indisponível neste momento.</p>
               </div>
             </div>
           </motion.div>

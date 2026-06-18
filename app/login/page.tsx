@@ -39,10 +39,10 @@ export default function LoginPage() {
 
   const validateForm = () => {
     const newErrors: { email?: string; password?: string } = {}
-    if (!email) newErrors.email = "Email obrigatorio"
-    else if (!/\S+@\S+\.\S+/.test(email)) newErrors.email = "Email invalido"
-    if (!password) newErrors.password = "Senha obrigatoria"
-    else if (password.length < 6) newErrors.password = "Minimo 6 caracteres"
+    if (!email) newErrors.email = "Email obrigatório"
+    else if (!/\S+@\S+\.\S+/.test(email)) newErrors.email = "Email inválido"
+    if (!password) newErrors.password = "Senha obrigatória"
+    else if (password.length < 6) newErrors.password = "Mínimo 6 caracteres"
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
   }
@@ -71,7 +71,7 @@ export default function LoginPage() {
       console.log("[AUTH] redirect target", redirectPath)
       router.replace(redirectPath)
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Nao foi possivel entrar agora."
+      const message = error instanceof Error ? error.message : "Não foi possível entrar agora."
       console.error("[AUTH ERROR]", message)
       setErrors((prev) => ({ ...prev, auth: message }))
     } finally {
@@ -113,15 +113,15 @@ export default function LoginPage() {
                 </div>
                 <div>
                   <p className="text-sm font-semibold text-[#0f172a]">Tudo pronto para a sua viagem</p>
-                  <p className="text-xs text-[#667085]">Acesse roteiros, documentos e concierge em um unico lugar.</p>
+                  <p className="text-xs text-[#667085]">Acesse roteiros, documentos e concierge em um único lugar.</p>
                 </div>
               </div>
 
               <div className="grid gap-3">
                 {[
-                  "Passagens centralizadas com acesso rapido",
+                  "Passagens centralizadas com acesso rápido",
                   "Documentos organizados no mesmo link",
-                  "Concierge IA pronto para ajudar voce",
+                  "Concierge IA pronto para ajudar você",
                 ].map((item) => (
                   <div key={item} className="rounded-2xl border border-black/6 bg-[#f8fafc] px-4 py-3 text-sm text-[#475467]">
                     {item}
@@ -139,7 +139,7 @@ export default function LoginPage() {
               <h1 className="mb-6 text-4xl font-semibold leading-tight tracking-[-0.05em] text-[#101828] xl:text-5xl">
                 Sua viagem inteira.
                 <span className="block bg-gradient-to-r from-[#38c8ff] to-[#0b56d8] bg-clip-text text-transparent">
-                  Em um unico lugar.
+                  Em um único lugar.
                 </span>
               </h1>
               <p className="text-lg leading-relaxed text-[#667085]">
@@ -259,6 +259,9 @@ export default function LoginPage() {
                 <div className="space-y-3">
                   <Button
                     variant="outline"
+                    type="button"
+                    disabled
+                    title="Login social indisponível neste momento."
                     className="h-12 w-full rounded-2xl border border-black/8 bg-white text-[#344054] transition-all hover:bg-[#f8fafc] hover:text-[#101828]"
                   >
                     <svg className="mr-3 h-5 w-5" viewBox="0 0 24 24">
@@ -272,6 +275,9 @@ export default function LoginPage() {
 
                   <Button
                     variant="outline"
+                    type="button"
+                    disabled
+                    title="Login social indisponível neste momento."
                     className="h-12 w-full rounded-2xl border border-black/8 bg-white text-[#344054] transition-all hover:bg-[#f8fafc] hover:text-[#101828]"
                   >
                     <svg className="mr-3 h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
@@ -283,7 +289,7 @@ export default function LoginPage() {
 
                 <div className="mt-8 space-y-3 text-center">
                   <p className="text-sm text-[#667085]">
-                    Nao tem uma conta?{" "}
+                    Não tem uma conta?{" "}
                     <Link href="/signup" className="font-medium text-[#0b56d8] hover:underline">
                       Criar conta
                     </Link>
@@ -292,9 +298,10 @@ export default function LoginPage() {
                     href="/agency/signup"
                     className="inline-flex items-center gap-2 text-sm text-[#667085] transition-colors hover:text-[#344054]"
                   >
-                    Sou uma agencia
+                    Sou uma agência
                     <ArrowRight className="h-3 w-3" />
                   </Link>
+                  <p className="text-xs text-[#98a2b3]">Login social indisponível neste momento.</p>
                 </div>
               </div>
             </div>
