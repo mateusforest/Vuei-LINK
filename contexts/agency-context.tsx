@@ -48,8 +48,8 @@ import {
   resolveAgencyPlanSnapshot,
 } from "@/lib/billing/agency-plans"
 import { resolveAgencyAvailableCredits } from "@/lib/billing/agency-billing"
-import { getAgencyBillingStatus, setAgencyPlanSelection } from "@/lib/repositories/agency-billing-repository"
-import { CREDIT_BALANCE_CHANGED_EVENT } from "@/lib/credits/credit-events"
+import { getAgencyBillingStatus, getAgencyBillingStatusFromApi, setAgencyPlanSelection } from "@/lib/repositories/agency-billing-repository"
+import { CREDIT_BALANCE_CHANGED_EVENT, type CreditBalanceChangedDetail } from "@/lib/credits/credit-events"
 
 export interface Client extends Pick<CanonicalClient, "id" | "name"> {
   id: string
@@ -494,16 +494,12 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
 
     const refreshAgencyCredits = async () => {
       const [billingStatusResult, creditTransactionsResult] = await Promise.all([
-        getAgencyBillingStatus(agency.id),
+        getAgencyBillingStatusFromApi(),
         listCreditTransactions("agency", agency.id),
       ])
 
       if (!active || billingStatusResult.error || !billingStatusResult.data) return
 
-      const nextSubscription = resolveAgencyPlanSnapshot({
-        agency,
-        billingStatus: billingStatusResult.data,
-      })
       const history = (creditTransactionsResult.data ?? []).map((transaction) => ({
         action: transaction.reason || transaction.type,
         amount: transaction.amount,
@@ -511,11 +507,18 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
         source: transaction.source || "Supabase",
       }))
 
-      setSubscription(nextSubscription)
-      setCredits(buildAgencyCredits(billingStatusResult.data.totalAvailable, nextSubscription.code, history))
+      setCredits((current) => buildAgencyCredits(
+        billingStatusResult.data.totalAvailable,
+        current.plan || billingStatusResult.data.currentPlan || "free",
+        history.length > 0 ? history : current.history,
+      ))
     }
 
-    const handleCreditsChanged = () => {
+    const handleCreditsChanged = (event: Event) => {
+      const detail = (event as CustomEvent<CreditBalanceChangedDetail>).detail
+      if (detail?.ownerType && detail.ownerType !== "agency") {
+        return
+      }
       void refreshAgencyCredits()
     }
 

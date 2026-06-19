@@ -296,7 +296,12 @@ export async function POST(request: Request) {
   const tripSlug = body?.tripSlug?.trim?.() ?? null
   const adminToken = body?.adminToken?.trim?.() ?? null
   const publicToken = body?.publicToken?.trim?.() ?? null
-  const accessMode = body?.accessMode === "admin" || body?.accessMode === "public" ? body.accessMode : "authenticated"
+  const explicitAccessMode = body?.accessMode === "admin" || body?.accessMode === "public" ? body.accessMode : null
+  const inferredLinkAccessMode =
+    explicitAccessMode
+    ?? (adminToken ? "admin" : null)
+    ?? (publicToken || tripSlug || origin === "trip-public-link" || origin === "trip-admin-link" ? "public" : null)
+  const accessMode = inferredLinkAccessMode ?? "authenticated"
 
   if (!tripId || !message) {
     return NextResponse.json({ error: "Trip e mensagem sao obrigatorios para o concierge." }, { status: 400 })
@@ -325,7 +330,14 @@ export async function POST(request: Request) {
     accessResult = await getAccessibleTrip(supabase, user.id, tripId, profileResult.data)
     actingUserId = user.id
   } else {
-    if (authError && accessMode === "authenticated") {
+    const isDirectTripLinkRequest =
+      origin === "trip-public-link"
+      || origin === "trip-admin-link"
+      || Boolean(adminToken)
+      || Boolean(publicToken)
+      || Boolean(tripSlug)
+
+    if (authError && accessMode === "authenticated" && !isDirectTripLinkRequest) {
       return NextResponse.json({ error: "Faça login novamente para continuar." }, { status: 401 })
     }
 
@@ -334,7 +346,7 @@ export async function POST(request: Request) {
       tripSlug,
       adminToken,
       publicToken,
-      accessMode: accessMode === "admin" ? "admin" : "public",
+      accessMode: accessMode === "admin" || origin === "trip-admin-link" ? "admin" : "public",
     })
     actingUserId = accessResult.trip?.owner_user_id ?? null
   }
