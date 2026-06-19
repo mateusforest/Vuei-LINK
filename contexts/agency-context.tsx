@@ -154,7 +154,7 @@ export interface Activity {
 interface AgencyCredits {
   balance: number
   plan: AgencyCommercialPlanCode
-  history: { action: string; amount: number; date: string; source: string }[]
+  history: { action: string; amount: number; date: string; source: string; metadata?: Record<string, unknown> | null }[]
   canonicalBalance?: CreditBalance
   canonicalTransactions?: CreditTransaction[]
 }
@@ -505,6 +505,7 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
         amount: transaction.amount,
         date: transaction.createdAt,
         source: transaction.source || "Supabase",
+        metadata: transaction.metadata ?? null,
       }))
 
       setCredits((current) => buildAgencyCredits(
@@ -806,6 +807,7 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
         amount: transaction.amount,
         date: transaction.createdAt,
         source: transaction.source || "Supabase",
+        metadata: transaction.metadata ?? null,
       }))
 
       const primaryWorkspaceError =

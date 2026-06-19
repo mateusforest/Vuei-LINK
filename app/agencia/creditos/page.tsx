@@ -59,6 +59,47 @@ export default function AgencyCreditsPage() {
     return date.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })
   }
 
+  const formatHistoryLabel = (item: (typeof credits.history)[number]) => {
+    const metadata = item.metadata && typeof item.metadata === "object" ? item.metadata : null
+    const tripTitle = typeof metadata?.trip_title === "string" ? metadata.trip_title.trim() : ""
+    const clientName = typeof metadata?.client_name === "string" ? metadata.client_name.trim() : ""
+    const sourceContext = typeof metadata?.source_context === "string" ? metadata.source_context.trim() : ""
+    const mode = typeof metadata?.mode === "string" ? metadata.mode.trim() : ""
+
+    let featureLabel = item.action?.trim() || "Consumo de créditos"
+
+    if (item.source === "ai_concierge" || sourceContext.includes("link_") || sourceContext.includes("portal_")) {
+      featureLabel = "Concierge IA"
+    } else if (item.source === "ai_itinerary_generation") {
+      featureLabel = mode === "complete_pdf" ? "Roteiro completo IA" : "Roteiro simples IA"
+    } else if (item.source === "ai_flight_extraction") {
+      featureLabel = "Leitura de passagem"
+    } else {
+      featureLabel = featureLabel
+        .replace(/^Geracao/i, "Geração")
+        .replace(/^Consumo do concierge ia/i, "Concierge IA")
+        .replace(/^Consumo da leitura de passagem/i, "Leitura de passagem")
+    }
+
+    const parts = [featureLabel]
+    if (tripTitle) parts.push(tripTitle)
+    if (clientName) parts.push(`Cliente ${clientName}`)
+
+    return parts.join(" • ")
+  }
+
+  const formatHistoryDetail = (item: (typeof credits.history)[number]) => {
+    const metadata = item.metadata && typeof item.metadata === "object" ? item.metadata : null
+    const sourceContext = typeof metadata?.source_context === "string" ? metadata.source_context.trim() : ""
+
+    if (sourceContext === "link_public") return "Link público"
+    if (sourceContext === "link_admin") return "Link admin"
+    if (sourceContext === "portal_agency") return "Portal da agência"
+    if (sourceContext === "portal_traveler") return "Portal do viajante"
+
+    return formatDate(item.date)
+  }
+
   return (
     <div className="mx-auto max-w-5xl space-y-6">
       <motion.div {...fadeInUp} className="flex items-center justify-between gap-4">
@@ -142,8 +183,8 @@ export default function AgencyCreditsPage() {
                   <Clock size={16} className={item.amount > 0 ? "text-green-400" : "text-muted-foreground"} />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium">{item.action}</p>
-                  <p className="text-xs text-muted-foreground">{formatDate(item.date)}</p>
+                  <p className="truncate text-sm font-medium">{formatHistoryLabel(item)}</p>
+                  <p className="text-xs text-muted-foreground">{formatHistoryDetail(item)}</p>
                 </div>
                 <span className={`text-sm font-semibold ${item.amount > 0 ? "text-green-400" : "text-muted-foreground"}`}>
                   {item.amount > 0 ? "+" : ""}
