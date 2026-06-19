@@ -4464,6 +4464,7 @@ function AddDocumentModal({ open, onClose, onSave, tripId, ownerUserId, agencyId
 function ConciergeSection({
   tripData,
   onOpenCredits,
+  showCredits = true,
   offlineReadOnly = false,
   tripSlug,
   adminToken,
@@ -4472,6 +4473,7 @@ function ConciergeSection({
 }: {
   tripData: any
   onOpenCredits: () => void
+  showCredits?: boolean
   offlineReadOnly?: boolean
   tripSlug: string
   adminToken: string | null
@@ -4491,7 +4493,6 @@ function ConciergeSection({
   const hasFlights = Array.isArray(tripData.flights) && tripData.flights.length > 0
   const hasHotel = Boolean(tripData.hotel)
   const hasItinerary = Array.isArray(tripData.itinerary) && tripData.itinerary.length > 0
-  const showCredits = !tripData?.agencyId
 
   useEffect(() => {
     setMessages([
@@ -6060,6 +6061,7 @@ export default function TripPage() {
   const loadRequestRef = useRef(0)
   const offlineImageUrlsRef = useRef<string[]>([])
   const flightPollingTimersRef = useRef<Map<string, ReturnType<typeof window.setTimeout>>>(new Map())
+  const isAgencyTrip = Boolean(tripData?.agencyId || tripData?.agency_id || agencyBranding?.isAgency)
 
   const logOfflineLookupDev = (stage: string, payload: Record<string, unknown>) => {
     if (process.env.NODE_ENV !== "development") return
@@ -6115,6 +6117,12 @@ export default function TripPage() {
   useEffect(() => {
     setTravelerPanel(null)
   }, [routeSlug, pathname])
+
+  useEffect(() => {
+    if (isAgencyTrip && creditsOpen) {
+      setCreditsOpen(false)
+    }
+  }, [creditsOpen, isAgencyTrip])
 
   useEffect(() => {
     if (typeof window === "undefined") return
@@ -6815,6 +6823,7 @@ export default function TripPage() {
     }
 
     if (section === "credits") {
+      if (isAgencyTrip) return
       setCreditsOpen(true)
     } else {
       scrollToSection()
@@ -7193,7 +7202,7 @@ export default function TripPage() {
   const handleGenerateItinerary = async (mode: "simple" | "complete_pdf") => {
     if (blockOfflineMutation()) return
 
-    const travelerTrip = !agencyBranding.isAgency && !tripData.agencyId && !profile?.agencyId
+    const travelerTrip = !isAgencyTrip && !profile?.agencyId
     const premiumLocked =
       travelerTrip &&
       ((mode === "simple" && !travelerPlan.definition.limits.simpleItinerary) ||
@@ -7652,7 +7661,11 @@ export default function TripPage() {
               {travelerPanel === "concierge" ? (
                 <ConciergeSection
                   tripData={tripData}
-                  onOpenCredits={() => setCreditsOpen(true)}
+                  onOpenCredits={() => {
+                    if (isAgencyTrip) return
+                    setCreditsOpen(true)
+                  }}
+                  showCredits={!isAgencyTrip}
                   offlineReadOnly={offlineModeEnabled}
                   tripSlug={routeSlug}
                   adminToken={tripAdminToken}
@@ -7694,7 +7707,7 @@ export default function TripPage() {
               open={menuOpen}
               onClose={() => setMenuOpen(false)}
               publicView
-              showCredits={!tripData.agencyId}
+              showCredits={!isAgencyTrip}
               onOpenTravelers={() => {
                 setMenuOpen(false)
                 setTravelersOpen(true)
@@ -7709,6 +7722,7 @@ export default function TripPage() {
               }}
               onOpenCredits={() => {
                 setMenuOpen(false)
+                if (isAgencyTrip) return
                 setCreditsOpen(true)
               }}
             />
@@ -7716,7 +7730,7 @@ export default function TripPage() {
             <TravelersModal open={travelersOpen} onClose={() => setTravelersOpen(false)} travelers={tripData.travelers} onUpdateTravelers={handleUpdateTravelers} />
             <TripSettingsModal open={tripSettingsOpen} onClose={() => setTripSettingsOpen(false)} tripData={tripData} onSave={handleSaveTripSettings} />
             <TripSecurityModal open={securitySettingsOpen} onClose={() => setSecuritySettingsOpen(false)} tripId={tripData.id} tripTitle={tripData.destination} onSecurityUpdated={() => setToast({ message: "Seguranca do dispositivo atualizada.", type: "success" })} />
-            {!tripData.agencyId ? <TravelerPublicCreditsModal open={creditsOpen} onClose={() => setCreditsOpen(false)} credits={tripData.credits} /> : null}
+            {!isAgencyTrip ? <TravelerPublicCreditsModal open={creditsOpen} onClose={() => setCreditsOpen(false)} credits={tripData.credits} /> : null}
             <Modal open={premiumGateModalOpen} onClose={() => setPremiumGateModalOpen(false)} title="DisponÃ­vel no Premium">
               <div className="space-y-5">
                 <p className="text-sm text-white/60">
@@ -7834,7 +7848,11 @@ export default function TripPage() {
               {travelerPanel === "concierge" ? (
                 <ConciergeSection
                   tripData={tripData}
-                  onOpenCredits={() => setCreditsOpen(true)}
+                  onOpenCredits={() => {
+                    if (isAgencyTrip) return
+                    setCreditsOpen(true)
+                  }}
+                  showCredits={!isAgencyTrip}
                   offlineReadOnly={offlineModeEnabled}
                   tripSlug={routeSlug}
                   adminToken={tripAdminToken}
@@ -7877,7 +7895,7 @@ export default function TripPage() {
               open={menuOpen}
               onClose={() => setMenuOpen(false)}
               publicView
-              showCredits={!tripData.agencyId}
+              showCredits={!isAgencyTrip}
               onOpenEditTrip={() => {
                 setMenuOpen(false)
                 setEditTripOpen(true)
@@ -7904,6 +7922,7 @@ export default function TripPage() {
               }}
               onOpenCredits={() => {
                 setMenuOpen(false)
+                if (isAgencyTrip) return
                 setCreditsOpen(true)
               }}
             />
@@ -7911,7 +7930,7 @@ export default function TripPage() {
             <TravelersModal open={travelersOpen} onClose={() => setTravelersOpen(false)} travelers={tripData.travelers} onUpdateTravelers={handleUpdateTravelers} />
             <TripSettingsModal open={tripSettingsOpen} onClose={() => setTripSettingsOpen(false)} tripData={tripData} onSave={handleSaveTripSettings} />
             <TripSecurityModal open={securitySettingsOpen} onClose={() => setSecuritySettingsOpen(false)} tripId={tripData.id} tripTitle={tripData.destination} onSecurityUpdated={() => setToast({ message: "Seguranca do dispositivo atualizada.", type: "success" })} />
-            {!tripData.agencyId ? <LinkCreditsSummaryModal open={creditsOpen} onClose={() => setCreditsOpen(false)} credits={tripData.credits} /> : null}
+            {!isAgencyTrip ? <LinkCreditsSummaryModal open={creditsOpen} onClose={() => setCreditsOpen(false)} credits={tripData.credits} /> : null}
             <Modal open={premiumGateModalOpen} onClose={() => setPremiumGateModalOpen(false)} title="Disponivel no Premium">
               <div className="space-y-5">
                 <p className="text-sm text-slate-600">
@@ -7975,7 +7994,11 @@ export default function TripPage() {
           <DocumentsSection loading={sectionsLoading.documents} tripData={tripData} onAddDocument={handleAddDocument} onDeleteDocument={handleDeleteDocument} tripId={tripData.id} ownerUserId={tripOwnerUserId} agencyId={profile?.agencyId ?? null} routeSlug={routeSlug} tripAdminToken={tripAdminToken} tripPublicToken={tripPublicToken} adminLinkMutationMode={adminLinkMutationMode} ensureSensitiveAccess={ensureSensitiveAccess} onSensitiveAccessGranted={() => setSensitiveAccessGranted(true)} offlineReadOnly={offlineModeEnabled} offlineDocumentContext={offlineDocumentContext} />
           <ConciergeSection
             tripData={tripData}
-            onOpenCredits={() => setCreditsOpen(true)}
+            onOpenCredits={() => {
+              if (isAgencyTrip) return
+              setCreditsOpen(true)
+            }}
+            showCredits={!isAgencyTrip}
             offlineReadOnly={offlineModeEnabled}
             tripSlug={routeSlug}
             adminToken={tripAdminToken}
@@ -8005,7 +8028,7 @@ export default function TripPage() {
           <MenuModal
             open={menuOpen}
             onClose={() => setMenuOpen(false)}
-            showCredits={!tripData.agencyId}
+            showCredits={!isAgencyTrip}
             onOpenTravelers={() => {
               setMenuOpen(false)
               setTravelersOpen(true)
@@ -8020,6 +8043,7 @@ export default function TripPage() {
             }}
             onOpenCredits={() => {
               setMenuOpen(false)
+              if (isAgencyTrip) return
               setCreditsOpen(true)
             }}
           />
@@ -8027,7 +8051,7 @@ export default function TripPage() {
           <TravelersModal open={travelersOpen} onClose={() => setTravelersOpen(false)} travelers={tripData.travelers} onUpdateTravelers={handleUpdateTravelers} />
           <TripSettingsModal open={tripSettingsOpen} onClose={() => setTripSettingsOpen(false)} tripData={tripData} onSave={handleSaveTripSettings} />
           <TripSecurityModal open={securitySettingsOpen} onClose={() => setSecuritySettingsOpen(false)} tripId={tripData.id} tripTitle={tripData.destination} onSecurityUpdated={() => setToast({ message: "Seguranca do dispositivo atualizada.", type: "success" })} />
-          {!tripData.agencyId ? <LinkCreditsSummaryModal open={creditsOpen} onClose={() => setCreditsOpen(false)} credits={tripData.credits} /> : null}
+          {!isAgencyTrip ? <LinkCreditsSummaryModal open={creditsOpen} onClose={() => setCreditsOpen(false)} credits={tripData.credits} /> : null}
           <Modal open={premiumGateModalOpen} onClose={() => setPremiumGateModalOpen(false)} title="Disponível no Premium">
             <div className="space-y-5">
               <p className="text-sm text-white/60">
