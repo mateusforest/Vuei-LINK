@@ -32,6 +32,8 @@ type DocumentRow = Database["public"]["Tables"]["documents"]["Row"]
 type HotelRow = Database["public"]["Tables"]["trip_hotels"]["Row"]
 type FlightRow = Database["public"]["Tables"]["trip_flights"]["Row"]
 type PromptRow = Database["public"]["Tables"]["ai_prompts"]["Row"]
+type ClientRow = Database["public"]["Tables"]["clients"]["Row"]
+type RouteSupabaseClient = ReturnType<typeof createSupabaseAdminClient>
 
 function mapPromptRow(row: PromptRow): AiPrompt {
   return {
@@ -49,7 +51,7 @@ function mapPromptRow(row: PromptRow): AiPrompt {
   }
 }
 
-async function getProfile(client: NonNullable<Awaited<ReturnType<typeof createSupabaseServerClient>>>, userId: string) {
+async function getProfile(client: RouteSupabaseClient, userId: string) {
   const { data, error } = await client
     .from("profiles")
     .select("id, role, agency_id, email, name")
@@ -64,7 +66,7 @@ async function getProfile(client: NonNullable<Awaited<ReturnType<typeof createSu
 }
 
 async function getAccessibleTrip(
-  client: NonNullable<Awaited<ReturnType<typeof createSupabaseServerClient>>>,
+  client: RouteSupabaseClient,
   userId: string,
   tripId: string,
   profile: ProfileRow | null,
@@ -154,7 +156,7 @@ async function getTripByLinkAccess(payload: {
 }
 
 async function getCreditsBalance(
-  client: NonNullable<Awaited<ReturnType<typeof createSupabaseServerClient>>>,
+  client: RouteSupabaseClient,
   ownerType: "traveler" | "agency",
   ownerId: string,
 ) {
@@ -175,7 +177,7 @@ async function getCreditsBalance(
 }
 
 async function resolvePrompt(
-  client: NonNullable<Awaited<ReturnType<typeof createSupabaseServerClient>>>,
+  client: RouteSupabaseClient,
   code: "concierge_traveler" | "concierge_agency",
 ) {
   const exact = await client
@@ -202,7 +204,7 @@ async function resolvePrompt(
 }
 
 async function createOrReuseConversation(
-  client: NonNullable<Awaited<ReturnType<typeof createSupabaseServerClient>>>,
+  client: RouteSupabaseClient,
   trip: TripRow,
   ownerUserId: string | null,
   agencyId: string | null,
@@ -261,7 +263,7 @@ async function createOrReuseConversation(
 }
 
 async function fetchConversationHistory(
-  client: NonNullable<Awaited<ReturnType<typeof createSupabaseServerClient>>>,
+  client: RouteSupabaseClient,
   conversationId: string,
 ) {
   const { data } = await client
@@ -293,13 +295,29 @@ export async function POST(request: Request) {
   const tripId = body?.tripId?.trim?.()
   const message = body?.message?.trim?.()
   const origin = body?.origin?.trim?.() || "unknown"
+  const referer = request.headers.get("referer")
   const tripSlug = body?.tripSlug?.trim?.() ?? null
   const adminToken = body?.adminToken?.trim?.() ?? null
   const publicToken = body?.publicToken?.trim?.() ?? null
+  const refererPathname = (() => {
+    if (!referer) return null
+    try {
+      return new URL(referer).pathname
+    } catch {
+      return null
+    }
+  })()
+  const refererAccessMode =
+    refererPathname?.endsWith("/admin")
+      ? "admin"
+      : refererPathname?.startsWith("/v/") || refererPathname?.startsWith("/viagem/")
+        ? "public"
+        : null
   const explicitAccessMode = body?.accessMode === "admin" || body?.accessMode === "public" ? body.accessMode : null
   const inferredLinkAccessMode =
     explicitAccessMode
     ?? (adminToken ? "admin" : null)
+    ?? refererAccessMode
     ?? (publicToken || tripSlug || origin === "trip-public-link" || origin === "trip-admin-link" ? "public" : null)
   const accessMode = inferredLinkAccessMode ?? "authenticated"
 
@@ -315,6 +333,15 @@ export async function POST(request: Request) {
   const authResult = await supabase.auth.getUser()
   const user = authResult.data.user
   const authError = authResult.error
+  const adminClient = createSupabaseAdminClient()
+  const isDirectTripLinkRequest =
+    origin === "trip-public-link"
+    || origin === "trip-admin-link"
+    || Boolean(adminToken)
+    || Boolean(publicToken)
+    || Boolean(tripSlug)
+    || Boolean(refererAccessMode)
+  const dataClient = !user && isDirectTripLinkRequest ? adminClient : supabase
 
   let actingUserId: string | null = null
   let accessResult:
@@ -330,13 +357,6 @@ export async function POST(request: Request) {
     accessResult = await getAccessibleTrip(supabase, user.id, tripId, profileResult.data)
     actingUserId = user.id
   } else {
-    const isDirectTripLinkRequest =
-      origin === "trip-public-link"
-      || origin === "trip-admin-link"
-      || Boolean(adminToken)
-      || Boolean(publicToken)
-      || Boolean(tripSlug)
-
     if (authError && accessMode === "authenticated" && !isDirectTripLinkRequest) {
       return NextResponse.json({ error: "Faça login novamente para continuar." }, { status: 401 })
     }
@@ -361,7 +381,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Nao foi possivel identificar o saldo responsavel por esta chamada de IA." }, { status: 400 })
   }
 
-  const balanceResult = await getCreditsBalance(supabase, ownerType, ownerId)
+  const balanceResult = await getCreditsBalance(dataClient, ownerType, ownerId)
   if (balanceResult.error) {
     return NextResponse.json({ error: balanceResult.error }, { status: 500 })
   }
@@ -375,25 +395,28 @@ export async function POST(request: Request) {
     )
   }
 
-  const promptResult = await resolvePrompt(supabase, ownerType === "agency" ? "concierge_agency" : "concierge_traveler")
-  const hotelsResult = await supabase
+  const promptResult = await resolvePrompt(dataClient, ownerType === "agency" ? "concierge_agency" : "concierge_traveler")
+  const hotelsResult = await dataClient
     .from("trip_hotels")
     .select("*")
     .eq("trip_id", accessResult.trip.id)
     .order("created_at", { ascending: true })
-  const flightsResult = await supabase
+  const flightsResult = await dataClient
     .from("trip_flights")
     .select("*")
     .eq("trip_id", accessResult.trip.id)
     .order("departure_at", { ascending: true, nullsFirst: false })
-  const documentsResult = await supabase
+  const documentsResult = await dataClient
     .from("documents")
     .select("*")
     .eq("trip_id", accessResult.trip.id)
     .order("created_at", { ascending: true })
+  const clientResult = accessResult.trip.client_id
+    ? await dataClient.from("clients").select("id, name").eq("id", accessResult.trip.client_id).maybeSingle()
+    : { data: null as ClientRow | null, error: null }
 
   const conversationResult = await createOrReuseConversation(
-    supabase,
+    dataClient,
     accessResult.trip,
     ownerType === "traveler" ? actingUserId : null,
     ownerType === "agency" ? accessResult.trip.agency_id : null,
@@ -410,7 +433,7 @@ export async function POST(request: Request) {
     )
   }
 
-  const history = await fetchConversationHistory(supabase, conversationResult.conversationId)
+  const history = await fetchConversationHistory(dataClient, conversationResult.conversationId)
   const contextSummary = buildTripContextSummary({
     trip: accessResult.trip,
     hotels: (hotelsResult.data ?? []) as HotelRow[],
@@ -425,7 +448,7 @@ export async function POST(request: Request) {
 
   if (!aiResult.ok) {
     if (aiResult.calledModel) {
-      const usageResult = await createAiUsageLog(supabase, {
+      const usageResult = await createAiUsageLog(dataClient, {
         ownerUserId: ownerType === "traveler" ? actingUserId : null,
         agencyId: accessResult.trip.agency_id,
         tripId: accessResult.trip.id,
@@ -443,6 +466,10 @@ export async function POST(request: Request) {
           promptCode: promptResult.prompt.code,
           promptFallback: promptResult.error ? true : false,
           error: aiResult.error,
+          tripTitle: accessResult.trip.title,
+          tripSlug: accessResult.trip.slug,
+          clientId: accessResult.trip.client_id,
+          clientName: clientResult.data?.name ?? null,
         },
       })
 
@@ -457,14 +484,14 @@ export async function POST(request: Request) {
   const assistantMessage = aiResult.content
   const creditsToCharge = creditsPerCall
 
-  const userInsert = await supabase.from("ai_messages").insert({
+  const userInsert = await dataClient.from("ai_messages").insert({
     conversation_id: conversationResult.conversationId,
     role: "user",
     content: message,
     metadata: { origin, accessMode, promptCode: promptResult.prompt.code, promptSourceError: promptResult.error },
   })
 
-  const assistantInsert = await supabase.from("ai_messages").insert({
+  const assistantInsert = await dataClient.from("ai_messages").insert({
     conversation_id: conversationResult.conversationId,
     role: "assistant",
     content: assistantMessage,
@@ -476,7 +503,7 @@ export async function POST(request: Request) {
     },
   })
 
-  const conversationUpdate = await supabase
+  const conversationUpdate = await dataClient
     .from("ai_conversations")
     .update({
       last_message: assistantMessage,
@@ -498,7 +525,7 @@ export async function POST(request: Request) {
     )
   }
 
-  const usageInsert = await createAiUsageLog(supabase, {
+  const usageInsert = await createAiUsageLog(dataClient, {
     ownerUserId: ownerType === "traveler" ? actingUserId : null,
     agencyId: accessResult.trip.agency_id,
     tripId: accessResult.trip.id,
@@ -516,6 +543,10 @@ export async function POST(request: Request) {
       promptCode: promptResult.prompt.code,
       promptFallback: promptResult.error ? true : false,
       estimatedCostUsd: estimateCostUsd(aiResult.usage.inputTokens, aiResult.usage.outputTokens),
+      tripTitle: accessResult.trip.title,
+      tripSlug: accessResult.trip.slug,
+      clientId: accessResult.trip.client_id,
+      clientName: clientResult.data?.name ?? null,
     },
   })
 
@@ -527,7 +558,6 @@ export async function POST(request: Request) {
   }
 
   if (ownerType === "traveler" && actingUserId) {
-    const adminClient = createSupabaseAdminClient()
     const consumeResult = await consumeTravelerCredits(adminClient, {
       userId: actingUserId,
       amount: creditsToCharge,
@@ -536,7 +566,13 @@ export async function POST(request: Request) {
       metadata: {
         module: "concierge",
         trip_id: accessResult.trip.id,
+        trip_slug: accessResult.trip.slug,
+        trip_title: accessResult.trip.title,
+        client_id: accessResult.trip.client_id,
+        client_name: clientResult.data?.name ?? null,
         conversation_id: conversationResult.conversationId,
+        feature: "concierge",
+        source_context: isDirectTripLinkRequest ? (accessMode === "admin" ? "link_admin" : "link_public") : "portal_traveler",
       },
       createdBy: actingUserId,
     })
@@ -549,7 +585,6 @@ export async function POST(request: Request) {
       )
     }
   } else {
-    const adminClient = createSupabaseAdminClient()
     const consumeResult = await consumeAgencyCredits(adminClient, {
       agencyId: accessResult.trip.agency_id ?? "",
       amount: creditsToCharge,
@@ -558,7 +593,13 @@ export async function POST(request: Request) {
       metadata: {
         module: "concierge",
         trip_id: accessResult.trip.id,
+        trip_slug: accessResult.trip.slug,
+        trip_title: accessResult.trip.title,
+        client_id: accessResult.trip.client_id,
+        client_name: clientResult.data?.name ?? null,
         conversation_id: conversationResult.conversationId,
+        feature: "concierge",
+        source_context: isDirectTripLinkRequest ? (accessMode === "admin" ? "link_admin" : "link_public") : "portal_agency",
       },
       createdBy: actingUserId,
     })

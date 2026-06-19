@@ -4433,6 +4433,7 @@ function ConciergeSection({
   const hasFlights = Array.isArray(tripData.flights) && tripData.flights.length > 0
   const hasHotel = Boolean(tripData.hotel)
   const hasItinerary = Array.isArray(tripData.itinerary) && tripData.itinerary.length > 0
+  const showCredits = !tripData?.agencyId
 
   useEffect(() => {
     setMessages([
@@ -4670,15 +4671,17 @@ function ConciergeSection({
             </div>
           </div>
 
-          <div className="px-4 py-3 bg-white/[0.02] border-t border-white/[0.06] flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <CreditCard className="w-4 h-4 text-[#5de0e6]" />
-              <span className="text-xs text-white/40">{tripData.credits.balance} creditos restantes</span>
+          {showCredits ? (
+            <div className="px-4 py-3 bg-white/[0.02] border-t border-white/[0.06] flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <CreditCard className="w-4 h-4 text-[#5de0e6]" />
+                <span className="text-xs text-white/40">{tripData.credits.balance} creditos restantes</span>
+              </div>
+              <Button size="sm" variant="ghost" onClick={onOpenCredits} className="text-[#5de0e6] text-xs">
+                Ver saldo
+              </Button>
             </div>
-            <Button size="sm" variant="ghost" onClick={onOpenCredits} className="text-[#5de0e6] text-xs">
-              Ver saldo
-            </Button>
-          </div>
+          ) : null}
         </motion.div>
       </div>
     </section>
@@ -4777,6 +4780,7 @@ function MenuModal({
   onOpenSecurity,
   onOpenCredits,
   publicView = false,
+  showCredits = true,
   onOpenEditTrip,
   onOpenShare,
   onOpenOffline,
@@ -4788,6 +4792,7 @@ function MenuModal({
   onOpenSecurity: () => void
   onOpenCredits: () => void
   publicView?: boolean
+  showCredits?: boolean
   onOpenEditTrip?: () => void
   onOpenShare?: () => void
   onOpenOffline?: () => void
@@ -4797,7 +4802,7 @@ function MenuModal({
     ...(isAdmin ? [
       ...(onOpenEditTrip ? [{ icon: Edit3, label: "Editar viagem", action: onOpenEditTrip }] : []),
       ...(onOpenShare ? [{ icon: Share2, label: "Compartilhar link", action: onOpenShare }] : []),
-      { icon: CreditCard, label: "Creditos", action: onOpenCredits },
+      ...(showCredits ? [{ icon: CreditCard, label: "Creditos", action: onOpenCredits }] : []),
       { icon: Shield, label: "Seguranca", action: onOpenSecurity },
       ...(onOpenOffline ? [{ icon: WifiOff, label: "Offline", action: onOpenOffline }] : []),
       { icon: Settings, label: "Configuracoes", action: onOpenSettings },
@@ -4809,7 +4814,7 @@ function MenuModal({
   return (
     <BottomSheet tone={publicView ? "light" : "dark"} open={open} onClose={onClose} title="Menu da Viagem">
       <div className="space-y-2">
-        {(isAdmin ? menuItems.slice(0, -1) : menuItems).map((item, i) => (
+        {((isAdmin ? menuItems.slice(0, -1) : menuItems).filter((item) => showCredits || item.action !== onOpenCredits)).map((item, i) => (
           <button
             key={i}
             onClick={() => { item.action(); onClose() }}
@@ -7631,6 +7636,7 @@ export default function TripPage() {
               open={menuOpen}
               onClose={() => setMenuOpen(false)}
               publicView
+              showCredits={!tripData.agencyId}
               onOpenTravelers={() => {
                 setMenuOpen(false)
                 setTravelersOpen(true)
@@ -7652,7 +7658,7 @@ export default function TripPage() {
             <TravelersModal open={travelersOpen} onClose={() => setTravelersOpen(false)} travelers={tripData.travelers} onUpdateTravelers={handleUpdateTravelers} />
             <TripSettingsModal open={tripSettingsOpen} onClose={() => setTripSettingsOpen(false)} tripData={tripData} onSave={handleSaveTripSettings} />
             <TripSecurityModal open={securitySettingsOpen} onClose={() => setSecuritySettingsOpen(false)} tripId={tripData.id} tripTitle={tripData.destination} onSecurityUpdated={() => setToast({ message: "Seguranca do dispositivo atualizada.", type: "success" })} />
-            <TravelerPublicCreditsModal open={creditsOpen} onClose={() => setCreditsOpen(false)} credits={tripData.credits} />
+            {!tripData.agencyId ? <TravelerPublicCreditsModal open={creditsOpen} onClose={() => setCreditsOpen(false)} credits={tripData.credits} /> : null}
             <Modal open={premiumGateModalOpen} onClose={() => setPremiumGateModalOpen(false)} title="DisponÃ­vel no Premium">
               <div className="space-y-5">
                 <p className="text-sm text-white/60">
@@ -7813,6 +7819,7 @@ export default function TripPage() {
               open={menuOpen}
               onClose={() => setMenuOpen(false)}
               publicView
+              showCredits={!tripData.agencyId}
               onOpenEditTrip={() => {
                 setMenuOpen(false)
                 setEditTripOpen(true)
@@ -7846,7 +7853,7 @@ export default function TripPage() {
             <TravelersModal open={travelersOpen} onClose={() => setTravelersOpen(false)} travelers={tripData.travelers} onUpdateTravelers={handleUpdateTravelers} />
             <TripSettingsModal open={tripSettingsOpen} onClose={() => setTripSettingsOpen(false)} tripData={tripData} onSave={handleSaveTripSettings} />
             <TripSecurityModal open={securitySettingsOpen} onClose={() => setSecuritySettingsOpen(false)} tripId={tripData.id} tripTitle={tripData.destination} onSecurityUpdated={() => setToast({ message: "Seguranca do dispositivo atualizada.", type: "success" })} />
-            <LinkCreditsSummaryModal open={creditsOpen} onClose={() => setCreditsOpen(false)} credits={tripData.credits} />
+            {!tripData.agencyId ? <LinkCreditsSummaryModal open={creditsOpen} onClose={() => setCreditsOpen(false)} credits={tripData.credits} /> : null}
             <Modal open={premiumGateModalOpen} onClose={() => setPremiumGateModalOpen(false)} title="Disponivel no Premium">
               <div className="space-y-5">
                 <p className="text-sm text-slate-600">
@@ -7940,6 +7947,7 @@ export default function TripPage() {
           <MenuModal
             open={menuOpen}
             onClose={() => setMenuOpen(false)}
+            showCredits={!tripData.agencyId}
             onOpenTravelers={() => {
               setMenuOpen(false)
               setTravelersOpen(true)
@@ -7961,7 +7969,7 @@ export default function TripPage() {
           <TravelersModal open={travelersOpen} onClose={() => setTravelersOpen(false)} travelers={tripData.travelers} onUpdateTravelers={handleUpdateTravelers} />
           <TripSettingsModal open={tripSettingsOpen} onClose={() => setTripSettingsOpen(false)} tripData={tripData} onSave={handleSaveTripSettings} />
           <TripSecurityModal open={securitySettingsOpen} onClose={() => setSecuritySettingsOpen(false)} tripId={tripData.id} tripTitle={tripData.destination} onSecurityUpdated={() => setToast({ message: "Seguranca do dispositivo atualizada.", type: "success" })} />
-          <LinkCreditsSummaryModal open={creditsOpen} onClose={() => setCreditsOpen(false)} credits={tripData.credits} />
+          {!tripData.agencyId ? <LinkCreditsSummaryModal open={creditsOpen} onClose={() => setCreditsOpen(false)} credits={tripData.credits} /> : null}
           <Modal open={premiumGateModalOpen} onClose={() => setPremiumGateModalOpen(false)} title="Disponível no Premium">
             <div className="space-y-5">
               <p className="text-sm text-white/60">
