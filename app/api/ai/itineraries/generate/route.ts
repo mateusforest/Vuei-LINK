@@ -375,7 +375,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: accessResult.error ?? "Viagem nao encontrada." }, { status: 403 })
   }
 
-  const ownerType = accessResult.membership ? "agency" : "traveler"
+  const ownerType = accessResult.trip.agency_id ? "agency" : "traveler"
   const ownerId = ownerType === "agency" ? accessResult.trip.agency_id : actingUserId
   const actingOwnerUserId = actingUserId ?? accessResult.trip.owner_user_id ?? null
   const fileOwnerKey = accessResult.trip.owner_user_id ?? accessResult.trip.agency_id ?? accessResult.trip.id

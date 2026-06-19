@@ -117,6 +117,9 @@ export default function RoteirosIAPage() {
     () => trips.find((trip) => trip.id === selectedTripId) ?? null,
     [selectedTripId, trips],
   )
+  const simpleCreditCost = getAiCreditCost("itinerary_generation_simple")
+  const completeCreditCost = getAiCreditCost("itinerary_generation_complete")
+  const hasCreditsForSimple = availableCredits >= simpleCreditCost
 
   const refreshAvailableCredits = useCallback(async () => {
     if (!isRealMode) {
@@ -250,9 +253,7 @@ export default function RoteirosIAPage() {
       return
     }
 
-    const creditCost = mode === "simple"
-      ? getAiCreditCost("itinerary_generation_simple")
-      : getAiCreditCost("itinerary_generation_complete")
+    const creditCost = mode === "simple" ? simpleCreditCost : completeCreditCost
 
     if (availableCredits < creditCost) {
       showInsufficientCredits()
@@ -377,15 +378,28 @@ export default function RoteirosIAPage() {
             <div>
               <p className="text-sm font-semibold text-amber-200">Créditos insuficientes</p>
               <p className="mt-1 text-sm text-amber-100/80">
-                Você não possui créditos suficientes para gerar este roteiro. Veja os planos e pacotes de créditos da agência.
+                Créditos insuficientes para gerar este roteiro. Recarregue créditos no portal da agência.
               </p>
             </div>
             <Button asChild className="w-full sm:w-fit bg-gradient-to-r from-primary to-accent text-white">
-              <Link href="/agencia/planos">Ver planos</Link>
+              <Link href="/agencia/creditos">Ver créditos</Link>
             </Button>
           </CardContent>
         </Card>
       ) : null}
+
+      <Card className={hasCreditsForSimple ? "border-emerald-500/20 bg-emerald-500/10" : "border-amber-500/20 bg-amber-500/10"}>
+        <CardContent className="p-4">
+          <p className={hasCreditsForSimple ? "text-sm font-semibold text-emerald-300" : "text-sm font-semibold text-amber-200"}>
+            {hasCreditsForSimple ? "Roteiros IA disponíveis" : "Créditos insuficientes para gerar roteiros"}
+          </p>
+          <p className={hasCreditsForSimple ? "mt-1 text-sm text-emerald-100/80" : "mt-1 text-sm text-amber-100/80"}>
+            {hasCreditsForSimple
+              ? `O consumo será descontado dos créditos da agência: ${simpleCreditCost} créditos no roteiro simples e ${completeCreditCost} no completo em PDF.`
+              : `A agência precisa de pelo menos ${simpleCreditCost} créditos para o roteiro simples e ${completeCreditCost} para o completo em PDF.`}
+          </p>
+        </CardContent>
+      </Card>
 
       {generatedMessage ? (
         <Card className="bg-emerald-500/10 border-emerald-500/20">
