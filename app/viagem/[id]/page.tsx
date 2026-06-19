@@ -7,7 +7,6 @@ import { motion, AnimatePresence, useScroll, useTransform } from "framer-motion"
 import { extractAgencyStorageState } from "@/lib/mappers/agency-mappers"
 import { extractTripsStoragePayload } from "@/lib/mappers/trip-mappers"
 import { shouldUseSupabase } from "@/lib/data-source"
-import { getAgencyById } from "@/lib/repositories/agencies-repository"
 import { getTripByAdminToken, getTripByPublicToken, getTripBySlug } from "@/lib/repositories/trips-repository"
 import { createDocumentMetadata, deleteDocument, deleteDocumentFile, getSignedDocumentUrl, listDocumentsByTrip, listPublicTripDocuments, uploadDocumentFile } from "@/lib/repositories/documents-repository"
 import { deleteTripFlight, listPublicTripFlights, listTripFlights, requestTripFlightExtraction, upsertTripFlight } from "@/lib/repositories/trip-flights-repository"
@@ -947,63 +946,63 @@ function resolveTripAgencyId(source: any) {
   return source.agencyId ?? source.agency_id ?? source.agency?.id ?? null
 }
 
-function readAgencyBrandingFromBrowserCache(agencyId: string | null) {
-  if (typeof window === "undefined" || !agencyId) return null
+type TripBrandingAccessMode = "admin" | "public"
 
-  try {
-    for (let index = 0; index < window.sessionStorage.length; index += 1) {
-      const key = window.sessionStorage.key(index)
-      if (!key || !key.startsWith("vuei_agency_workspace_cache:")) continue
+type TripAgencyBrandingPayload = {
+  agencyId: string | null
+  name: string | null
+  logoUrl: string | null
+  linkLogoUrl: string | null
+  isAgency: boolean
+}
 
-      const rawValue = window.sessionStorage.getItem(key)
-      if (!rawValue) continue
+async function fetchTripAgencyBranding(params: {
+  tripId?: string | null
+  tripSlug?: string | null
+  adminToken?: string | null
+  publicToken?: string | null
+  accessMode: TripBrandingAccessMode
+}) {
+  const searchParams = new URLSearchParams({
+    accessMode: params.accessMode,
+  })
 
-      const parsed = JSON.parse(rawValue) as {
-        agency?: {
-          id?: string | null
-          name?: string | null
-          logo?: string | null
-          branding?: {
-            logoUrl?: string | null
-            linkLogoUrl?: string | null
-          } | null
-        } | null
-        agencyId?: string | null
-      }
+  if (params.tripId) {
+    searchParams.set("tripId", params.tripId)
+  }
 
-      if (parsed.agency?.id !== agencyId && parsed.agencyId !== agencyId) continue
+  if (params.tripSlug) {
+    searchParams.set("tripSlug", params.tripSlug)
+  }
 
-      return {
-        name: typeof parsed.agency?.name === "string" ? parsed.agency.name : null,
-        logoUrl: resolveAgencyBrandLogo(
-          parsed.agency?.branding?.linkLogoUrl,
-          parsed.agency?.branding?.logoUrl,
-          parsed.agency?.logo,
-        ),
-      }
-    }
-  } catch (error) {
-    console.error("[TRIP] agency session cache read error", error)
+  if (params.adminToken) {
+    searchParams.set("adminToken", params.adminToken)
+  }
+
+  if (params.publicToken) {
+    searchParams.set("publicToken", params.publicToken)
   }
 
   try {
-    const rawSettings = window.localStorage.getItem("vuei_agencia_configuracoes_frontend")
-    if (!rawSettings) return null
+    const response = await fetch(`/api/trip-branding?${searchParams.toString()}`, {
+      cache: "no-store",
+    })
+    const payload = (await response.json().catch(() => null)) as TripAgencyBrandingPayload | { error?: string } | null
 
-    const parsed = JSON.parse(rawSettings) as {
-      agencyData?: { name?: string | null } | null
-      brandingData?: { linkLogo?: string | null } | null
+    if (!response.ok) {
+      console.error("[TRIP] trip branding fetch failed", payload)
+      return null
     }
 
-    return {
-      name: typeof parsed.agencyData?.name === "string" ? parsed.agencyData.name : null,
-      logoUrl: resolveAgencyBrandLogo(parsed.brandingData?.linkLogo),
+    if (!payload || typeof payload !== "object" || !("isAgency" in payload)) {
+      return null
     }
+
+    return payload as TripAgencyBrandingPayload
   } catch (error) {
-    console.error("[TRIP] agency local settings read error", error)
+    console.error("[TRIP] trip branding request error", error)
+    return null
   }
-
-  return null
 }
 
 type OfflineDocumentContext = {
@@ -6260,17 +6259,19 @@ export default function TripPage() {
             setOfflineDocumentContext(null)
           }
           const resolvedAgencyId = resolveTripAgencyId(repositoryTrip.data)
-          const preloadedAgencyResult = resolvedAgencyId ? await getAgencyById(resolvedAgencyId) : null
-          const cachedAgencyBranding = readAgencyBrandingFromBrowserCache(resolvedAgencyId)
+          const preloadedAgencyBranding = await fetchTripAgencyBranding({
+            tripId: repositoryTrip.data.id,
+            tripSlug: repositoryTrip.data.slug ?? routeSlug,
+            adminToken: repositoryTrip.data.adminToken ?? adminToken ?? null,
+            publicToken: repositoryTrip.data.publicToken ?? publicToken ?? null,
+            accessMode: isAdminRoute ? "admin" : "public",
+          })
           const preloadedAgencyLogo = resolveAgencyBrandLogo(
-            preloadedAgencyResult?.data?.branding?.linkLogoUrl,
-            preloadedAgencyResult?.data?.branding?.logoUrl,
-            preloadedAgencyResult?.data?.logo,
-            cachedAgencyBranding?.logoUrl,
+            preloadedAgencyBranding?.linkLogoUrl,
+            preloadedAgencyBranding?.logoUrl,
           )
           const preloadedAgencyName =
-            preloadedAgencyResult?.data?.name ??
-            cachedAgencyBranding?.name ??
+            preloadedAgencyBranding?.name ??
             (resolvedAgencyId ? "Agencia parceira" : null)
 
           setAgencyBranding({
@@ -6364,7 +6365,7 @@ export default function TripPage() {
               adminSectionsPromise
                 ? adminSectionsPromise.then((data: any) => ({ source: "admin-api" as const, data: data?.hotels ?? [], error: null }))
                 : listTripHotels(repositoryTrip.data.id),
-              Promise.resolve(preloadedAgencyResult),
+              Promise.resolve(preloadedAgencyBranding),
             ])
 
             if (loadRequestRef.current !== requestId) return
@@ -6417,11 +6418,10 @@ export default function TripPage() {
             const simpleItinerary = resolveSimpleTripItinerary(itinerariesResult.data ?? [])
             setTripItineraryRecords(itinerariesResult.data ?? [])
             setAgencyBranding({
-              name: agencyResult?.data?.name ?? preloadedAgencyName,
+              name: agencyResult?.name ?? preloadedAgencyName,
               logoUrl: resolveAgencyBrandLogo(
-                agencyResult?.data?.branding?.linkLogoUrl,
-                agencyResult?.data?.branding?.logoUrl,
-                agencyResult?.data?.logo,
+                agencyResult?.linkLogoUrl,
+                agencyResult?.logoUrl,
                 preloadedAgencyLogo,
               ),
               isAgency: Boolean(resolvedAgencyId),
