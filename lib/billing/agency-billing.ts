@@ -440,6 +440,7 @@ export async function consumeAgencyCredits(
     agency_id: params.agencyId,
     type: "consume",
     amount: -amount,
+    balance_after: nextBalance,
     reason: params.reason,
     source: params.source,
     metadata: {
@@ -463,17 +464,6 @@ export async function consumeAgencyCredits(
     if (cycleUpdate.error) {
       return { success: false, error: cycleUpdate.error.message }
     }
-  }
-
-  const balanceUpdate = await (client.from("agencies") as any)
-    .update({
-      credits_balance: nextBalance,
-      updated_at: nowIso,
-    } as any)
-    .eq("id", params.agencyId)
-
-  if (balanceUpdate.error) {
-    return { success: false, error: balanceUpdate.error.message }
   }
 
   return {

@@ -531,7 +531,10 @@ export async function POST(request: Request) {
 
     if (!consumeResult.success) {
       console.error("[AI] traveler credits consume error", consumeResult.error)
-      warning = "A resposta foi gerada, mas o consumo de creditos ainda nao foi registrado. Revise o ledger de creditos."
+      return NextResponse.json(
+        { error: consumeResult.error ?? "A resposta foi gerada, mas o débito dos créditos falhou." },
+        { status: 500 },
+      )
     }
   } else {
     const adminClient = createSupabaseAdminClient()
@@ -550,7 +553,10 @@ export async function POST(request: Request) {
 
     if (!consumeResult.success) {
       console.error("[AI] agency credits consume error", consumeResult.error)
-      warning = "A resposta foi gerada, mas o consumo de creditos ainda nao foi registrado. Revise o ledger de creditos."
+      return NextResponse.json(
+        { error: consumeResult.error ?? "A resposta foi gerada, mas o débito dos créditos falhou." },
+        { status: 500 },
+      )
     }
   }
 

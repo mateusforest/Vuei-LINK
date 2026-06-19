@@ -580,6 +580,10 @@ export async function POST(request: Request) {
 
       if (!consumeResult.success) {
         console.error("[AI][FLIGHT_EXTRACTION] traveler credit transaction error", consumeResult.error)
+        return NextResponse.json(
+          { error: consumeResult.error ?? "A passagem foi extraída, mas o débito dos créditos falhou." },
+          { status: 500 },
+        )
       }
     } else {
       const adminClient = createSupabaseAdminClient()
@@ -599,6 +603,10 @@ export async function POST(request: Request) {
 
       if (!consumeResult.success) {
         console.error("[AI][FLIGHT_EXTRACTION] agency credit transaction error", consumeResult.error)
+        return NextResponse.json(
+          { error: consumeResult.error ?? "A passagem foi extraída, mas o débito dos créditos falhou." },
+          { status: 500 },
+        )
       }
     }
   }

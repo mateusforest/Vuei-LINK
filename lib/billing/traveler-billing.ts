@@ -502,6 +502,7 @@ export async function consumeTravelerCredits(
       owner_user_id: params.userId,
       type: "consume",
       amount: -amount,
+      balance_after: Math.max(balanceResult.data.totalAvailable - amount, 0),
       reason: params.reason,
       source: params.source,
       metadata: {
@@ -527,18 +528,6 @@ export async function consumeTravelerCredits(
     if (cycleUpdate.error) {
       return { success: false, error: cycleUpdate.error.message }
     }
-  }
-
-  const balanceUpdate = await (client
-    .from("profiles") as any)
-    .update({
-      credits_balance: Math.max(balanceResult.data.totalAvailable - amount, 0),
-      updated_at: new Date().toISOString(),
-    } as any)
-    .eq("id", params.userId)
-
-  if (balanceUpdate.error) {
-    return { success: false, error: balanceUpdate.error.message }
   }
 
   return {
