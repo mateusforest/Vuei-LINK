@@ -1,6 +1,14 @@
+-- LEGADO / SNAPSHOT HISTORICO
 -- Vuei schema v1 final
--- Consolidado para revisao manual e execucao idempotente no Supabase.
--- Nao usar em bloco sem revisar em ambiente real.
+-- Consolidado antigo para revisao manual.
+-- Nao tratar este arquivo como fonte unica de verdade do schema atual.
+-- O runtime atual depende tambem dos SQLs versionados separados, como:
+-- - ai_usage_logs.sql
+-- - agency_billing.sql
+-- - traveler_billing.sql
+-- - trip_itineraries.sql
+-- - trip_hotels.sql
+-- Nao usar em bloco sem reconciliar com os SQLs modulares acima e com o schema real.
 -- Principios:
 -- - sem drop table
 -- - sem truncate

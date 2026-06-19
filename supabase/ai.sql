@@ -1,3 +1,8 @@
+-- LEGADO PARCIAL
+-- Este arquivo ainda e util como referencia historica para ai_conversations, ai_messages e ai_prompts,
+-- mas o bloco de ai_usage_logs aqui nao representa mais o schema usado em runtime.
+-- Para ai_usage_logs, a referencia atual e supabase/ai_usage_logs.sql.
+
 create table if not exists public.ai_conversations (
   id uuid primary key default gen_random_uuid(),
   trip_id uuid references public.trips(id) on delete cascade,
