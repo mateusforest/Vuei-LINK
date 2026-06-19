@@ -55,6 +55,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { cn } from "@/lib/utils"
 import { devLog, startPerfMeasure } from "@/lib/dev/perf"
+import { dispatchCreditBalanceChanged } from "@/lib/credits/credit-events"
 
 const TRIPS_STORAGE_KEY = "vuei_trips"
 const AGENCY_STORAGE_KEY = "vuei_agency"
@@ -4542,6 +4543,7 @@ function ConciergeSection({
       conversationId: data?.conversationId ?? null,
       assistantMessage: data?.assistantMessage ?? "",
       warning: data?.warning ?? null,
+      creditsCharged: typeof data?.creditsCharged === "number" ? data.creditsCharged : 0,
     }
   }
 
@@ -4575,6 +4577,10 @@ function ConciergeSection({
 
         if (result.warning) {
           showToast(result.warning, "info")
+        }
+
+        if (!result.warning && result.creditsCharged > 0) {
+          dispatchCreditBalanceChanged({ amount: result.creditsCharged, feature: "concierge" })
         }
 
         setMessages((prev) => [...prev, { role: "assistant", content: result.assistantMessage }])

@@ -22,6 +22,7 @@ import { useTrips } from "@/contexts/trips-context"
 import { useAuth } from "@/contexts/auth-context"
 import { listConversationsByTrip, listMessages } from "@/lib/repositories/ai-repository"
 import { shouldUseSupabase } from "@/lib/data-source"
+import { dispatchCreditBalanceChanged } from "@/lib/credits/credit-events"
 
 type UiMessage = {
   id: string
@@ -143,6 +144,7 @@ async function requestRealConciergeReply(payload: {
     conversationId: data?.conversationId ?? null,
     assistantMessage: data?.assistantMessage ?? "",
     warning: data?.warning ?? null,
+    creditsCharged: typeof data?.creditsCharged === "number" ? data.creditsCharged : 0,
   }
 }
 
@@ -261,6 +263,10 @@ export default function ConciergePage() {
 
       if (result.conversationId) {
         setConversationId(result.conversationId)
+      }
+
+      if (!result.warning && result.creditsCharged > 0) {
+        dispatchCreditBalanceChanged({ ownerType: "traveler", amount: result.creditsCharged, feature: "concierge" })
       }
 
       window.setTimeout(() => {

@@ -39,6 +39,7 @@ import { deleteTripItinerary, listTripItineraries, requestAiItineraryGeneration 
 import { getSignedDocumentUrl, listDocumentsByTrip } from "@/lib/repositories/documents-repository"
 import { getAiCreditCost } from "@/lib/ai/credit-costs"
 import { getAgencyBillingStatusFromApi } from "@/lib/repositories/agency-billing-repository"
+import { dispatchCreditBalanceChanged } from "@/lib/credits/credit-events"
 
 type PreviewState = {
   itinerary: TripItineraryRecord
@@ -292,6 +293,7 @@ export default function RoteirosIAPage() {
           : "Roteiro simples gerado e salvo na viagem.",
       )
       await refreshAvailableCredits()
+      dispatchCreditBalanceChanged({ ownerType: "agency", amount: creditCost, feature: "itinerary_generation" })
       setActiveTab("saved")
 
       if (result.data.document) {
@@ -388,12 +390,12 @@ export default function RoteirosIAPage() {
         </Card>
       ) : null}
 
-      <Card className={hasCreditsForSimple ? "border-emerald-500/20 bg-emerald-500/10" : "border-amber-500/20 bg-amber-500/10"}>
+      <Card className={hasCreditsForSimple ? "border-emerald-100 bg-emerald-50" : "border-amber-200 bg-amber-50"}>
         <CardContent className="p-4">
-          <p className={hasCreditsForSimple ? "text-sm font-semibold text-emerald-300" : "text-sm font-semibold text-amber-200"}>
+          <p className={hasCreditsForSimple ? "text-sm font-semibold text-emerald-700" : "text-sm font-semibold text-amber-800"}>
             {hasCreditsForSimple ? "Roteiros IA disponíveis" : "Créditos insuficientes para gerar roteiros"}
           </p>
-          <p className={hasCreditsForSimple ? "mt-1 text-sm text-emerald-100/80" : "mt-1 text-sm text-amber-100/80"}>
+          <p className={hasCreditsForSimple ? "mt-1 text-sm text-emerald-700/80" : "mt-1 text-sm text-amber-800/80"}>
             {hasCreditsForSimple
               ? `O consumo será descontado dos créditos da agência: ${simpleCreditCost} créditos no roteiro simples e ${completeCreditCost} no completo em PDF.`
               : `A agência precisa de pelo menos ${simpleCreditCost} créditos para o roteiro simples e ${completeCreditCost} para o completo em PDF.`}
@@ -402,8 +404,8 @@ export default function RoteirosIAPage() {
       </Card>
 
       {generatedMessage ? (
-        <Card className="bg-emerald-500/10 border-emerald-500/20">
-          <CardContent className="p-4 text-sm text-emerald-300">{generatedMessage}</CardContent>
+        <Card className="border-emerald-100 bg-emerald-50">
+          <CardContent className="p-4 text-sm text-emerald-700">{generatedMessage}</CardContent>
         </Card>
       ) : null}
 

@@ -26,6 +26,8 @@ import {
 import { resolveTravelerPlan, resolveTravelerPlanFromBillingStatus, type TravelerPlanSnapshot } from "@/lib/billing/traveler-plans"
 import { getTravelerBillingStatus } from "@/lib/repositories/traveler-billing-repository"
 import { resolveTripHeroImage } from "@/lib/trip-destination"
+import { listCreditTransactions } from "@/lib/repositories/credits-repository"
+import { CREDIT_BALANCE_CHANGED_EVENT } from "@/lib/credits/credit-events"
 
 export interface Trip extends Pick<CanonicalTrip, "id" | "slug" | "destination" | "country" | "city" | "startDate" | "endDate" | "coverImage" | "createdAt"> {
   id: string
@@ -318,16 +320,25 @@ export function TripsProvider({ children }: { children: ReactNode }) {
     let mounted = true
 
     const syncBillingStatus = async () => {
-      const result = await getTravelerBillingStatus()
-      if (!mounted || result.error || !result.data) return
-      const billingStatus = result.data
+      const [statusResult, historyResult] = await Promise.all([
+        getTravelerBillingStatus(),
+        listCreditTransactions("profile", user.id),
+      ])
+      if (!mounted || statusResult.error || !statusResult.data) return
+      const billingStatus = statusResult.data
+      const nextHistory = historyResult.data?.map((transaction) => ({
+        action: transaction.reason || transaction.type,
+        amount: transaction.amount,
+        date: transaction.createdAt,
+        source: transaction.source || "Supabase",
+      })) ?? []
 
       setSubscription(resolveTravelerPlanFromBillingStatus(billingStatus))
-      setCredits((prev) => ({
-        ...prev,
+      setCredits({
         balance: billingStatus.totalAvailable,
-        ...buildCanonicalCredits(billingStatus.totalAvailable, prev.history),
-      }))
+        history: nextHistory,
+        ...buildCanonicalCredits(billingStatus.totalAvailable, nextHistory),
+      })
     }
 
     void syncBillingStatus()
@@ -336,6 +347,46 @@ export function TripsProvider({ children }: { children: ReactNode }) {
       mounted = false
     }
   }, [isLoaded, profile, user])
+
+  useEffect(() => {
+    if (!isLoaded || !user?.id || !shouldUseSupabase() || typeof window === "undefined") return
+
+    let active = true
+
+    const refreshCredits = async () => {
+      const [statusResult, historyResult] = await Promise.all([
+        getTravelerBillingStatus(),
+        listCreditTransactions("profile", user.id),
+      ])
+
+      if (!active || statusResult.error || !statusResult.data) return
+
+      const billingStatus = statusResult.data
+      const nextHistory = historyResult.data?.map((transaction) => ({
+        action: transaction.reason || transaction.type,
+        amount: transaction.amount,
+        date: transaction.createdAt,
+        source: transaction.source || "Supabase",
+      })) ?? []
+
+      setSubscription(resolveTravelerPlanFromBillingStatus(billingStatus))
+      setCredits({
+        balance: billingStatus.totalAvailable,
+        history: nextHistory,
+        ...buildCanonicalCredits(billingStatus.totalAvailable, nextHistory),
+      })
+    }
+
+    const handleCreditsChanged = () => {
+      void refreshCredits()
+    }
+
+    window.addEventListener(CREDIT_BALANCE_CHANGED_EVENT, handleCreditsChanged as EventListener)
+    return () => {
+      active = false
+      window.removeEventListener(CREDIT_BALANCE_CHANGED_EVENT, handleCreditsChanged as EventListener)
+    }
+  }, [isLoaded, user?.id])
 
   useEffect(() => {
     if (!isLoaded || loading || !shouldUseSupabase()) return

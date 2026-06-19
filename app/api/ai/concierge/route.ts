@@ -10,7 +10,7 @@ import { buildFallbackConciergePrompt, buildPromptInput } from "@/lib/ai/prompts
 import { buildTripContextSummary } from "@/lib/ai/trip-context"
 import { createAiUsageLog } from "@/lib/ai/usage-logs"
 import { consumeTravelerCredits, getTravelerCreditBalance } from "@/lib/billing/traveler-billing"
-import { getAgencyCreditBalance } from "@/lib/billing/agency-billing"
+import { consumeAgencyCredits, getAgencyCreditBalance } from "@/lib/billing/agency-billing"
 
 type JsonObject = Record<string, unknown>
 
@@ -342,8 +342,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: accessResult.error ?? "Viagem nao encontrada." }, { status: 403 })
   }
 
-  const ownerType = accessResult.membership ? "agency" : "traveler"
-  const ownerId = accessResult.membership ? accessResult.trip.agency_id : actingUserId
+  const ownerType = accessResult.trip.agency_id ? "agency" : "traveler"
+  const ownerId = ownerType === "agency" ? accessResult.trip.agency_id : actingUserId
 
   if (!ownerId) {
     return NextResponse.json({ error: "Nao foi possivel identificar o saldo responsavel por esta chamada de IA." }, { status: 400 })
@@ -534,12 +534,10 @@ export async function POST(request: Request) {
       warning = "A resposta foi gerada, mas o consumo de creditos ainda nao foi registrado. Revise o ledger de creditos."
     }
   } else {
-    const creditsInsert = await supabase.from("credit_transactions").insert({
-      owner_type: ownerType,
-      owner_user_id: ownerType === "traveler" ? actingUserId : null,
-      agency_id: ownerType === "agency" ? accessResult.trip.agency_id : null,
-      type: "consume",
-      amount: -creditsToCharge,
+    const adminClient = createSupabaseAdminClient()
+    const consumeResult = await consumeAgencyCredits(adminClient, {
+      agencyId: accessResult.trip.agency_id ?? "",
+      amount: creditsToCharge,
       reason: `Consumo do concierge IA para ${accessResult.trip.title}`,
       source: "ai_concierge",
       metadata: {
@@ -547,11 +545,11 @@ export async function POST(request: Request) {
         trip_id: accessResult.trip.id,
         conversation_id: conversationResult.conversationId,
       },
-      created_by: actingUserId,
+      createdBy: actingUserId,
     })
 
-    if (creditsInsert.error) {
-      console.error("[AI] credits consume error", creditsInsert.error.message)
+    if (!consumeResult.success) {
+      console.error("[AI] agency credits consume error", consumeResult.error)
       warning = "A resposta foi gerada, mas o consumo de creditos ainda nao foi registrado. Revise o ledger de creditos."
     }
   }

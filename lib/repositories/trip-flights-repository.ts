@@ -2,6 +2,7 @@ import type { TripFlightRecord, TripFlightUpsertPayload } from "@/types/flight"
 import { createSupabaseBrowserClient, createSupabaseBrowserClientPlaceholder } from "@/lib/supabase/client"
 import { shouldUseSupabase } from "@/lib/data-source"
 import type { Database } from "@/lib/supabase/types"
+import { dispatchCreditBalanceChanged } from "@/lib/credits/credit-events"
 
 const STORAGE_KEY = "vuei_trip_flights_repository"
 
@@ -281,6 +282,10 @@ export async function requestTripFlightExtraction(payload: { tripId: string; doc
   })
 
   const data = await response.json().catch(() => null)
+
+  if (response.ok && data?.flight) {
+    dispatchCreditBalanceChanged({ feature: "flight_extraction" })
+  }
 
   return {
     source: "api" as const,

@@ -230,6 +230,52 @@ async function getCurrentAgencyPlanCycle(client: SupabaseDbClient, agencyId: str
   return { data: (data as AgencyPlanCycleRow | null) ?? null, error: error?.message ?? null }
 }
 
+async function ensureAgencyCurrentPlanCycle(
+  client: SupabaseDbClient,
+  agencyId: string,
+  subscription: AgencySubscriptionRow,
+  agency: Pick<AgencyRow, "id" | "created_at">,
+  atIso: string,
+) {
+  const existing = await getCurrentAgencyPlanCycle(client, agencyId, atIso)
+  if (existing.error) {
+    return { data: null as AgencyPlanCycleRow | null, error: existing.error }
+  }
+
+  if (existing.data) {
+    return { data: existing.data, error: null }
+  }
+
+  const effectivePlan = getEffectiveAgencyPlan(subscription)
+  const definition = AGENCY_PLAN_DEFINITIONS[effectivePlan]
+  const window =
+    subscription.current_period_start && subscription.current_period_end
+      ? {
+          periodStart: subscription.current_period_start,
+          periodEnd: subscription.current_period_end,
+        }
+      : buildCurrentCycleWindow(subscription.started_at ?? agency.created_at ?? atIso, new Date(atIso))
+
+  const insertResult = await (client.from("agency_plan_credit_cycles" as any) as any)
+    .insert({
+      agency_id: agencyId,
+      subscription_id: subscription.id,
+      plan_code: effectivePlan,
+      period_start: window.periodStart,
+      period_end: window.periodEnd,
+      granted_credits: definition.monthlyCredits,
+      used_credits: 0,
+      stripe_invoice_id: null,
+    } as any)
+    .select("*")
+    .single()
+
+  return {
+    data: (insertResult.data as AgencyPlanCycleRow | null) ?? null,
+    error: insertResult.error?.message ?? null,
+  }
+}
+
 async function listAgencyCreditTransactions(client: SupabaseDbClient, agencyId: string) {
   const { data, error } = await (client.from("credit_transactions") as any)
     .select("amount, source, metadata")
@@ -339,6 +385,103 @@ export async function getAgencyCreditBalance(client: SupabaseDbClient, agencyId:
       canManageBilling: Boolean(subscriptionResult.data.stripe_customer_id || effectivePlan !== "free"),
     },
     error: null,
+  }
+}
+
+export async function consumeAgencyCredits(
+  client: SupabaseDbClient,
+  params: {
+    agencyId: string
+    amount: number
+    reason: string
+    source: string
+    metadata?: Record<string, unknown>
+    createdBy?: string | null
+  },
+) {
+  const balanceResult = await getAgencyCreditBalance(client, params.agencyId)
+  if (balanceResult.error || !balanceResult.data) {
+    return { success: false, error: balanceResult.error ?? "Nao foi possivel calcular o saldo da agencia." }
+  }
+
+  const amount = Math.abs(params.amount)
+  if (balanceResult.data.totalAvailable < amount) {
+    return { success: false, error: "Saldo insuficiente." }
+  }
+
+  const subscriptionResult = await ensureAgencySubscriptionRow(client, params.agencyId)
+  if (subscriptionResult.error || !subscriptionResult.data) {
+    return { success: false, error: subscriptionResult.error ?? "Nao foi possivel carregar a assinatura da agencia." }
+  }
+
+  const agencyResult = await getAgencyRow(client, params.agencyId)
+  if (agencyResult.error || !agencyResult.data) {
+    return { success: false, error: agencyResult.error ?? "Agencia nao encontrada." }
+  }
+
+  const nowIso = new Date().toISOString()
+  const currentCycleResult = await ensureAgencyCurrentPlanCycle(
+    client,
+    params.agencyId,
+    subscriptionResult.data,
+    agencyResult.data,
+    nowIso,
+  )
+  if (currentCycleResult.error) {
+    return { success: false, error: currentCycleResult.error }
+  }
+
+  const appliedFromPlan = Math.min(balanceResult.data.planCreditsAvailable, amount)
+  const appliedFromPurchased = amount - appliedFromPlan
+  const nextBalance = Math.max(balanceResult.data.totalAvailable - amount, 0)
+
+  const transactionInsert = await (client.from("credit_transactions") as any).insert({
+    owner_type: "agency",
+    agency_id: params.agencyId,
+    type: "consume",
+    amount: -amount,
+    reason: params.reason,
+    source: params.source,
+    metadata: {
+      ...(params.metadata ?? {}),
+      billing_scope: "agency",
+      applied_from_plan: appliedFromPlan,
+      applied_from_purchased: appliedFromPurchased,
+    },
+    created_by: params.createdBy ?? agencyResult.data.owner_user_id,
+  } as any)
+
+  if (transactionInsert.error) {
+    return { success: false, error: transactionInsert.error.message }
+  }
+
+  if (appliedFromPlan > 0 && currentCycleResult.data) {
+    const cycleUpdate = await (client.from("agency_plan_credit_cycles" as any) as any)
+      .update({ used_credits: currentCycleResult.data.used_credits + appliedFromPlan } as any)
+      .eq("id", currentCycleResult.data.id)
+
+    if (cycleUpdate.error) {
+      return { success: false, error: cycleUpdate.error.message }
+    }
+  }
+
+  const balanceUpdate = await (client.from("agencies") as any)
+    .update({
+      credits_balance: nextBalance,
+      updated_at: nowIso,
+    } as any)
+    .eq("id", params.agencyId)
+
+  if (balanceUpdate.error) {
+    return { success: false, error: balanceUpdate.error.message }
+  }
+
+  return {
+    success: true,
+    error: null,
+    appliedFromPlan,
+    appliedFromPurchased,
+    remainingBalance: nextBalance,
   }
 }
 

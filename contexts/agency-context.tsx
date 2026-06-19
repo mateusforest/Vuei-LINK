@@ -49,6 +49,7 @@ import {
 } from "@/lib/billing/agency-plans"
 import { resolveAgencyAvailableCredits } from "@/lib/billing/agency-billing"
 import { getAgencyBillingStatus, setAgencyPlanSelection } from "@/lib/repositories/agency-billing-repository"
+import { CREDIT_BALANCE_CHANGED_EVENT } from "@/lib/credits/credit-events"
 
 export interface Client extends Pick<CanonicalClient, "id" | "name"> {
   id: string
@@ -485,6 +486,45 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
   const hasWarmStateRef = useRef(false)
   const activeTripsCount = trips.filter((trip) => isAgencyActiveTripStatus(trip.status)).length
   const teamSeatsUsed = getActiveAgencyTeamMembersCount(teamMembers)
+
+  useEffect(() => {
+    if (!shouldUseSupabase() || !agency?.id || typeof window === "undefined") return
+
+    let active = true
+
+    const refreshAgencyCredits = async () => {
+      const [billingStatusResult, creditTransactionsResult] = await Promise.all([
+        getAgencyBillingStatus(agency.id),
+        listCreditTransactions("agency", agency.id),
+      ])
+
+      if (!active || billingStatusResult.error || !billingStatusResult.data) return
+
+      const nextSubscription = resolveAgencyPlanSnapshot({
+        agency,
+        billingStatus: billingStatusResult.data,
+      })
+      const history = (creditTransactionsResult.data ?? []).map((transaction) => ({
+        action: transaction.reason || transaction.type,
+        amount: transaction.amount,
+        date: transaction.createdAt,
+        source: transaction.source || "Supabase",
+      }))
+
+      setSubscription(nextSubscription)
+      setCredits(buildAgencyCredits(billingStatusResult.data.totalAvailable, nextSubscription.code, history))
+    }
+
+    const handleCreditsChanged = () => {
+      void refreshAgencyCredits()
+    }
+
+    window.addEventListener(CREDIT_BALANCE_CHANGED_EVENT, handleCreditsChanged as EventListener)
+    return () => {
+      active = false
+      window.removeEventListener(CREDIT_BALANCE_CHANGED_EVENT, handleCreditsChanged as EventListener)
+    }
+  }, [agency])
 
   useEffect(() => {
     hasWarmStateRef.current = Boolean(agency || clients.length || trips.length || documents.length || teamMembers.length)

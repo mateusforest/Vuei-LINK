@@ -7,7 +7,7 @@ import { countUsefulFlightFields, requestFlightExtraction } from "@/lib/ai/fligh
 import { estimateCostUsd, getTicketExtractionCreditCost } from "@/lib/ai/credit-consumption"
 import { createAiUsageLog } from "@/lib/ai/usage-logs"
 import { consumeTravelerCredits, getTravelerCreditBalance } from "@/lib/billing/traveler-billing"
-import { getAgencyCreditBalance } from "@/lib/billing/agency-billing"
+import { consumeAgencyCredits, getAgencyCreditBalance } from "@/lib/billing/agency-billing"
 
 interface FlightExtractionRequestBody {
   tripId?: string
@@ -389,8 +389,8 @@ export async function POST(request: Request) {
     )
   }
 
-  const ownerType = accessResult.membership ? "agency" : "traveler"
-  const ownerId = accessResult.membership ? accessResult.trip.agency_id : actingUserId
+  const ownerType = accessResult.trip.agency_id ? "agency" : "traveler"
+  const ownerId = ownerType === "agency" ? accessResult.trip.agency_id : actingUserId
 
   if (!ownerId) {
     return NextResponse.json({ error: "Nao foi possivel identificar o saldo responsavel por esta extracao." }, { status: 400 })
@@ -582,12 +582,10 @@ export async function POST(request: Request) {
         console.error("[AI][FLIGHT_EXTRACTION] traveler credit transaction error", consumeResult.error)
       }
     } else {
-      const creditsInsert = await supabase.from("credit_transactions").insert({
-        owner_type: ownerType,
-        owner_user_id: ownerType === "traveler" ? actingUserId : null,
-        agency_id: ownerType === "agency" ? accessResult.trip.agency_id : null,
-        type: "consume",
-        amount: -creditsPerCall,
+      const adminClient = createSupabaseAdminClient()
+      const consumeResult = await consumeAgencyCredits(adminClient, {
+        agencyId: accessResult.trip.agency_id ?? "",
+        amount: creditsPerCall,
         reason: `Consumo da leitura de passagem para ${accessResult.trip.title}`,
         source: "ai_flight_extraction",
         metadata: {
@@ -596,11 +594,11 @@ export async function POST(request: Request) {
           document_id: entityResult.document.id,
           flight_id: entityResult.flight.id,
         },
-        created_by: actingUserId,
+        createdBy: actingUserId,
       })
 
-      if (creditsInsert.error) {
-        console.error("[AI][FLIGHT_EXTRACTION] credit transaction error", creditsInsert.error.message)
+      if (!consumeResult.success) {
+        console.error("[AI][FLIGHT_EXTRACTION] agency credit transaction error", consumeResult.error)
       }
     }
   }

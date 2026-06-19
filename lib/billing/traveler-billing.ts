@@ -529,6 +529,18 @@ export async function consumeTravelerCredits(
     }
   }
 
+  const balanceUpdate = await (client
+    .from("profiles") as any)
+    .update({
+      credits_balance: Math.max(balanceResult.data.totalAvailable - amount, 0),
+      updated_at: new Date().toISOString(),
+    } as any)
+    .eq("id", params.userId)
+
+  if (balanceUpdate.error) {
+    return { success: false, error: balanceUpdate.error.message }
+  }
+
   return {
     success: true,
     error: null,

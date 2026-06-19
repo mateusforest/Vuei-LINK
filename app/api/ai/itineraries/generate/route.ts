@@ -11,7 +11,7 @@ import { getDestinationCoverImage, getDestinationMetadata } from "@/lib/trip-des
 import type { Document } from "@/types/document"
 import type { TripItineraryRecord, TripItineraryContent } from "@/types/itinerary"
 import { consumeTravelerCredits, getTravelerCreditBalance } from "@/lib/billing/traveler-billing"
-import { getAgencyCreditBalance } from "@/lib/billing/agency-billing"
+import { consumeAgencyCredits, getAgencyCreditBalance } from "@/lib/billing/agency-billing"
 
 export const runtime = "nodejs"
 export const maxDuration = 60
@@ -271,39 +271,6 @@ async function updateItinerary(
     .single()
 
   return { data: (data as TripItineraryRow | null) ?? null, error: error?.message ?? null }
-}
-
-async function registerItineraryCreditConsumption(
-  client: NonNullable<Awaited<ReturnType<typeof createSupabaseServerClient>>>,
-  payload: {
-    ownerType: "traveler" | "agency"
-    ownerUserId: string | null
-    agencyId: string | null
-    amount: number
-    tripId: string
-    itineraryId: string
-    mode: "simple" | "complete_pdf"
-    createdBy: string
-    failed?: boolean
-  },
-) {
-  return client.from("credit_transactions").insert({
-    owner_type: payload.ownerType,
-    owner_user_id: payload.ownerType === "traveler" ? payload.ownerUserId : null,
-    agency_id: payload.ownerType === "agency" ? payload.agencyId : null,
-    type: "consume",
-    amount: -payload.amount,
-    reason: `Geracao de roteiro ${payload.mode === "simple" ? "simples" : "completo"} para a viagem`,
-    source: payload.failed ? "ai_itinerary_generation_failed" : "ai_itinerary_generation",
-    metadata: {
-      module: "itinerary",
-      trip_id: payload.tripId,
-      itinerary_id: payload.itineraryId,
-      mode: payload.mode,
-      failed: payload.failed ?? false,
-    },
-    created_by: payload.createdBy,
-  })
 }
 
 export async function POST(request: Request) {
@@ -849,19 +816,24 @@ export async function POST(request: Request) {
       console.error("[AI][ITINERARY] traveler credit transaction error", consumeResult.error)
     }
   } else {
-    const creditInsert = await registerItineraryCreditConsumption(supabase, {
-      ownerType,
-      ownerUserId: actingOwnerUserId,
-      agencyId: accessResult.trip.agency_id,
+    const adminClient = createSupabaseAdminClient()
+    const consumeResult = await consumeAgencyCredits(adminClient, {
+      agencyId: accessResult.trip.agency_id ?? "",
       amount: creditCost,
-      tripId: accessResult.trip.id,
-      itineraryId: itineraryUpdate.data.id,
-      mode,
+      reason: `Geracao de roteiro ${mode === "simple" ? "simples" : "completo"} para a viagem`,
+      source: "ai_itinerary_generation",
+      metadata: {
+        module: "itinerary",
+        trip_id: accessResult.trip.id,
+        itinerary_id: itineraryUpdate.data.id,
+        mode,
+        failed: false,
+      },
       createdBy: actingOwnerUserId,
     })
 
-    if (creditInsert.error) {
-      console.error("[AI][ITINERARY] credit transaction error", creditInsert.error.message)
+    if (!consumeResult.success) {
+      console.error("[AI][ITINERARY] agency credit transaction error", consumeResult.error)
     }
   }
 

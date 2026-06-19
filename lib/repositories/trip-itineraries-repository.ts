@@ -3,6 +3,7 @@ import type { Document } from "@/types/document"
 import { createSupabaseBrowserClient, createSupabaseBrowserClientPlaceholder } from "@/lib/supabase/client"
 import { shouldUseSupabase } from "@/lib/data-source"
 import type { Database } from "@/lib/supabase/types"
+import { dispatchCreditBalanceChanged } from "@/lib/credits/credit-events"
 
 const STORAGE_KEY = "vuei_trip_itineraries_repository"
 
@@ -284,6 +285,10 @@ export async function requestAiItineraryGeneration(payload: { tripId: string; mo
   })
 
   const data = await response.json().catch(() => null)
+
+  if (response.ok && data?.itinerary) {
+    dispatchCreditBalanceChanged({ feature: "itinerary_generation" })
+  }
 
   return {
     source: "api" as const,
