@@ -31,6 +31,7 @@ type AgencyMemberRow = Database["public"]["Tables"]["agency_members"]["Row"]
 type DocumentRow = Database["public"]["Tables"]["documents"]["Row"]
 type HotelRow = Database["public"]["Tables"]["trip_hotels"]["Row"]
 type FlightRow = Database["public"]["Tables"]["trip_flights"]["Row"]
+type TripItineraryRow = Database["public"]["Tables"]["trip_itineraries"]["Row"]
 type PromptRow = Database["public"]["Tables"]["ai_prompts"]["Row"]
 type ClientRow = Database["public"]["Tables"]["clients"]["Row"]
 type RouteSupabaseClient = ReturnType<typeof createSupabaseAdminClient>
@@ -411,6 +412,11 @@ export async function POST(request: Request) {
     .select("*")
     .eq("trip_id", accessResult.trip.id)
     .order("created_at", { ascending: true })
+  const itinerariesResult = await dataClient
+    .from("trip_itineraries")
+    .select("*")
+    .eq("trip_id", accessResult.trip.id)
+    .order("created_at", { ascending: false })
   const clientResult = accessResult.trip.client_id
     ? await dataClient.from("clients").select("id, name").eq("id", accessResult.trip.client_id).maybeSingle()
     : { data: null as ClientRow | null, error: null }
@@ -438,6 +444,7 @@ export async function POST(request: Request) {
     trip: accessResult.trip,
     hotels: (hotelsResult.data ?? []) as HotelRow[],
     flights: (flightsResult.data ?? []) as FlightRow[],
+    itineraries: (itinerariesResult.data ?? []) as TripItineraryRow[],
     documents: (documentsResult.data ?? []) as DocumentRow[],
     audience: ownerType,
     recentMessages: history,

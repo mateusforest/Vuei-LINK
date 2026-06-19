@@ -247,6 +247,39 @@ function parseDestinationParts(destination?: string | null) {
   }
 }
 
+async function resolveServerDestinationCoverImage(params: {
+  destination?: string | null
+  city?: string | null
+  country?: string | null
+}) {
+  if (typeof window === "undefined") return null
+  if (!(params.destination || params.city || params.country)) return null
+
+  const searchParams = new URLSearchParams()
+  if (params.destination) searchParams.set("destination", params.destination)
+  if (params.city) searchParams.set("city", params.city)
+  if (params.country) searchParams.set("country", params.country)
+
+  try {
+    const response = await fetch(`/api/destination-image?${searchParams.toString()}`, {
+      cache: "no-store",
+    })
+    const payload = (await response.json().catch(() => null)) as { imageUrl?: string | null; source?: string | null } | null
+
+    if (!response.ok) {
+      return null
+    }
+
+    if (payload?.source === "fallback") {
+      return null
+    }
+
+    return payload?.imageUrl ?? null
+  } catch {
+    return null
+  }
+}
+
 function buildTrip(payload: CreateTripPayload, existingTrips: Trip[], slugOverride?: string): Trip {
   const now = new Date().toISOString()
   const baseSlug = slugifyTripBase(payload.title, payload.destination)
@@ -566,8 +599,15 @@ export async function createTrip(payload: CreateTripPayload) {
         const adminLink = buildAdminTripUrl(trip.slug)
         const publicLink = buildPublicTripUrl(trip.slug)
         const parsedDestination = parseDestinationParts(trip.destination)
+        const autoResolvedCoverImage = trip.coverImage
+          ? null
+          : await resolveServerDestinationCoverImage({
+              destination: trip.destination,
+              city: trip.city ?? parsedDestination.city,
+              country: trip.country ?? parsedDestination.country,
+            })
         const resolvedCoverImage = resolveTripHeroImage({
-          coverImage: trip.coverImage,
+          coverImage: trip.coverImage ?? autoResolvedCoverImage,
           destination: trip.destination,
           city: trip.city ?? parsedDestination.city,
           country: trip.country ?? parsedDestination.country,
@@ -695,6 +735,19 @@ export async function updateTrip(id: string, payload: Partial<Trip>) {
         permissions: payload.permissions,
         credits_summary: payload.creditsSummary ?? undefined,
         offline_enabled: payload.offlineEnabled,
+      }
+
+      const autoResolvedCoverImage =
+        payload.coverImage || !(payload.destination || payload.city || payload.country)
+          ? null
+          : await resolveServerDestinationCoverImage({
+              destination: payload.destination,
+              city: payload.city,
+              country: payload.country,
+            })
+
+      if (!payload.coverImage && autoResolvedCoverImage) {
+        updatePayload.cover_image = autoResolvedCoverImage
       }
 
       const { data, error } = await supabase.from("trips").update(updatePayload).eq("id", id).select("*").maybeSingle()

@@ -55,7 +55,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { cn } from "@/lib/utils"
 import { devLog, startPerfMeasure } from "@/lib/dev/perf"
-import { dispatchCreditBalanceChanged } from "@/lib/credits/credit-events"
+import { CREDIT_BALANCE_CHANGED_EVENT, dispatchCreditBalanceChanged } from "@/lib/credits/credit-events"
 
 const TRIPS_STORAGE_KEY = "vuei_trips"
 const AGENCY_STORAGE_KEY = "vuei_agency"
@@ -287,7 +287,7 @@ const initialTripData = {
     emergency: "112",
     embassy: "+33 1 45 61 63 00"
   },
-  credits: { balance: 47, used: 3, total: 50 },
+  credits: { balance: 0, used: 0, total: 0 },
   adminLink: buildAdminTripUrl("minha-viagem"),
   shareLink: buildPublicTripUrl("minha-viagem")
 }
@@ -957,6 +957,17 @@ type TripAgencyBrandingPayload = {
   isAgency: boolean
 }
 
+type TripTravelerCreditsPayload = {
+  hidden: boolean
+  isAgencyTrip: boolean
+  balance: number
+  planCreditsAvailable: number
+  purchasedCreditsAvailable: number
+  currentPeriodEnd: string | null
+  currentPlan: "free" | "premium"
+  subscriptionStatus: string
+}
+
 async function fetchTripAgencyBranding(params: {
   tripId?: string | null
   tripSlug?: string | null
@@ -1004,6 +1015,68 @@ async function fetchTripAgencyBranding(params: {
     console.error("[TRIP] trip branding request error", error)
     return null
   }
+}
+
+async function fetchTripTravelerCredits(params: {
+  tripId?: string | null
+  tripSlug?: string | null
+  adminToken?: string | null
+  publicToken?: string | null
+  accessMode: TripBrandingAccessMode
+}) {
+  const searchParams = new URLSearchParams({
+    accessMode: params.accessMode,
+  })
+
+  if (params.tripId) {
+    searchParams.set("tripId", params.tripId)
+  }
+
+  if (params.tripSlug) {
+    searchParams.set("tripSlug", params.tripSlug)
+  }
+
+  if (params.adminToken) {
+    searchParams.set("adminToken", params.adminToken)
+  }
+
+  if (params.publicToken) {
+    searchParams.set("publicToken", params.publicToken)
+  }
+
+  try {
+    const response = await fetch(`/api/trip-credits?${searchParams.toString()}`, {
+      cache: "no-store",
+    })
+    const payload = (await response.json().catch(() => null)) as TripTravelerCreditsPayload | { error?: string } | null
+
+    if (!response.ok) {
+      console.error("[TRIP] trip credits fetch failed", payload)
+      return null
+    }
+
+    if (!payload || typeof payload !== "object" || !("hidden" in payload)) {
+      return null
+    }
+
+    return payload as TripTravelerCreditsPayload
+  } catch (error) {
+    console.error("[TRIP] trip credits request error", error)
+    return null
+  }
+}
+
+function formatCreditsPeriodEnd(value?: string | null) {
+  if (!value) return "Nao informado"
+
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) return "Nao informado"
+
+  return parsed.toLocaleDateString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  })
 }
 
 type OfflineDocumentContext = {
@@ -4465,6 +4538,7 @@ function ConciergeSection({
   tripData,
   onOpenCredits,
   showCredits = true,
+  creditsBalance,
   offlineReadOnly = false,
   tripSlug,
   adminToken,
@@ -4474,6 +4548,7 @@ function ConciergeSection({
   tripData: any
   onOpenCredits: () => void
   showCredits?: boolean
+  creditsBalance: number | null
   offlineReadOnly?: boolean
   tripSlug: string
   adminToken: string | null
@@ -4734,7 +4809,9 @@ function ConciergeSection({
             <div className="px-4 py-3 bg-white/[0.02] border-t border-white/[0.06] flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <CreditCard className="w-4 h-4 text-[#5de0e6]" />
-                <span className="text-xs text-white/40">{tripData.credits.balance} creditos restantes</span>
+                <span className="text-xs text-white/40">
+                  {typeof creditsBalance === "number" ? `${creditsBalance} creditos restantes` : "Sincronizando saldo real"}
+                </span>
               </div>
               <Button size="sm" variant="ghost" onClick={onOpenCredits} className="text-[#5de0e6] text-xs">
                 Ver saldo
@@ -5521,22 +5598,30 @@ function TravelerPublicCreditsModal({
 }: {
   open: boolean
   onClose: () => void
-  credits: any
+  credits: TripTravelerCreditsPayload | null
 }) {
-  const totalCredits = Math.max(credits?.total || credits?.balance || 0, 1)
-  const usagePercentage = Math.min(((credits?.balance || 0) / totalCredits) * 100, 100)
+  const balance = Math.max(credits?.balance ?? 0, 0)
+  const planCredits = Math.max(credits?.planCreditsAvailable ?? 0, 0)
+  const purchasedCredits = Math.max(credits?.purchasedCreditsAvailable ?? 0, 0)
+  const totalCredits = Math.max(balance, planCredits + purchasedCredits, 1)
+  const usagePercentage = Math.min((balance / totalCredits) * 100, 100)
 
   return (
     <Modal tone="light" open={open} onClose={onClose} title="Creditos">
       <div className="space-y-5">
+        {!credits ? (
+          <div className="rounded-2xl border border-slate-200 bg-white/92 p-4 text-sm text-slate-600">
+            Sincronizando saldo real desta viagem...
+          </div>
+        ) : null}
         <div className="rounded-[26px] border border-[#dbe5f4] bg-[linear-gradient(180deg,#ffffff_0%,#eef5ff_100%)] p-5">
           <div className="flex items-start justify-between gap-4">
             <div>
               <p className="text-sm text-slate-500">Creditos disponiveis</p>
-              <p className="mt-1 text-4xl font-semibold tracking-[-0.04em] text-slate-950">{credits?.balance ?? 0}</p>
+              <p className="mt-1 text-4xl font-semibold tracking-[-0.04em] text-slate-950">{balance}</p>
             </div>
             <div className="rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-600 ring-1 ring-slate-200">
-              {credits?.used ?? 0} usados de {credits?.total ?? 0}
+              Plano {credits?.currentPlan === "premium" ? "Premium" : "Free"}
             </div>
           </div>
           <div className="mt-4 h-2 rounded-full bg-slate-200">
@@ -5546,20 +5631,20 @@ function TravelerPublicCreditsModal({
 
         <div className="grid grid-cols-2 gap-3">
           <div className="rounded-2xl border border-slate-200 bg-white/92 p-4">
-            <p className="text-xs text-slate-500">Consumo da viagem</p>
-            <p className="mt-2 text-2xl font-semibold text-slate-950">{credits?.used ?? 0}</p>
+            <p className="text-xs text-slate-500">Creditos do plano</p>
+            <p className="mt-2 text-2xl font-semibold text-slate-950">{planCredits}</p>
           </div>
           <div className="rounded-2xl border border-slate-200 bg-white/92 p-4">
             <p className="text-xs text-slate-500">Saldo atual</p>
-            <p className="mt-2 text-2xl font-semibold text-slate-950">{credits?.balance ?? 0}</p>
+            <p className="mt-2 text-2xl font-semibold text-slate-950">{balance}</p>
           </div>
           <div className="rounded-2xl border border-slate-200 bg-white/92 p-4">
-            <p className="text-xs text-slate-500">Total da viagem</p>
-            <p className="mt-2 text-2xl font-semibold text-slate-950">{credits?.total ?? 0}</p>
+            <p className="text-xs text-slate-500">Creditos comprados</p>
+            <p className="mt-2 text-2xl font-semibold text-slate-950">{purchasedCredits}</p>
           </div>
           <div className="rounded-2xl border border-slate-200 bg-white/92 p-4">
-            <p className="text-xs text-slate-500">Disponivel agora</p>
-            <p className="mt-2 text-2xl font-semibold text-slate-950">{credits?.balance ?? 0}</p>
+            <p className="text-xs text-slate-500">Ciclo atual</p>
+            <p className="mt-2 text-sm font-semibold text-slate-950">{formatCreditsPeriodEnd(credits?.currentPeriodEnd)}</p>
           </div>
         </div>
 
@@ -5578,22 +5663,30 @@ function LinkCreditsSummaryModal({
 }: {
   open: boolean
   onClose: () => void
-  credits: any
+  credits: TripTravelerCreditsPayload | null
 }) {
-  const totalCredits = Math.max(credits?.total || credits?.balance || 0, 1)
-  const usagePercentage = Math.min(((credits?.balance || 0) / totalCredits) * 100, 100)
+  const balance = Math.max(credits?.balance ?? 0, 0)
+  const planCredits = Math.max(credits?.planCreditsAvailable ?? 0, 0)
+  const purchasedCredits = Math.max(credits?.purchasedCreditsAvailable ?? 0, 0)
+  const totalCredits = Math.max(balance, planCredits + purchasedCredits, 1)
+  const usagePercentage = Math.min((balance / totalCredits) * 100, 100)
 
   return (
     <Modal tone="light" open={open} onClose={onClose} title="Creditos">
       <div className="space-y-5">
+        {!credits ? (
+          <div className="rounded-2xl border border-slate-200 bg-white/92 p-4 text-sm text-slate-600">
+            Sincronizando saldo real desta viagem...
+          </div>
+        ) : null}
         <div className="rounded-[26px] border border-[#dbe5f4] bg-[linear-gradient(180deg,#ffffff_0%,#eef5ff_100%)] p-5">
           <div className="flex items-start justify-between gap-4">
             <div>
               <p className="text-sm text-slate-500">Creditos disponiveis</p>
-              <p className="mt-1 text-4xl font-semibold tracking-[-0.04em] text-slate-950">{credits?.balance ?? 0}</p>
+              <p className="mt-1 text-4xl font-semibold tracking-[-0.04em] text-slate-950">{balance}</p>
             </div>
             <div className="rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-600 ring-1 ring-slate-200">
-              {credits?.used ?? 0} usados de {credits?.total ?? 0}
+              Plano {credits?.currentPlan === "premium" ? "Premium" : "Free"}
             </div>
           </div>
           <div className="mt-4 h-2 rounded-full bg-slate-200">
@@ -5603,20 +5696,20 @@ function LinkCreditsSummaryModal({
 
         <div className="grid grid-cols-2 gap-3">
           <div className="rounded-2xl border border-slate-200 bg-white/92 p-4">
-            <p className="text-xs text-slate-500">Consumo da viagem</p>
-            <p className="mt-2 text-2xl font-semibold text-slate-950">{credits?.used ?? 0}</p>
+            <p className="text-xs text-slate-500">Creditos do plano</p>
+            <p className="mt-2 text-2xl font-semibold text-slate-950">{planCredits}</p>
           </div>
           <div className="rounded-2xl border border-slate-200 bg-white/92 p-4">
             <p className="text-xs text-slate-500">Saldo atual</p>
-            <p className="mt-2 text-2xl font-semibold text-slate-950">{credits?.balance ?? 0}</p>
+            <p className="mt-2 text-2xl font-semibold text-slate-950">{balance}</p>
           </div>
           <div className="rounded-2xl border border-slate-200 bg-white/92 p-4">
-            <p className="text-xs text-slate-500">Total da viagem</p>
-            <p className="mt-2 text-2xl font-semibold text-slate-950">{credits?.total ?? 0}</p>
+            <p className="text-xs text-slate-500">Creditos comprados</p>
+            <p className="mt-2 text-2xl font-semibold text-slate-950">{purchasedCredits}</p>
           </div>
           <div className="rounded-2xl border border-slate-200 bg-white/92 p-4">
-            <p className="text-xs text-slate-500">Disponivel agora</p>
-            <p className="mt-2 text-2xl font-semibold text-slate-950">{credits?.balance ?? 0}</p>
+            <p className="text-xs text-slate-500">Ciclo atual</p>
+            <p className="mt-2 text-sm font-semibold text-slate-950">{formatCreditsPeriodEnd(credits?.currentPeriodEnd)}</p>
           </div>
         </div>
 
@@ -6051,6 +6144,7 @@ export default function TripPage() {
   const [offlinePackageStatus, setOfflinePackageStatus] = useState<OfflineTripPackageStatus | null>(null)
   const [offlineDocumentContext, setOfflineDocumentContext] = useState<OfflineDocumentContext | null>(null)
   const [agencyBranding, setAgencyBranding] = useState<{ name: string | null; logoUrl: string | null; isAgency: boolean }>({ name: null, logoUrl: null, isAgency: false })
+  const [travelerCredits, setTravelerCredits] = useState<TripTravelerCreditsPayload | null>(null)
   const [sectionsLoading, setSectionsLoading] = useState({
     flights: true,
     hotels: true,
@@ -6123,6 +6217,79 @@ export default function TripPage() {
       setCreditsOpen(false)
     }
   }, [creditsOpen, isAgencyTrip])
+
+  useEffect(() => {
+    if (isLoadingTrip || offlineModeEnabled || isAgencyTrip || !tripData?.id) {
+      setTravelerCredits(null)
+      return
+    }
+
+    let active = true
+
+    const loadTravelerCredits = async () => {
+      const credits = await fetchTripTravelerCredits({
+        tripId: tripData.id,
+        tripSlug: routeSlug,
+        adminToken: tripAdminToken,
+        publicToken: tripPublicToken,
+        accessMode: adminRouteActive ? "admin" : "public",
+      })
+
+      if (!active) return
+
+      if (!credits || credits.hidden || credits.isAgencyTrip) {
+        setTravelerCredits(null)
+        return
+      }
+
+      setTravelerCredits(credits)
+    }
+
+    void loadTravelerCredits()
+
+    return () => {
+      active = false
+    }
+  }, [adminRouteActive, isAgencyTrip, isLoadingTrip, offlineModeEnabled, routeSlug, tripAdminToken, tripData?.id, tripPublicToken])
+
+  useEffect(() => {
+    if (isLoadingTrip || offlineModeEnabled || isAgencyTrip || !tripData?.id) {
+      return
+    }
+
+    const reloadCredits = () => {
+      void (async () => {
+        const credits = await fetchTripTravelerCredits({
+          tripId: tripData.id,
+          tripSlug: routeSlug,
+          adminToken: tripAdminToken,
+          publicToken: tripPublicToken,
+          accessMode: adminRouteActive ? "admin" : "public",
+        })
+
+        if (!credits || credits.hidden || credits.isAgencyTrip) {
+          return
+        }
+
+        setTravelerCredits(credits)
+      })()
+    }
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        reloadCredits()
+      }
+    }
+
+    window.addEventListener(CREDIT_BALANCE_CHANGED_EVENT, reloadCredits)
+    window.addEventListener("focus", reloadCredits)
+    document.addEventListener("visibilitychange", handleVisibilityChange)
+    return () => {
+      window.removeEventListener(CREDIT_BALANCE_CHANGED_EVENT, reloadCredits)
+      window.removeEventListener("focus", reloadCredits)
+      document.removeEventListener("visibilitychange", handleVisibilityChange)
+    }
+  }, [adminRouteActive, isAgencyTrip, isLoadingTrip, offlineModeEnabled, routeSlug, tripAdminToken, tripData?.id, tripPublicToken])
 
   useEffect(() => {
     if (typeof window === "undefined") return
@@ -7666,6 +7833,7 @@ export default function TripPage() {
                     setCreditsOpen(true)
                   }}
                   showCredits={!isAgencyTrip}
+                  creditsBalance={travelerCredits?.balance ?? null}
                   offlineReadOnly={offlineModeEnabled}
                   tripSlug={routeSlug}
                   adminToken={tripAdminToken}
@@ -7730,7 +7898,7 @@ export default function TripPage() {
             <TravelersModal open={travelersOpen} onClose={() => setTravelersOpen(false)} travelers={tripData.travelers} onUpdateTravelers={handleUpdateTravelers} />
             <TripSettingsModal open={tripSettingsOpen} onClose={() => setTripSettingsOpen(false)} tripData={tripData} onSave={handleSaveTripSettings} />
             <TripSecurityModal open={securitySettingsOpen} onClose={() => setSecuritySettingsOpen(false)} tripId={tripData.id} tripTitle={tripData.destination} onSecurityUpdated={() => setToast({ message: "Seguranca do dispositivo atualizada.", type: "success" })} />
-            {!isAgencyTrip ? <TravelerPublicCreditsModal open={creditsOpen} onClose={() => setCreditsOpen(false)} credits={tripData.credits} /> : null}
+            {!isAgencyTrip ? <TravelerPublicCreditsModal open={creditsOpen} onClose={() => setCreditsOpen(false)} credits={travelerCredits} /> : null}
             <Modal open={premiumGateModalOpen} onClose={() => setPremiumGateModalOpen(false)} title="DisponÃ­vel no Premium">
               <div className="space-y-5">
                 <p className="text-sm text-white/60">
@@ -7853,6 +8021,7 @@ export default function TripPage() {
                     setCreditsOpen(true)
                   }}
                   showCredits={!isAgencyTrip}
+                  creditsBalance={travelerCredits?.balance ?? null}
                   offlineReadOnly={offlineModeEnabled}
                   tripSlug={routeSlug}
                   adminToken={tripAdminToken}
@@ -7930,7 +8099,7 @@ export default function TripPage() {
             <TravelersModal open={travelersOpen} onClose={() => setTravelersOpen(false)} travelers={tripData.travelers} onUpdateTravelers={handleUpdateTravelers} />
             <TripSettingsModal open={tripSettingsOpen} onClose={() => setTripSettingsOpen(false)} tripData={tripData} onSave={handleSaveTripSettings} />
             <TripSecurityModal open={securitySettingsOpen} onClose={() => setSecuritySettingsOpen(false)} tripId={tripData.id} tripTitle={tripData.destination} onSecurityUpdated={() => setToast({ message: "Seguranca do dispositivo atualizada.", type: "success" })} />
-            {!isAgencyTrip ? <LinkCreditsSummaryModal open={creditsOpen} onClose={() => setCreditsOpen(false)} credits={tripData.credits} /> : null}
+            {!isAgencyTrip ? <LinkCreditsSummaryModal open={creditsOpen} onClose={() => setCreditsOpen(false)} credits={travelerCredits} /> : null}
             <Modal open={premiumGateModalOpen} onClose={() => setPremiumGateModalOpen(false)} title="Disponivel no Premium">
               <div className="space-y-5">
                 <p className="text-sm text-slate-600">
@@ -7999,6 +8168,7 @@ export default function TripPage() {
               setCreditsOpen(true)
             }}
             showCredits={!isAgencyTrip}
+            creditsBalance={travelerCredits?.balance ?? null}
             offlineReadOnly={offlineModeEnabled}
             tripSlug={routeSlug}
             adminToken={tripAdminToken}
@@ -8051,7 +8221,7 @@ export default function TripPage() {
           <TravelersModal open={travelersOpen} onClose={() => setTravelersOpen(false)} travelers={tripData.travelers} onUpdateTravelers={handleUpdateTravelers} />
           <TripSettingsModal open={tripSettingsOpen} onClose={() => setTripSettingsOpen(false)} tripData={tripData} onSave={handleSaveTripSettings} />
           <TripSecurityModal open={securitySettingsOpen} onClose={() => setSecuritySettingsOpen(false)} tripId={tripData.id} tripTitle={tripData.destination} onSecurityUpdated={() => setToast({ message: "Seguranca do dispositivo atualizada.", type: "success" })} />
-          {!isAgencyTrip ? <LinkCreditsSummaryModal open={creditsOpen} onClose={() => setCreditsOpen(false)} credits={tripData.credits} /> : null}
+          {!isAgencyTrip ? <LinkCreditsSummaryModal open={creditsOpen} onClose={() => setCreditsOpen(false)} credits={travelerCredits} /> : null}
           <Modal open={premiumGateModalOpen} onClose={() => setPremiumGateModalOpen(false)} title="Disponível no Premium">
             <div className="space-y-5">
               <p className="text-sm text-white/60">

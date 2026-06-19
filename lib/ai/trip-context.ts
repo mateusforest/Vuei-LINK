@@ -4,12 +4,14 @@ type TripRow = Database["public"]["Tables"]["trips"]["Row"]
 type DocumentRow = Database["public"]["Tables"]["documents"]["Row"]
 type HotelRow = Database["public"]["Tables"]["trip_hotels"]["Row"]
 type FlightRow = Database["public"]["Tables"]["trip_flights"]["Row"]
+type TripItineraryRow = Database["public"]["Tables"]["trip_itineraries"]["Row"]
 
 export interface TripContextSummaryInput {
   trip: TripRow
   documents: DocumentRow[]
   hotels: HotelRow[]
   flights: FlightRow[]
+  itineraries: TripItineraryRow[]
   audience: "traveler" | "agency"
   recentMessages?: Array<{ role: string; content: string }>
 }
@@ -77,6 +79,28 @@ function summarizeFlights(flights: FlightRow[], documents: DocumentRow[]) {
     .join("; ")
 }
 
+function summarizeItineraries(itineraries: TripItineraryRow[]) {
+  if (!itineraries.length) return "Nenhum roteiro real adicionado."
+
+  return itineraries
+    .map((itinerary) => {
+      const content = itinerary.content && typeof itinerary.content === "object"
+        ? (itinerary.content as { days?: unknown[] })
+        : null
+      const daysCount = Array.isArray(content?.days) ? content.days.length : 0
+      const parts = [
+        itinerary.title || "Roteiro da viagem",
+        `[${itinerary.mode}]`,
+        `status=${itinerary.status}`,
+        daysCount > 0 ? `${daysCount} dia(s)` : null,
+        itinerary.pdf_url ? "com PDF" : null,
+      ]
+
+      return parts.filter(Boolean).join(" ")
+    })
+    .join("; ")
+}
+
 function summarizeRecentMessages(messages: Array<{ role: string; content: string }> | undefined) {
   if (!messages?.length) return "Sem historico recente."
 
@@ -87,7 +111,7 @@ function summarizeRecentMessages(messages: Array<{ role: string; content: string
 }
 
 export function buildTripContextSummary(input: TripContextSummaryInput) {
-  const { trip, documents, hotels, flights, audience, recentMessages } = input
+  const { trip, documents, hotels, flights, itineraries, audience, recentMessages } = input
   const travelWindow = [trip.start_date, trip.end_date].filter(Boolean).join(" ate ")
 
   return [
@@ -99,6 +123,7 @@ export function buildTripContextSummary(input: TripContextSummaryInput) {
     `Viajantes: ${trip.travelers_count}`,
     `Hospedagens: ${summarizeHotels(hotels)}`,
     `Passagens estruturadas: ${summarizeFlights(flights, documents)}`,
+    `Roteiros: ${summarizeItineraries(itineraries)}`,
     `Documentos visiveis para este contexto (${audience}): ${summarizeDocuments(documents)}`,
     `Historico recente:\n${summarizeRecentMessages(recentMessages)}`,
   ].join("\n")
