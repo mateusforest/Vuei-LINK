@@ -46,6 +46,7 @@ const documentTypes = [
   { value: "visa", label: "Vistos" },
   { value: "voucher", label: "Vouchers" },
   { value: "ticket", label: "Passagens" },
+  { value: "itinerary", label: "Roteiros" },
   { value: "admission_ticket", label: "Ingressos" },
   { value: "insurance", label: "Seguros" },
 ]
@@ -58,6 +59,7 @@ const getFileIcon = (type: string) => {
     case "voucher":
     case "insurance":
     case "ticket":
+    case "itinerary":
     case "admission_ticket":
       return File
     default:
@@ -123,6 +125,8 @@ export default function DocumentsPage() {
         } else {
           setActionNotice("Passagem anexada. Estamos extraindo as informacoes.")
         }
+      } else if (uploadData.type === "itinerary") {
+        setActionNotice("Roteiro anexado com sucesso.")
       } else {
         setActionNotice("Documento anexado com sucesso.")
       }
@@ -481,6 +485,7 @@ export default function DocumentsPage() {
                 <option value="voucher" className="bg-[#0a0a0a]">Voucher</option>
                 <option value="ticket" className="bg-[#0a0a0a]">Passagem</option>
                 <option value="admission_ticket" className="bg-[#0a0a0a]">Ingresso</option>
+                <option value="itinerary" className="bg-[#0a0a0a]">Roteiro</option>
                 <option value="passport" className="bg-[#0a0a0a]">Passaporte</option>
                 <option value="visa" className="bg-[#0a0a0a]">Visto</option>
                 <option value="insurance" className="bg-[#0a0a0a]">Seguro</option>

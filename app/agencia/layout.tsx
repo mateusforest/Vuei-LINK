@@ -10,6 +10,7 @@ import {
   LayoutDashboard,
   Users,
   Plane,
+  Building2,
   Link2,
   MessageSquare,
   FileText,
@@ -43,6 +44,7 @@ const navItems = [
   { href: "/agencia/links", icon: Link2, label: "Links" },
   { href: "/agencia/concierge", icon: MessageSquare, label: "Concierge" },
   { href: "/agencia/documentos", icon: FileText, label: "Documentos" },
+  { href: "/agencia/hospedagens", icon: Building2, label: "Hospedagens" },
   { href: "/agencia/roteiros-ia", icon: Map, label: "Roteiros IA" },
   { href: "/agencia/equipe", icon: UserCog, label: "Equipe" },
   { href: "/agencia/creditos", icon: Coins, label: "Créditos" },
@@ -490,7 +492,7 @@ function AgencyLayoutInner({ children }: { children: React.ReactNode }) {
       {/* Mobile Bottom Navigation */}
       <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-border/60 bg-white/92 backdrop-blur-xl lg:hidden">
         <div className="flex items-center justify-around py-2">
-          {[navItems[0], navItems[1], navItems[2], navItems[4], navItems[10]].map((item) => {
+          {[navItems[0], navItems[1], navItems[2], navItems[4], navItems[11]].map((item) => {
             const isActive = pathname === item.href || (item.href !== "/agencia" && pathname.startsWith(item.href))
             return (
               <Link key={item.href} href={item.href}>

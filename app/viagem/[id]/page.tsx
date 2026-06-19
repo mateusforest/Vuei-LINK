@@ -1566,7 +1566,20 @@ function buildTravelerCardSummaries(tripData: any) {
   const documents = Array.isArray(tripData?.documents) ? tripData.documents : []
   const itinerary = Array.isArray(tripData?.itinerary) ? tripData.itinerary : []
   const flight = flights[0]
-  const hotel = hotels[0]
+  const rawHotel = hotels[0]
+  const hotelNights =
+    rawHotel?.checkIn && rawHotel?.checkOut
+      ? Math.max(
+          Math.round((new Date(rawHotel.checkOut).getTime() - new Date(rawHotel.checkIn).getTime()) / (1000 * 60 * 60 * 24)),
+          0,
+        )
+      : 0
+  const hotelDetail = rawHotel
+    ? [rawHotel.checkIn || "Check-in pendente", hotelNights > 0 ? `${hotelNights} noite(s)` : rawHotel.checkOut || null]
+        .filter(Boolean)
+        .join(" • ")
+    : "Abra para ver"
+  const hotel = rawHotel ? { ...rawHotel, checkIn: hotelDetail, checkOut: "" } : rawHotel
 
   return [
     {
@@ -2716,69 +2729,114 @@ function HotelSection({
           </motion.div>
         ) : (
           <div className="space-y-4">
-            {hotels.map((hotel: any, index: number) => (
-              <motion.div
-                key={hotel.id || `${hotel.name}-${index}`}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                className="relative rounded-3xl overflow-hidden bg-white/[0.02] backdrop-blur-xl border border-white/[0.06]"
-              >
-                <div className="relative h-48 sm:h-64">
-                  <Image src={hotel.image || tripData.heroImage} alt={hotel.name} fill className="object-cover" />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent" />
-                  <div className="absolute bottom-4 left-4 right-4">
-                    <h3 className="text-xl font-semibold text-white">{hotel.name}</h3>
-                    <div className="flex items-center gap-2 mt-1 text-white/60">
-                      <MapPin className="w-3 h-3" />
-                      <span className="text-sm">{hotel.address || "Endereco nao informado"}</span>
+            {hotels.map((hotel: any, index: number) => {
+              const linkedVoucherHref =
+                hotel.documentId && tripData?.id && tripData?.slug
+                  ? buildTripDocumentAccessHref({
+                      tripId: tripData.id,
+                      documentId: hotel.documentId,
+                      tripSlug: tripData.slug,
+                      accessMode: isAdmin ? "admin" : "public",
+                      adminToken: tripData.adminToken ?? null,
+                      publicToken: tripData.publicToken ?? null,
+                      disposition: "inline",
+                    })
+                  : null
+              const nights =
+                hotel.checkIn && hotel.checkOut
+                  ? Math.max(
+                      Math.round((new Date(hotel.checkOut).getTime() - new Date(hotel.checkIn).getTime()) / (1000 * 60 * 60 * 24)),
+                      0,
+                    )
+                  : 0
+
+              return (
+                <motion.div
+                  key={hotel.id || `${hotel.name}-${index}`}
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  className="relative rounded-3xl overflow-hidden bg-white/[0.02] backdrop-blur-xl border border-white/[0.06]"
+                >
+                  <div className="relative h-48 sm:h-64">
+                    <Image src={hotel.image || tripData.heroImage} alt={hotel.name || "Hospedagem"} fill className="object-cover" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent" />
+                    <div className="absolute bottom-4 left-4 right-4">
+                      <h3 className="text-xl font-semibold text-white">{hotel.name || "Hospedagem sem nome"}</h3>
+                      <div className="mt-1 flex items-center gap-2 text-white/60">
+                        <MapPin className="h-3 w-3" />
+                        <span className="text-sm">{hotel.address || "Endereco nao informado"}</span>
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                <div className="p-5">
-                  <div className="grid grid-cols-2 gap-4 mb-4">
-                    <div className="p-3 rounded-xl bg-white/[0.03]">
-                      <p className="text-[10px] text-white/40 uppercase tracking-wider">Check-in</p>
-                      <p className="text-sm text-white font-medium mt-1">{hotel.checkIn || "Nao informado"}</p>
+                  <div className="p-5">
+                    <div className="mb-4 grid grid-cols-2 gap-4">
+                      <div className="rounded-xl bg-white/[0.03] p-3">
+                        <p className="text-[10px] uppercase tracking-wider text-white/40">Check-in</p>
+                        <p className="mt-1 text-sm font-medium text-white">{hotel.checkIn || "Nao informado"}</p>
+                      </div>
+                      <div className="rounded-xl bg-white/[0.03] p-3">
+                        <p className="text-[10px] uppercase tracking-wider text-white/40">Check-out</p>
+                        <p className="mt-1 text-sm font-medium text-white">{hotel.checkOut || "Nao informado"}</p>
+                      </div>
                     </div>
-                    <div className="p-3 rounded-xl bg-white/[0.03]">
-                      <p className="text-[10px] text-white/40 uppercase tracking-wider">Check-out</p>
-                      <p className="text-sm text-white font-medium mt-1">{hotel.checkOut || "Nao informado"}</p>
-                    </div>
-                  </div>
 
-                  <div className="flex items-center justify-between pt-4 border-t border-white/[0.06]">
-                    <span className="text-sm text-white/40">{hotel.confirmationCode || "Reserva nao informada"}</span>
-                    {canWrite && (
-                      <div className="flex items-center gap-2">
+                    <div className="mb-4 flex flex-wrap gap-2 text-xs text-white/60">
+                      <span className="rounded-full border border-white/[0.08] bg-white/[0.03] px-3 py-1.5">
+                        {nights > 0 ? `${nights} noite(s)` : "Noites a confirmar"}
+                      </span>
+                      <span className="rounded-full border border-white/[0.08] bg-white/[0.03] px-3 py-1.5">
+                        {hotel.confirmationCode || "Reserva nao informada"}
+                      </span>
+                    </div>
+
+                    {hotel.notes ? <p className="mb-4 text-sm text-white/60">{hotel.notes}</p> : null}
+
+                    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-white/[0.06] pt-4">
+                      {linkedVoucherHref ? (
                         <Button
                           size="sm"
                           variant="ghost"
                           className="text-[#5de0e6] hover:bg-[#5de0e6]/10"
-                          onClick={() => {
-                            setSelectedHotel(hotel)
-                            setEditing(true)
-                          }}
+                          onClick={() => window.open(linkedVoucherHref, "_blank", "noopener,noreferrer")}
                         >
-                          <Edit3 className="w-4 h-4 mr-2" />
-                          Editar
+                          <FileText className="mr-2 h-4 w-4" />
+                          Abrir voucher
                         </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="text-red-300 hover:bg-red-500/10"
-                          onClick={() => void onDeleteHotel(hotel.id)}
-                        >
-                          <Trash2 className="w-4 h-4 mr-2" />
-                          Excluir
-                        </Button>
-                      </div>
-                    )}
+                      ) : (
+                        <span className="text-sm text-white/40">Voucher nao informado</span>
+                      )}
+                      {canWrite && (
+                        <div className="flex items-center gap-2">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="text-[#5de0e6] hover:bg-[#5de0e6]/10"
+                            onClick={() => {
+                              setSelectedHotel(hotel)
+                              setEditing(true)
+                            }}
+                          >
+                            <Edit3 className="mr-2 h-4 w-4" />
+                            Editar
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="text-red-300 hover:bg-red-500/10"
+                            onClick={() => void onDeleteHotel(hotel.id)}
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Excluir
+                          </Button>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
-              </motion.div>
-            ))}
+                </motion.div>
+              )
+            })}
           </div>
         )}
       </div>

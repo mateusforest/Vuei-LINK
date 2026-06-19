@@ -67,6 +67,7 @@ function mapHotelRow(row: HotelRow) {
   return {
     id: row.id,
     tripId: row.trip_id,
+    documentId: row.document_id,
     name: row.name ?? row.hotel_name ?? "",
     address: row.address ?? null,
     checkIn: row.check_in ?? null,
@@ -409,6 +410,7 @@ export async function POST(request: NextRequest) {
       const hotelId = typeof body?.hotelId === "string" ? body.hotelId : null
       const payload = {
         trip_id: trip.id,
+        document_id: typeof body?.documentId === "string" ? body.documentId : undefined,
         name: typeof body?.name === "string" ? body.name : "",
         address: typeof body?.address === "string" ? body.address : null,
         check_in: typeof body?.checkIn === "string" ? body.checkIn : null,

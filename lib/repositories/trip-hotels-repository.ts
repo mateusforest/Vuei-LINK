@@ -10,6 +10,7 @@ export interface TripHotelPayload {
   checkOut?: string | null
   confirmationCode?: string | null
   notes?: string | null
+  documentId?: string | null
 }
 
 export interface TripHotelUpdatePayload {
@@ -19,6 +20,7 @@ export interface TripHotelUpdatePayload {
   checkOut?: string | null
   confirmationCode?: string | null
   notes?: string | null
+  documentId?: string | null
 }
 
 export interface TripHotelRecord {
@@ -30,6 +32,7 @@ export interface TripHotelRecord {
   checkOut: string | null
   confirmationCode: string | null
   notes: string | null
+  documentId: string | null
   createdAt: string
   updatedAt: string
 }
@@ -48,6 +51,7 @@ function mapRow(row: TripHotelRow): TripHotelRecord {
     checkOut: row.check_out ?? null,
     confirmationCode: row.confirmation_code ?? row.confirmation_number ?? null,
     notes: row.notes ?? null,
+    documentId: row.document_id ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }
@@ -101,6 +105,7 @@ export async function createTripHotel(payload: TripHotelPayload) {
       check_out: payload.checkOut ?? null,
       confirmation_code: payload.confirmationCode ?? null,
       notes: payload.notes ?? null,
+      document_id: payload.documentId ?? null,
     } satisfies TripHotelInsert)
     .select("*")
     .single()
@@ -127,6 +132,7 @@ export async function updateTripHotel(id: string, payload: TripHotelUpdatePayloa
       check_out: payload.checkOut ?? null,
       confirmation_code: payload.confirmationCode ?? null,
       notes: payload.notes ?? null,
+      document_id: payload.documentId ?? undefined,
     } satisfies TripHotelUpdate)
     .eq("id", id)
     .select("*")

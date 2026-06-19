@@ -23,11 +23,13 @@ import { createClient as createClientRecord, deleteClient as deleteClientRecord,
 import { addAgencyMember as addAgencyMemberRecord, getAgencyById, getAgencyByOwner, listAgencyMembers, updateAgencyMember as updateAgencyMemberRecord } from "@/lib/repositories/agencies-repository"
 import {
   createDocumentMetadata,
+  deleteDocumentFile,
   deleteDocument as deleteDocumentRecord,
   listDocuments,
   uploadDocumentFile,
 } from "@/lib/repositories/documents-repository"
 import { requestTripFlightExtraction, upsertTripFlight } from "@/lib/repositories/trip-flights-repository"
+import { upsertTripItinerary } from "@/lib/repositories/trip-itineraries-repository"
 import { createTrip as createTripRecord, deleteTrip as deleteTripRecord, listTripsByAgency, updateTrip as updateTripRecord } from "@/lib/repositories/trips-repository"
 import { getProfileByEmail } from "@/lib/repositories/profiles-repository"
 import { updateProfile as updateProfileRecord } from "@/lib/repositories/profiles-repository"
@@ -1250,6 +1252,8 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
       }
 
       const isFlightDocument = data.type === "ticket"
+      const isManualItineraryDocument = data.type === "itinerary"
+      const shouldExposeOnTripLink = isFlightDocument || isManualItineraryDocument
       const safeName = sanitizeFileName(data.file.name)
       const storageFolder = isFlightDocument ? "tickets" : data.type
       const path = `${user.id}/${agencyId}/${data.tripId}/${storageFolder}/${Date.now()}-${safeName}`
@@ -1271,13 +1275,34 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
         fileUrl: uploadResult.data.fileUrl ?? null,
         mimeType: data.file.type || null,
         size: data.file.size ?? null,
-        isPrivate: isFlightDocument ? false : data.isPrivate,
-        visibility: isFlightDocument ? "public_trip" : (data.visibility ?? (data.isPrivate ? "private" : "agency_only")),
+        isPrivate: shouldExposeOnTripLink ? false : data.isPrivate,
+        visibility: shouldExposeOnTripLink ? "public_trip" : (data.visibility ?? (data.isPrivate ? "private" : "agency_only")),
       })
 
       if (!metadataResult.data) {
         setWorkspaceError(metadataResult.error ?? "Nao foi possivel salvar o documento no Supabase.")
         return null
+      }
+
+      if (isManualItineraryDocument) {
+        const itineraryTitle = metadataResult.data.name || data.name || data.file.name.replace(/\.[^.]+$/, "")
+        const itineraryResult = await upsertTripItinerary({
+          tripId: data.tripId,
+          documentId: metadataResult.data.id,
+          title: itineraryTitle,
+          mode: "uploaded",
+          status: "uploaded",
+          content: { days: [] },
+          pdfUrl: metadataResult.data.filePath ?? metadataResult.data.fileUrl ?? null,
+          createdBy: user.id,
+        })
+
+        if (!itineraryResult.data) {
+          await deleteDocumentRecord(metadataResult.data.id)
+          await deleteDocumentFile(uploadResult.data.path)
+          setWorkspaceError(itineraryResult.error ?? "Nao foi possivel vincular o roteiro enviado a viagem.")
+          return null
+        }
       }
 
       const newDocument = mapDocumentRecordToAgencyDocument(metadataResult.data)
