@@ -11,6 +11,7 @@ create table if not exists public.trip_hotels (
   check_in text,
   check_out text,
   confirmation_code text,
+  document_id uuid references public.documents(id) on delete set null,
   notes text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -21,6 +22,7 @@ alter table public.trip_hotels add column if not exists address text;
 alter table public.trip_hotels add column if not exists check_in text;
 alter table public.trip_hotels add column if not exists check_out text;
 alter table public.trip_hotels add column if not exists confirmation_code text;
+alter table public.trip_hotels add column if not exists document_id uuid references public.documents(id) on delete set null;
 alter table public.trip_hotels add column if not exists notes text;
 
 do $$
@@ -57,6 +59,7 @@ end $$;
 alter table public.trip_hotels drop constraint if exists trip_hotels_trip_id_key;
 
 create index if not exists trip_hotels_trip_id_idx on public.trip_hotels(trip_id);
+create index if not exists trip_hotels_document_id_idx on public.trip_hotels(document_id);
 
 drop trigger if exists set_trip_hotels_updated_at on public.trip_hotels;
 create trigger set_trip_hotels_updated_at

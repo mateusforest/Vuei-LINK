@@ -641,6 +641,7 @@ export interface Database {
           check_out: string | null
           confirmation_code: string | null
           confirmation_number: string | null
+          document_id: string | null
           notes: string | null
           created_at: string
           updated_at: string
@@ -655,6 +656,7 @@ export interface Database {
           check_out?: string | null
           confirmation_code?: string | null
           confirmation_number?: string | null
+          document_id?: string | null
           notes?: string | null
           created_at?: string
           updated_at?: string
@@ -668,6 +670,7 @@ export interface Database {
           check_out?: string | null
           confirmation_code?: string | null
           confirmation_number?: string | null
+          document_id?: string | null
           notes?: string | null
           updated_at?: string
         }
