@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import Image from "next/image"
 import {
   Search,
@@ -171,7 +172,8 @@ function LinksModal({ open, onClose, trip }: { open: boolean; onClose: () => voi
 }
 
 export default function TripsPage() {
-  const { trips, deleteTrip, getDocumentsByTrip, conciergeRequests, setupIncomplete, workspaceError, activeTripsCount, subscription } = useAgency()
+  const router = useRouter()
+  const { trips, deleteTrip, getDocumentsByTrip, conciergeRequests, setupIncomplete, workspaceError, activeTripsCount, subscription, canCreateMoreTrips, showPlanLimitDialog } = useAgency()
   const [searchQuery, setSearchQuery] = useState("")
   const [filter, setFilter] = useState<"all" | "upcoming" | "ongoing" | "completed">("all")
   const [linksTrip, setLinksTrip] = useState<AgencyTrip | null>(null)
@@ -206,6 +208,15 @@ export default function TripsPage() {
     return conciergeRequests.filter(r => r.tripId === tripId && r.status === "pending").length
   }
 
+  const handleOpenCreateTrip = () => {
+    if (!canCreateMoreTrips) {
+      showPlanLimitDialog("trip_limit")
+      return
+    }
+
+    router.push("/agencia/viagens/criar")
+  }
+
   return (
     <div className="space-y-6 pb-20 lg:pb-0">
       {setupIncomplete && (
@@ -230,12 +241,10 @@ export default function TripsPage() {
           <h1 className="text-2xl font-bold text-foreground">Viagens</h1>
           <p className="mt-1 text-muted-foreground">{activeTripsCount} de {subscription.definition.maxActiveTrips} viagens ativas no plano</p>
         </div>
-        <Link href="/agencia/viagens/criar">
-          <Button className="gap-2 bg-gradient-to-r from-primary to-accent text-white hover:opacity-90">
-            <Plus className="h-4 w-4" />
-            Nova Viagem
-          </Button>
-        </Link>
+        <Button className="gap-2 bg-gradient-to-r from-primary to-accent text-white hover:opacity-90" onClick={handleOpenCreateTrip}>
+          <Plus className="h-4 w-4" />
+          Nova Viagem
+        </Button>
       </div>
 
       {/* Search and Filters */}
@@ -283,12 +292,10 @@ export default function TripsPage() {
             {searchQuery ? "Tente buscar com outros termos" : "Crie sua primeira viagem"}
           </p>
           {!searchQuery && (
-            <Link href="/agencia/viagens/criar">
-              <Button className="gap-2">
-                <Plus className="w-4 h-4" />
-                Nova Viagem
-              </Button>
-            </Link>
+            <Button className="gap-2" onClick={handleOpenCreateTrip}>
+              <Plus className="w-4 h-4" />
+              Nova Viagem
+            </Button>
           )}
         </div>
       ) : (
@@ -341,7 +348,7 @@ export default function TripsPage() {
                           {trip.status === "ongoing"
                             ? "Em andamento"
                             : trip.status === "upcoming"
-                              ? "Proximo"
+                              ? "Próximo"
                               : "Finalizada"}
                         </Badge>
                       </div>

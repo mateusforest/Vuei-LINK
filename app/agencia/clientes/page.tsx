@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import {
   Search,
   Plus,
@@ -142,7 +143,7 @@ function NewClientModal({ open, onClose, onSave, editClient }: {
           />
         </div>
         <div>
-          <label className="text-xs uppercase tracking-wider text-muted-foreground">Observacoes</label>
+          <label className="text-xs uppercase tracking-wider text-muted-foreground">Observações</label>
           <textarea
             value={formData.notes}
             onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
@@ -156,7 +157,7 @@ function NewClientModal({ open, onClose, onSave, editClient }: {
           disabled={!formData.name || !formData.email}
           className="w-full bg-gradient-to-r from-[#5de0e6] to-[#004aad] hover:opacity-90 text-white border-0 disabled:opacity-50"
         >
-          {editClient ? "Salvar Alteracoes" : "Cadastrar Cliente"}
+          {editClient ? "Salvar alterações" : "Cadastrar cliente"}
         </Button>
       </div>
     </Modal>
@@ -192,7 +193,7 @@ function ClientProfileModal({ open, onClose, client, trips, onEdit, onNewTrip }:
 
         {client.notes && (
           <div className="rounded-xl border border-border/60 bg-[#fbfbfc] p-3">
-            <p className="mb-1 text-xs uppercase tracking-wider text-muted-foreground">Observacoes</p>
+            <p className="mb-1 text-xs uppercase tracking-wider text-muted-foreground">Observações</p>
             <p className="text-sm text-foreground/80">{client.notes}</p>
           </div>
         )}
@@ -218,7 +219,7 @@ function ClientProfileModal({ open, onClose, client, trips, onEdit, onNewTrip }:
                   <Badge variant="outline" className={`text-[10px] ${
                     trip.status === "upcoming" ? "border-green-500/30 bg-green-500/10 text-green-400" : "border-white/10"
                   }`}>
-                    {trip.status === "upcoming" ? "Proximo" : trip.status === "ongoing" ? "Em andamento" : "Concluido"}
+                    {trip.status === "upcoming" ? "Próximo" : trip.status === "ongoing" ? "Em andamento" : "Concluído"}
                   </Badge>
                 </div>
               ))}
@@ -242,7 +243,8 @@ function ClientProfileModal({ open, onClose, client, trips, onEdit, onNewTrip }:
 }
 
 export default function ClientsPage() {
-  const { clients, trips, addClient, updateClient, deleteClient, getTripsByClient, setupIncomplete, workspaceError } = useAgency()
+  const router = useRouter()
+  const { clients, trips, addClient, updateClient, deleteClient, getTripsByClient, setupIncomplete, workspaceError, canCreateMoreClients, canCreateMoreTrips, showPlanLimitDialog } = useAgency()
   const [searchQuery, setSearchQuery] = useState("")
   const [filter, setFilter] = useState<"all" | "active" | "inactive">("all")
   const [newClientOpen, setNewClientOpen] = useState(false)
@@ -305,6 +307,24 @@ export default function ClientsPage() {
     }
   }
 
+  const handleOpenNewClient = () => {
+    if (!canCreateMoreClients) {
+      showPlanLimitDialog("client_limit")
+      return
+    }
+
+    setNewClientOpen(true)
+  }
+
+  const handleOpenNewTrip = (clientId?: string | null) => {
+    if (!canCreateMoreTrips) {
+      showPlanLimitDialog("trip_limit")
+      return
+    }
+
+    router.push(clientId ? `/agencia/viagens/criar?clientId=${clientId}` : "/agencia/viagens/criar")
+  }
+
   return (
     <div className="space-y-6 pb-20 lg:pb-0">
       {setupIncomplete && (
@@ -330,7 +350,7 @@ export default function ClientsPage() {
           <p className="mt-1 text-muted-foreground">{visibleClients.length} clientes cadastrados</p>
         </div>
         <Button 
-          onClick={() => setNewClientOpen(true)}
+          onClick={handleOpenNewClient}
           className="gap-2 bg-gradient-to-r from-primary to-accent text-white hover:opacity-90"
         >
           <Plus className="h-4 w-4" />
@@ -382,7 +402,7 @@ export default function ClientsPage() {
             {searchQuery ? "Tente buscar com outros termos" : "Cadastre seu primeiro cliente"}
           </p>
           {!searchQuery && (
-            <Button onClick={() => setNewClientOpen(true)} className="gap-2">
+            <Button onClick={handleOpenNewClient} className="gap-2">
               <Plus className="w-4 h-4" />
               Novo Cliente
             </Button>
@@ -430,11 +450,9 @@ export default function ClientsPage() {
                             <Edit className="w-4 h-4 mr-2" />
                             Editar
                           </DropdownMenuItem>
-                          <DropdownMenuItem asChild>
-                            <Link href={`/agencia/viagens/criar?clientId=${client.id}`}>
-                              <Plane className="w-4 h-4 mr-2" />
-                              Nova viagem
-                            </Link>
+                          <DropdownMenuItem onClick={() => handleOpenNewTrip(client.id)}>
+                            <Plane className="w-4 h-4 mr-2" />
+                            Nova viagem
                           </DropdownMenuItem>
                           <DropdownMenuItem 
                             onClick={() => handleDeleteClient(client.id)}
@@ -516,7 +534,11 @@ export default function ClientsPage() {
         client={profileClient}
         trips={profileClient ? getTripsByClient(profileClient.id) : []}
         onEdit={() => { setEditClient(profileClient); setProfileClient(null) }}
-        onNewTrip={() => { setProfileClient(null); window.location.href = `/agencia/viagens/criar?clientId=${profileClient?.id}` }}
+        onNewTrip={() => {
+          const clientId = profileClient?.id
+          setProfileClient(null)
+          handleOpenNewTrip(clientId)
+        }}
       />
     </div>
   )

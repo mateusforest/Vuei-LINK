@@ -56,14 +56,14 @@ export default function MasterIAPage() {
       {
         id: "concierge",
         name: "Concierge IA",
-        description: "Concierge do viajante e da agencia",
+        description: "Concierge do viaj?nte e da ag?ncia",
         icon: MessageSquare,
         usage: usageGroups.concierge ?? 0,
         prompts: promptGroups.concierge ?? 0,
       },
       {
         id: "flight_extraction",
-        name: "Extracao de Passagens",
+        name: "Extra??o de Passagens",
         description: "Leitura operacional de voos",
         icon: Plane,
         usage: usageGroups.flight_extraction ?? 0,
@@ -72,7 +72,7 @@ export default function MasterIAPage() {
       {
         id: "itinerary",
         name: "Roteiros IA",
-        description: "Geracao de itinerarios",
+        description: "Gera??o de itinerarios",
         icon: Sparkles,
         usage: usageGroups.itinerary_generation ?? 0,
         prompts: promptGroups.itinerary ?? 0,
@@ -80,7 +80,7 @@ export default function MasterIAPage() {
       {
         id: "documents",
         name: "Leitura de Documentos",
-        description: "Extracao operacional de dados",
+        description: "Extra??o operacional de dados",
         icon: FileText,
         usage: usageGroups.document_extraction ?? 0,
         prompts: promptGroups.documents ?? 0,
@@ -104,12 +104,12 @@ export default function MasterIAPage() {
 
   const mostUsedModel = useMemo(() => {
     const counts = aiUsageLogs.reduce<Record<string, number>>((accumulator, log) => {
-      const model = log.model || "Nao informado"
+      const model = log.model || "N?o informado"
       accumulator[model] = (accumulator[model] ?? 0) + 1
       return accumulator
     }, {})
 
-    return Object.entries(counts).sort((left, right) => right[1] - left[1])[0]?.[0] ?? "Nao informado"
+    return Object.entries(counts).sort((left, right) => right[1] - left[1])[0]?.[0] ?? "N?o informado"
   }, [aiUsageLogs])
 
   useEffect(() => {
@@ -119,8 +119,8 @@ export default function MasterIAPage() {
   const stats = [
     { label: "Conversas", value: aiOverview.totalConversations.toString(), icon: Brain },
     { label: "Mensagens", value: aiOverview.totalMessages.toString(), icon: Activity },
-    { label: "Creditos cobrados", value: aiOverview.totalCreditsCharged.toString(), icon: Zap },
-    { label: "Custo estimado", value: aiOverview.totalEstimatedCost > 0 ? `$${aiOverview.totalEstimatedCost.toFixed(4)}` : "Nao informado", icon: Shield },
+    { label: "Cr?ditos cobrados", value: aiOverview.totalCreditsCharged.toString(), icon: Zap },
+    { label: "Custo estimado", value: aiOverview.totalEstimatedCost > 0 ? `$${aiOverview.totalEstimatedCost.toFixed(4)}` : "N?o informado", icon: Shield },
   ]
 
   return (
@@ -231,7 +231,7 @@ export default function MasterIAPage() {
                 <div className="flex items-center justify-between rounded-xl border border-white/5 bg-white/[0.02] px-4 py-3">
                   <div>
                     <div className="text-sm font-medium text-foreground">{selectedPrompt.name}</div>
-                    <div className="text-xs text-muted-foreground">Ultima atualizacao: {new Date(selectedPrompt.updatedAt).toLocaleString("pt-BR")}</div>
+                    <div className="text-xs text-muted-foreground">?ltima atualiza??o: {new Date(selectedPrompt.updatedAt).toLocaleString("pt-BR")}</div>
                   </div>
                   <div className="flex items-center gap-3">
                     <Badge variant="outline" className={selectedPrompt.isActive ? "border-emerald-500/30 text-emerald-400" : "border-white/10 text-muted-foreground"}>
@@ -288,7 +288,7 @@ export default function MasterIAPage() {
 
             {recentLogs.length === 0 ? (
               <div className="rounded-xl border border-white/5 bg-white/[0.02] px-4 py-6 text-sm text-muted-foreground">
-                Nenhum usage log real disponivel ainda.
+                Nenhum usage log real dispon?vel ainda.
               </div>
             ) : (
               <div className="space-y-3">
@@ -303,7 +303,7 @@ export default function MasterIAPage() {
                           </Badge>
                         </div>
                         <div className="text-xs text-muted-foreground">
-                          {log.model || "Modelo nao informado"} • {log.totalTokens} tokens • {log.creditAmount} credito(s)
+                          {log.model || "Modelo n?o informado"} • {log.totalTokens} tokens • {log.creditAmount} credito(s)
                         </div>
                         <div className="text-xs text-muted-foreground">
                           {new Date(log.createdAt).toLocaleString("pt-BR")}

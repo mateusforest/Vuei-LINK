@@ -57,7 +57,7 @@ export default function AnalyticsPage() {
       period: "Mensagens",
     },
     {
-      label: "Creditos IA",
+      label: "Créditos IA",
       value: creditsUsed.toLocaleString(),
       change: "-8%",
       trend: "down" as const,

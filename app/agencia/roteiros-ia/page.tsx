@@ -57,19 +57,19 @@ function differenceInDaysInclusive(startDate?: string, endDate?: string) {
 
 function formatTripDuration(startDate?: string, endDate?: string) {
   const totalDays = differenceInDaysInclusive(startDate, endDate)
-  if (!totalDays) return "Nao informado"
+  if (!totalDays) return "Não informado"
   return `${totalDays} ${totalDays === 1 ? "dia" : "dias"}`
 }
 
 function formatTravelersLabel(count?: number) {
-  if (!count || count <= 0) return "Nao informado"
-  return `${count} ${count === 1 ? "viajante" : "viajantes"}`
+  if (!count || count <= 0) return "Não informado"
+  return `${count} ${count === 1 ? "viaj?nte" : "viaj?ntes"}`
 }
 
 function formatItineraryStatus(status: TripItineraryRecord["status"]) {
   switch (status) {
     case "completed":
-      return "Concluido"
+      return "Conclu?do"
     case "generating":
       return "Gerando"
     case "failed":
@@ -274,12 +274,12 @@ export default function RoteirosIAPage() {
 
       if (!result.data?.itinerary) {
         const normalizedError = (result.error ?? "").toLowerCase()
-        if (normalizedError.includes("saldo insuficiente") || normalizedError.includes("créditos insuficientes") || normalizedError.includes("creditos insuficientes")) {
+        if (normalizedError.includes("saldo insuficiente") || normalizedError.includes("créditos insuficientes") || normalizedError.includes("cr?ditos insuficientes")) {
           showInsufficientCredits()
           return
         }
 
-        setLoadError(result.error ?? "Nao foi possivel gerar o roteiro.")
+        setLoadError(result.error ?? "Não foi possível gerar o roteiro.")
         return
       }
 
@@ -323,13 +323,13 @@ export default function RoteirosIAPage() {
     const matchingDocument = documents.find((document) => document.id === itinerary.documentId)
 
     if (!matchingDocument?.filePath) {
-      setLoadError("Documento do roteiro nao encontrado.")
+      setLoadError("Documento do roteiro n?o ?ncontrado.")
       return
     }
 
     const signedUrlResult = await getSignedDocumentUrl(matchingDocument.filePath)
     if (!signedUrlResult.data) {
-      setLoadError(signedUrlResult.error ?? "Nao foi possivel abrir o arquivo do roteiro.")
+      setLoadError(signedUrlResult.error ?? "Não foi possível abrir o arquivo do roteiro.")
       return
     }
 
@@ -337,13 +337,13 @@ export default function RoteirosIAPage() {
   }
 
   const handleDeleteSavedItinerary = async (itineraryId: string) => {
-    if (!confirm("Deseja remover este roteiro salvo?")) {
+    if (!confirm("Desej? remover este roteiro salvo?")) {
       return
     }
 
     const result = await deleteTripItinerary(itineraryId)
     if (!result.success) {
-      setLoadError(result.error ?? "Nao foi possivel remover o roteiro.")
+      setLoadError(result.error ?? "Não foi possível remover o roteiro.")
       return
     }
 
@@ -471,14 +471,14 @@ export default function RoteirosIAPage() {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label>Duracao</Label>
+                    <Label>Dura??o</Label>
                     <div className="relative">
                       <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                       <Input value={formData.duration} readOnly className="pl-10 bg-background border-border" />
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <Label>Viajantes</Label>
+                    <Label>Viaj?ntes</Label>
                     <div className="relative">
                       <Users className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                       <Input value={formData.travelers} readOnly className="pl-10 bg-background border-border" />
@@ -489,7 +489,7 @@ export default function RoteirosIAPage() {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Estilo</Label>
-                    <Input value={formData.style || "Nao informado"} readOnly className="bg-background border-border" />
+                    <Input value={formData.style || "Não informado"} readOnly className="bg-background border-border" />
                   </div>
                   <div className="space-y-2">
                     <Label>Orcamento</Label>
@@ -510,7 +510,7 @@ export default function RoteirosIAPage() {
                   <Textarea
                     value={formData.preferences}
                     onChange={(event) => setFormData((current) => ({ ...current, preferences: event.target.value }))}
-                    placeholder="Adicione preferencias extras para a geracao do roteiro."
+                    placeholder="Adicione preferencias extras para a gera??o do roteiro."
                     className="bg-background border-border min-h-[100px]"
                   />
                 </div>
@@ -599,7 +599,7 @@ export default function RoteirosIAPage() {
                         </div>
                       ) : previewDays.length === 0 ? (
                         <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4 text-sm text-muted-foreground">
-                          Este roteiro ainda nao possui dias estruturados.
+                          Este roteiro ainda n?o possui dias estruturados.
                         </div>
                       ) : (
                         <div className="space-y-4 max-h-[420px] overflow-y-auto pr-2">

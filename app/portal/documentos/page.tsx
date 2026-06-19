@@ -160,7 +160,7 @@ export default function DocumentosPage() {
     }
 
     if (!quickAccessMethods.pinEnabled) {
-      setPinErrorMessage("PIN da conta nao configurado. Configure em Configuracoes.")
+      setPinErrorMessage("PIN da conta não configurado. Configure em Configurações.")
       return
     }
 
@@ -179,7 +179,7 @@ export default function DocumentosPage() {
       setPin("")
       setToastMessage("Documentos privados liberados.")
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Nao foi possivel validar o PIN desta conta."
+      const message = error instanceof Error ? error.message : "Não foi possível validar o PIN desta conta."
       setPinErrorMessage(message)
     } finally {
       setIsUnlocking(false)
@@ -203,7 +203,7 @@ export default function DocumentosPage() {
     try {
       const authenticated = await authenticateQuickAccessBiometric(quickAccessOwnerId)
       if (!authenticated) {
-        setPinErrorMessage("Nao foi possivel validar a biometria neste dispositivo.")
+        setPinErrorMessage("Não foi possível validar a biometria neste dispositivo.")
         return
       }
 
@@ -211,7 +211,7 @@ export default function DocumentosPage() {
       setShowPinModal(false)
       setToastMessage("Documentos privados liberados.")
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Nao foi possivel validar a biometria."
+      const message = error instanceof Error ? error.message : "Não foi possível validar a biometria."
       setPinErrorMessage(message)
     } finally {
       setIsUnlocking(false)
@@ -252,7 +252,7 @@ export default function DocumentosPage() {
 
       const uploadResult = await uploadDocumentFile(selectedFile, filePath)
       if (uploadResult.error || !uploadResult.data) {
-        setErrorMessage(uploadResult.error ?? "Nao foi possivel enviar o arquivo.")
+        setErrorMessage(uploadResult.error ?? "Não foi possível enviar o arquivo.")
         return
       }
 
@@ -274,7 +274,7 @@ export default function DocumentosPage() {
 
       const metadataResult = await createDocumentMetadata(payload)
       if (metadataResult.error || !metadataResult.data) {
-        setErrorMessage(metadataResult.error ?? "Nao foi possivel salvar os metadados do documento.")
+        setErrorMessage(metadataResult.error ?? "Não foi possível salvar os dados do documento.")
         return
       }
 
@@ -306,7 +306,7 @@ export default function DocumentosPage() {
     })
 
     if (result.error || !result.data) {
-      setErrorMessage(result.error ?? "Nao foi possivel atualizar a visibilidade.")
+      setErrorMessage(result.error ?? "Não foi possível atualizar a visibilidade.")
       return
     }
 
@@ -322,7 +322,7 @@ export default function DocumentosPage() {
 
     const urlResult = document.filePath ? await getSignedDocumentUrl(document.filePath) : { data: document.fileUrl, error: null }
     if (urlResult.error || !urlResult.data) {
-      setErrorMessage(urlResult.error ?? "Nao foi possivel abrir o documento.")
+      setErrorMessage(urlResult.error ?? "Não foi possível abrir o documento.")
       return
     }
 
@@ -520,7 +520,7 @@ export default function DocumentosPage() {
               </>
             ) : (
               <Card className="border-border/50 bg-muted/20 p-4 text-sm text-muted-foreground">
-                PIN da conta nao configurado. Configure em Configuracoes para liberar documentos privados aqui.
+                PIN da conta não configurado. Configure em Configurações para liberar documentos privados aqui.
               </Card>
             )}
 
@@ -624,7 +624,7 @@ export default function DocumentosPage() {
               <div className="rounded-xl border border-border/50 bg-muted/20 p-4 text-sm text-muted-foreground">
                 <p>Tipo: {selectedDoc.type}</p>
                 <p>Visibilidade: {selectedDoc.isPrivate ? "Privado" : "Compartilhavel"}</p>
-                <p>Tamanho: {selectedDoc.size ? formatFileSize(selectedDoc.size) : "Nao informado"}</p>
+                <p>Tamanho: {selectedDoc.size ? formatFileSize(selectedDoc.size) : "Não informado"}</p>
               </div>
               <div className="flex gap-3">
                 <Button variant="outline" className="flex-1" onClick={() => void handleTogglePrivacy(selectedDoc)}>

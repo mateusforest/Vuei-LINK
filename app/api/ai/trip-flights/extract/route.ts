@@ -35,14 +35,14 @@ async function getTripByAdminAccess(
 
   const trip = data as TripRow | null
   if (!trip) {
-    return { trip: null as TripRow | null, membership: null as AgencyMemberRow | null, error: "Viagem nao encontrada." }
+    return { trip: null as TripRow | null, membership: null as AgencyMemberRow | null, error: "Viagem n?o ?ncontrada." }
   }
 
   const tokenMatches = Boolean(payload.adminToken && trip.admin_token === payload.adminToken)
   const slugMatches = Boolean(payload.tripSlug && trip.slug === payload.tripSlug)
 
   if (!tokenMatches && !slugMatches) {
-    return { trip: null as TripRow | null, membership: null as AgencyMemberRow | null, error: "Voce nao tem permissao para processar esta passagem." }
+    return { trip: null as TripRow | null, membership: null as AgencyMemberRow | null, error: "Voc? n?o tem permiss?o para processar esta passagem." }
   }
 
   return { trip, membership: null as AgencyMemberRow | null, error: null }
@@ -80,7 +80,7 @@ async function getAccessibleTrip(
 
   const trip = tripResult.data as TripRow | null
   if (!trip) {
-    return { trip: null as TripRow | null, membership: null as AgencyMemberRow | null, error: "Viagem nao encontrada." }
+    return { trip: null as TripRow | null, membership: null as AgencyMemberRow | null, error: "Viagem n?o ?ncontrada." }
   }
 
   if (profile?.role === "master") {
@@ -92,7 +92,7 @@ async function getAccessibleTrip(
   }
 
   if (!trip.agency_id) {
-    return { trip: null as TripRow | null, membership: null as AgencyMemberRow | null, error: "Voce nao tem permissao para processar esta passagem." }
+    return { trip: null as TripRow | null, membership: null as AgencyMemberRow | null, error: "Voc? n?o tem permiss?o para processar esta passagem." }
   }
 
   const membershipResult = await client
@@ -108,7 +108,7 @@ async function getAccessibleTrip(
   }
 
   if (!membershipResult.data) {
-    return { trip: null as TripRow | null, membership: null as AgencyMemberRow | null, error: "Voce nao tem permissao para processar esta passagem." }
+    return { trip: null as TripRow | null, membership: null as AgencyMemberRow | null, error: "Voc? n?o tem permiss?o para processar esta passagem." }
   }
 
   return { trip, membership: membershipResult.data as AgencyMemberRow, error: null }
@@ -160,7 +160,7 @@ async function getFlightAndDocument(
     return {
       flight: null as TripFlightRow | null,
       document: null as DocumentRow | null,
-      error: "Registro da passagem nao encontrado.",
+      error: "Registro da passagem n?o ?ncontrado.",
     }
   }
 
@@ -183,7 +183,7 @@ async function getFlightAndDocument(
     return {
       flight: null as TripFlightRow | null,
       document: null as DocumentRow | null,
-      error: "Documento da passagem nao encontrado.",
+      error: "Documento da passagem n?o ?ncontrado.",
     }
   }
 
@@ -288,7 +288,7 @@ async function markFlightFailed(
 export async function POST(request: Request) {
   if (!shouldUseSupabase()) {
     return NextResponse.json(
-      { error: "A extracao operacional real de passagens so fica disponivel quando o Supabase estiver ativo." },
+      { error: "A extra??o operacional real de passagens so fica dispon?vel quando o Supabase estiver ativo." },
       { status: 503 }
     )
   }
@@ -319,14 +319,14 @@ export async function POST(request: Request) {
     })
 
     return NextResponse.json(
-      { error: "A configuracao administrativa do servidor nao esta disponivel no momento." },
+      { error: "A configura??o administrativa do servidor n?o ?sta dispon?vel no momento." },
       { status: 503 },
     )
   }
 
   const supabase = adminAccessRequested ? createSupabaseAdminClient() : await createSupabaseServerClient()
   if (!supabase) {
-    return NextResponse.json({ error: "Supabase server client indisponivel." }, { status: 503 })
+    return NextResponse.json({ error: "Supabase server client indispon?vel." }, { status: 503 })
   }
 
   let actingUserId: string | null = null
@@ -351,19 +351,19 @@ export async function POST(request: Request) {
 
     const profileResult = await getProfile(supabase, user.id)
     if (!profileResult.data) {
-      return NextResponse.json({ error: profileResult.error ?? "Perfil do usuario nao encontrado." }, { status: 403 })
+      return NextResponse.json({ error: profileResult.error ?? "Perfil do usuario n?o ?ncontrado." }, { status: 403 })
     }
 
     accessResult = await getAccessibleTrip(supabase, user.id, tripId, profileResult.data)
     actingUserId = user.id
   }
   if (!accessResult.trip) {
-    return NextResponse.json({ error: accessResult.error ?? "Viagem nao encontrada." }, { status: 403 })
+    return NextResponse.json({ error: accessResult.error ?? "Viagem n?o ?ncontrada." }, { status: 403 })
   }
 
   const entityResult = await getFlightAndDocument(supabase, tripId, flightId, documentId)
   if (!entityResult.flight || !entityResult.document) {
-    return NextResponse.json({ error: entityResult.error ?? "Passagem nao encontrada." }, { status: 404 })
+    return NextResponse.json({ error: entityResult.error ?? "Passagem n?o ?ncontrada." }, { status: 404 })
   }
 
   if (entityResult.document.type !== "ticket") {
@@ -371,7 +371,7 @@ export async function POST(request: Request) {
       supabase,
       entityResult.flight.id,
       entityResult.document.id,
-      "O documento anexado nao esta classificado como passagem aerea.",
+      "O documento anexado n?o ?sta classificado como passagem aerea.",
       {
         source: "flight_extraction",
         skipped_before_ai: true,
@@ -381,7 +381,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json(
       {
-        error: "O documento informado nao e uma passagem.",
+        error: "O documento informado n?o ? uma passagem.",
         flight: failed.flight,
         document: failed.document,
       },
@@ -393,7 +393,7 @@ export async function POST(request: Request) {
   const ownerId = ownerType === "agency" ? accessResult.trip.agency_id : actingUserId
 
   if (!ownerId) {
-    return NextResponse.json({ error: "Nao foi possivel identificar o saldo responsavel por esta extracao." }, { status: 400 })
+    return NextResponse.json({ error: "N?o foi poss?vel identificar o saldo responsavel por esta extra??o." }, { status: 400 })
   }
 
   const balanceResult = await getCreditsBalance(supabase, ownerType, ownerId)
@@ -407,7 +407,7 @@ export async function POST(request: Request) {
       supabase,
       entityResult.flight.id,
       entityResult.document.id,
-      "Saldo insuficiente para iniciar a extracao desta passagem.",
+      "Saldo insuficiente para iniciar a extra??o desta passagem.",
       {
         source: "flight_extraction",
         skipped_before_ai: true,
@@ -417,7 +417,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json(
       {
-        error: "Saldo insuficiente. Adicione creditos antes de processar passagens reais.",
+        error: "Saldo insuficiente. Adicione cr?ditos antes de processar passagens reais.",
         flight: failed.flight,
         document: failed.document,
       },
@@ -443,7 +443,7 @@ export async function POST(request: Request) {
       supabase,
       entityResult.flight.id,
       entityResult.document.id,
-      "A passagem anexada nao possui file_path para leitura operacional.",
+      "A passagem anexada n?o possui file_path para leitura operacional.",
       {
         source: "flight_extraction",
         skipped_before_ai: true,
@@ -452,7 +452,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json(
       {
-        error: "A passagem anexada nao possui um arquivo valido para leitura.",
+        error: "A passagem anexada n?o possui um arquivo valido para leitura.",
         flight: failed.flight,
         document: failed.document,
       },
@@ -466,7 +466,7 @@ export async function POST(request: Request) {
       supabase,
       entityResult.flight.id,
       entityResult.document.id,
-      signedUrlResult.error?.message || "Nao foi possivel gerar a URL temporaria para leitura da passagem.",
+      signedUrlResult.error?.message || "N?o foi poss?vel gerar a URL tempor?ria para leitura da passagem.",
       {
         source: "flight_extraction",
         skipped_before_ai: true,
@@ -475,7 +475,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json(
       {
-        error: signedUrlResult.error?.message || "Nao foi possivel acessar o arquivo da passagem.",
+        error: signedUrlResult.error?.message || "N?o foi poss?vel acessar o arquivo da passagem.",
         flight: failed.flight,
         document: failed.document,
       },
@@ -497,8 +497,8 @@ export async function POST(request: Request) {
   const failureReason =
     aiResult.error ||
     extractionPayload?.failure_reason ||
-    (!extractionPayload?.is_ticket ? "O arquivo analisado nao parece ser uma passagem aerea." : null) ||
-    (usefulFieldCount === 0 ? "Nao foi possivel identificar dados uteis nesta passagem." : null)
+    (!extractionPayload?.is_ticket ? "O arquivo analisado n?o parece ser uma passagem aerea." : null) ||
+    (usefulFieldCount === 0 ? "N?o foi poss?vel identificar dados ?teis nesta passagem." : null)
 
   const metadata: JsonObject = {
     source: "flight_extraction",
@@ -536,7 +536,7 @@ export async function POST(request: Request) {
   const documentUpdate = await updateDocumentExtractionData(supabase, entityResult.document.id, metadata)
 
   if (flightUpdate.error || !flightUpdate.data) {
-    return NextResponse.json({ error: flightUpdate.error ?? "Nao foi possivel atualizar a passagem processada." }, { status: 500 })
+    return NextResponse.json({ error: flightUpdate.error ?? "N?o foi poss?vel atualizar a passagem processada." }, { status: 500 })
   }
 
   if (documentUpdate.error) {
@@ -614,7 +614,7 @@ export async function POST(request: Request) {
   if (!completed) {
     return NextResponse.json(
       {
-        error: failureReason || "Nao foi possivel identificar esta passagem.",
+        error: failureReason || "N?o foi poss?vel identificar esta passagem.",
         flight: flightUpdate.data,
         document: documentUpdate.data,
       },

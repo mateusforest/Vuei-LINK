@@ -219,7 +219,7 @@ export default function OfflinePage() {
               <div>
                 <h3 className="text-lg font-semibold">{latestPackage ? latestPackage.tripName : "Nenhuma viagem salva offline"}</h3>
                 <p className="text-sm text-muted-foreground">
-                  {latestPackage ? `${savedItems.length} blocos salvos • ${totalSize}` : "Use o botao Salvar offline dentro do link da viagem."}
+                  {latestPackage ? `${savedItems.length} blocos salvos • ${totalSize}` : "Use o botão Salvar offline dentro do link da viagem."}
                 </p>
               </div>
             </div>
@@ -228,9 +228,9 @@ export default function OfflinePage() {
               <div className="text-right">
                 <div className="flex items-center gap-1 text-xs text-muted-foreground">
                   <Clock size={12} />
-                  <span>Ultima sincronizacao</span>
+                  <span>Última sincronização</span>
                 </div>
-                <p className="text-sm font-medium">{latestPackage ? formatSavedAt(latestPackage.savedAt) : "Ainda nao sincronizado"}</p>
+                <p className="text-sm font-medium">{latestPackage ? formatSavedAt(latestPackage.savedAt) : "Ainda não sincronizado"}</p>
               </div>
               <Button variant="outline" size="icon" className="rounded-xl border-border/50" disabled>
                 <RefreshCw size={18} />
@@ -243,7 +243,7 @@ export default function OfflinePage() {
           </div>
           {(latestPackage ? latestPackage.status ?? "legacy_snapshot" : null) === "legacy_snapshot" ? (
             <div className="mt-3 text-xs text-muted-foreground">
-              Este snapshot local nao garante que todos os documentos tenham sido baixados para uso offline.
+              Este pacote local não garante que todos os documentos tenham sido baixados para uso offline.
             </div>
           ) : null}
         </Card>
@@ -261,7 +261,7 @@ export default function OfflinePage() {
         <Card className="bg-card/50 border-border/50 vuei-glass divide-y divide-border/50">
           {(latestPackage?.items ?? []).length === 0 ? (
             <div className="p-6 text-sm text-muted-foreground">
-              Nenhum pacote offline foi salvo ainda. Abra uma viagem e use o botao `Salvar offline` para gerar a versao local.
+              Nenhum pacote offline foi salvo ainda. Abra uma viagem e use o botão `Salvar offline` para gerar a versão local.
             </div>
           ) : (
             latestPackage!.items.map((item) => {
@@ -284,7 +284,7 @@ export default function OfflinePage() {
                       Salvo
                     </Badge>
                   ) : (
-                    <Badge className="bg-muted/40 text-muted-foreground border-0 text-xs">Nao disponivel</Badge>
+                    <Badge className="bg-muted/40 text-muted-foreground border-0 text-xs">Não disponível</Badge>
                   )}
                 </div>
               )

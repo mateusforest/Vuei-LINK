@@ -20,7 +20,7 @@ export default function MasterAnalyticsPage() {
 
   const cards = [
     { label: "Usuarios", value: stats.totalUsers, icon: Users },
-    { label: "Agencias", value: stats.totalAgencies, icon: Building2 },
+    { label: "Agências", value: stats.totalAgencies, icon: Building2 },
     { label: "Viagens", value: stats.totalTrips, icon: Plane },
     { label: "Documentos", value: stats.totalDocuments, icon: FileText },
   ]

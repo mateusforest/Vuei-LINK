@@ -27,8 +27,8 @@ function formatDate(dateStr: string) {
 
 function getRoleLabel(type: "traveler" | "agency" | "admin") {
   if (type === "admin") return "Master"
-  if (type === "agency") return "Agencia"
-  return "Viajante"
+  if (type === "agency") return "Agência"
+  return "Viaj?nte"
 }
 
 function MasterUsuariosPageContent() {
@@ -56,7 +56,7 @@ function MasterUsuariosPageContent() {
   const pageStats = [
     { label: "Total Usuarios", value: stats.totalUsers.toString(), icon: Users },
     { label: "Usuarios Ativos", value: stats.activeUsers.toString(), icon: Activity },
-    { label: "Usuarios Agencia", value: users.filter((user) => user.type === "agency").length.toString(), icon: Building2 },
+    { label: "Usuários da agência", value: users.filter((user) => user.type === "agency").length.toString(), icon: Building2 },
     { label: "Masters", value: users.filter((user) => user.type === "admin").length.toString(), icon: Shield },
   ]
 
@@ -115,14 +115,14 @@ function MasterUsuariosPageContent() {
                     <p className="text-sm font-medium">{selectedUser.tripsCount}</p>
                   </div>
                   <div className="p-3 rounded-lg bg-white/5">
-                    <p className="text-xs text-muted-foreground mb-1">Ultima Atualizacao</p>
+                    <p className="text-xs text-muted-foreground mb-1">?ltima atualiza??o</p>
                     <p className="text-sm font-medium">{formatDate(selectedUser.lastActive)}</p>
                   </div>
                 </div>
 
                 {selectedUser.agencyName ? (
                   <div className="p-3 rounded-lg bg-white/5">
-                    <p className="text-xs text-muted-foreground mb-1">Agencia vinculada</p>
+                    <p className="text-xs text-muted-foreground mb-1">Agência vinculada</p>
                     <p className="text-sm font-medium">{selectedUser.agencyName}</p>
                   </div>
                 ) : null}
@@ -178,8 +178,8 @@ function MasterUsuariosPageContent() {
           </SelectTrigger>
           <SelectContent className="bg-card border-white/10">
             <SelectItem value="all">Todos</SelectItem>
-            <SelectItem value="traveler">Viajantes</SelectItem>
-            <SelectItem value="agency">Agencia</SelectItem>
+            <SelectItem value="traveler">Viaj?ntes</SelectItem>
+            <SelectItem value="agency">Agência</SelectItem>
             <SelectItem value="admin">Master</SelectItem>
           </SelectContent>
         </Select>
@@ -193,7 +193,7 @@ function MasterUsuariosPageContent() {
                 <tr className="border-b border-white/5">
                   <th className="text-left text-xs font-medium text-muted-foreground px-6 py-4">Usuario</th>
                   <th className="text-left text-xs font-medium text-muted-foreground px-6 py-4">Role</th>
-                  <th className="text-left text-xs font-medium text-muted-foreground px-6 py-4">Agencia</th>
+                  <th className="text-left text-xs font-medium text-muted-foreground px-6 py-4">Agência</th>
                   <th className="text-left text-xs font-medium text-muted-foreground px-6 py-4">Criado em</th>
                 </tr>
               </thead>
@@ -235,7 +235,7 @@ function MasterUsuariosPageContent() {
                         </div>
                       </td>
                       <td className="px-6 py-4 text-sm text-foreground">{getRoleLabel(user.type)}</td>
-                      <td className="px-6 py-4 text-sm text-muted-foreground">{user.agencyName || "Sem agencia"}</td>
+                      <td className="px-6 py-4 text-sm text-muted-foreground">{user.agencyName || "Sem ag?ncia"}</td>
                       <td className="px-6 py-4 text-sm text-muted-foreground">{formatDate(user.createdAt)}</td>
                     </tr>
                   ))

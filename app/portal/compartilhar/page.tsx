@@ -63,7 +63,7 @@ export default function CompartilharPage() {
       setTimeout(() => setAdminCopied(false), 2000)
     } else {
       setShareCopied(true)
-      setShareFeedback("Link compartilhavel copiado.")
+      setShareFeedback("Link compartilh?vel copiado.")
       setTimeout(() => setShareCopied(false), 2000)
     }
   }
@@ -72,13 +72,13 @@ export default function CompartilharPage() {
     const result = await ensureTripIsPublic(trip.id)
     if (result.error) {
       console.error("[TRIP] publish before share error", result.error)
-      setShareFeedback("Nao foi possivel publicar a viagem para compartilhamento.")
+      setShareFeedback("N?o foi poss?vel publicar a viagem para compartilhamento.")
       return false
     }
     return true
   }
 
-  // Se nao tem viagem, mostra tela para criar
+  // Se n?o tem viagem, mostra tela para criar
   if (!activeTrip && trips.length === 0) {
     return (
       <motion.div

@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error("[DESTINATION IMAGE] failed to resolve image", error)
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Nao foi possivel resolver a imagem do destino." },
+      { error: error instanceof Error ? error.message : "N?o foi poss?vel resolver a imagem do destino." },
       { status: 500 },
     )
   }

@@ -36,7 +36,7 @@ const quickSuggestions = [
   "Qual o endereco da minha hospedagem?",
   "Me mostra meus documentos",
   "Qual o horario da minha passagem?",
-  "O que tenho planejado no roteiro?",
+  "O que tenho planej?do no roteiro?",
 ]
 
 const attachmentIcons = {
@@ -51,7 +51,7 @@ function buildInitialAssistantMessage(destination: string): UiMessage {
   return {
     id: "assistant-initial",
     role: "assistant",
-    content: `Ola! Sou seu concierge da viagem para ${destination}. Posso responder com base nos dados reais ja adicionados no Vuei.`,
+    content: `Ola! Sou seu concierge da viagem para ${destination}. Posso responder com base nos dados reais j? adicionados no Vuei.`,
     timestamp: new Date(),
   }
 }
@@ -65,7 +65,7 @@ function buildTripAwareResponse(
 
   if (normalizedMessage.includes("hosped") || normalizedMessage.includes("hotel")) {
     return {
-      content: "As hospedagens reais ficam disponiveis no link da viagem. Se ainda nao aparecer nada, nenhuma hospedagem real foi adicionada.",
+      content: "As hospedagens reais ficam dispon?veis no link da viagem. Se ainda n?o aparecer nada, nenhuma hospedagem real foi adicionada.",
       attachment: {
         type: "hotel",
         title: `Hospedagem em ${destination}`,
@@ -87,28 +87,28 @@ function buildTripAwareResponse(
 
   if (normalizedMessage.includes("passag") || normalizedMessage.includes("voo")) {
     return {
-      content: "As passagens reais anexadas ficam disponiveis no link da viagem. Se a secao estiver vazia, ainda nao ha passagem real cadastrada.",
+      content: "As passagens reais anexadas ficam dispon?veis no link da viagem. Se a secao estiver vazia, ainda n?o ha passagem real cadastrada.",
       attachment: {
         type: "flight",
         title: "Passagens da viagem",
-        description: "Arquivos anexados reais ficam disponiveis no historico da viagem.",
+        description: "Arquivos anexados reais ficam dispon?veis no historico da viagem.",
       },
     }
   }
 
   if (normalizedMessage.includes("roteiro") || normalizedMessage.includes("itiner")) {
     return {
-      content: "Seu roteiro real continua disponivel no link inteligente da viagem. Se estiver vazio, ainda nao foi criado nenhum roteiro.",
+      content: "Seu roteiro real continua dispon?vel no link inteligente da viagem. Se estiver vazio, ainda n?o foi criado nenhum roteiro.",
       attachment: {
         type: "itinerary",
         title: "Roteiro da viagem",
-        description: "O concierge nao inventa atividades quando nao ha roteiro real salvo.",
+        description: "O concierge n?o inventa atividades quando n?o ha roteiro real salvo.",
       },
     }
   }
 
   return {
-    content: `Entendi. Vou considerar apenas os dados reais disponiveis hoje para ${destination} ao continuar te ajudando por aqui.`,
+    content: `Entendi. Vou considerar apenas os dados reais dispon?veis hoje para ${destination} ao continuar te ajudando por aqui.`,
   }
 }
 
@@ -135,7 +135,7 @@ async function requestRealConciergeReply(payload: {
   if (!response.ok) {
     return {
       ok: false as const,
-      error: data?.error || "Nao foi possivel obter uma resposta real do concierge.",
+      error: data?.error || "N?o foi poss?vel obter uma resposta real do concierge.",
     }
   }
 

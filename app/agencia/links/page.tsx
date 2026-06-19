@@ -187,7 +187,7 @@ export default function LinksPage() {
                           <DropdownMenuContent align="end" className="border-white/10 bg-card">
                             <DropdownMenuItem onClick={() => openSettings(trip)}>
                               <Settings className="mr-2 h-4 w-4" />
-                              Configuracoes
+                              Configurações
                             </DropdownMenuItem>
                             <DropdownMenuItem>
                               <QrCode className="mr-2 h-4 w-4" />
@@ -279,7 +279,7 @@ export default function LinksPage() {
                           trip.status === "ongoing" ? "border-green-500/30 bg-green-500/10 text-green-400" :
                           "border-white/10"
                         }`}>
-                          {trip.status === "upcoming" ? "Proximo" : trip.status === "ongoing" ? "Em andamento" : "Concluido"}
+                          {trip.status === "upcoming" ? "Próximo" : trip.status === "ongoing" ? "Em andamento" : "Concluído"}
                         </Badge>
                       </div>
                     </div>
@@ -295,7 +295,7 @@ export default function LinksPage() {
       <Dialog open={settingsModalOpen} onOpenChange={setSettingsModalOpen}>
         <DialogContent className="border-white/10 bg-card sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Configuracoes do Link</DialogTitle>
+            <DialogTitle>Configurações do link</DialogTitle>
           </DialogHeader>
           {selectedLink && (
             <div className="space-y-4">

@@ -121,9 +121,9 @@ export default function DocumentsPage() {
     if (created) {
       if (uploadData.type === "ticket") {
         if (created.flightExtractionStatus === "failed") {
-          setActionError(created.extractionError || "Passagem anexada, mas nao foi possivel iniciar a extracao agora.")
+          setActionError(created.extractionError || "Passagem anexada, mas n?o foi poss?vel iniciar a extra??o agora.")
         } else {
-          setActionNotice("Passagem anexada. Estamos extraindo as informacoes.")
+          setActionNotice("Passagem anexada. Estamos extraindo as informa??es.")
         }
       } else if (uploadData.type === "itinerary") {
         setActionNotice("Roteiro anexado com sucesso.")
@@ -136,11 +136,11 @@ export default function DocumentsPage() {
       return
     }
 
-    setActionError(workspaceError || "Nao foi possivel enviar o documento.")
+    setActionError(workspaceError || "N?o foi poss?vel enviar o documento.")
   }
 
   const handleDelete = async (id: string) => {
-    if (confirm("Tem certeza que deseja excluir este documento?")) {
+    if (confirm("Tem certeza que desej? excluir este documento?")) {
       await deleteDocument(id)
     }
   }
@@ -149,7 +149,7 @@ export default function DocumentsPage() {
     if (!file) return
     const validation = validateDocumentFile(file)
     if (!validation.valid) {
-      setActionError(validation.error || "Arquivo invalido.")
+      setActionError(validation.error || "Arquivo inv?lido.")
       setActionNotice("")
       return
     }
@@ -164,7 +164,7 @@ export default function DocumentsPage() {
     if (doc.filePath && isUsingRealData) {
       const result = await getSignedDocumentUrl(doc.filePath)
       if (!result.data) {
-        setActionError(result.error || "Nao foi possivel abrir o documento.")
+        setActionError(result.error || "N?o foi poss?vel abrir o documento.")
         return
       }
 
@@ -177,7 +177,7 @@ export default function DocumentsPage() {
       return
     }
 
-    setActionError("Documento sem arquivo disponivel para visualizacao.")
+    setActionError("Documento sem arquivo dispon?vel para visualiza??o.")
   }
 
   const handleTogglePrivacy = async (doc: AgencyDocument) => {
@@ -190,7 +190,7 @@ export default function DocumentsPage() {
     })
 
     if (!result.data) {
-      setActionError(result.error || "Nao foi possivel atualizar a privacidade do documento.")
+      setActionError(result.error || "N?o foi poss?vel atualizar a privacidade do documento.")
       return
     }
 
@@ -228,7 +228,7 @@ export default function DocumentsPage() {
           <div className="flex-1">
             <p className="text-sm font-medium text-foreground">Documentos protegidos</p>
             <p className="text-xs text-muted-foreground">
-              Docs privados requerem PIN/Face ID e nao aparecem nos links compartilhados
+              Docs privados requerem PIN/Face ID e n?o aparecem nos links compartilhados
             </p>
           </div>
         </CardContent>
@@ -384,7 +384,7 @@ export default function DocumentsPage() {
                             {doc.isPrivate ? (
                               <>
                                 <Unlock className="mr-2 h-4 w-4" />
-                                Tornar compartilhavel
+                                Tornar compartilh?vel
                               </>
                             ) : (
                               <>

@@ -68,26 +68,26 @@ const agencyPlans = [
     code: "free",
     name: "Free",
     price: "R$ 0",
-    limits: ["1 usuario", "1 viagem ativa", "40 creditos por mes"],
+    limits: ["1 usuario", "1 viagem ativa", "40 cr?ditos por mes"],
   },
   {
     code: "start",
     name: "Start",
     price: "R$ 69,90/mes",
-    limits: ["3 usuarios", "20 viagens ativas", "350 creditos por mes"],
+    limits: ["3 usuarios", "20 viagens ativas", "350 cr?ditos por mes"],
   },
   {
     code: "pro",
     name: "Pro",
     price: "R$ 109,90/mes",
     badge: "Mais popular",
-    limits: ["5 usuarios", "100 viagens ativas", "600 creditos por mes"],
+    limits: ["5 usuarios", "100 viagens ativas", "600 cr?ditos por mes"],
   },
   {
     code: "business",
     name: "Business",
     price: "R$ 249,90/mes",
-    limits: ["15 usuarios", "220 viagens ativas", "1.500 creditos por mes"],
+    limits: ["15 usuarios", "220 viagens ativas", "1.500 cr?ditos por mes"],
   },
 ]
 
@@ -128,7 +128,7 @@ export default function MasterConfiguracoesPage() {
           disabled={saving}
         >
           {saved ? <Check className="h-4 w-4" /> : <Save className="h-4 w-4" />}
-          {saving ? "Salvando..." : saved ? "Salvo!" : "Salvar Alteracoes"}
+          {saving ? "Salvando..." : saved ? "Salvo!" : "Salvar altera??es"}
         </Button>
       </motion.div>
 
@@ -189,7 +189,7 @@ export default function MasterConfiguracoesPage() {
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-foreground">Descrição</label>
                   <Textarea
-                    defaultValue="Plataforma inteligente de planejamento de viagens com IA"
+                    defaultValue="Plataforma inteligente de planej?mento de viagens com IA"
                     className="bg-black/40 border-white/10 focus:border-primary/50 min-h-[100px]"
                   />
                 </div>
@@ -300,7 +300,7 @@ export default function MasterConfiguracoesPage() {
           {/* Integrations */}
           {activeSection === "planos" && (
             <Card className="border-white/5 bg-black/40 backdrop-blur-xl p-6">
-              <h2 className="text-lg font-semibold text-foreground mb-6">Planos B2B da Agencia</h2>
+              <h2 className="text-lg font-semibold text-foreground mb-6">Planos B2B da agência</h2>
 
               <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                 {agencyPlans.map((plan) => (
@@ -334,7 +334,7 @@ export default function MasterConfiguracoesPage() {
                     </div>
 
                     <div className="mt-5 rounded-xl border border-white/10 bg-black/20 p-3 text-xs text-muted-foreground">
-                      Configuracao inicial pronta para futura integracao Stripe. Sem cobranca nesta etapa.
+                      Configura??o inicial pronta para futura integra??o Stripe. Sem cobranca nesta etapa.
                     </div>
                   </div>
                 ))}

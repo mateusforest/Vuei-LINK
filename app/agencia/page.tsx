@@ -125,7 +125,7 @@ function NewClientModal({ open, onClose, onSave }: { open: boolean; onClose: () 
           />
         </div>
         <div>
-          <label className="text-xs text-white/50 uppercase tracking-wider">Observacoes</label>
+          <label className="text-xs text-white/50 uppercase tracking-wider">Observa??es</label>
           <textarea
             value={formData.notes}
             onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
@@ -149,9 +149,9 @@ function NewClientModal({ open, onClose, onSave }: { open: boolean; onClose: () 
 export default function AgencyDashboard() {
   const router = useRouter()
   const { profile } = useAuth()
-  const { clients, trips, credits, activities, conciergeRequests, addClient, setupIncomplete, workspaceError, agency, workspaceLoading, subscription, activeTripsCount } = useAgency()
+  const { clients, trips, credits, activities, conciergeRequests, addClient, setupIncomplete, workspaceError, agency, workspaceLoading, subscription, activeTripsCount, canCreateMoreClients, canCreateMoreTrips, showPlanLimitDialog } = useAgency()
   const [newClientOpen, setNewClientOpen] = useState(false)
-  const agencyName = agency?.name || profile?.name || "Agencia"
+  const agencyName = agency?.name || profile?.name || "Agência"
 
   // Calculate stats from real data
   const upcomingTrips = trips.filter(t => t.status === "upcoming")
@@ -162,16 +162,34 @@ export default function AgencyDashboard() {
     { label: "Viagens Ativas", value: activeTripsCount.toString(), icon: Plane, trend: `${upcomingTrips.length} proximas`, color: "from-primary to-accent" },
     { label: "Clientes Ativos", value: activeClients.length.toString(), icon: Users, trend: "Todos ativos", color: "from-accent to-primary" },
     { label: "Concierge Ativos", value: pendingRequests.length.toString(), icon: MessageSquare, trend: "Aguardando", color: "from-primary/80 to-accent/80" },
-    { label: "Creditos IA", value: credits.balance.toString(), icon: Sparkles, trend: subscription.definition.name, color: "from-accent/80 to-primary/80" },
+    { label: "Cr?ditos IA", value: credits.balance.toString(), icon: Sparkles, trend: subscription.definition.name, color: "from-accent/80 to-primary/80" },
   ]
 
   const handleNewClient = async (data: Omit<Client, "id" | "createdAt">) => {
     const created = await addClient(data)
     if (!created) {
-      window.alert(workspaceError || "Nao foi possivel salvar o cliente no Supabase.")
+      window.alert(workspaceError || "N?o foi poss?vel salvar o cliente no Supabase.")
       return false
     }
     return true
+  }
+
+  const handleOpenNewClient = () => {
+    if (!canCreateMoreClients) {
+      showPlanLimitDialog("client_limit")
+      return
+    }
+
+    setNewClientOpen(true)
+  }
+
+  const handleOpenCreateTrip = () => {
+    if (!canCreateMoreTrips) {
+      showPlanLimitDialog("trip_limit")
+      return
+    }
+
+    router.push("/agencia/viagens/criar")
   }
 
   // Format date for display
@@ -231,7 +249,7 @@ export default function AgencyDashboard() {
       {setupIncomplete && (
         <Card className="border-amber-500/20 bg-amber-500/5">
           <CardContent className="p-4 text-sm text-amber-200">
-            Sua conta de agencia foi criada, mas a estrutura da agencia ainda nao foi persistida corretamente no Supabase.
+            Sua conta de agência foi criada, mas a estrutura da agência ainda não foi persistida corretamente no Supabase.
           </CardContent>
         </Card>
       )}
@@ -249,15 +267,13 @@ export default function AgencyDashboard() {
         <div>
           <h1 className="text-2xl font-bold text-foreground lg:text-3xl">Bom dia, {agencyName}</h1>
           <p className="mt-1 text-muted-foreground">
-            Voce tem {upcomingTrips.length} viagens com embarque proximo
+            Você tem {upcomingTrips.length} viagens com embarque próximo
           </p>
         </div>
-        <Link href="/agencia/viagens/criar">
-          <Button className="gap-2 bg-gradient-to-r from-primary to-accent text-white hover:opacity-90">
-            <Plane className="h-4 w-4" />
-            Nova Viagem
-          </Button>
-        </Link>
+        <Button className="gap-2 bg-gradient-to-r from-primary to-accent text-white hover:opacity-90" onClick={handleOpenCreateTrip}>
+          <Plane className="h-4 w-4" />
+          Nova Viagem
+        </Button>
       </motion.div>
 
       {/* Hero Stats Card */}
@@ -296,13 +312,13 @@ export default function AgencyDashboard() {
 
       {/* Main Grid */}
       <div className="grid gap-6 lg:grid-cols-3">
-        {/* Proximos Embarques */}
+        {/* Próximos Embarques */}
         <motion.div variants={itemVariants} className="lg:col-span-2">
           <Card className="border-white/5 bg-card/50">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="flex items-center gap-2 text-base font-semibold">
                 <Calendar className="h-4 w-4 text-primary" />
-                Proximos Embarques
+                Próximos embarques
               </CardTitle>
               <Link href="/agencia/viagens">
                 <Button variant="ghost" size="sm" className="gap-1 text-xs text-muted-foreground hover:text-foreground">
@@ -315,14 +331,12 @@ export default function AgencyDashboard() {
               {upcomingTrips.length === 0 ? (
                 <div className="text-center py-8">
                   <Plane className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
-                  <p className="text-sm text-muted-foreground">Nenhuma viagem proxima</p>
-                  <Link href="/agencia/viagens/criar">
-                    <Button size="sm" variant="outline" className="mt-3 border-white/10">
-                      Criar viagem
-                    </Button>
-                  </Link>
-                </div>
-              ) : (
+              <p className="text-sm text-muted-foreground">Nenhuma viagem proxima</p>
+              <Button size="sm" variant="outline" className="mt-3 border-white/10" onClick={handleOpenCreateTrip}>
+                Criar viagem
+              </Button>
+            </div>
+          ) : (
                 upcomingTrips.slice(0, 3).map((trip, index) => (
                   <motion.div
                     key={trip.id}
@@ -357,7 +371,7 @@ export default function AgencyDashboard() {
                           variant="outline"
                           className="mt-1 text-[10px] border-green-500/30 bg-green-500/10 text-green-400"
                         >
-                          Proximo
+                          Pr?ximo
                         </Badge>
                       </div>
                       <Button
@@ -415,8 +429,8 @@ export default function AgencyDashboard() {
         <h2 className="mb-4 text-sm font-medium text-muted-foreground">Acoes Rapidas</h2>
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
           {[
-            { icon: Plane, label: "Nova Viagem", action: () => router.push("/agencia/viagens/criar"), gradient: "from-primary to-accent" },
-            { icon: Users, label: "Novo Cliente", action: () => setNewClientOpen(true), gradient: "from-accent to-primary" },
+            { icon: Plane, label: "Nova Viagem", action: handleOpenCreateTrip, gradient: "from-primary to-accent" },
+            { icon: Users, label: "Novo Cliente", action: handleOpenNewClient, gradient: "from-accent to-primary" },
             { icon: FileText, label: "Upload Doc", action: () => router.push("/agencia/documentos"), gradient: "from-primary/80 to-accent/80" },
             { icon: Sparkles, label: "Gerar Roteiro", action: () => router.push("/agencia/roteiros-ia"), gradient: "from-accent/80 to-primary/80" },
             { icon: MessageSquare, label: "Concierge", action: () => router.push("/agencia/concierge"), gradient: "from-primary to-accent" },
@@ -463,7 +477,7 @@ export default function AgencyDashboard() {
                   <p className="text-sm text-muted-foreground">
                     {pendingRequests.length > 0 
                       ? `${pendingRequests.length} solicitacoes aguardando resposta`
-                      : "Nenhuma solicitacao pendente"
+                      : "Nenhuma solicita??o pendente"
                     }
                   </p>
                 </div>

@@ -60,7 +60,7 @@ function MasterViagensPageContent() {
     { label: "Total Viagens", value: stats.totalTrips.toString(), icon: Plane },
     { label: "Ativas", value: stats.activeTrips.toString(), icon: Plane },
     { label: "Documentos", value: stats.totalDocuments.toString(), icon: FileText },
-    { label: "Agencias", value: stats.totalAgencies.toString(), icon: Share2 },
+    { label: "Agências", value: stats.totalAgencies.toString(), icon: Share2 },
   ]
 
   const copyLink = async (link: string, type: string) => {
@@ -112,12 +112,12 @@ function MasterViagensPageContent() {
 
                   <div className="grid grid-cols-2 gap-4 mb-6">
                     <div className="p-3 rounded-lg bg-white/5">
-                      <p className="text-xs text-muted-foreground mb-1">Agencia</p>
+                      <p className="text-xs text-muted-foreground mb-1">Agência</p>
                       <p className="text-sm font-medium">{selectedTrip.agencyName || "Viagem de viajante"}</p>
                     </div>
                     <div className="p-3 rounded-lg bg-white/5">
                       <p className="text-xs text-muted-foreground mb-1">Responsavel</p>
-                      <p className="text-sm font-medium">{selectedTrip.userName || "Nao informado"}</p>
+                      <p className="text-sm font-medium">{selectedTrip.userName || "N?o informado"}</p>
                     </div>
                     <div className="p-3 rounded-lg bg-white/5">
                       <p className="text-xs text-muted-foreground mb-1">Periodo</p>
@@ -220,7 +220,7 @@ function MasterViagensPageContent() {
               <thead>
                 <tr className="border-b border-white/5">
                   <th className="text-left text-xs font-medium text-muted-foreground px-6 py-4">Viagem</th>
-                  <th className="text-left text-xs font-medium text-muted-foreground px-6 py-4">Agencia</th>
+                  <th className="text-left text-xs font-medium text-muted-foreground px-6 py-4">Agência</th>
                   <th className="text-left text-xs font-medium text-muted-foreground px-6 py-4">Status</th>
                   <th className="text-left text-xs font-medium text-muted-foreground px-6 py-4">Criado em</th>
                 </tr>

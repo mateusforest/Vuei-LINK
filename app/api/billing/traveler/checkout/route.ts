@@ -13,21 +13,21 @@ interface TravelerCheckoutBody {
 export async function POST(request: Request) {
   try {
     if (!shouldUseSupabase()) {
-      return NextResponse.json({ error: "Billing traveler so fica disponivel com Supabase ativo." }, { status: 503 })
+      return NextResponse.json({ error: "Billing traveler so fica dispon?vel com Supabase ativo." }, { status: 503 })
     }
 
     if (!hasSupabaseAdminEnv()) {
-      return NextResponse.json({ error: "A configuracao administrativa do billing traveler nao esta disponivel." }, { status: 503 })
+      return NextResponse.json({ error: "A configura??o administrativa do billing traveler n?o ?sta dispon?vel." }, { status: 503 })
     }
 
     const body = (await request.json().catch(() => null)) as TravelerCheckoutBody | null
     if (body?.planCode !== "premium") {
-      return NextResponse.json({ error: "Plano invalido. Apenas premium pode ser assinado nesta etapa." }, { status: 400 })
+      return NextResponse.json({ error: "Plano inv?lido. Apenas premium pode ser assinado nesta etapa." }, { status: 400 })
     }
 
     const supabase = await createSupabaseServerClient()
     if (!supabase) {
-      return NextResponse.json({ error: "Supabase server client indisponivel." }, { status: 503 })
+      return NextResponse.json({ error: "Supabase server client indispon?vel." }, { status: 503 })
     }
 
     const {
@@ -46,7 +46,7 @@ export async function POST(request: Request) {
     const adminClient = createSupabaseAdminClient()
     const customerResult = await ensureTravelerStripeCustomer(adminClient, user)
     if (customerResult.error || !customerResult.customerId) {
-      return NextResponse.json({ error: customerResult.error ?? "Nao foi possivel preparar o cliente Stripe." }, { status: 500 })
+      return NextResponse.json({ error: customerResult.error ?? "N?o foi poss?vel preparar o cliente Stripe." }, { status: 500 })
     }
 
     const stripe = getStripeClient()
@@ -79,16 +79,16 @@ export async function POST(request: Request) {
     })
 
     if (!session.url) {
-      return NextResponse.json({ error: "O Stripe nao retornou uma URL de checkout valida." }, { status: 500 })
+      return NextResponse.json({ error: "O Stripe n?o retornou uma URL de checkout valida." }, { status: 500 })
     }
 
     return NextResponse.json({ url: session.url })
   } catch (error) {
     const message = error instanceof Error && error.message.startsWith("Missing required env:")
-      ? "Pagamentos ainda nao configurados."
+      ? "Pagamentos ainda n?o configurados."
       : error instanceof Error
         ? error.message
-        : "Nao foi possivel iniciar o checkout Premium."
+        : "N?o foi poss?vel iniciar o checkout Premium."
 
     return NextResponse.json({ error: message }, { status: 503 })
   }

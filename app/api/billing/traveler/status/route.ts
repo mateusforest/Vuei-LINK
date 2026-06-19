@@ -6,16 +6,16 @@ import { getTravelerCreditBalance } from "@/lib/billing/traveler-billing"
 
 export async function GET() {
   if (!shouldUseSupabase()) {
-    return NextResponse.json({ error: "Billing traveler so fica disponivel com Supabase ativo." }, { status: 503 })
+    return NextResponse.json({ error: "Billing traveler so fica dispon?vel com Supabase ativo." }, { status: 503 })
   }
 
   if (!hasSupabaseAdminEnv()) {
-    return NextResponse.json({ error: "A configuracao administrativa do billing traveler nao esta disponivel." }, { status: 503 })
+    return NextResponse.json({ error: "A configura??o administrativa do billing traveler n?o ?sta dispon?vel." }, { status: 503 })
   }
 
   const supabase = await createSupabaseServerClient()
   if (!supabase) {
-    return NextResponse.json({ error: "Supabase server client indisponivel." }, { status: 503 })
+    return NextResponse.json({ error: "Supabase server client indispon?vel." }, { status: 503 })
   }
 
   const {
@@ -35,7 +35,7 @@ export async function GET() {
   const balanceResult = await getTravelerCreditBalance(adminClient, user.id)
 
   if (balanceResult.error || !balanceResult.data) {
-    return NextResponse.json({ error: balanceResult.error ?? "Nao foi possivel carregar o billing traveler." }, { status: 500 })
+    return NextResponse.json({ error: balanceResult.error ?? "N?o foi poss?vel carregar o billing traveler." }, { status: 500 })
   }
 
   return NextResponse.json(balanceResult.data)

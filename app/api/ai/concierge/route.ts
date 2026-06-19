@@ -84,7 +84,7 @@ async function getAccessibleTrip(
 
   const trip = tripResult.data as TripRow | null
   if (!trip) {
-    return { trip: null as TripRow | null, membership: null as AgencyMemberRow | null, error: "Viagem nao encontrada." }
+    return { trip: null as TripRow | null, membership: null as AgencyMemberRow | null, error: "Viagem n?o ?ncontrada." }
   }
 
   if (profile?.role === "master") {
@@ -96,7 +96,7 @@ async function getAccessibleTrip(
   }
 
   if (!trip.agency_id) {
-    return { trip: null as TripRow | null, membership: null as AgencyMemberRow | null, error: "Voce nao tem permissao para usar o concierge desta viagem." }
+    return { trip: null as TripRow | null, membership: null as AgencyMemberRow | null, error: "Voc? n?o tem permiss?o para usar o concierge desta viagem." }
   }
 
   const membershipResult = await client
@@ -112,7 +112,7 @@ async function getAccessibleTrip(
   }
 
   if (!membershipResult.data) {
-    return { trip: null as TripRow | null, membership: null as AgencyMemberRow | null, error: "Voce nao tem permissao para usar o concierge desta viagem." }
+    return { trip: null as TripRow | null, membership: null as AgencyMemberRow | null, error: "Voc? n?o tem permiss?o para usar o concierge desta viagem." }
   }
 
   return { trip, membership: membershipResult.data as AgencyMemberRow, error: null }
@@ -134,7 +134,7 @@ async function getTripByLinkAccess(payload: {
 
   const trip = tripResult.data as TripRow | null
   if (!trip) {
-    return { trip: null as TripRow | null, membership: null as AgencyMemberRow | null, error: "Viagem nao encontrada." }
+    return { trip: null as TripRow | null, membership: null as AgencyMemberRow | null, error: "Viagem n?o ?ncontrada." }
   }
 
   if (payload.accessMode === "admin") {
@@ -142,14 +142,14 @@ async function getTripByLinkAccess(payload: {
     const slugMatches = Boolean(payload.tripSlug && trip.slug === payload.tripSlug)
 
     if (!tokenMatches && !slugMatches) {
-      return { trip: null as TripRow | null, membership: null as AgencyMemberRow | null, error: "Voce nao tem permissao para usar o concierge desta viagem." }
+      return { trip: null as TripRow | null, membership: null as AgencyMemberRow | null, error: "Voc? n?o tem permiss?o para usar o concierge desta viagem." }
     }
   } else {
     const tokenMatches = Boolean(payload.publicToken && trip.public_token === payload.publicToken)
     const slugMatches = Boolean(payload.tripSlug && trip.slug === payload.tripSlug && trip.visibility === "public")
 
     if (trip.visibility !== "public" || (!tokenMatches && !slugMatches)) {
-      return { trip: null as TripRow | null, membership: null as AgencyMemberRow | null, error: "Voce nao tem permissao para usar o concierge desta viagem." }
+      return { trip: null as TripRow | null, membership: null as AgencyMemberRow | null, error: "Voc? n?o tem permiss?o para usar o concierge desta viagem." }
     }
   }
 
@@ -283,13 +283,13 @@ async function fetchConversationHistory(
 export async function POST(request: Request) {
   if (!shouldUseSupabase()) {
     return NextResponse.json(
-      { error: "A IA operacional real so fica disponivel quando o Supabase estiver ativo." },
+      { error: "A IA operacional real so fica dispon?vel quando o Supabase estiver ativo." },
       { status: 503 }
     )
   }
 
   if (!hasSupabaseAdminEnv()) {
-    return NextResponse.json({ error: "A configuracao administrativa do billing traveler nao esta disponivel." }, { status: 503 })
+    return NextResponse.json({ error: "A configura??o administrativa do billing traveler n?o ?sta dispon?vel." }, { status: 503 })
   }
 
   const body = (await request.json().catch(() => null)) as ConciergeRequestBody | null
@@ -328,7 +328,7 @@ export async function POST(request: Request) {
 
   const supabase = await createSupabaseServerClient()
   if (!supabase) {
-    return NextResponse.json({ error: "Supabase server client indisponivel." }, { status: 503 })
+    return NextResponse.json({ error: "Supabase server client indispon?vel." }, { status: 503 })
   }
 
   const authResult = await supabase.auth.getUser()
@@ -352,7 +352,7 @@ export async function POST(request: Request) {
   if (user) {
     const profileResult = await getProfile(supabase, user.id)
     if (!profileResult.data) {
-      return NextResponse.json({ error: profileResult.error ?? "Perfil do usuario nao encontrado." }, { status: 403 })
+      return NextResponse.json({ error: profileResult.error ?? "Perfil do usuario n?o ?ncontrado." }, { status: 403 })
     }
 
     accessResult = await getAccessibleTrip(supabase, user.id, tripId, profileResult.data)
@@ -372,14 +372,14 @@ export async function POST(request: Request) {
     actingUserId = accessResult.trip?.owner_user_id ?? null
   }
   if (!accessResult.trip) {
-    return NextResponse.json({ error: accessResult.error ?? "Viagem nao encontrada." }, { status: 403 })
+    return NextResponse.json({ error: accessResult.error ?? "Viagem n?o ?ncontrada." }, { status: 403 })
   }
 
   const ownerType = accessResult.trip.agency_id ? "agency" : "traveler"
   const ownerId = ownerType === "agency" ? accessResult.trip.agency_id : actingUserId
 
   if (!ownerId) {
-    return NextResponse.json({ error: "Nao foi possivel identificar o saldo responsavel por esta chamada de IA." }, { status: 400 })
+    return NextResponse.json({ error: "N?o foi poss?vel identificar o saldo responsavel por esta chamada de IA." }, { status: 400 })
   }
 
   const balanceResult = await getCreditsBalance(dataClient, ownerType, ownerId)
@@ -391,7 +391,7 @@ export async function POST(request: Request) {
 
   if ((balanceResult.balance ?? 0) < creditsPerCall) {
     return NextResponse.json(
-      { error: "Saldo insuficiente. Adicione creditos antes de usar o concierge real." },
+      { error: "Saldo insuficiente. Adicione cr?ditos antes de usar o concierge real." },
       { status: 402 }
     )
   }
@@ -434,7 +434,7 @@ export async function POST(request: Request) {
 
   if (!conversationResult.conversationId) {
     return NextResponse.json(
-      { error: conversationResult.error ?? "Nao foi possivel iniciar a conversa real do concierge." },
+      { error: conversationResult.error ?? "N?o foi poss?vel iniciar a conversa real do concierge." },
       { status: 500 }
     )
   }
@@ -526,7 +526,7 @@ export async function POST(request: Request) {
           userInsert.error?.message ||
           assistantInsert.error?.message ||
           conversationUpdate.error?.message ||
-          "Nao foi possivel persistir o historico real do concierge.",
+          "N?o foi poss?vel persistir o historico real do concierge.",
       },
       { status: 500 }
     )
@@ -561,7 +561,7 @@ export async function POST(request: Request) {
 
   if (usageInsert.error) {
     console.error("[AI] usage log error", usageInsert.error)
-    warning = "A resposta foi gerada, mas o log operacional da IA ainda nao foi salvo. Revise o schema de ai_usage_logs."
+    warning = "A resposta foi gerada, mas o log operacional da IA ainda n?o foi salvo. Revise o schema de ai_usage_logs."
   }
 
   if (ownerType === "traveler" && actingUserId) {

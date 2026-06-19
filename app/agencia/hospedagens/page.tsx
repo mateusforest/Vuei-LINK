@@ -22,7 +22,7 @@ function sanitizeFileName(name: string) {
 }
 
 function formatShortDate(value?: string | null) {
-  if (!value) return "Nao informado"
+  if (!value) return "N?o informado"
   const parsed = new Date(value)
   if (Number.isNaN(parsed.getTime())) return value
   return parsed.toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" })
@@ -97,7 +97,7 @@ export default function AgencyHotelsPage() {
     if (!file) return
     const validation = validateDocumentFile(file)
     if (!validation.valid) {
-      setActionError(validation.error || "Arquivo invalido para voucher.")
+      setActionError(validation.error || "Arquivo inv?lido para voucher.")
       setActionNotice("")
       return
     }
@@ -110,14 +110,14 @@ export default function AgencyHotelsPage() {
   const handleOpenVoucher = async (hotel: TripHotelRecord) => {
     const linkedDocument = documents.find((document) => document.id === hotel.documentId)
     if (!linkedDocument) {
-      setActionError("Voucher nao encontrado para esta hospedagem.")
+      setActionError("Voucher n?o ?ncontrado para esta hospedagem.")
       return
     }
 
     if (linkedDocument.filePath) {
       const signedUrlResult = await getSignedDocumentUrl(linkedDocument.filePath)
       if (!signedUrlResult.data) {
-        setActionError(signedUrlResult.error || "Nao foi possivel abrir o voucher.")
+        setActionError(signedUrlResult.error || "N?o foi poss?vel abrir o voucher.")
         return
       }
 
@@ -130,7 +130,7 @@ export default function AgencyHotelsPage() {
       return
     }
 
-    setActionError("Voucher sem arquivo disponivel para abertura.")
+    setActionError("Voucher sem arquivo dispon?vel para abertura.")
   }
 
   const resetForm = () => {
@@ -147,7 +147,7 @@ export default function AgencyHotelsPage() {
 
   const handleSaveHotel = async () => {
     if (!agencyId || !user?.id) {
-      setActionError("Sessao da agencia indisponivel para cadastrar hospedagem.")
+      setActionError("Sessao da ag?ncia indispon?vel para cadastrar hospedagem.")
       return
     }
 
@@ -178,7 +178,7 @@ export default function AgencyHotelsPage() {
 
     if (!hotelResult.data) {
       setSaving(false)
-      setActionError(hotelResult.error || "Nao foi possivel salvar a hospedagem.")
+      setActionError(hotelResult.error || "N?o foi poss?vel salvar a hospedagem.")
       return
     }
 
@@ -191,7 +191,7 @@ export default function AgencyHotelsPage() {
       const uploadResult = await uploadDocumentFile({ file: voucherFile, path })
 
       if (!uploadResult.data) {
-        notice = "Hospedagem salva, mas o voucher nao foi anexado."
+        notice = "Hospedagem salva, mas o voucher n?o foi anexado."
       } else {
         const documentResult = await createDocumentMetadata({
           tripId: selectedTrip.id,
@@ -213,7 +213,7 @@ export default function AgencyHotelsPage() {
         })
 
         if (!documentResult.data) {
-          notice = "Hospedagem salva, mas o voucher nao foi vinculado."
+          notice = "Hospedagem salva, mas o voucher n?o foi vinculado."
         } else {
           const hotelWithVoucher = await updateTripHotel(savedHotel.id, {
             documentId: documentResult.data.id,
@@ -222,7 +222,7 @@ export default function AgencyHotelsPage() {
           if (hotelWithVoucher.data) {
             savedHotel = hotelWithVoucher.data
           } else {
-            notice = "Hospedagem salva, mas o voucher nao foi vinculado."
+            notice = "Hospedagem salva, mas o voucher n?o foi vinculado."
           }
         }
       }
@@ -312,7 +312,7 @@ export default function AgencyHotelsPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="hotelAddress">Endereco</Label>
+              <Label htmlFor="hotelAddress">Endereço</Label>
               <input
                 id="hotelAddress"
                 value={formData.address}
@@ -348,7 +348,7 @@ export default function AgencyHotelsPage() {
 
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="confirmationCode">Codigo da reserva</Label>
+              <Label htmlFor="confirmationCode">Código da reserva</Label>
                 <input
                   id="confirmationCode"
                   value={formData.confirmationCode}
@@ -371,13 +371,13 @@ export default function AgencyHotelsPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="hotelNotes">Observacoes</Label>
+              <Label htmlFor="hotelNotes">Observações</Label>
               <textarea
                 id="hotelNotes"
                 value={formData.notes}
                 onChange={(event) => setFormData((prev) => ({ ...prev, notes: event.target.value }))}
                 className="min-h-[96px] w-full rounded-xl border border-border/70 bg-white px-3 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary/40 focus:outline-none focus:ring-1 focus:ring-primary/40"
-                placeholder="Informacoes extras da hospedagem"
+                placeholder="Informações extras da hospedagem"
               />
             </div>
 
@@ -398,7 +398,7 @@ export default function AgencyHotelsPage() {
               <div>
                 <h2 className="text-lg font-semibold text-foreground">Hospedagens da viagem</h2>
                 <p className="text-sm text-muted-foreground">
-                  {selectedTripId ? "Acompanhe os dados que vao aparecer no link da viagem." : "Selecione uma viagem para visualizar as hospedagens."}
+                  {selectedTripId ? "Acompanhe os dados que vão aparecer no link da viagem." : "Selecione uma viagem para visualizar as hospedagens."}
                 </p>
               </div>
               <Search className="h-4 w-4 text-muted-foreground" />
@@ -427,7 +427,7 @@ export default function AgencyHotelsPage() {
                           <p className="truncate text-base font-semibold text-foreground">{hotel.name || "Hospedagem sem nome"}</p>
                           <div className="mt-1 flex items-center gap-2 text-sm text-muted-foreground">
                             <MapPin className="h-4 w-4 shrink-0" />
-                            <span className="line-clamp-2">{hotel.address || "Endereco nao informado"}</span>
+                            <span className="line-clamp-2">{hotel.address || "Endereço não informado"}</span>
                           </div>
                         </div>
                         {hotel.documentId ? (

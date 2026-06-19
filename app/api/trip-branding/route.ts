@@ -28,7 +28,7 @@ async function resolveTripByLinkAccess(params: {
   } else if (params.accessMode === "public" && params.publicToken) {
     query = query.eq("public_token", params.publicToken)
   } else {
-    return { trip: null as TripRow | null, error: "Link da viagem invalido." }
+    return { trip: null as TripRow | null, error: "Link da viagem inv?lido." }
   }
 
   const { data, error } = await query.maybeSingle()
@@ -38,7 +38,7 @@ async function resolveTripByLinkAccess(params: {
 
   const trip = data as TripRow | null
   if (!trip) {
-    return { trip: null as TripRow | null, error: "Viagem nao encontrada." }
+    return { trip: null as TripRow | null, error: "Viagem n?o ?ncontrada." }
   }
 
   if (params.accessMode === "admin") {
@@ -46,18 +46,18 @@ async function resolveTripByLinkAccess(params: {
     const slugMatches = Boolean(params.tripSlug && trip.slug === params.tripSlug)
 
     if (!tokenMatches && !slugMatches) {
-      return { trip: null as TripRow | null, error: "Acesso administrativo invalido para este link." }
+      return { trip: null as TripRow | null, error: "Acesso administrativo inv?lido para este link." }
     }
   } else {
     const tokenMatches = Boolean(params.publicToken && trip.public_token === params.publicToken)
     const slugMatches = Boolean(params.tripSlug && trip.slug === params.tripSlug && trip.visibility === "public")
 
     if (trip.visibility !== "public") {
-      return { trip: null as TripRow | null, error: "Esta viagem nao esta disponivel publicamente." }
+      return { trip: null as TripRow | null, error: "Esta viagem n?o ?sta dispon?vel publicamente." }
     }
 
     if (!tokenMatches && !slugMatches) {
-      return { trip: null as TripRow | null, error: "Acesso publico invalido para este link." }
+      return { trip: null as TripRow | null, error: "Acesso publico inv?lido para este link." }
     }
   }
 
@@ -107,7 +107,7 @@ async function resolveAgencyBranding(agencyId: string | null) {
 export async function GET(request: NextRequest) {
   try {
     if (!hasSupabaseAdminEnv()) {
-      return NextResponse.json({ error: "A configuracao administrativa do servidor nao esta disponivel no momento." }, { status: 503 })
+      return NextResponse.json({ error: "A configura??o administrativa do servidor n?o ?sta dispon?vel no momento." }, { status: 503 })
     }
 
     const url = new URL(request.url)
@@ -126,7 +126,7 @@ export async function GET(request: NextRequest) {
     })
 
     if (!accessResult.trip) {
-      return NextResponse.json({ error: accessResult.error ?? "Acesso invalido." }, { status: 403 })
+      return NextResponse.json({ error: accessResult.error ?? "Acesso inv?lido." }, { status: 403 })
     }
 
     const agencyBranding = await resolveAgencyBranding(accessResult.trip.agency_id)
@@ -143,9 +143,9 @@ export async function GET(request: NextRequest) {
     console.error("[TRIP][BRANDING] failed to resolve trip branding", error)
 
     if (isMissingSupabaseAdminEnvError(error)) {
-      return NextResponse.json({ error: "A configuracao administrativa do servidor nao esta disponivel no momento." }, { status: 503 })
+      return NextResponse.json({ error: "A configura??o administrativa do servidor n?o ?sta dispon?vel no momento." }, { status: 503 })
     }
 
-    return NextResponse.json({ error: error instanceof Error ? error.message : "Nao foi possivel carregar o branding da agencia." }, { status: 500 })
+    return NextResponse.json({ error: error instanceof Error ? error.message : "N?o foi poss?vel carregar o branding da ag?ncia." }, { status: 500 })
   }
 }

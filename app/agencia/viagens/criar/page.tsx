@@ -46,7 +46,7 @@ const travelStyles = [
   { id: "cultural", label: "Cultural", desc: "Museus, historia, gastronomia local" },
   { id: "relaxamento", label: "Relaxamento", desc: "Spas, praias, descanso" },
   { id: "lua-de-mel", label: "Romantica", desc: "Lua de mel, aniversarios" },
-  { id: "familia", label: "Familia", desc: "Atividades para todas idades" },
+  { id: "familia", label: "Família", desc: "Atividades para todas as idades" },
 ]
 
 function CreateTripPageContent() {
@@ -500,7 +500,7 @@ function CreateTripPageContent() {
               >
                 <h2 className="text-lg font-semibold text-foreground">Destino da Viagem</h2>
                 <div>
-                  <Label className="text-muted-foreground">Cidade e pais</Label>
+                  <Label className="text-muted-foreground">Cidade e país</Label>
                   <div className="relative">
                     <Input
                       value={formData.destination}
@@ -509,7 +509,7 @@ function CreateTripPageContent() {
                       onBlur={() => {
                         window.setTimeout(() => setDestinationMenuOpen(false), 120)
                       }}
-                      placeholder="Ex: Paris, Franca"
+                      placeholder="Ex: Paris, França"
                       className="mt-1.5 border-border/70 bg-white"
                     />
                     {destinationMenuOpen && destinationSuggestions.length > 0 ? (
@@ -527,7 +527,7 @@ function CreateTripPageContent() {
                               <p className="text-xs text-muted-foreground">{option.city} • {option.countryCode}</p>
                             </div>
                             <Badge variant="outline" className="border-border/60 bg-white">
-                              Canonico
+                              Canônico
                             </Badge>
                           </button>
                         ))}
@@ -536,7 +536,7 @@ function CreateTripPageContent() {
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-2 pt-2">
-                  {["Paris, Franca", "Tokyo, Japao", "Nova York, EUA", "Maldivas", "Dubai, Emirados", "Lisboa, Portugal", "Roma, Italia"].map((dest) => (
+                  {["Paris, França", "Tóquio, Japão", "Nova York, EUA", "Maldivas", "Dubai, Emirados", "Lisboa, Portugal", "Roma, Itália"].map((dest) => (
                     <Badge
                       key={dest}
                       variant="outline"
@@ -589,7 +589,7 @@ function CreateTripPageContent() {
                   </div>
                 </div>
                 {formData.startDate && formData.endDate && formData.endDate < formData.startDate ? (
-                  <p className="text-sm text-red-400">A data de volta nao pode ser anterior a data de ida.</p>
+                  <p className="text-sm text-red-400">A data de volta não pode ser anterior à data de ida.</p>
                 ) : null}
                 {tripDays ? (
                   <div className="rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 text-sm text-foreground">
@@ -636,7 +636,7 @@ function CreateTripPageContent() {
                   {[
                     { count: 1, label: "Sozinho" },
                     { count: 2, label: "Casal" },
-                    { count: 4, label: "Familia" },
+                    { count: 4, label: "Família" },
                     { count: 6, label: "Grupo" },
                   ].map((option) => (
                     <Badge
@@ -707,7 +707,7 @@ function CreateTripPageContent() {
               disabled={!canProceed() || isCreating}
               className="gap-2 bg-gradient-to-r from-primary to-accent text-white hover:opacity-90 disabled:opacity-50"
             >
-              {currentStep === steps.length ? (isCreating ? "Criando sua viagem..." : "Criar Viagem") : "Proximo"}
+              {currentStep === steps.length ? (isCreating ? "Criando sua viagem..." : "Criar viagem") : "Próximo"}
               {currentStep === steps.length ? <Check className="h-4 w-4" /> : <ArrowRight className="h-4 w-4" />}
             </Button>
           </div>
@@ -719,7 +719,7 @@ function CreateTripPageContent() {
 
 export default function CreateTripPage() {
   return (
-    <Suspense fallback={<div className="mx-auto max-w-2xl"><Card className="border-border/60 bg-white/88"><CardContent className="p-6">Carregando criacao da viagem...</CardContent></Card></div>}>
+    <Suspense fallback={<div className="mx-auto max-w-2xl"><Card className="border-border/60 bg-white/88"><CardContent className="p-6">Carregando criação da viagem...</CardContent></Card></div>}>
       <CreateTripPageContent />
     </Suspense>
   )

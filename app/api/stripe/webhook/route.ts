@@ -110,7 +110,7 @@ async function upsertTravelerSubscriptionFromStripeObject(subscription: Stripe.S
   }
 
   if (!userId) {
-    return { error: "Nao foi possivel identificar o traveler desta assinatura Stripe." }
+    return { error: "N?o foi poss?vel identificar o traveler desta assinatura Stripe." }
   }
 
   const result = await upsertTravelerSubscriptionFromStripe(adminClient, {
@@ -153,7 +153,7 @@ async function upsertAgencySubscriptionFromStripeObject(subscription: Stripe.Sub
   }
 
   if (!agencyId) {
-    return { error: "Nao foi possivel identificar a agencia desta assinatura Stripe." }
+    return { error: "N?o foi poss?vel identificar a ag?ncia desta assinatura Stripe." }
   }
 
   const result = await updateAgencySubscriptionFromStripe(adminClient, {
@@ -185,7 +185,7 @@ async function handleTravelerCreditPackageCheckoutCompleted(session: Stripe.Chec
   const selectedPackage = packageCode ? getTravelerCreditPackage(packageCode) : null
 
   if (!userId || !selectedPackage) {
-    return "Metadata incompleta para registrar a compra de creditos traveler."
+    return "Metadata incompleta para registrar a compra de cr?ditos traveler."
   }
 
   const adminClient = createSupabaseAdminClient()
@@ -244,7 +244,7 @@ async function handleAgencyCreditPackageCheckoutCompleted(session: Stripe.Checko
   const selectedPackage = packageCode ? getTravelerCreditPackage(packageCode) : null
 
   if (!agencyId || !userId || !selectedPackage) {
-    return "Metadata incompleta para registrar a compra de creditos da agencia."
+    return "Metadata incompleta para registrar a compra de cr?ditos da ag?ncia."
   }
 
   const adminClient = createSupabaseAdminClient()
@@ -313,7 +313,7 @@ async function handleSubscriptionCheckoutCompleted(session: Stripe.Checkout.Sess
 async function handleTravelerInvoicePaid(invoice: Stripe.Invoice, subscription: Stripe.Subscription) {
   const subscriptionResult = await upsertTravelerSubscriptionFromStripeObject(subscription)
   if (subscriptionResult.error || !subscriptionResult.data || !subscriptionResult.userId) {
-    return subscriptionResult.error ?? "Nao foi possivel sincronizar a assinatura traveler apos invoice.paid."
+    return subscriptionResult.error ?? "N?o foi poss?vel sincronizar a assinatura traveler apos invoice.paid."
   }
 
   const priceId = subscription.items.data[0]?.price?.id ?? null
@@ -325,7 +325,7 @@ async function handleTravelerInvoicePaid(invoice: Stripe.Invoice, subscription: 
   const adminClient = createSupabaseAdminClient()
   const { currentPeriodStart, currentPeriodEnd } = getStripeSubscriptionPeriod(subscription)
   if (!currentPeriodStart || !currentPeriodEnd) {
-    return "Nao foi possivel identificar o periodo da assinatura premium."
+    return "N?o foi poss?vel identificar o periodo da assinatura premium."
   }
 
   const grantResult = await grantTravelerPlanCycleFromInvoice(adminClient, {
@@ -344,7 +344,7 @@ async function handleTravelerInvoicePaid(invoice: Stripe.Invoice, subscription: 
 async function handleAgencyInvoicePaid(invoice: Stripe.Invoice, subscription: Stripe.Subscription) {
   const subscriptionResult = await upsertAgencySubscriptionFromStripeObject(subscription)
   if (subscriptionResult.error || !subscriptionResult.data || !subscriptionResult.agencyId) {
-    return subscriptionResult.error ?? "Nao foi possivel sincronizar a assinatura da agencia apos invoice.paid."
+    return subscriptionResult.error ?? "N?o foi poss?vel sincronizar a assinatura da ag?ncia apos invoice.paid."
   }
 
   const priceId = subscription.items.data[0]?.price?.id ?? null
@@ -355,13 +355,13 @@ async function handleAgencyInvoicePaid(invoice: Stripe.Invoice, subscription: St
 
   const { currentPeriodStart, currentPeriodEnd } = getStripeSubscriptionPeriod(subscription)
   if (!currentPeriodStart || !currentPeriodEnd) {
-    return "Nao foi possivel identificar o periodo da assinatura da agencia."
+    return "N?o foi poss?vel identificar o periodo da assinatura da ag?ncia."
   }
 
   const adminClient = createSupabaseAdminClient()
   const existingSubscription = await findAgencySubscriptionByStripeSubscriptionId(adminClient, subscription.id)
   if (existingSubscription.error || !existingSubscription.data) {
-    return existingSubscription.error ?? "Nao foi possivel localizar a subscription canonica da agencia."
+    return existingSubscription.error ?? "N?o foi poss?vel localizar a subscription canonica da ag?ncia."
   }
 
   const cycleResult = await createAgencyPlanCreditCycleFromInvoice(adminClient, {
@@ -426,7 +426,7 @@ async function handleSubscriptionLifecycleEvent(subscription: Stripe.Subscriptio
 
 export async function POST(request: Request) {
   if (!hasSupabaseAdminEnv()) {
-    return NextResponse.json({ error: "Supabase admin env indisponivel para o webhook Stripe." }, { status: 503 })
+    return NextResponse.json({ error: "Supabase admin env indispon?vel para o webhook Stripe." }, { status: 503 })
   }
 
   const signature = request.headers.get("stripe-signature")

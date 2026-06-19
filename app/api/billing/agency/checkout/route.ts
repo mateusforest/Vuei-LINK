@@ -15,43 +15,43 @@ interface AgencyCheckoutBody {
 
 function getAgencyPlanCheckoutUnavailableMessage(planCode: AgencyCheckoutBody["planCode"]) {
   if (planCode === "start") {
-    return "Pagamentos ainda nao configurados para o plano Start."
+    return "Pagamentos ainda n?o configurados para o plano Start."
   }
 
   if (planCode === "pro") {
-    return "Pagamentos ainda nao configurados para o plano Pro."
+    return "Pagamentos ainda n?o configurados para o plano Pro."
   }
 
-  return "Pagamentos ainda nao configurados para o plano Business."
+  return "Pagamentos ainda n?o configurados para o plano Business."
 }
 
 export async function POST(request: Request) {
   if (!shouldUseSupabase()) {
-    return NextResponse.json({ error: "Billing da agencia so fica disponivel com Supabase ativo." }, { status: 503 })
+    return NextResponse.json({ error: "Billing da ag?ncia so fica dispon?vel com Supabase ativo." }, { status: 503 })
   }
 
   if (!hasSupabaseAdminEnv()) {
-    return NextResponse.json({ error: "A configuracao administrativa do billing da agencia nao esta disponivel." }, { status: 503 })
+    return NextResponse.json({ error: "A configura??o administrativa do billing da ag?ncia n?o ?sta dispon?vel." }, { status: 503 })
   }
 
   const body = (await request.json().catch(() => null)) as AgencyCheckoutBody | null
   if (!body?.planCode || !["start", "pro", "business"].includes(body.planCode)) {
-    return NextResponse.json({ error: "Plano invalido. O checkout da agencia aceita apenas Start, Pro ou Business." }, { status: 400 })
+    return NextResponse.json({ error: "Plano inv?lido. O checkout da ag?ncia aceita apenas Start, Pro ou Business." }, { status: 400 })
   }
 
   const supabase = await createSupabaseServerClient()
   if (!supabase) {
-    return NextResponse.json({ error: "Supabase server client indisponivel." }, { status: 503 })
+    return NextResponse.json({ error: "Supabase server client indispon?vel." }, { status: 503 })
   }
 
   const adminClient = createSupabaseAdminClient()
   const actorResult = await resolveAgencyBillingActor(supabase, adminClient)
   if (actorResult.error || !actorResult.data) {
-    return NextResponse.json({ error: actorResult.error ?? "Nao foi possivel validar o billing da agencia." }, { status: actorResult.status ?? 500 })
+    return NextResponse.json({ error: actorResult.error ?? "N?o foi poss?vel validar o billing da ag?ncia." }, { status: actorResult.status ?? 500 })
   }
 
   if (!actorResult.data.canManageBilling) {
-    return NextResponse.json({ error: "Apenas owner ou admin da agencia podem iniciar um upgrade." }, { status: 403 })
+    return NextResponse.json({ error: "Apenas owner ou admin da ag?ncia podem iniciar um upgrade." }, { status: 403 })
   }
 
   try {
@@ -66,7 +66,7 @@ export async function POST(request: Request) {
     })
 
     if (customerResult.error || !customerResult.customerId) {
-      return NextResponse.json({ error: customerResult.error ?? "Nao foi possivel preparar o cliente Stripe da agencia." }, { status: 500 })
+      return NextResponse.json({ error: customerResult.error ?? "N?o foi poss?vel preparar o cliente Stripe da ag?ncia." }, { status: 500 })
     }
 
     const session = await createAgencySubscriptionCheckout({
@@ -78,12 +78,12 @@ export async function POST(request: Request) {
     })
 
     if (!session.url) {
-      return NextResponse.json({ error: "O Stripe nao retornou uma URL de checkout valida." }, { status: 500 })
+      return NextResponse.json({ error: "O Stripe n?o retornou uma URL de checkout valida." }, { status: 500 })
     }
 
     return NextResponse.json({ url: session.url })
   } catch (error) {
-    const technicalMessage = error instanceof Error ? error.message : "Nao foi possivel iniciar o checkout da agencia."
+    const technicalMessage = error instanceof Error ? error.message : "N?o foi poss?vel iniciar o checkout da ag?ncia."
     const normalizedMessage = technicalMessage.toLowerCase()
     const priceIssue =
       normalizedMessage.startsWith("missing required env:") ||

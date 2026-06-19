@@ -53,8 +53,8 @@ function MasterAgenciasPageContent() {
     : []
 
   const pageStats = [
-    { label: "Total Agencias", value: stats.totalAgencies.toString(), icon: Building2 },
-    { label: "Agencias Ativas", value: stats.activeAgencies.toString(), icon: Building2 },
+    { label: "Total de agências", value: stats.totalAgencies.toString(), icon: Building2 },
+    { label: "Agências ativas", value: stats.activeAgencies.toString(), icon: Building2 },
     { label: "Clientes", value: stats.totalClients.toString(), icon: Users },
     { label: "Viagens", value: stats.totalTrips.toString(), icon: Plane },
   ]
@@ -160,7 +160,7 @@ function MasterAgenciasPageContent() {
       </AnimatePresence>
 
       <motion.div variants={fadeInUp} className="space-y-1">
-        <h1 className="text-2xl lg:text-3xl font-bold text-foreground tracking-tight">Agencias</h1>
+        <h1 className="text-2xl lg:text-3xl font-bold text-foreground tracking-tight">Agências</h1>
         <p className="text-sm text-muted-foreground">Leitura real de agências e memberships do Supabase</p>
       </motion.div>
 
@@ -218,7 +218,7 @@ function MasterAgenciasPageContent() {
             <table className="w-full">
               <thead>
                 <tr className="border-b border-white/5">
-                  <th className="text-left text-xs font-medium text-muted-foreground px-6 py-4">Agencia</th>
+                  <th className="text-left text-xs font-medium text-muted-foreground px-6 py-4">Agência</th>
                   <th className="text-left text-xs font-medium text-muted-foreground px-6 py-4">Responsavel</th>
                   <th className="text-left text-xs font-medium text-muted-foreground px-6 py-4">Plano</th>
                   <th className="text-left text-xs font-medium text-muted-foreground px-6 py-4">Criado em</th>

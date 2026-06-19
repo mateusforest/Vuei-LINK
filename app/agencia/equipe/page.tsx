@@ -98,7 +98,7 @@ export default function TeamPage() {
       if (result.error === AGENCY_TEAM_LIMIT_ERROR) {
         return
       }
-      window.alert(result.error || "Nao foi possivel vincular o membro a agencia.")
+      window.alert(result.error || "Não foi possível vincular o membro à agência.")
       return
     }
 
@@ -111,14 +111,14 @@ export default function TeamPage() {
   const handleResendInvite = async (id: string) => {
     const result = await updateTeamMember(id, { status: "active" })
     if (!result.success) {
-      window.alert(result.error || "Nao foi possivel atualizar o membro.")
+      window.alert(result.error || "Não foi possível atualizar o membro.")
     }
   }
 
   const handleCancelInvite = async (id: string) => {
     const result = await removeTeamMember(id)
     if (!result.success) {
-      window.alert(result.error || "Nao foi possivel desativar o membro.")
+      window.alert(result.error || "Não foi possível desativar o membro.")
     }
   }
 
@@ -346,7 +346,7 @@ export default function TeamPage() {
               </div>
             </div>
             <p className="text-xs text-muted-foreground">
-              Convite de novo usuario ainda depende de fluxo de convite. Por enquanto, so e possivel vincular emails que ja existem em profiles.
+              O convite de novo usuário ainda depende do fluxo de convite. Por enquanto, só é possível vincular e-mails que já existem em perfis.
             </p>
             <div className="flex gap-3">
               <Button

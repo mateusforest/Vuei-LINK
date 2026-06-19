@@ -98,14 +98,14 @@ async function getTripByAdminAccess(
 
   const trip = data as TripRow | null
   if (!trip) {
-    return { trip: null as TripRow | null, membership: null as AgencyMemberRow | null, error: "Viagem nao encontrada." }
+    return { trip: null as TripRow | null, membership: null as AgencyMemberRow | null, error: "Viagem n?o ?ncontrada." }
   }
 
   const tokenMatches = Boolean(payload.adminToken && trip.admin_token === payload.adminToken)
   const slugMatches = Boolean(payload.tripSlug && trip.slug === payload.tripSlug)
 
   if (!tokenMatches && !slugMatches) {
-    return { trip: null as TripRow | null, membership: null as AgencyMemberRow | null, error: "Voce nao tem permissao para gerar roteiros desta viagem." }
+    return { trip: null as TripRow | null, membership: null as AgencyMemberRow | null, error: "Voc? n?o tem permiss?o para gerar roteiros desta viagem." }
   }
 
   return { trip, membership: null as AgencyMemberRow | null, error: null }
@@ -134,7 +134,7 @@ async function getAccessibleTrip(
 
   const trip = tripResult.data as TripRow | null
   if (!trip) {
-    return { trip: null as TripRow | null, membership: null as AgencyMemberRow | null, error: "Viagem nao encontrada." }
+    return { trip: null as TripRow | null, membership: null as AgencyMemberRow | null, error: "Viagem n?o ?ncontrada." }
   }
 
   if (profile?.role === "master" || trip.owner_user_id === userId) {
@@ -142,7 +142,7 @@ async function getAccessibleTrip(
   }
 
   if (!trip.agency_id) {
-    return { trip: null as TripRow | null, membership: null as AgencyMemberRow | null, error: "Voce nao tem permissao para gerar roteiros desta viagem." }
+    return { trip: null as TripRow | null, membership: null as AgencyMemberRow | null, error: "Voc? n?o tem permiss?o para gerar roteiros desta viagem." }
   }
 
   const membershipResult = await client
@@ -158,7 +158,7 @@ async function getAccessibleTrip(
   }
 
   if (!membershipResult.data || !["owner", "admin", "member"].includes(membershipResult.data.role)) {
-    return { trip: null as TripRow | null, membership: null as AgencyMemberRow | null, error: "Voce nao tem permissao para gerar roteiros desta viagem." }
+    return { trip: null as TripRow | null, membership: null as AgencyMemberRow | null, error: "Voc? n?o tem permiss?o para gerar roteiros desta viagem." }
   }
 
   return { trip, membership: membershipResult.data as AgencyMemberRow, error: null }
@@ -198,7 +198,7 @@ async function getCreditsBalance(
 }
 
 function buildTravelerName(params: { trip: TripRow; ownerProfile: ProfileRow | null; client: ClientRow | null }) {
-  return params.client?.name ?? params.ownerProfile?.name ?? (params.trip.travelers_count > 1 ? `${params.trip.travelers_count} viajantes` : "Viajante")
+  return params.client?.name ?? params.ownerProfile?.name ?? (params.trip.travelers_count > 1 ? `${params.trip.travelers_count} viaj?ntes` : "Viaj?nte")
 }
 
 function buildTripContext(params: {
@@ -209,10 +209,10 @@ function buildTripContext(params: {
 }) {
   const { trip, documents, hotels, flights } = params
   const hotelsSummary = hotels.length
-    ? hotels.map((hotel) => `${hotel.name ?? hotel.hotel_name ?? "Hospedagem"} (${hotel.check_in ?? "check-in nao informado"} -> ${hotel.check_out ?? "check-out nao informado"})`).join("; ")
+    ? hotels.map((hotel) => `${hotel.name ?? hotel.hotel_name ?? "Hospedagem"} (${hotel.check_in ?? "check-in n?o informado"} -> ${hotel.check_out ?? "check-out n?o informado"})`).join("; ")
     : "Nenhuma hospedagem adicionada."
   const flightsSummary = flights.length
-    ? flights.map((flight) => `${flight.airline ?? "Companhia nao informada"} ${flight.flight_number ?? ""} ${flight.origin_airport ?? ""} -> ${flight.destination_airport ?? ""}`.trim()).join("; ")
+    ? flights.map((flight) => `${flight.airline ?? "Companhia n?o informada"} ${flight.flight_number ?? ""} ${flight.origin_airport ?? ""} -> ${flight.destination_airport ?? ""}`.trim()).join("; ")
     : "Nenhuma passagem adicionada."
   const documentsSummary = documents.length
     ? documents.map((document) => `${document.name} [${document.type}]${document.is_private ? " (privado)" : ""}`).join("; ")
@@ -221,14 +221,14 @@ function buildTripContext(params: {
   return [
     `Viagem: ${trip.title}`,
     `Destino: ${trip.destination}${trip.city ? `, ${trip.city}` : ""}${trip.country ? `, ${trip.country}` : ""}`,
-    `Periodo: ${trip.start_date ?? "nao informado"} ate ${trip.end_date ?? "nao informado"}`,
+    `Periodo: ${trip.start_date ?? "n?o informado"} ate ${trip.end_date ?? "n?o informado"}`,
     `Status: ${trip.status}`,
-    `Estilo: ${trip.style ?? "nao informado"}`,
-    `Quantidade de viajantes: ${trip.travelers_count}`,
+    `Estilo: ${trip.style ?? "n?o informado"}`,
+    `Quantidade de viaj?ntes: ${trip.travelers_count}`,
     `Hospedagens: ${hotelsSummary}`,
     `Passagens: ${flightsSummary}`,
     `Documentos: ${documentsSummary}`,
-    "Quando faltar informacao critica, mantenha null ou trate como sugestao geral.",
+    "Quando faltar informa??o critica, mantenha null ou trate como sugest?o geral.",
   ].join("\n")
 }
 
@@ -275,7 +275,7 @@ async function updateItinerary(
 
 export async function POST(request: Request) {
   if (!shouldUseSupabase()) {
-    return NextResponse.json({ error: "A geracao operacional real de roteiros so fica disponivel quando o Supabase estiver ativo." }, { status: 503 })
+    return NextResponse.json({ error: "A gera??o operacional real de roteiros so fica dispon?vel quando o Supabase estiver ativo." }, { status: 503 })
   }
 
   const body = (await request.json().catch(() => null)) as GenerateItineraryRequestBody | null
@@ -303,14 +303,14 @@ export async function POST(request: Request) {
     })
 
     return NextResponse.json(
-      { error: "A configuracao administrativa do servidor nao esta disponivel no momento." },
+      { error: "A configura??o administrativa do servidor n?o ?sta dispon?vel no momento." },
       { status: 503 },
     )
   }
 
   const supabase = adminAccessRequested ? createSupabaseAdminClient() : await createSupabaseServerClient()
   if (!supabase) {
-    return NextResponse.json({ error: "Supabase server client indisponivel." }, { status: 503 })
+    return NextResponse.json({ error: "Supabase server client indispon?vel." }, { status: 503 })
   }
 
   let actingUserId: string | null = null
@@ -331,7 +331,7 @@ export async function POST(request: Request) {
 
     const profileResult = await getProfile(supabase, authData.user.id)
     if (!profileResult.data) {
-      return NextResponse.json({ error: profileResult.error ?? "Perfil do usuario nao encontrado." }, { status: 403 })
+      return NextResponse.json({ error: profileResult.error ?? "Perfil do usuario n?o ?ncontrado." }, { status: 403 })
     }
 
     actingProfile = profileResult.data
@@ -339,7 +339,7 @@ export async function POST(request: Request) {
     actingUserId = authData.user.id
   }
   if (!accessResult.trip) {
-    return NextResponse.json({ error: accessResult.error ?? "Viagem nao encontrada." }, { status: 403 })
+    return NextResponse.json({ error: accessResult.error ?? "Viagem n?o ?ncontrada." }, { status: 403 })
   }
 
   const ownerType = accessResult.trip.agency_id ? "agency" : "traveler"
@@ -347,7 +347,7 @@ export async function POST(request: Request) {
   const actingOwnerUserId = actingUserId ?? accessResult.trip.owner_user_id ?? null
   const fileOwnerKey = accessResult.trip.owner_user_id ?? accessResult.trip.agency_id ?? accessResult.trip.id
   if (!ownerId) {
-    return NextResponse.json({ error: "Nao foi possivel identificar o responsavel pelos creditos desta geracao." }, { status: 400 })
+    return NextResponse.json({ error: "N?o foi poss?vel identificar o responsavel pelos cr?ditos desta gera??o." }, { status: 400 })
   }
 
   const creditCost = mode === "simple" ? getSimpleItineraryCreditCost() : getCompleteItineraryCreditCost()
@@ -373,7 +373,7 @@ export async function POST(request: Request) {
   )
 
   if (!generatingRecord.data) {
-    return NextResponse.json({ error: generatingRecord.error ?? "Nao foi possivel iniciar a geracao do roteiro." }, { status: 500 })
+    return NextResponse.json({ error: generatingRecord.error ?? "N?o foi poss?vel iniciar a gera??o do roteiro." }, { status: 500 })
   }
 
   logItineraryDev("generation_started", {
@@ -427,7 +427,7 @@ export async function POST(request: Request) {
       },
     })
 
-    return NextResponse.json({ error: aiResult.error ?? "A IA nao foi chamada para gerar o roteiro." }, { status: 503 })
+    return NextResponse.json({ error: aiResult.error ?? "A IA n?o foi chamada para gerar o roteiro." }, { status: 503 })
   }
 
   const usageMetadata: JsonObject = {
@@ -463,7 +463,7 @@ export async function POST(request: Request) {
       metadata: usageMetadata,
     })
 
-    return NextResponse.json({ error: aiResult.error ?? "Nao foi possivel gerar o roteiro." }, { status: 422 })
+    return NextResponse.json({ error: aiResult.error ?? "N?o foi poss?vel gerar o roteiro." }, { status: 422 })
   }
 
   let document: DocumentRow | null = null
@@ -623,7 +623,7 @@ export async function POST(request: Request) {
         status: "failed",
         content: {
           ...aiResult.data,
-          error: signedPdfResult.error?.message || "Nao foi possivel validar o PDF salvo no Storage.",
+          error: signedPdfResult.error?.message || "N?o foi poss?vel validar o PDF salvo no Storage.",
         },
       })
 
@@ -640,11 +640,11 @@ export async function POST(request: Request) {
         status: "failed",
         metadata: {
           ...usageMetadata,
-          signed_url_error: signedPdfResult.error?.message || "Nao foi possivel validar o PDF salvo no Storage.",
+          signed_url_error: signedPdfResult.error?.message || "N?o foi poss?vel validar o PDF salvo no Storage.",
         },
       })
 
-      return NextResponse.json({ error: signedPdfResult.error?.message || "Nao foi possivel validar o PDF salvo no Storage." }, { status: 500 })
+      return NextResponse.json({ error: signedPdfResult.error?.message || "N?o foi poss?vel validar o PDF salvo no Storage." }, { status: 500 })
     }
 
     const documentInsert = await supabase
@@ -679,7 +679,7 @@ export async function POST(request: Request) {
         status: "failed",
         content: {
           ...aiResult.data,
-          error: documentInsert.error?.message || "Nao foi possivel registrar o PDF do roteiro.",
+          error: documentInsert.error?.message || "N?o foi poss?vel registrar o PDF do roteiro.",
         },
       })
 
@@ -696,11 +696,11 @@ export async function POST(request: Request) {
         status: "failed",
         metadata: {
           ...usageMetadata,
-          document_error: documentInsert.error?.message || "Nao foi possivel registrar o PDF do roteiro.",
+          document_error: documentInsert.error?.message || "N?o foi poss?vel registrar o PDF do roteiro.",
         },
       })
 
-      return NextResponse.json({ error: documentInsert.error?.message || "Nao foi possivel registrar o PDF do roteiro." }, { status: 500 })
+      return NextResponse.json({ error: documentInsert.error?.message || "N?o foi poss?vel registrar o PDF do roteiro." }, { status: 500 })
     }
 
     document = documentInsert.data as DocumentRow
@@ -737,7 +737,7 @@ export async function POST(request: Request) {
         },
       })
 
-      return NextResponse.json({ error: `Falha na geracao do PDF do roteiro: ${message}` }, { status: 500 })
+      return NextResponse.json({ error: `Falha na gera??o do PDF do roteiro: ${message}` }, { status: 500 })
     }
   }
 
@@ -763,11 +763,11 @@ export async function POST(request: Request) {
       status: "failed",
       metadata: {
         ...usageMetadata,
-        finalize_error: itineraryUpdate.error ?? "Nao foi possivel finalizar o roteiro gerado.",
+        finalize_error: itineraryUpdate.error ?? "N?o foi poss?vel finalizar o roteiro gerado.",
       },
     })
 
-    return NextResponse.json({ error: itineraryUpdate.error ?? "Nao foi possivel finalizar o roteiro gerado." }, { status: 500 })
+    return NextResponse.json({ error: itineraryUpdate.error ?? "N?o foi poss?vel finalizar o roteiro gerado." }, { status: 500 })
   }
 
   logItineraryDev("itinerary_updated", {
@@ -800,7 +800,7 @@ export async function POST(request: Request) {
     const consumeResult = await consumeTravelerCredits(adminClient, {
       userId: actingOwnerUserId,
       amount: creditCost,
-      reason: `Geracao de roteiro ${mode === "simple" ? "simples" : "completo"} para a viagem`,
+      reason: `Gera??o de roteiro ${mode === "simple" ? "simples" : "completo"} para a viagem`,
       source: "ai_itinerary_generation",
       metadata: {
         module: "itinerary",
@@ -821,7 +821,7 @@ export async function POST(request: Request) {
     const consumeResult = await consumeAgencyCredits(adminClient, {
       agencyId: accessResult.trip.agency_id ?? "",
       amount: creditCost,
-      reason: `Geracao de roteiro ${mode === "simple" ? "simples" : "completo"} para a viagem`,
+      reason: `Gera??o de roteiro ${mode === "simple" ? "simples" : "completo"} para a viagem`,
       source: "ai_itinerary_generation",
       metadata: {
         module: "itinerary",

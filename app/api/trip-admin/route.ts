@@ -120,14 +120,14 @@ async function resolveTripAdminAccess(params: {
 
   const trip = data as TripRow | null
   if (!trip) {
-    return { supabase, trip: null as TripRow | null, error: "Viagem administrativa nao encontrada." }
+    return { supabase, trip: null as TripRow | null, error: "Viagem administrativa n?o ?ncontrada." }
   }
 
   const tokenMatches = Boolean(params.adminToken && trip.admin_token === params.adminToken)
   const slugMatches = Boolean(params.tripSlug && trip.slug === params.tripSlug)
 
   if (!tokenMatches && !slugMatches) {
-    return { supabase, trip: null as TripRow | null, error: "Acesso administrativo invalido para esta viagem." }
+    return { supabase, trip: null as TripRow | null, error: "Acesso administrativo inv?lido para esta viagem." }
   }
 
   return { supabase, trip, error: null as string | null }
@@ -135,7 +135,7 @@ async function resolveTripAdminAccess(params: {
 
 function getMissingAdminConfigResponse() {
   return NextResponse.json(
-    { error: "A configuracao administrativa do servidor nao esta disponivel no momento." },
+    { error: "A configura??o administrativa do servidor n?o ?sta dispon?vel no momento." },
     { status: 503 },
   )
 }
@@ -185,7 +185,7 @@ export async function GET(request: NextRequest) {
 
     const { supabase, trip, error } = await resolveTripAdminAccess({ tripId, tripSlug, adminToken })
     if (error || !trip) {
-      return NextResponse.json({ error: error ?? "Acesso administrativo invalido." }, { status: 403 })
+      return NextResponse.json({ error: error ?? "Acesso administrativo inv?lido." }, { status: 403 })
     }
 
     const [documentsResult, flightsResult, hotelsResult, itinerariesResult] = await Promise.all([
@@ -217,7 +217,7 @@ export async function GET(request: NextRequest) {
       return getMissingAdminConfigResponse()
     }
 
-    const message = error instanceof Error ? error.message : "Nao foi possivel carregar os dados administrativos da viagem."
+    const message = error instanceof Error ? error.message : "N?o foi poss?vel carregar os dados administrativos da viagem."
     console.error("[TRIP ADMIN] get error", message)
     return NextResponse.json({ error: message }, { status: 500 })
   }
@@ -249,11 +249,11 @@ export async function POST(request: NextRequest) {
 
       const { supabase, trip, error } = await resolveTripAdminAccess({ tripId, tripSlug, adminToken })
       if (error || !trip) {
-        return NextResponse.json({ error: error ?? "Acesso administrativo invalido." }, { status: 403 })
+        return NextResponse.json({ error: error ?? "Acesso administrativo inv?lido." }, { status: 403 })
       }
 
       if (!(file instanceof File)) {
-        return NextResponse.json({ error: "Arquivo obrigatorio para esta acao." }, { status: 400 })
+        return NextResponse.json({ error: "Arquivo obrigatorio para esta a??o." }, { status: 400 })
       }
 
       if (action === "uploadDocument") {
@@ -403,7 +403,7 @@ export async function POST(request: NextRequest) {
 
     const { supabase, trip, error } = await resolveTripAdminAccess({ tripId, tripSlug, adminToken })
     if (error || !trip) {
-      return NextResponse.json({ error: error ?? "Acesso administrativo invalido." }, { status: 403 })
+      return NextResponse.json({ error: error ?? "Acesso administrativo inv?lido." }, { status: 403 })
     }
 
     if (action === "saveHotel") {
@@ -574,7 +574,7 @@ export async function POST(request: NextRequest) {
       return getMissingAdminConfigResponse()
     }
 
-    const message = error instanceof Error ? error.message : "Nao foi possivel concluir esta acao administrativa."
+    const message = error instanceof Error ? error.message : "N?o foi poss?vel concluir esta a??o administrativa."
     console.error("[TRIP ADMIN] post error", message)
     return NextResponse.json({ error: message }, { status: 500 })
   }

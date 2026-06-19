@@ -252,7 +252,7 @@ export default function CriarViagemPage() {
           setErrorMessage(result.error)
           return
         } else {
-          setErrorMessage("Nao foi possivel criar a viagem no Supabase.")
+          setErrorMessage("N?o foi poss?vel criar a viagem no Supabase.")
           return
         }
       } else if (shouldUseSupabase() && !user) {
@@ -461,7 +461,7 @@ export default function CriarViagemPage() {
               </div>
 
               {formData.startDate && formData.endDate && formData.endDate < formData.startDate ? (
-                <p className="text-sm text-red-400">A data de volta nao pode ser anterior a data de ida.</p>
+                <p className="text-sm text-red-400">A data de volta n?o pode ser anterior a data de ida.</p>
               ) : null}
 
               {tripDays ? (
@@ -526,7 +526,7 @@ export default function CriarViagemPage() {
           {step === 5 && !isComplete && (
             <motion.div key="step5" {...fadeInUp} className="space-y-6">
               <div className="space-y-2">
-                <h2 className="text-2xl font-bold">Quem vai viajar com voce?</h2>
+                <h2 className="text-2xl font-bold">Quem vai viaj?r com voce?</h2>
                 <p className="text-muted-foreground">
                   Selecione o tipo de grupo.
                 </p>

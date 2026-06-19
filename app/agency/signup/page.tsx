@@ -109,7 +109,7 @@ export default function AgencySignupPage() {
       }
 
       if (!result.user) {
-        setErrors((prev) => ({ ...prev, auth: "Nao foi possivel iniciar a sessao apos o cadastro." }))
+        setErrors((prev) => ({ ...prev, auth: "Não foi possível iniciar a sessão após o cadastro." }))
         return
       }
 
@@ -123,7 +123,7 @@ export default function AgencySignupPage() {
 
       if ("error" in agencyResult && agencyResult.error) {
         console.error("[AUTH ERROR]", agencyResult.error)
-        setErrors((prev) => ({ ...prev, auth: agencyResult.error ?? "Nao foi possivel criar a agencia." }))
+        setErrors((prev) => ({ ...prev, auth: agencyResult.error ?? "Não foi possível criar a agência." }))
         return
       }
 

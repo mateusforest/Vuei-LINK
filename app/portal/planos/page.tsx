@@ -41,7 +41,7 @@ export default function PortalPlanosPage() {
 
     const result = await createTravelerPremiumCheckout()
     if (result.error || !result.data?.url) {
-      setActionError(result.error ?? "Nao foi possivel iniciar o checkout Premium.")
+      setActionError(result.error ?? "Não foi possível iniciar o checkout do Premium.")
       setPremiumLoading(false)
       return
     }
@@ -55,7 +55,7 @@ export default function PortalPlanosPage() {
 
     const result = await createTravelerCreditsCheckout(packageCode)
     if (result.error || !result.data?.url) {
-      setActionError(result.error ?? "Nao foi possivel iniciar o checkout de creditos.")
+      setActionError(result.error ?? "Não foi possível iniciar o checkout de créditos.")
       setPackageLoading(null)
       return
     }
@@ -69,7 +69,7 @@ export default function PortalPlanosPage() {
 
     const result = await createTravelerCustomerPortal()
     if (result.error || !result.data?.url) {
-      setActionError(result.error ?? "Nao foi possivel abrir o portal de assinatura.")
+      setActionError(result.error ?? "Não foi possível abrir o portal de assinatura.")
       setPortalLoading(false)
       return
     }
@@ -88,9 +88,9 @@ export default function PortalPlanosPage() {
         </Button>
 
         <div>
-          <h1 className="text-3xl font-bold">Planos e Creditos</h1>
+          <h1 className="text-3xl font-bold">Planos e créditos</h1>
           <p className="text-sm text-muted-foreground">
-            Escolha o plano ideal para suas viagens e acompanhe seu consumo de creditos.
+            Escolha o plano ideal para suas viagens e acompanhe seu consumo de créditos.
           </p>
         </div>
 
@@ -104,20 +104,20 @@ export default function PortalPlanosPage() {
 
           {subscription.currentPeriodEnd ? (
             <Badge variant="secondary" className="border-border/50 bg-card/60 text-muted-foreground">
-              Ciclo atual ate {new Date(subscription.currentPeriodEnd).toLocaleDateString("pt-BR")}
+              Ciclo atual até {new Date(subscription.currentPeriodEnd).toLocaleDateString("pt-BR")}
             </Badge>
           ) : null}
         </div>
 
         {checkoutStatus === "success" ? (
           <Card className="border-emerald-500/20 bg-emerald-500/10 p-4 text-sm text-emerald-300">
-            Checkout concluido. O billing so e atualizado quando o webhook real do Stripe confirma o pagamento.
+            Checkout concluído. A assinatura só é atualizada quando o webhook do Stripe confirma o pagamento.
           </Card>
         ) : null}
 
         {checkoutStatus === "canceled" ? (
           <Card className="border-amber-500/20 bg-amber-500/10 p-4 text-sm text-amber-300">
-            Checkout cancelado. Nenhuma alteracao foi aplicada ao billing.
+            Checkout cancelado. Nenhuma alteração foi aplicada à assinatura.
           </Card>
         ) : null}
 
@@ -154,7 +154,7 @@ export default function PortalPlanosPage() {
           </div>
 
           <Button disabled={subscription.code === "free"} className="mt-auto w-full rounded-xl bg-muted/50 text-foreground hover:bg-muted">
-            Comecar gratis
+            Começar grátis
           </Button>
         </Card>
 
@@ -195,9 +195,9 @@ export default function PortalPlanosPage() {
               <Coins size={20} className="text-primary" />
             </div>
             <div>
-              <h2 className="text-xl font-semibold">Precisa de mais creditos?</h2>
+              <h2 className="text-xl font-semibold">Precisa de mais créditos?</h2>
               <p className="text-sm text-muted-foreground">
-                Compre creditos adicionais e utilize quando precisar.
+                Compre créditos adicionais e use quando precisar.
               </p>
             </div>
           </div>
@@ -210,7 +210,7 @@ export default function PortalPlanosPage() {
                   {pkg.code === "popular" ? <Badge className="bg-primary text-primary-foreground">Popular</Badge> : null}
                 </div>
                 <p className="text-[2rem] font-bold leading-none">{pkg.credits}</p>
-                <p className="text-sm text-muted-foreground">creditos</p>
+                <p className="text-sm text-muted-foreground">créditos</p>
                 <p className="mt-3 text-lg font-semibold">{pkg.priceLabel}</p>
                 <Button
                   className="mt-auto w-full rounded-xl"
@@ -232,21 +232,21 @@ export default function PortalPlanosPage() {
           <h2 className="text-xl font-semibold">FAQ</h2>
           <Accordion type="single" collapsible className="mt-4">
             <AccordionItem value="credits">
-              <AccordionTrigger>O que sao creditos?</AccordionTrigger>
+              <AccordionTrigger>O que são créditos?</AccordionTrigger>
               <AccordionContent>
-                Creditos sao utilizados para recursos que consomem inteligencia artificial.
+                Créditos são usados em recursos que consomem inteligência artificial.
               </AccordionContent>
             </AccordionItem>
             <AccordionItem value="consumption">
-              <AccordionTrigger>Quando creditos sao consumidos?</AccordionTrigger>
+              <AccordionTrigger>Quando os créditos são consumidos?</AccordionTrigger>
               <AccordionContent>
-                Atualmente os creditos sao consumidos em perguntas ao Concierge IA, geracao de roteiros e extracao inteligente de passagens.
+                Atualmente, os créditos são consumidos em perguntas ao Concierge IA, geração de roteiros e extração inteligente de passagens.
               </AccordionContent>
             </AccordionItem>
             <AccordionItem value="rollover">
-              <AccordionTrigger>Os creditos acumulam?</AccordionTrigger>
+              <AccordionTrigger>Os créditos acumulam?</AccordionTrigger>
               <AccordionContent>
-                Creditos comprados acumulam e nao expiram. Creditos inclusos no plano renovam a cada ciclo.
+                Créditos comprados acumulam e não expiram. Os créditos do plano são renovados a cada ciclo.
               </AccordionContent>
             </AccordionItem>
           </Accordion>

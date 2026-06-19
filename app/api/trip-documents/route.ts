@@ -45,7 +45,7 @@ async function getAccessibleTrip(
 
   const trip = tripResult.data as TripRow | null
   if (!trip) {
-    return { trip: null as TripRow | null, membership: null as AgencyMemberRow | null, error: "Viagem nao encontrada." }
+    return { trip: null as TripRow | null, membership: null as AgencyMemberRow | null, error: "Viagem n?o ?ncontrada." }
   }
 
   if (profile?.role === "master" || trip.owner_user_id === userId) {
@@ -53,7 +53,7 @@ async function getAccessibleTrip(
   }
 
   if (!trip.agency_id) {
-    return { trip: null as TripRow | null, membership: null as AgencyMemberRow | null, error: "Voce nao tem permissao para acessar este documento." }
+    return { trip: null as TripRow | null, membership: null as AgencyMemberRow | null, error: "Voc? n?o tem permiss?o para acessar este documento." }
   }
 
   const membershipResult = await client
@@ -69,7 +69,7 @@ async function getAccessibleTrip(
   }
 
   if (!membershipResult.data) {
-    return { trip: null as TripRow | null, membership: null as AgencyMemberRow | null, error: "Voce nao tem permissao para acessar este documento." }
+    return { trip: null as TripRow | null, membership: null as AgencyMemberRow | null, error: "Voc? n?o tem permiss?o para acessar este documento." }
   }
 
   return { trip, membership: membershipResult.data as AgencyMemberRow, error: null }
@@ -94,7 +94,7 @@ async function resolveTripByLinkAccess(params: {
   } else if (params.accessMode === "public" && params.publicToken) {
     query = query.eq("public_token", params.publicToken)
   } else {
-    return { supabase, trip: null as TripRow | null, error: "Link da viagem invalido." }
+    return { supabase, trip: null as TripRow | null, error: "Link da viagem inv?lido." }
   }
 
   const { data, error } = await query.maybeSingle()
@@ -104,7 +104,7 @@ async function resolveTripByLinkAccess(params: {
 
   const trip = data as TripRow | null
   if (!trip) {
-    return { supabase, trip: null as TripRow | null, error: "Viagem nao encontrada." }
+    return { supabase, trip: null as TripRow | null, error: "Viagem n?o ?ncontrada." }
   }
 
   if (params.accessMode === "admin") {
@@ -112,18 +112,18 @@ async function resolveTripByLinkAccess(params: {
     const slugMatches = Boolean(params.tripSlug && trip.slug === params.tripSlug)
 
     if (!tokenMatches && !slugMatches) {
-      return { supabase, trip: null as TripRow | null, error: "Acesso administrativo invalido para este documento." }
+      return { supabase, trip: null as TripRow | null, error: "Acesso administrativo inv?lido para este documento." }
     }
   } else {
     const tokenMatches = Boolean(params.publicToken && trip.public_token === params.publicToken)
     const slugMatches = Boolean(params.tripSlug && trip.slug === params.tripSlug && trip.visibility === "public")
 
     if (!trip.visibility || trip.visibility !== "public") {
-      return { supabase, trip: null as TripRow | null, error: "Esta viagem nao esta disponivel publicamente." }
+      return { supabase, trip: null as TripRow | null, error: "Esta viagem n?o ?sta dispon?vel publicamente." }
     }
 
     if (!tokenMatches && !slugMatches) {
-      return { supabase, trip: null as TripRow | null, error: "Acesso publico invalido para este documento." }
+      return { supabase, trip: null as TripRow | null, error: "Acesso publico inv?lido para este documento." }
     }
   }
 
@@ -147,7 +147,7 @@ async function resolveDocument(
   }
 
   if (!data) {
-    return { document: null as DocumentRow | null, error: "Documento nao encontrado." }
+    return { document: null as DocumentRow | null, error: "Documento n?o ?ncontrado." }
   }
 
   return { document: data as DocumentRow, error: null }
@@ -169,7 +169,7 @@ function buildErrorResponse(message: string, status: number, mode: "inline" | "d
     .replace(/>/g, "&gt;")
 
   return new NextResponse(
-    `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><title>Documento indisponivel</title></head><body style="margin:0;background:#0b1220;color:#fff;font-family:Inter,system-ui,sans-serif;display:flex;min-height:100vh;align-items:center;justify-content:center;padding:24px;"><div style="max-width:420px;border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.04);border-radius:24px;padding:24px;text-align:center;box-shadow:0 20px 50px rgba(0,0,0,.28);"><h1 style="font-size:20px;margin:0 0 12px;">Nao foi possivel abrir este documento</h1><p style="margin:0;color:rgba(255,255,255,.72);line-height:1.6;">${safeMessage}</p></div></body></html>`,
+    `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><title>Documento indispon?vel</title></head><body style="margin:0;background:#0b1220;color:#fff;font-family:Inter,system-ui,sans-serif;display:flex;min-height:100vh;align-items:center;justify-content:center;padding:24px;"><div style="max-width:420px;border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.04);border-radius:24px;padding:24px;text-align:center;box-shadow:0 20px 50px rgba(0,0,0,.28);"><h1 style="font-size:20px;margin:0 0 12px;">N?o foi poss?vel abrir este documento</h1><p style="margin:0;color:rgba(255,255,255,.72);line-height:1.6;">${safeMessage}</p></div></body></html>`,
     {
       status,
       headers: {
@@ -192,7 +192,7 @@ export async function GET(request: NextRequest) {
     const dispositionMode = url.searchParams.get("disposition") === "download" ? "download" : "inline"
 
     if (!documentId) {
-      return buildErrorResponse("Documento invalido.", 400, dispositionMode)
+      return buildErrorResponse("Documento inv?lido.", 400, dispositionMode)
     }
 
     let adminClient: ReturnType<typeof createSupabaseAdminClient> | null = null
@@ -205,23 +205,23 @@ export async function GET(request: NextRequest) {
     if (serverClient && sessionUser && tripId && accessMode !== "public") {
       const profileResult = await getProfile(serverClient, sessionUser.id)
       if (!profileResult.data) {
-        return buildErrorResponse(profileResult.error ?? "Perfil do usuario nao encontrado.", 403, dispositionMode)
+        return buildErrorResponse(profileResult.error ?? "Perfil do usuario n?o ?ncontrado.", 403, dispositionMode)
       }
 
       const accessResult = await getAccessibleTrip(serverClient, sessionUser.id, tripId, profileResult.data)
       if (!accessResult.trip) {
-        return buildErrorResponse(accessResult.error ?? "Voce nao tem permissao para acessar este documento.", 403, dispositionMode)
+        return buildErrorResponse(accessResult.error ?? "Voc? n?o tem permiss?o para acessar este documento.", 403, dispositionMode)
       }
 
       if (!hasSupabaseAdminEnv()) {
-        return buildErrorResponse("A configuracao administrativa do servidor nao esta disponivel no momento.", 503, dispositionMode)
+        return buildErrorResponse("A configura??o administrativa do servidor n?o ?sta dispon?vel no momento.", 503, dispositionMode)
       }
 
       adminClient = createSupabaseAdminClient()
       trip = accessResult.trip
     } else {
       if (!hasSupabaseAdminEnv()) {
-        return buildErrorResponse("A configuracao administrativa do servidor nao esta disponivel no momento.", 503, dispositionMode)
+        return buildErrorResponse("A configura??o administrativa do servidor n?o ?sta dispon?vel no momento.", 503, dispositionMode)
       }
 
       const accessResult = await resolveTripByLinkAccess({
@@ -233,7 +233,7 @@ export async function GET(request: NextRequest) {
       })
 
       if (!accessResult.trip) {
-        return buildErrorResponse(accessResult.error ?? "Acesso invalido a este documento.", 403, dispositionMode)
+        return buildErrorResponse(accessResult.error ?? "Acesso inv?lido a este documento.", 403, dispositionMode)
       }
 
       adminClient = accessResult.supabase
@@ -241,12 +241,12 @@ export async function GET(request: NextRequest) {
     }
 
     if (!adminClient || !trip) {
-      return buildErrorResponse("Nao foi possivel validar este documento.", 403, dispositionMode)
+      return buildErrorResponse("N?o foi poss?vel validar este documento.", 403, dispositionMode)
     }
 
     const documentResult = await resolveDocument(adminClient, trip.id, documentId)
     if (!documentResult.document) {
-      return buildErrorResponse(documentResult.error ?? "Documento nao encontrado.", 404, dispositionMode)
+      return buildErrorResponse(documentResult.error ?? "Documento n?o ?ncontrado.", 404, dispositionMode)
     }
 
     const document = documentResult.document
@@ -256,16 +256,16 @@ export async function GET(request: NextRequest) {
       document.visibility === "agency_only"
 
     if (accessMode === "public" && isPrivateDocument) {
-      return buildErrorResponse("Este documento nao esta disponivel no link publico.", 403, dispositionMode)
+      return buildErrorResponse("Este documento n?o ?sta dispon?vel no link publico.", 403, dispositionMode)
     }
 
     if (!document.file_path) {
-      return buildErrorResponse("Arquivo indisponivel para este documento.", 400, dispositionMode)
+      return buildErrorResponse("Arquivo indispon?vel para este documento.", 400, dispositionMode)
     }
 
     const fileResult = await adminClient.storage.from(DOCUMENTS_BUCKET).download(document.file_path)
     if (fileResult.error || !fileResult.data) {
-      return buildErrorResponse(fileResult.error?.message || "Nao foi possivel abrir este documento agora.", 400, dispositionMode)
+      return buildErrorResponse(fileResult.error?.message || "N?o foi poss?vel abrir este documento agora.", 400, dispositionMode)
     }
 
     const arrayBuffer = await fileResult.data.arrayBuffer()
@@ -281,10 +281,10 @@ export async function GET(request: NextRequest) {
     })
   } catch (error) {
     if (isMissingSupabaseAdminEnvError(error)) {
-      return buildErrorResponse("A configuracao administrativa do servidor nao esta disponivel no momento.", 503, "inline")
+      return buildErrorResponse("A configura??o administrativa do servidor n?o ?sta dispon?vel no momento.", 503, "inline")
     }
 
-    const message = error instanceof Error ? error.message : "Nao foi possivel abrir este documento agora."
+    const message = error instanceof Error ? error.message : "N?o foi poss?vel abrir este documento agora."
     console.error("[TRIP DOCUMENTS] get error", message)
     return buildErrorResponse(message, 500, "inline")
   }

@@ -37,7 +37,7 @@ export default function MasterOverviewPage() {
 
   const overviewCards = [
     { label: "Usuarios", value: stats.totalUsers, icon: Users, href: "/master/usuarios" },
-    { label: "Agencias", value: stats.totalAgencies, icon: Building2, href: "/master/agencias" },
+    { label: "Agências", value: stats.totalAgencies, icon: Building2, href: "/master/agencias" },
     { label: "Clientes", value: stats.totalClients, icon: Users, href: "/master/agencias" },
     { label: "Viagens", value: stats.totalTrips, icon: Plane, href: "/master/viagens" },
     { label: "Documentos", value: stats.totalDocuments, icon: FileText, href: "/master/viagens" },
@@ -59,7 +59,7 @@ export default function MasterOverviewPage() {
           <Card className="border-red-500/20 bg-red-500/5 p-4">
             <p className="text-sm font-medium text-foreground">Falha ao carregar dados do Master</p>
             {dataErrors.profiles ? <p className="mt-1 text-xs text-muted-foreground">Usuarios: {dataErrors.profiles}</p> : null}
-            {dataErrors.agencies ? <p className="mt-1 text-xs text-muted-foreground">Agencias: {dataErrors.agencies}</p> : null}
+            {dataErrors.agencies ? <p className="mt-1 text-xs text-muted-foreground">Agências: {dataErrors.agencies}</p> : null}
           </Card>
         </motion.div>
       ) : null}
@@ -112,7 +112,7 @@ export default function MasterOverviewPage() {
         <motion.div variants={fadeInUp}>
           <Card className="border-white/5 bg-black/40 backdrop-blur-xl p-6 h-full">
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-lg font-semibold text-foreground">Agencias Recentes</h2>
+              <h2 className="text-lg font-semibold text-foreground">Agências recentes</h2>
               <Link href="/master/agencias" className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 transition-colors">
                 Ver todas <ArrowUpRight className="h-3 w-3" />
               </Link>

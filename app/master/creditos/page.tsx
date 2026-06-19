@@ -88,7 +88,7 @@ export default function MasterCreditosPage() {
       id: `agency:${agency.id}`,
       ownerType: "agency" as const,
       name: agency.name,
-      description: "Agencia",
+      description: "Agência",
       balance: balanceOverrides[`agency:${agency.id}`] ?? agency.creditsBalance,
       group: "agency" as const,
     }))
@@ -183,13 +183,13 @@ export default function MasterCreditosPage() {
   const availableBase = Math.max(overview.totalAvailable + overview.totalConsumed, 1)
   const pageStats = [
     {
-      label: "Creditos Disponiveis",
+      label: "Créditos disponíveis",
       value: `${(overview.totalAvailable / 1000).toFixed(0)}K`,
       change: "saldo real",
       icon: Coins,
     },
     {
-      label: "Creditos Consumidos",
+      label: "Créditos consumidos",
       value: `${(overview.totalConsumed / 1000).toFixed(0)}K`,
       change: "ledger acumulado",
       icon: TrendingUp,
@@ -252,7 +252,7 @@ export default function MasterCreditosPage() {
       })
 
       if (!result.data) {
-        setGrantError(result.error ?? "Nao foi possivel conceder creditos.")
+        setGrantError(result.error ?? "Não foi possível conceder créditos.")
         return
       }
 
@@ -277,7 +277,7 @@ export default function MasterCreditosPage() {
     <motion.div initial="initial" animate="animate" variants={stagger} className="space-y-8">
       <motion.div variants={fadeInUp} className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div className="space-y-1">
-          <h1 className="text-2xl lg:text-3xl font-bold text-foreground tracking-tight">Creditos</h1>
+          <h1 className="text-2xl lg:text-3xl font-bold text-foreground tracking-tight">Créditos</h1>
           <p className="text-sm text-muted-foreground">Leitura real do saldo e ledger de creditos da plataforma</p>
         </div>
         <div className="flex gap-3">
@@ -324,7 +324,7 @@ export default function MasterCreditosPage() {
 
       <motion.div variants={fadeInUp}>
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-foreground">Pacotes de Creditos</h2>
+          <h2 className="text-lg font-semibold text-foreground">Pacotes de créditos</h2>
           <Badge variant="outline" className="border-white/10 bg-white/5 text-xs text-muted-foreground">
             Pagamento ainda nao integrado
           </Badge>
@@ -506,7 +506,7 @@ export default function MasterCreditosPage() {
               >
                 <option value="">Selecione uma entidade</option>
                 {groupedTargets.agencies.length > 0 ? (
-                  <optgroup label="Agencias">
+                  <optgroup label="Agências">
                     {groupedTargets.agencies.map((target) => (
                       <option key={target.id} value={target.id}>
                         {target.name} • {target.description}

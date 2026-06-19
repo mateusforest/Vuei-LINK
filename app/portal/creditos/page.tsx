@@ -126,7 +126,7 @@ export default function CreditosPage() {
 
     const result = await createTravelerCreditsCheckout(packageCode)
     if (result.error || !result.data?.url) {
-      setLoadError(result.error ?? "Nao foi possivel iniciar o checkout de creditos.")
+        setLoadError(result.error ?? "Não foi possível iniciar o checkout de créditos.")
       setPackageLoading(null)
       return
     }
@@ -143,7 +143,7 @@ export default function CreditosPage() {
     >
       <motion.div variants={fadeInUp} className="flex items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold">Creditos</h1>
+          <h1 className="text-2xl font-bold">Créditos</h1>
           <p className="text-sm text-muted-foreground">Gerencie seus creditos Vuei</p>
         </div>
         <Badge className="bg-gradient-to-r from-amber-500/20 to-amber-600/20 text-amber-400 border-amber-500/30">
@@ -177,7 +177,7 @@ export default function CreditosPage() {
               <div className="space-y-2">
                 <div className="flex items-center gap-2 text-muted-foreground">
                   <Coins size={16} className="text-primary" />
-                  <span className="text-sm">Saldo disponivel</span>
+                  <span className="text-sm">Saldo disponível</span>
                 </div>
                 <div className="flex items-baseline gap-3">
                   <span className="text-5xl md:text-6xl font-bold vuei-gradient-text">{effectiveBalance}</span>
@@ -243,7 +243,7 @@ export default function CreditosPage() {
 
       <motion.div variants={fadeInUp}>
         <div className="flex items-center justify-between mb-4">
-          <h2 className="font-semibold">Comprar Creditos</h2>
+          <h2 className="font-semibold">Comprar créditos</h2>
         </div>
         <div className="grid md:grid-cols-3 gap-4">
           {TRAVELER_CREDIT_PACKAGES.map((pkg) => (

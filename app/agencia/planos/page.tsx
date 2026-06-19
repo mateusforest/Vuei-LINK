@@ -69,7 +69,7 @@ export default function AgencyPlansPage() {
 
     const result = await createAgencyPlanCheckout(planCode)
     if (result.error || !result.data?.url) {
-      setActionError(result.error ?? "Nao foi possivel iniciar o checkout da agencia.")
+      setActionError(result.error ?? "Não foi possível iniciar o checkout da agência.")
       setPlanLoading(null)
       return
     }
@@ -83,7 +83,7 @@ export default function AgencyPlansPage() {
 
     const result = await createAgencyCreditsCheckout(packageCode)
     if (result.error || !result.data?.url) {
-      setActionError(result.error ?? "Nao foi possivel iniciar a compra de creditos.")
+      setActionError(result.error ?? "Não foi possível iniciar a compra de créditos.")
       setPackageLoading(null)
       return
     }
@@ -97,7 +97,7 @@ export default function AgencyPlansPage() {
 
     const result = await createAgencyCustomerPortal()
     if (result.error || !result.data?.url) {
-      setActionError(result.error ?? "Nao foi possivel abrir o portal de assinatura.")
+      setActionError(result.error ?? "Não foi possível abrir o portal de assinatura.")
       setPortalLoading(false)
       return
     }
@@ -277,7 +277,7 @@ export default function AgencyPlansPage() {
               <Coins size={20} className="text-primary" />
             </div>
             <div>
-              <h2 className="text-xl font-semibold">Creditos extras</h2>
+              <h2 className="text-xl font-semibold">Créditos extras</h2>
               <p className="text-sm text-muted-foreground">
                 Os mesmos pacotes do traveler agora tambem ficam preparados para o checkout B2B da agencia.
               </p>
@@ -319,7 +319,7 @@ export default function AgencyPlansPage() {
             <AccordionItem value="credits">
               <AccordionTrigger>O que sao creditos?</AccordionTrigger>
               <AccordionContent>
-                Creditos sao utilizados para recursos que consomem inteligencia artificial no portal da agencia.
+                Créditos são usados em recursos que consomem inteligência artificial no portal da agência.
               </AccordionContent>
             </AccordionItem>
             <AccordionItem value="consumption">
@@ -331,7 +331,7 @@ export default function AgencyPlansPage() {
             <AccordionItem value="rollover">
               <AccordionTrigger>Os creditos acumulam?</AccordionTrigger>
               <AccordionContent>
-                Creditos comprados acumulam. Creditos do plano valem para o ciclo atual e sao renovados pelo billing da assinatura.
+                Créditos comprados acumulam. Os créditos do plano valem para o ciclo atual e são renovados pela assinatura.
               </AccordionContent>
             </AccordionItem>
             <AccordionItem value="limits">
@@ -343,7 +343,7 @@ export default function AgencyPlansPage() {
             <AccordionItem value="excursions">
               <AccordionTrigger>Uma excursao conta como varias viagens?</AccordionTrigger>
               <AccordionContent>
-                Nao. Uma excursao conta como apenas uma viagem ativa.
+                Não. Uma excursão conta como apenas uma viagem ativa.
               </AccordionContent>
             </AccordionItem>
           </Accordion>

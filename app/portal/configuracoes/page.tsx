@@ -73,7 +73,7 @@ const defaultProfile = {
   phone: "",
   plan: "Free",
   avatar: "",
-  createdAt: "Nao informado",
+  createdAt: "Não informado",
 }
 
 const defaultSettings = {
@@ -279,7 +279,7 @@ export default function ConfiguracoesPage() {
       if (shouldUseSupabase() && authProfile) {
         const client = createSupabaseBrowserClient()
         if (!client) {
-          throw new Error("Cliente Supabase indisponivel para upload da foto.")
+          throw new Error("Cliente Supabase indispon?vel para upload da foto.")
         }
 
         const file = photoFile
@@ -296,7 +296,7 @@ export default function ConfiguracoesPage() {
             console.error("[UPLOAD] error", uploadResult.error.message)
             throw new Error(
               uploadResult.error.message.includes("Bucket not found")
-                ? "Bucket 'vuei-avatars' nao existe. Rode o SQL de configuracao do bucket antes de salvar a foto."
+                ? "Bucket 'vuei-avatars' n?o ?xiste. Rode o SQL de configura??o do bucket antes de salvar a foto."
                 : uploadResult.error.message
             )
           }
@@ -313,7 +313,7 @@ export default function ConfiguracoesPage() {
       if (shouldUseSupabase() && authProfile) {
         const result = await updateProfileRepository(authProfile.id, { avatarUrl: nextAvatar })
         if (!result.data) {
-          throw new Error("Nao foi possivel salvar a foto no perfil.")
+          throw new Error("N?o foi poss?vel salvar a foto no perfil.")
         }
         await refreshProfile()
       }
@@ -322,7 +322,7 @@ export default function ConfiguracoesPage() {
       setPhotoFile(null)
       showToast("Foto atualizada com sucesso.")
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Nao foi possivel atualizar a foto."
+      const message = error instanceof Error ? error.message : "N?o foi poss?vel atualizar a foto."
       console.error("[PROFILE] save error", message)
       setActionError(message)
     } finally {
@@ -346,7 +346,7 @@ export default function ConfiguracoesPage() {
         })
 
         if (!result.data) {
-          throw new Error("Nao foi possivel salvar o perfil.")
+          throw new Error("N?o foi poss?vel salvar o perfil.")
         }
 
         await refreshProfile()
@@ -355,7 +355,7 @@ export default function ConfiguracoesPage() {
       setShowProfileModal(false)
       showToast("Perfil atualizado com sucesso.")
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Nao foi possivel salvar o perfil."
+      const message = error instanceof Error ? error.message : "N?o foi poss?vel salvar o perfil."
       console.error("[PROFILE] save error", message)
       setActionError(message)
     } finally {
@@ -392,7 +392,7 @@ export default function ConfiguracoesPage() {
         })
 
         if (!result.data) {
-          throw new Error("Nao foi possivel salvar a configuracao de PIN.")
+          throw new Error("N?o foi poss?vel salvar a configura??o de PIN.")
         }
 
         await refreshProfile()
@@ -404,7 +404,7 @@ export default function ConfiguracoesPage() {
       setShowPinModal(false)
       showToast("PIN salvo com sucesso.")
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Nao foi possivel configurar o PIN."
+      const message = error instanceof Error ? error.message : "N?o foi poss?vel configurar o PIN."
       console.error("[PROFILE] save error", message)
       setActionError(message)
     } finally {
@@ -424,7 +424,7 @@ export default function ConfiguracoesPage() {
     setBillingActionLoading(false)
 
     if (result.error || !result.data?.url) {
-      setActionError(result.error ?? "Nao foi possivel abrir o portal de assinatura.")
+      setActionError(result.error ?? "N?o foi poss?vel abrir o portal de assinatura.")
       return
     }
 
@@ -472,7 +472,7 @@ export default function ConfiguracoesPage() {
 
       if (settings.faceId) {
         if (!biometricSupported) {
-          throw new Error("Biometria indisponivel neste dispositivo ou navegador.")
+          throw new Error("Biometria indispon?vel neste dispositivo ou navegador.")
         }
 
         await registerQuickAccessBiometric(authProfile.id, authProfile.name || authProfile.email)
@@ -493,7 +493,7 @@ export default function ConfiguracoesPage() {
         })
 
         if (!result.data) {
-          throw new Error("Nao foi possivel salvar a preferencia de biometria.")
+          throw new Error("N?o foi poss?vel salvar a preferencia de biometria.")
         }
 
         await refreshProfile()
@@ -507,7 +507,7 @@ export default function ConfiguracoesPage() {
       }))
       showToast(settings.faceId ? "Biometria ativada." : "Biometria desativada.")
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Nao foi possivel salvar a configuracao."
+      const message = error instanceof Error ? error.message : "N?o foi poss?vel salvar a configura??o."
       console.error("[PROFILE] save error", message)
       setSettings((prev) => ({ ...prev, faceId: authProfile?.settings?.biometricEnabled ?? false }))
       setActionError(message)
@@ -518,12 +518,12 @@ export default function ConfiguracoesPage() {
 
   const handleTogglePinPreference = async () => {
     if (!authProfile?.id) {
-      setActionError("Faca login novamente para atualizar a protecao por PIN.")
+      setActionError("Faca login novamente para atualizar a prote??o por PIN.")
       return
     }
 
     if (!settings.pinEnabled) {
-      showToast("Defina um novo PIN para ativar o acesso rapido desta conta.")
+      showToast("Defina um novo PIN para ativar o acesso r?pido desta conta.")
       return
     }
 
@@ -550,7 +550,7 @@ export default function ConfiguracoesPage() {
         })
 
         if (!result.data) {
-          throw new Error("Nao foi possivel desativar a protecao por PIN.")
+          throw new Error("N?o foi poss?vel desativar a prote??o por PIN.")
         }
 
         await refreshProfile()
@@ -565,7 +565,7 @@ export default function ConfiguracoesPage() {
       setPinForm({ pin: "", confirmPin: "" })
       showToast("PIN desativado nesta conta.")
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Nao foi possivel atualizar a protecao por PIN."
+      const message = error instanceof Error ? error.message : "N?o foi poss?vel atualizar a prote??o por PIN."
       console.error("[PROFILE] save error", message)
       setActionError(message)
     } finally {
@@ -599,7 +599,7 @@ export default function ConfiguracoesPage() {
       ],
     },
     {
-      title: "Seguranca",
+      title: "Seguran?a",
       items: [
         {
           icon: Fingerprint,
@@ -636,7 +636,7 @@ export default function ConfiguracoesPage() {
           action: () =>
             openInfoModal(
               "Idioma",
-              "No momento, o Vuei esta disponivel em portugues. Novos idiomas serao adicionados futuramente."
+              "No momento, o Vuei está disponível em português. Novos idiomas serão adicionados futuramente."
             ),
         },
       ],
@@ -651,7 +651,7 @@ export default function ConfiguracoesPage() {
           action: () =>
             openInfoModal(
               "Central de ajuda",
-              "Nossa central de ajuda estara disponivel em breve. Se precisar de suporte, entre em contato pelo canal oficial do Vuei."
+              "Nossa central de ajuda estará disponível em breve. Se precisar de suporte, entre em contato pelo canal oficial do Vuei."
             ),
         },
         {
@@ -678,7 +678,7 @@ export default function ConfiguracoesPage() {
       className="mx-auto max-w-4xl space-y-6"
     >
       <motion.div variants={fadeInUp}>
-        <h1 className="text-2xl font-bold">Configuracoes</h1>
+        <h1 className="text-2xl font-bold">Configurações</h1>
         <p className="text-sm text-muted-foreground">Gerencie sua conta e preferencias</p>
       </motion.div>
 
@@ -726,13 +726,13 @@ export default function ConfiguracoesPage() {
                 <div>
                   <p className="text-xs uppercase tracking-wide text-muted-foreground">Status</p>
                   <p className="mt-1 text-sm font-medium">
-                    {billingLoading ? "Carregando..." : billingStatus?.currentPlan === "free" ? "Você está utilizando o plano Free." : billingStatus?.subscriptionStatus ?? "Nao informado"}
+                    {billingLoading ? "Carregando..." : billingStatus?.currentPlan === "free" ? "Você está utilizando o plano Free." : billingStatus?.subscriptionStatus ?? "Não informado"}
                   </p>
                 </div>
                 <div>
                   <p className="text-xs uppercase tracking-wide text-muted-foreground">Próxima renovação</p>
                   <p className="mt-1 text-sm font-medium">
-                    {billingStatus?.currentPeriodEnd ? new Date(billingStatus.currentPeriodEnd).toLocaleDateString("pt-BR") : "Nao se aplica"}
+                    {billingStatus?.currentPeriodEnd ? new Date(billingStatus.currentPeriodEnd).toLocaleDateString("pt-BR") : "Não se aplica"}
                   </p>
                 </div>
                 <div>
@@ -768,21 +768,21 @@ export default function ConfiguracoesPage() {
               <Shield size={18} className="text-primary" />
             </div>
             <div className="space-y-2">
-              <h2 className="text-base font-semibold">Acesso rapido</h2>
+              <h2 className="text-base font-semibold">Acesso rápido</h2>
               <p className="text-sm text-muted-foreground">
                 O PIN fica salvo com seguranca na sua conta e funciona em outros dispositivos depois do login. A biometria continua sendo configurada separadamente em cada dispositivo.
               </p>
               <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
                 <Badge variant="secondary" className="border-border/50 bg-background/50">
-                  {deviceQuickAccess.pinEnabled ? "PIN da conta ativo" : "PIN da conta nao configurado"}
+                  {deviceQuickAccess.pinEnabled ? "PIN da conta ativo" : "PIN da conta n?o configurado"}
                 </Badge>
                 <Badge variant="secondary" className="border-border/50 bg-background/50">
-                  {deviceQuickAccess.biometricEnabled ? "Biometria ativa neste dispositivo" : biometricSupported ? "Biometria disponivel" : "Biometria indisponivel"}
+                  {deviceQuickAccess.biometricEnabled ? "Biometria ativa neste dispositivo" : biometricSupported ? "Biometria dispon?vel" : "Biometria indispon?vel"}
                 </Badge>
               </div>
               {setupQuickAccess && (
                 <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 p-3 text-sm text-amber-300">
-                  Este dispositivo ainda nao tinha acesso rapido configurado. O PIN da conta pode ser usado aqui depois do login, e a biometria pode ser ativada localmente neste aparelho.
+                  Este dispositivo ainda n?o tinha acesso r?pido configurado. O PIN da conta pode ser usado aqui depois do login, e a biometria pode ser ativada localmente neste aparelho.
                 </div>
               )}
               {returnTo && (
@@ -938,7 +938,7 @@ export default function ConfiguracoesPage() {
           <DialogHeader>
             <DialogTitle>Biometria / Face ID</DialogTitle>
             <DialogDescription>
-              A autenticacao biometrica sera usada pelo dispositivo quando houver suporte a WebAuthn/passkey.
+              A autentica??o biom?trica sera usada pelo dispositivo quando houver suporte a WebAuthn/passkey.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
@@ -949,12 +949,12 @@ export default function ConfiguracoesPage() {
             </div>
             {!biometricSupported && (
               <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 p-4 text-sm text-amber-300">
-                Este navegador ou dispositivo ainda nao oferece suporte confiavel a WebAuthn/passkey para o Vuei. Voce pode usar o PIN da conta ou entrar com login.
+                Este navegador ou dispositivo ainda não oferece suporte confiável a WebAuthn/passkey para o Vuei. Você pode usar o PIN da conta ou entrar com login.
               </div>
             )}
             <div className="flex items-center justify-between rounded-xl border border-border/50 p-4">
               <div>
-                <p className="font-medium">Protecao biometrica</p>
+                <p className="font-medium">Protecao biom?trica</p>
                 <p className="text-sm text-muted-foreground">{settings.faceId ? "Ativa agora" : "Desativada agora"}</p>
               </div>
               <Switch checked={settings.faceId} onCheckedChange={(checked) => setSettings((prev) => ({ ...prev, faceId: checked }))} />
@@ -1005,7 +1005,7 @@ export default function ConfiguracoesPage() {
               onClick={() => void handleTogglePinPreference()}
               disabled={isSavingSettings}
             >
-              {settings.pinEnabled ? "Desativar PIN atual" : "Ativar protecao por PIN"}
+              {settings.pinEnabled ? "Desativar PIN atual" : "Ativar prote??o por PIN"}
             </Button>
             <div className="flex gap-3">
               <Button variant="outline" className="flex-1" onClick={() => setShowPinModal(false)}>
