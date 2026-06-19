@@ -36,6 +36,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { AgencyProvider, useAgency } from "@/contexts/agency-context"
 import { RouteGuard } from "@/components/auth/route-guard"
 import { useAuth } from "@/contexts/auth-context"
+import { SupportFab } from "@/components/support/support-fab"
 
 const navItems = [
   { href: "/agencia", icon: LayoutDashboard, label: "Dashboard" },
@@ -539,6 +540,8 @@ function AgencyLayoutInner({ children }: { children: React.ReactNode }) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <SupportFab portalType="agency" agencyId={agency?.id ?? profile?.agencyId ?? null} />
     </div>
   )
 }

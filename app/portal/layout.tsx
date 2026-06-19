@@ -25,6 +25,7 @@ import { TripsProvider, useTrips } from "@/contexts/trips-context"
 import { RouteGuard } from "@/components/auth/route-guard"
 import { useAuth } from "@/contexts/auth-context"
 import { CreateTripButton } from "@/components/portal/create-trip-button"
+import { SupportFab } from "@/components/support/support-fab"
 
 const navItems = [
   { href: "/portal", icon: Home, label: "Início" },
@@ -279,6 +280,8 @@ function PortalLayoutInner({ children }: { children: React.ReactNode }) {
           </div>
         </nav>
       )}
+
+      <SupportFab portalType="traveler" agencyId={profile?.agencyId ?? null} />
     </div>
   )
 }

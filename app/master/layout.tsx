@@ -28,7 +28,8 @@ import {
   User,
   Shield,
   LogOut,
-  Check
+  Check,
+  LifeBuoy
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -51,6 +52,7 @@ const navItems = [
   { href: "/master/usuarios", icon: Users, label: "Usuários" },
   { href: "/master/viagens", icon: Plane, label: "Viagens" },
   { href: "/master/concierge", icon: MessageSquare, label: "Concierge" },
+  { href: "/master/suporte", icon: LifeBuoy, label: "Suporte" },
   { href: "/master/ia", icon: Brain, label: "Central IA" },
   { href: "/master/creditos", icon: Coins, label: "Créditos" },
   { href: "/master/templates", icon: FileText, label: "Templates" },

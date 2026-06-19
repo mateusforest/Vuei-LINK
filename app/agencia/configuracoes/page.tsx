@@ -40,14 +40,15 @@ import { updateAgency as updateAgencyRepository } from "@/lib/repositories/agenc
 import { shouldUseSupabase } from "@/lib/data-source"
 import { createSupabaseBrowserClient } from "@/lib/supabase/client"
 import { AGENCY_PLAN_DEFINITIONS, mapCommercialPlanToLegacyAgencyPlan } from "@/lib/billing/agency-plans"
-import type { AgencyCommercialPlanCode } from "@/types"
+import { createAgencyCustomerPortal, getAgencyBillingStatusFromApi } from "@/lib/repositories/agency-billing-repository"
+import type { AgencyBillingApiStatus, AgencyCommercialPlanCode } from "@/types"
 
 const settingsSections = [
   { id: "agency", label: "Dados da Agencia", icon: Building2 },
   { id: "branding", label: "Branding", icon: Palette },
   { id: "security", label: "Seguranca", icon: Shield },
   { id: "notifications", label: "Notificacoes", icon: Bell },
-  { id: "plan", label: "Plano", icon: CreditCard },
+  { id: "plan", label: "Assinatura", icon: CreditCard },
 ]
 
 const availablePlans = Object.values(AGENCY_PLAN_DEFINITIONS).map((plan) => ({
@@ -63,6 +64,12 @@ const availablePlans = Object.values(AGENCY_PLAN_DEFINITIONS).map((plan) => ({
 
 const STORAGE_KEY = "vuei_agencia_configuracoes_frontend"
 
+function hasActiveAgencyPaidSubscription(status: AgencyBillingApiStatus | null) {
+  if (!status) return false
+  if (status.planCode === "free") return false
+  return status.status === "active" || status.status === "trialing" || status.status === "past_due"
+}
+
 export default function SettingsPage() {
   const router = useRouter()
   const { signOut, user, profile } = useAuth()
@@ -77,8 +84,12 @@ export default function SettingsPage() {
   const [showArchiveModal, setShowArchiveModal] = useState(false)
   const [archiveConfirmation, setArchiveConfirmation] = useState("")
   const [isArchivingAgency, setIsArchivingAgency] = useState(false)
+  const [billingStatus, setBillingStatus] = useState<AgencyBillingApiStatus | null>(null)
+  const [billingLoading, setBillingLoading] = useState(false)
+  const [billingActionLoading, setBillingActionLoading] = useState(false)
   const [agencyLogoFile, setAgencyLogoFile] = useState<File | null>(null)
   const [brandingLogoFile, setBrandingLogoFile] = useState<File | null>(null)
+  const hasPaidSubscriptionActive = hasActiveAgencyPaidSubscription(billingStatus)
 
   const [agencyData, setAgencyData] = useState({
     name: "Agencia Viaje+",
@@ -155,6 +166,32 @@ export default function SettingsPage() {
     if (shouldUseSupabase() && user?.id) return
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ agencyData, brandingData, notifications }))
   }, [agencyData, brandingData, notifications, user?.id])
+
+  useEffect(() => {
+    if (!shouldUseSupabase() || !user?.id) {
+      setBillingStatus(null)
+      return
+    }
+
+    let active = true
+    setBillingLoading(true)
+
+    const loadBilling = async () => {
+      const result = await getAgencyBillingStatusFromApi()
+      if (!active) return
+      setBillingStatus(result.data ?? null)
+      if (result.error) {
+        showToast(result.error)
+      }
+      setBillingLoading(false)
+    }
+
+    void loadBilling()
+
+    return () => {
+      active = false
+    }
+  }, [user?.id])
 
   const showToast = (message: string) => {
     setToastMessage(message)
@@ -350,7 +387,25 @@ export default function SettingsPage() {
     router.replace("/login")
   }
 
+  const handleOpenAgencyCustomerPortal = async () => {
+    setBillingActionLoading(true)
+    const result = await createAgencyCustomerPortal()
+    setBillingActionLoading(false)
+
+    if (result.error || !result.data?.url) {
+      showToast(result.error || "Nao foi possivel abrir o portal de assinatura.")
+      return
+    }
+
+    window.location.href = result.data.url
+  }
+
   const handleArchiveAgency = async () => {
+    if (hasPaidSubscriptionActive) {
+      showToast("Cancele a assinatura ativa antes de arquivar a agencia.")
+      return
+    }
+
     if (archiveConfirmation.trim().toUpperCase() !== "ARQUIVAR") {
       showToast('Digite "ARQUIVAR" para confirmar.')
       return
@@ -584,15 +639,31 @@ export default function SettingsPage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="mb-4 text-sm text-muted-foreground">Arquive a agencia com seguranca sem apagar clientes, viagens, documentos ou historico.</p>
-                  <Button
-                    variant="outline"
-                    className="gap-2 border-red-500/30 text-red-400 hover:bg-red-500/10"
-                    onClick={() => setShowArchiveModal(true)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                    Excluir Agencia
-                  </Button>
+                  <p className="mb-4 text-sm text-muted-foreground">
+                    {hasPaidSubscriptionActive
+                      ? "Se existe uma assinatura ativa, cancele-a antes de arquivar a agencia."
+                      : "Arquive a agencia com seguranca sem apagar clientes, viagens, documentos ou historico."}
+                  </p>
+                  <div className="flex flex-col gap-3 sm:flex-row">
+                    <Button
+                      variant="outline"
+                      className="gap-2 border-red-500/30 text-red-400 hover:bg-red-500/10"
+                      onClick={() => setShowArchiveModal(true)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      Excluir Agencia
+                    </Button>
+                    {hasPaidSubscriptionActive ? (
+                      <Button
+                        variant="outline"
+                        className="border-border/70 bg-white"
+                        onClick={() => void handleOpenAgencyCustomerPortal()}
+                        disabled={billingActionLoading}
+                      >
+                        {billingActionLoading ? "Abrindo..." : "Gerenciar assinatura"}
+                      </Button>
+                    ) : null}
+                  </div>
                 </CardContent>
               </Card>
             </motion.div>
@@ -630,23 +701,66 @@ export default function SettingsPage() {
                 <CardContent className="p-6">
                   <div className="flex items-start justify-between gap-4">
                     <div>
-                      <Badge className="bg-primary text-white">Plano {subscription.definition.name}</Badge>
-                      <p className="mt-2 text-2xl font-bold text-foreground">{subscription.definition.priceLabel}</p>
+                      <Badge className="bg-primary text-white">Plano {billingStatus?.planName || subscription.definition.name}</Badge>
+                      <p className="mt-2 text-2xl font-bold text-foreground">
+                        {billingStatus?.currentPlan === "free" ? "Plano Free" : subscription.definition.priceLabel}
+                      </p>
                       <p className="text-sm text-muted-foreground">
-                        {agency ? "Plano salvo na camada comercial da agencia" : "Plano ainda nao vinculado a uma agencia real"}
+                        {billingLoading
+                          ? "Carregando assinatura..."
+                          : billingStatus?.currentPlan === "free"
+                            ? "Voce esta utilizando o plano Free."
+                            : agency
+                              ? "Assinatura vinculada ao billing da agencia."
+                              : "Plano ainda nao vinculado a uma agencia real"}
                       </p>
                     </div>
                     <div className="flex flex-col gap-2 sm:flex-row">
                       <Button asChild variant="outline" className="border-border/70 bg-white">
-                        <Link href="/agencia/planos">Conhecer planos</Link>
+                        <Link href="/agencia/planos">Ver planos</Link>
                       </Button>
-                      <Button variant="outline" className="border-border/70 bg-white" onClick={() => setShowPlanModal(true)}>
-                        Ajustar plano interno
-                      </Button>
+                      {billingStatus?.currentPlan !== "free" ? (
+                        <Button
+                          variant="outline"
+                          className="border-border/70 bg-white"
+                          onClick={() => void handleOpenAgencyCustomerPortal()}
+                          disabled={billingActionLoading}
+                        >
+                          {billingActionLoading ? "Abrindo..." : "Gerenciar assinatura"}
+                        </Button>
+                      ) : null}
                     </div>
                   </div>
                   <hr className="my-4 border-border/60" />
-                  <div className="grid gap-2 text-sm">
+                  <div className="grid gap-4 text-sm sm:grid-cols-2">
+                    <div className="rounded-2xl border border-border/60 bg-white/80 p-4">
+                      <p className="text-xs uppercase tracking-wide text-muted-foreground">Status</p>
+                      <p className="mt-1 font-medium text-foreground">
+                        {billingLoading
+                          ? "Carregando..."
+                          : billingStatus?.currentPlan === "free"
+                            ? "Voce esta utilizando o plano Free."
+                            : billingStatus?.status || "Nao informado"}
+                      </p>
+                    </div>
+                    <div className="rounded-2xl border border-border/60 bg-white/80 p-4">
+                      <p className="text-xs uppercase tracking-wide text-muted-foreground">Proxima renovacao</p>
+                      <p className="mt-1 font-medium text-foreground">
+                        {billingStatus?.currentPeriodEnd
+                          ? new Date(billingStatus.currentPeriodEnd).toLocaleDateString("pt-BR")
+                          : "Nao se aplica"}
+                      </p>
+                    </div>
+                    <div className="rounded-2xl border border-border/60 bg-white/80 p-4">
+                      <p className="text-xs uppercase tracking-wide text-muted-foreground">Creditos mensais do plano</p>
+                      <p className="mt-1 font-medium text-foreground">{subscription.definition.monthlyCredits}</p>
+                    </div>
+                    <div className="rounded-2xl border border-border/60 bg-white/80 p-4">
+                      <p className="text-xs uppercase tracking-wide text-muted-foreground">Saldo atual</p>
+                      <p className="mt-1 font-medium text-foreground">{credits.balance}</p>
+                    </div>
+                  </div>
+                  <div className="mt-4 grid gap-2 text-sm">
                     <div className="flex items-center gap-2 text-muted-foreground">
                       <div className="h-1.5 w-1.5 rounded-full bg-primary" />
                       {subscription.definition.monthlyCredits} creditos IA inclusos por mes (Saldo atual: {credits.balance})
@@ -664,6 +778,11 @@ export default function SettingsPage() {
                       Em uso agora: {teamSeatsUsed} usuarios e {activeTripsCount} viagens ativas
                     </div>
                   </div>
+                  {billingStatus?.cancelAtPeriodEnd ? (
+                    <div className="mt-4 rounded-2xl border border-amber-300/70 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                      Esta assinatura esta programada para cancelamento ao final do ciclo atual.
+                    </div>
+                  ) : null}
                 </CardContent>
               </Card>
             </motion.div>
@@ -802,34 +921,58 @@ export default function SettingsPage() {
           <DialogHeader>
             <DialogTitle className="text-red-400">Arquivar agencia</DialogTitle>
             <DialogDescription>
-              A agencia sera desativada e arquivada com seguranca, sem excluir dados reais nem remover historico operacional.
+              {hasPaidSubscriptionActive
+                ? "Existe uma assinatura ativa nesta agencia. Cancele-a antes de arquivar a conta."
+                : "A agencia sera desativada e arquivada com seguranca, sem excluir dados reais nem remover historico operacional."}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
-            <div className="rounded-xl border border-red-500/20 bg-red-500/5 p-4 text-sm text-muted-foreground">
-              Digite <span className="font-medium text-foreground">ARQUIVAR</span> para confirmar a desativacao da agencia.
-            </div>
-            <div>
-              <Label className="text-muted-foreground">Confirmacao</Label>
-              <Input
-                value={archiveConfirmation}
-                onChange={(e) => setArchiveConfirmation(e.target.value)}
-                placeholder="ARQUIVAR"
-                className="mt-1.5 border-red-500/20 bg-white"
-              />
-            </div>
-            <div className="flex gap-3">
-              <Button variant="outline" className="flex-1 border-border/70 bg-white" onClick={() => setShowArchiveModal(false)} disabled={isArchivingAgency}>
-                Cancelar
-              </Button>
-              <Button
-                className="flex-1 bg-red-500 text-white hover:bg-red-500/90"
-                onClick={() => void handleArchiveAgency()}
-                disabled={isArchivingAgency || archiveConfirmation.trim().toUpperCase() !== "ARQUIVAR"}
-              >
-                {isArchivingAgency ? "Arquivando..." : "Arquivar agencia"}
-              </Button>
-            </div>
+            {hasPaidSubscriptionActive ? (
+              <>
+                <div className="rounded-xl border border-amber-300/70 bg-amber-50 p-4 text-sm text-amber-900">
+                  Se voce possui uma assinatura ativa, cancele-a antes de excluir ou arquivar a agencia.
+                </div>
+                <div className="flex gap-3">
+                  <Button variant="outline" className="flex-1 border-border/70 bg-white" onClick={() => setShowArchiveModal(false)}>
+                    Fechar
+                  </Button>
+                  <Button
+                    className="flex-1 bg-gradient-to-r from-primary to-accent text-white"
+                    onClick={() => void handleOpenAgencyCustomerPortal()}
+                    disabled={billingActionLoading}
+                  >
+                    {billingActionLoading ? "Abrindo..." : "Gerenciar assinatura"}
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="rounded-xl border border-red-500/20 bg-red-500/5 p-4 text-sm text-muted-foreground">
+                  Digite <span className="font-medium text-foreground">ARQUIVAR</span> para confirmar a desativacao da agencia.
+                </div>
+                <div>
+                  <Label className="text-muted-foreground">Confirmacao</Label>
+                  <Input
+                    value={archiveConfirmation}
+                    onChange={(e) => setArchiveConfirmation(e.target.value)}
+                    placeholder="ARQUIVAR"
+                    className="mt-1.5 border-red-500/20 bg-white"
+                  />
+                </div>
+                <div className="flex gap-3">
+                  <Button variant="outline" className="flex-1 border-border/70 bg-white" onClick={() => setShowArchiveModal(false)} disabled={isArchivingAgency}>
+                    Cancelar
+                  </Button>
+                  <Button
+                    className="flex-1 bg-red-500 text-white hover:bg-red-500/90"
+                    onClick={() => void handleArchiveAgency()}
+                    disabled={isArchivingAgency || archiveConfirmation.trim().toUpperCase() !== "ARQUIVAR"}
+                  >
+                    {isArchivingAgency ? "Arquivando..." : "Arquivar agencia"}
+                  </Button>
+                </div>
+              </>
+            )}
           </div>
         </DialogContent>
       </Dialog>

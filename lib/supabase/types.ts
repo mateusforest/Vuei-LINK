@@ -630,6 +630,69 @@ export interface Database {
           processed_at?: string
         }
       }
+      support_tickets: {
+        Row: {
+          id: string
+          user_id: string
+          agency_id: string | null
+          title: string
+          category: "vuei_help" | "technical_issue" | "billing" | "credits" | "trip_link" | "other"
+          priority: "normal" | "urgent"
+          status: "open" | "in_progress" | "resolved"
+          message: string
+          context: Json
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          agency_id?: string | null
+          title: string
+          category: "vuei_help" | "technical_issue" | "billing" | "credits" | "trip_link" | "other"
+          priority?: "normal" | "urgent"
+          status?: "open" | "in_progress" | "resolved"
+          message: string
+          context?: Json
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          user_id?: string
+          agency_id?: string | null
+          title?: string
+          category?: "vuei_help" | "technical_issue" | "billing" | "credits" | "trip_link" | "other"
+          priority?: "normal" | "urgent"
+          status?: "open" | "in_progress" | "resolved"
+          message?: string
+          context?: Json
+          updated_at?: string
+        }
+      }
+      support_messages: {
+        Row: {
+          id: string
+          ticket_id: string
+          sender_id: string | null
+          sender_role: "traveler" | "agency" | "master" | "system"
+          body: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          ticket_id: string
+          sender_id?: string | null
+          sender_role: "traveler" | "agency" | "master" | "system"
+          body: string
+          created_at?: string
+        }
+        Update: {
+          ticket_id?: string
+          sender_id?: string | null
+          sender_role?: "traveler" | "agency" | "master" | "system"
+          body?: string
+        }
+      }
       trip_hotels: {
         Row: {
           id: string
