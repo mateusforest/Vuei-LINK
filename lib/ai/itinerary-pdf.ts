@@ -108,13 +108,23 @@ function escapeHtml(value: string) {
 }
 
 function safeText(value: string | null | undefined, fallback = "Não informado") {
-  return value && value.trim() ? escapeHtml(value.trim()) : fallback
+  const normalized = value?.trim()
+  if (!normalized) return fallback
+
+  const lowered = normalized.toLowerCase()
+  if (lowered === "undefined" || lowered === "null" || lowered === "invalid date" || lowered === "n?o informado") {
+    return fallback
+  }
+
+  return escapeHtml(normalized)
 }
 
 function formatDate(value: string | null | undefined, fallback = "Não informado") {
   if (!value) return fallback
-  const parsed = new Date(`${value}T12:00:00`)
-  if (Number.isNaN(parsed.getTime())) return escapeHtml(value)
+  const normalized = value.trim()
+  if (!normalized || normalized.toLowerCase() === "invalid date") return fallback
+  const parsed = new Date(`${normalized}T12:00:00`)
+  if (Number.isNaN(parsed.getTime())) return fallback
   return escapeHtml(
     parsed.toLocaleDateString("pt-BR", {
       day: "2-digit",
@@ -246,13 +256,13 @@ function renderExperiences(days: GeneratedItineraryDay[]) {
   const cards = days.flatMap((day) =>
     day.activities
       .filter((activity) => activity.highlight || activity.type === "experience" || activity.type === "food" || activity.type === "transport")
-      .slice(0, 3)
+      .slice(0, 1)
       .map((activity) => ({
         day: day.day,
         date: day.date,
         activity,
       })),
-  )
+  ).slice(0, 4)
 
   if (cards.length === 0) {
     return `<div class="empty-card compact-empty">Nenhuma experiência adicional foi cadastrada além do roteiro principal.</div>`
@@ -353,8 +363,14 @@ function renderSummaryCards(input: TripPdfInput) {
   const documentsStatus = input.documents.length > 0 ? `${input.documents.length} documento(s) cadastrado(s)` : "Nenhum documento cadastrado"
   const flightStatus = input.flights.length > 0 ? `${input.flights.length} voo(s) cadastrado(s)` : "Nenhuma passagem cadastrada"
   const duration = calculateTripDuration(input.startDate, input.endDate) ?? "Período não informado"
+  const normalizedDestination = input.destination.trim().toLocaleLowerCase("pt-BR")
+  const normalizedCountry = input.country?.trim().toLocaleLowerCase("pt-BR")
+  const destinationLabel =
+    input.country && normalizedCountry && normalizedDestination.includes(normalizedCountry)
+      ? input.destination
+      : `${input.destination}${input.country ? `, ${input.country}` : ""}`
   const summaryItems = [
-    ["Destino", `${input.destination}${input.country ? `, ${input.country}` : ""}`],
+    ["Destino", destinationLabel],
     ["Período", `${formatDate(input.startDate)} - ${formatDate(input.endDate)}`],
     ["Viajantes", input.travelersLabel || `${input.travelersCount} pessoa(s)`],
     ["Hospedagem", accommodation],
@@ -430,14 +446,14 @@ function renderHtml(input: TripPdfInput, assets: { heroImage: string | null; age
         .agency-card strong { display: block; font-size: 16px; margin-bottom: 4px; }
         .agency-card span { display: block; font-size: 12px; color: rgba(255,255,255,0.78); }
         .cover-main { margin-top: auto; max-width: 620px; padding-bottom: 42px; }
-        .eyebrow { font-size: 12px; text-transform: uppercase; letter-spacing: 0.24em; color: rgba(255,255,255,0.78); margin-bottom: 18px; }
+        .eyebrow { font-size: 12px; text-transform: uppercase; letter-spacing: 0.1em; color: rgba(255,255,255,0.78); margin-bottom: 18px; }
         .cover-title { font-size: 60px; line-height: 0.98; letter-spacing: -0.05em; font-weight: 700; margin: 0 0 20px; }
         .cover-meta { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 28px; }
         .cover-meta span { background: rgba(255,255,255,0.11); border-radius: 999px; padding: 9px 14px; font-size: 13px; }
         .cover-summary { font-size: 19px; line-height: 1.7; color: rgba(255,255,255,0.82); margin: 0; max-width: 560px; }
         .cover-line { margin-top: auto; width: 92px; height: 4px; border-radius: 999px; background: ${SECONDARY}; }
         .section-head { margin-bottom: 22px; break-inside: avoid; page-break-inside: avoid; }
-        .section-head .eyebrow-dark, .subsection-head .eyebrow-dark { display: inline-flex; align-items: center; margin-bottom: 10px; padding: 8px 14px; border-radius: 999px; background: rgba(31,143,214,0.1); color: ${PRIMARY}; font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; font-weight: 700; }
+        .section-head .eyebrow-dark, .subsection-head .eyebrow-dark { display: inline-flex; align-items: center; margin-bottom: 10px; padding: 8px 14px; border-radius: 999px; background: rgba(31,143,214,0.1); color: ${PRIMARY}; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; font-weight: 700; }
         .section-head h2 { display: block; width: 100%; font-size: 34px; line-height: 1.06; letter-spacing: -0.04em; margin: 0; color: ${DARK}; }
         .section-head p { margin: 12px 2px 0; color: ${MUTED}; line-height: 1.62; max-width: 620px; font-size: 14px; }
         .subsection { margin-top: 24px; break-inside: auto; page-break-inside: auto; }
@@ -522,7 +538,7 @@ function renderHtml(input: TripPdfInput, assets: { heroImage: string | null; age
         .footer-brand h3 { margin: 0 0 5px; font-size: 24px; }
         .footer-brand p { margin: 0; color: rgba(255,255,255,0.68); }
         .footer-links { display: flex; gap: 12px; flex-wrap: wrap; justify-content: flex-end; }
-        .footer-link { padding: 11px 15px; border-radius: 999px; background: rgba(255,255,255,0.08); color: #fff; font-size: 13px; }
+        .footer-link { padding: 11px 15px; border-radius: 999px; background: rgba(255,255,255,0.08); color: #fff; font-size: 12px; white-space: nowrap; }
         .footer-bottom { width: 100%; border-top: 1px solid rgba(255,255,255,0.12); padding-top: 18px; display: flex; justify-content: space-between; align-items: center; color: rgba(255,255,255,0.58); font-size: 13px; }
         .powered { display: flex; align-items: center; gap: 8px; }
         .vuei-wordmark { font-weight: 800; letter-spacing: -0.04em; background: linear-gradient(90deg, ${SECONDARY}, #1f8fd6 55%, #1556c4); -webkit-background-clip: text; color: transparent; }
