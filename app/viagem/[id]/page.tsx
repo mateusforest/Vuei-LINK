@@ -555,6 +555,74 @@ function normalizeAirportCode(value?: string | null) {
   return match?.[0] ?? value.slice(0, 3).toUpperCase()
 }
 
+function sanitizeFlightTextSafe(value: unknown) {
+  if (typeof value !== "string") return null
+
+  const normalized = value.replace(/\s+/g, " ").trim()
+  if (!normalized) return null
+
+  const invalidValues = new Set(["undefined", "null", "invalid date", "[object object]", "--:--", "---", "-", "we"])
+  if (invalidValues.has(normalized.toLowerCase())) return null
+
+  return normalized
+}
+
+function formatFlightDateTimeSafe(dateString?: string | null) {
+  const normalizedValue = sanitizeFlightTextSafe(dateString)
+  if (!normalizedValue) return { date: "Data não informada", time: null as string | null, hasDate: false }
+
+  const date = new Date(normalizedValue)
+  if (Number.isNaN(date.getTime())) {
+    const dateOnlyMatch = normalizedValue.match(/^(\d{4}-\d{2}-\d{2})$/)
+    if (dateOnlyMatch) {
+      const fallbackDate = new Date(`${dateOnlyMatch[1]}T00:00:00`)
+      if (!Number.isNaN(fallbackDate.getTime())) {
+        return {
+          date: fallbackDate.toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" }),
+          time: null as string | null,
+          hasDate: true,
+        }
+      }
+    }
+
+    const timeOnlyMatch = normalizedValue.match(/^(\d{1,2}):(\d{2})$/)
+    if (timeOnlyMatch) {
+      return { date: "Data não informada", time: normalizedValue, hasDate: false }
+    }
+
+    return { date: "Data não informada", time: null as string | null, hasDate: false }
+  }
+
+  const hasExplicitTime = /t\d{2}:\d{2}/i.test(normalizedValue) || /\d{2}:\d{2}/.test(normalizedValue)
+
+  return {
+    date: date.toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" }),
+    time: hasExplicitTime ? date.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : null,
+    hasDate: true,
+  }
+}
+
+function calculateFlightDurationSafe(departureAt?: string | null, arrivalAt?: string | null) {
+  const departureValue = sanitizeFlightTextSafe(departureAt)
+  const arrivalValue = sanitizeFlightTextSafe(arrivalAt)
+  if (!departureValue || !arrivalValue) return null
+
+  const diff = new Date(arrivalValue).getTime() - new Date(departureValue).getTime()
+  if (!Number.isFinite(diff) || diff <= 0) return null
+
+  const totalMinutes = Math.round(diff / 60000)
+  const hours = Math.floor(totalMinutes / 60)
+  const minutes = totalMinutes % 60
+  return `${hours}h ${minutes.toString().padStart(2, "0")}m`
+}
+
+function normalizeAirportCodeSafe(value?: string | null) {
+  const normalizedValue = sanitizeFlightTextSafe(value)
+  if (!normalizedValue) return "—"
+  const match = normalizedValue.match(/\b[A-Z]{3}\b/)
+  return match?.[0] ?? normalizedValue.slice(0, 3).toUpperCase()
+}
+
 function getFlightExtractedValue(flight: TripFlightRecord, key: string) {
   const extractedData =
     flight.extractedData && typeof flight.extractedData === "object"
@@ -566,7 +634,7 @@ function getFlightExtractedValue(flight: TripFlightRecord, key: string) {
       : extractedData
 
   const value = structuredResult[key]
-  return typeof value === "string" && value.trim() ? value.trim() : null
+  return sanitizeFlightTextSafe(value)
 }
 
 function hasMeaningfulFlightExtraction(flight?: TripFlightRecord | null) {
@@ -579,39 +647,53 @@ function hasMeaningfulFlightExtraction(flight?: TripFlightRecord | null) {
       flight.destinationAirport ||
       flight.departureAt ||
       flight.arrivalAt ||
+      flight.bookingReference ||
+      flight.passengerName ||
       getFlightExtractedValue(flight, "airline") ||
       getFlightExtractedValue(flight, "flight_number") ||
       getFlightExtractedValue(flight, "origin_airport") ||
       getFlightExtractedValue(flight, "destination_airport") ||
       getFlightExtractedValue(flight, "departure_at") ||
-      getFlightExtractedValue(flight, "arrival_at")
+      getFlightExtractedValue(flight, "arrival_at") ||
+      getFlightExtractedValue(flight, "booking_reference") ||
+      getFlightExtractedValue(flight, "passenger_name")
   )
 }
 
 function mapFlightRecordToView(flight: TripFlightRecord, documents?: any[]) {
-  const airline = flight.airline || getFlightExtractedValue(flight, "airline")
-  const flightNumber = flight.flightNumber || getFlightExtractedValue(flight, "flight_number")
-  const bookingReference = flight.bookingReference || getFlightExtractedValue(flight, "booking_reference")
-  const originAirport = flight.originAirport || getFlightExtractedValue(flight, "origin_airport")
-  const destinationAirport = flight.destinationAirport || getFlightExtractedValue(flight, "destination_airport")
-  const departureAt = flight.departureAt || getFlightExtractedValue(flight, "departure_at")
-  const arrivalAt = flight.arrivalAt || getFlightExtractedValue(flight, "arrival_at")
-  const passengerName = flight.passengerName || getFlightExtractedValue(flight, "passenger_name")
-  const baggageInfo = flight.baggageInfo || getFlightExtractedValue(flight, "baggage_info")
-  const terminal = flight.terminal || getFlightExtractedValue(flight, "terminal")
-  const gate = flight.gate || getFlightExtractedValue(flight, "gate")
-  const seat = flight.seat || getFlightExtractedValue(flight, "seat")
-  const qrCodePayload = flight.qrCodePayload || getFlightExtractedValue(flight, "qr_code_payload")
-  const departure = formatFlightDateTime(departureAt)
-  const arrival = formatFlightDateTime(arrivalAt)
+  const airline = sanitizeFlightTextSafe(flight.airline) || getFlightExtractedValue(flight, "airline")
+  const flightNumber = sanitizeFlightTextSafe(flight.flightNumber) || getFlightExtractedValue(flight, "flight_number")
+  const bookingReference =
+    sanitizeFlightTextSafe(flight.bookingReference) || getFlightExtractedValue(flight, "booking_reference")
+  const originAirport = sanitizeFlightTextSafe(flight.originAirport) || getFlightExtractedValue(flight, "origin_airport")
+  const destinationAirport =
+    sanitizeFlightTextSafe(flight.destinationAirport) || getFlightExtractedValue(flight, "destination_airport")
+  const departureAt = sanitizeFlightTextSafe(flight.departureAt) || getFlightExtractedValue(flight, "departure_at")
+  const arrivalAt = sanitizeFlightTextSafe(flight.arrivalAt) || getFlightExtractedValue(flight, "arrival_at")
+  const passengerName =
+    sanitizeFlightTextSafe(flight.passengerName) || getFlightExtractedValue(flight, "passenger_name")
+  const baggageInfo = sanitizeFlightTextSafe(flight.baggageInfo) || getFlightExtractedValue(flight, "baggage_info")
+  const terminal = sanitizeFlightTextSafe(flight.terminal) || getFlightExtractedValue(flight, "terminal")
+  const gate = sanitizeFlightTextSafe(flight.gate) || getFlightExtractedValue(flight, "gate")
+  const seat = sanitizeFlightTextSafe(flight.seat) || getFlightExtractedValue(flight, "seat")
+  const qrCodePayload = sanitizeFlightTextSafe(flight.qrCodePayload) || getFlightExtractedValue(flight, "qr_code_payload")
+  const departure = formatFlightDateTimeSafe(departureAt)
+  const arrival = formatFlightDateTimeSafe(arrivalAt)
   const linkedDocument = Array.isArray(documents) ? documents.find((document: any) => document.id === flight.documentId) ?? null : null
+  const hasUsefulData = hasMeaningfulFlightExtraction(flight)
+  const extractionStatus = flight.extractionStatus === "failed" && hasUsefulData ? "completed" : flight.extractionStatus
+  const metaItems = [
+    terminal ? { label: "Terminal", value: terminal } : null,
+    gate ? { label: "Portão", value: gate } : null,
+    seat ? { label: "Assento", value: seat } : null,
+  ].filter(Boolean)
 
   return {
     id: flight.id,
     airline: airline || "Passagem anexada",
-    flightNumber: flightNumber || "Voo n?o identificado",
+    flightNumber: flightNumber || "Voo não identificado",
     bookingReference,
-    extractionStatus: flight.extractionStatus,
+    extractionStatus,
     extractedData: flight.extractedData ?? {},
     passengerName,
     baggageInfo,
@@ -620,17 +702,22 @@ function mapFlightRecordToView(flight: TripFlightRecord, documents?: any[]) {
     seat,
     qrCodePayload,
     date: departure.date,
-    duration: calculateFlightDuration(departureAt, arrivalAt),
+    duration: calculateFlightDurationSafe(departureAt, arrivalAt),
+    scheduleLabel:
+      departure.time && arrival.time
+        ? `${departure.time} - ${arrival.time}`
+        : departure.time || arrival.time || null,
     origin: {
-      code: normalizeAirportCode(originAirport),
-      city: originAirport || "Origem n?o informada",
+      code: normalizeAirportCodeSafe(originAirport),
+      city: originAirport || "Origem não informada",
       time: departure.time,
     },
     destination: {
-      code: normalizeAirportCode(destinationAirport),
-      city: destinationAirport || "Destino n?o informado",
+      code: normalizeAirportCodeSafe(destinationAirport),
+      city: destinationAirport || "Destino não informado",
       time: arrival.time,
     },
+    metaItems,
     document: linkedDocument,
   }
 }
@@ -638,7 +725,7 @@ function mapFlightRecordToView(flight: TripFlightRecord, documents?: any[]) {
 function getFlightStatusCopy(flight: any) {
   if (flight.extractionStatus === "completed") {
     return {
-      eyebrow: "Dados extraidos por IA",
+      eyebrow: "Dados extraídos por IA",
       detail: "Passagem processada",
       tone: "success" as const,
     }
@@ -655,7 +742,7 @@ function getFlightStatusCopy(flight: any) {
   if (flight.extractionStatus === "processing") {
     return {
       eyebrow: "Passagem anexada",
-      detail: "Extraindo dados da passagem...",
+      detail: "Analisando passagem...",
       tone: "pending" as const,
     }
   }
@@ -663,14 +750,14 @@ function getFlightStatusCopy(flight: any) {
   if (flight.extractionStatus === "failed") {
     return {
       eyebrow: "Passagem anexada",
-      detail: "N?o foi poss?vel identificar esta passagem",
+      detail: "Não conseguimos ler esta passagem automaticamente. Você ainda pode abrir o documento original.",
       tone: "error" as const,
     }
   }
 
   return {
     eyebrow: "Passagem anexada",
-    detail: "Estamos extraindo as informa??es.",
+    detail: "Estamos analisando as informações da passagem.",
     tone: "pending" as const,
   }
 }
@@ -1782,7 +1869,7 @@ function buildTravelerCardSummaries(tripData: any) {
           ? `${documents.filter((document: any) => document.type === "ticket").length} bilhete(s)`
           : "Nenhuma passagem",
       detail: flight
-        ? `${flight.date || "Data pendente"}${flight.origin?.time ? ` • ${flight.origin.time}` : ""}${flight.destination?.time ? ` - ${flight.destination.time}` : ""}`
+        ? `${flight.date || "Data pendente"}${flight.origin?.time ? ` • ${flight.origin.time}` : ""}${flight.destination?.time ? ` - ${flight.destination.time || "Hor?rio n?o informado"}` : ""}`
         : "Abra para ver",
       status: flight ? "Confirmado" : "Pendente",
       statusClassName: flight ? "text-emerald-600" : "text-slate-400",
@@ -1845,7 +1932,7 @@ function buildTravelerCardSummariesClean(tripData: any) {
           ? `${documents.filter((document: any) => document.type === "ticket").length} bilhete(s)`
           : "Nenhuma passagem",
       detail: flight
-        ? `${flight.date || "Data pendente"}${flight.origin?.time ? ` • ${flight.origin.time}` : ""}${flight.destination?.time ? ` - ${flight.destination.time}` : ""}`
+        ? `${flight.date || "Data pendente"}${flight.origin?.time ? ` • ${flight.origin.time}` : ""}${flight.destination?.time ? ` - ${flight.destination.time || "Hor?rio n?o informado"}` : ""}`
         : "Abra para ver",
       status: flight ? "Confirmado" : "Pendente",
       statusClassName: flight ? "text-emerald-600" : "text-slate-400",
@@ -2209,23 +2296,23 @@ function FlightCard({
 
         <div className="flex items-center gap-4">
           <div className="flex-1 text-center">
-            <p className="text-2xl font-bold text-white">{flight.origin.time}</p>
+            {flight.origin.time ? <p className="text-2xl font-bold text-white">{flight.origin.time}</p> : null}
             <p className="text-lg font-semibold text-[#5de0e6]">{flight.origin.code}</p>
             <p className="text-xs text-white/40">{flight.origin.city}</p>
           </div>
           
           <div className="flex-1 flex flex-col items-center">
-            <p className="text-[10px] text-white/30 mb-2">{flight.duration}</p>
+            {flight.duration ? <p className="text-[10px] text-white/30 mb-2">{flight.duration}</p> : null}
             <div className="w-full flex items-center gap-1">
               <div className="h-px flex-1 bg-gradient-to-r from-transparent via-[#5de0e6]/50 to-[#5de0e6]" />
               <Plane className="w-4 h-4 text-[#5de0e6] rotate-90" />
               <div className="h-px flex-1 bg-gradient-to-r from-[#5de0e6] via-[#5de0e6]/50 to-transparent" />
             </div>
-            <p className="text-[10px] text-white/30 mt-2">Direto</p>
+            {flight.scheduleLabel ? <p className="text-[10px] text-white/30 mt-2">{flight.scheduleLabel}</p> : null}
           </div>
           
           <div className="flex-1 text-center">
-            <p className="text-2xl font-bold text-white">{flight.destination.time}</p>
+            {flight.destination.time ? <p className="text-2xl font-bold text-white">{flight.destination.time}</p> : null}
             <p className="text-lg font-semibold text-[#5de0e6]">{flight.destination.code}</p>
             <p className="text-xs text-white/40">{flight.destination.city}</p>
           </div>
@@ -2240,20 +2327,16 @@ function FlightCard({
               transition={{ duration: 0.3 }}
               className="overflow-hidden"
             >
-              <div className="mt-4 pt-4 border-t border-white/[0.06] grid grid-cols-3 gap-4">
-                <div>
-                  <p className="text-[10px] text-white/40 uppercase tracking-wider">Terminal</p>
-                  <p className="text-sm text-white font-medium">{flight.terminal || "-"}</p>
+              {flight.metaItems?.length ? (
+                <div className="mt-4 pt-4 border-t border-white/[0.06] grid grid-cols-1 gap-4 sm:grid-cols-3">
+                  {flight.metaItems.map((item: { label: string; value: string }) => (
+                    <div key={item.label}>
+                      <p className="text-[10px] text-white/40 uppercase tracking-wider">{item.label}</p>
+                      <p className="text-sm text-white font-medium">{item.value}</p>
+                    </div>
+                  ))}
                 </div>
-                <div>
-                  <p className="text-[10px] text-white/40 uppercase tracking-wider">Portao</p>
-                  <p className="text-sm text-white font-medium">{flight.gate || "-"}</p>
-                </div>
-                <div>
-                  <p className="text-[10px] text-white/40 uppercase tracking-wider">Assento</p>
-                  <p className="text-sm text-white font-medium">{flight.seat || "-"}</p>
-                </div>
-              </div>
+              ) : null}
               
               <div className="mt-4 flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -2518,20 +2601,20 @@ function FlightDetailsModal({
             <p className="mt-2 text-sm text-white">{flight.destination.city}</p>
           </div>
           <div>
-            <p className="text-xs uppercase tracking-wider text-white/40">Saida</p>
+            <p className="text-xs uppercase tracking-wider text-white/40">Sa?da</p>
             <p className="mt-2 text-sm text-white">{flight.date} • {flight.origin.time}</p>
           </div>
           <div>
             <p className="text-xs uppercase tracking-wider text-white/40">Chegada</p>
-            <p className="mt-2 text-sm text-white">{flight.destination.time}</p>
+            <p className="mt-2 text-sm text-white">{flight.destination.time || "Hor?rio n?o informado"}</p>
           </div>
           <div>
-            <p className="text-xs uppercase tracking-wider text-white/40">Terminal / Portao</p>
-            <p className="mt-2 text-sm text-white">{flight.terminal || "-"} / {flight.gate || "-"}</p>
+            <p className="text-xs uppercase tracking-wider text-white/40">Terminal / Port?o</p>
+            <p className="mt-2 text-sm text-white">{[flight.terminal, flight.gate].filter(Boolean).join(" / ") || "N?o informado"}</p>
           </div>
           <div>
             <p className="text-xs uppercase tracking-wider text-white/40">Assento / Bagagem</p>
-            <p className="mt-2 text-sm text-white">{flight.seat || "-"} / {flight.baggageInfo || "-"}</p>
+            <p className="mt-2 text-sm text-white">{[flight.seat, flight.baggageInfo].filter(Boolean).join(" / ") || "N?o informado"}</p>
           </div>
         </div>
 

@@ -245,6 +245,45 @@ function isPartialFlightExtraction(payload: Record<string, unknown> | null | und
   return filledRequiredFields > 0 && filledRequiredFields < requiredFields.length
 }
 
+function sanitizeFlightText(value: unknown) {
+  if (typeof value !== "string") return null
+
+  const normalized = value.trim()
+  return normalized ? normalized : null
+}
+
+function hasStoredUsefulFlightData(flight: TripFlightRow | null) {
+  if (!flight) return false
+
+  const extractedData =
+    flight.extracted_data && typeof flight.extracted_data === "object"
+      ? (flight.extracted_data as JsonObject)
+      : null
+  const structuredResult =
+    extractedData?.structured_result && typeof extractedData.structured_result === "object"
+      ? (extractedData.structured_result as JsonObject)
+      : extractedData
+
+  return Boolean(
+    sanitizeFlightText(flight.airline) ||
+      sanitizeFlightText(flight.flight_number) ||
+      sanitizeFlightText(flight.origin_airport) ||
+      sanitizeFlightText(flight.destination_airport) ||
+      sanitizeFlightText(flight.departure_at) ||
+      sanitizeFlightText(flight.arrival_at) ||
+      sanitizeFlightText(flight.booking_reference) ||
+      sanitizeFlightText(flight.passenger_name) ||
+      sanitizeFlightText(structuredResult?.airline) ||
+      sanitizeFlightText(structuredResult?.flight_number) ||
+      sanitizeFlightText(structuredResult?.origin_airport) ||
+      sanitizeFlightText(structuredResult?.destination_airport) ||
+      sanitizeFlightText(structuredResult?.departure_at) ||
+      sanitizeFlightText(structuredResult?.arrival_at) ||
+      sanitizeFlightText(structuredResult?.booking_reference) ||
+      sanitizeFlightText(structuredResult?.passenger_name)
+  )
+}
+
 async function markFlightFailed(
   client: NonNullable<Awaited<ReturnType<typeof createSupabaseServerClient>>>,
   flightId: string,
@@ -364,6 +403,25 @@ export async function POST(request: Request) {
   const entityResult = await getFlightAndDocument(supabase, tripId, flightId, documentId)
   if (!entityResult.flight || !entityResult.document) {
     return NextResponse.json({ error: entityResult.error ?? "Passagem n?o ?ncontrada." }, { status: 404 })
+  }
+
+  const alreadyExtractedSuccessfully =
+    (entityResult.flight.extraction_status === "completed" || entityResult.flight.extraction_status === "manual") &&
+    hasStoredUsefulFlightData(entityResult.flight)
+
+  if (alreadyExtractedSuccessfully) {
+    console.info("[AI][FLIGHT_EXTRACTION] reusing existing extraction", {
+      tripId,
+      documentId,
+      flightId,
+      strategy: "existing_flight_data",
+      status: entityResult.flight.extraction_status,
+    })
+
+    return NextResponse.json({
+      flight: entityResult.flight,
+      document: entityResult.document,
+    })
   }
 
   if (entityResult.document.type !== "ticket") {
@@ -493,7 +551,7 @@ export async function POST(request: Request) {
   const extractionPayload = aiResult.data
   const usefulFieldCount = countUsefulFlightFields(extractionPayload)
   const partial = Boolean(extractionPayload?.is_ticket && isPartialFlightExtraction(extractionPayload))
-  const completed = Boolean(extractionPayload?.is_ticket && usefulFieldCount > 0 && !partial)
+  const completed = Boolean(extractionPayload?.is_ticket && usefulFieldCount > 0)
   const failureReason =
     aiResult.error ||
     extractionPayload?.failure_reason ||
@@ -515,6 +573,16 @@ export async function POST(request: Request) {
     estimatedCostUsd: estimateCostUsd(aiResult.usage.inputTokens, aiResult.usage.outputTokens),
   }
 
+  console.info("[AI][FLIGHT_EXTRACTION] processed", {
+    tripId,
+    documentId,
+    flightId,
+    strategy: completed ? "ai_ticket_completed" : partial ? "ai_ticket_partial_failed" : "ai_ticket_failed",
+    usefulFieldCount,
+    isTicket: Boolean(extractionPayload?.is_ticket),
+    shouldChargeCredits: Boolean(shouldChargeCredits && completed),
+  })
+
   const flightUpdate = await updateFlightRecord(supabase, entityResult.flight.id, {
     airline: completed ? extractionPayload?.airline ?? null : null,
     flight_number: completed ? extractionPayload?.flight_number ?? null : null,
@@ -530,7 +598,7 @@ export async function POST(request: Request) {
     baggage_info: completed ? extractionPayload?.baggage_info ?? null : null,
     qr_code_payload: completed ? extractionPayload?.qr_code_payload ?? null : null,
     extracted_data: metadata,
-    extraction_status: completed ? "completed" : partial ? "manual" : "failed",
+    extraction_status: completed ? "completed" : "failed",
   })
 
   const documentUpdate = await updateDocumentExtractionData(supabase, entityResult.document.id, metadata)
@@ -543,7 +611,7 @@ export async function POST(request: Request) {
     console.error("[AI][FLIGHT_EXTRACTION] document metadata update error", documentUpdate.error)
   }
 
-  if (shouldChargeCredits) {
+  if (shouldChargeCredits && completed) {
     const usageInsert = await createAiUsageLog(supabase, {
       ownerUserId: ownerType === "traveler" ? actingUserId : null,
       agencyId: accessResult.trip.agency_id,
@@ -554,7 +622,7 @@ export async function POST(request: Request) {
       outputTokens: aiResult.usage.outputTokens,
       totalTokens: aiResult.usage.totalTokens,
       creditAmount: creditsPerCall,
-      status: completed ? "completed" : "failed",
+      status: "completed",
       metadata,
     })
 
@@ -614,7 +682,9 @@ export async function POST(request: Request) {
   if (!completed) {
     return NextResponse.json(
       {
-        error: failureReason || "N?o foi poss?vel identificar esta passagem.",
+        error:
+          failureReason ||
+          "Não conseguimos ler esta passagem automaticamente. Você ainda pode abrir o documento original.",
         flight: flightUpdate.data,
         document: documentUpdate.data,
       },
