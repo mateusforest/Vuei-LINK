@@ -343,8 +343,15 @@ export function TripsProvider({ children }: { children: ReactNode }) {
 
     void syncBillingStatus()
 
+    const handleWindowFocus = () => {
+      void syncBillingStatus()
+    }
+
+    window.addEventListener("focus", handleWindowFocus)
+
     return () => {
       mounted = false
+      window.removeEventListener("focus", handleWindowFocus)
     }
   }, [isLoaded, profile, user])
 

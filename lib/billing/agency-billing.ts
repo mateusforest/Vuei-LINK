@@ -8,6 +8,7 @@ import type {
   CreditTransaction,
 } from "@/types"
 import { AGENCY_PLAN_DEFINITIONS, normalizeAgencyCommercialPlanCode } from "@/lib/billing/agency-plans"
+import { getAccountLimitOverrideQuantity } from "@/lib/billing/account-limit-overrides"
 
 type SupabaseDbClient = SupabaseClient<Database>
 type AgencySubscriptionRow = Database["public"]["Tables"]["agency_subscriptions"]["Row"]
@@ -106,6 +107,10 @@ function buildAgencyBillingStatus(
   status: AgencySubscriptionStatus,
   startedAt: string | null,
   expiresAt: string | null,
+  limitOverrides?: {
+    maxClients?: number | null
+    maxActiveTrips?: number
+  },
   extras?: {
     stripeCustomerId?: string | null
     stripeSubscriptionId?: string | null
@@ -124,8 +129,8 @@ function buildAgencyBillingStatus(
     startedAt,
     expiresAt,
     maxUsers: definition.maxUsers,
-    maxClients: definition.maxClients,
-    maxActiveTrips: definition.maxActiveTrips,
+    maxClients: limitOverrides?.maxClients ?? definition.maxClients,
+    maxActiveTrips: limitOverrides?.maxActiveTrips ?? definition.maxActiveTrips,
     monthlyCredits: definition.monthlyCredits,
     features: definition.features,
     stripeCustomerId: extras?.stripeCustomerId ?? null,
@@ -173,8 +178,53 @@ export async function getAgencyBillingStatusForClient(client: SupabaseDbClient, 
     return { data: null as AgencyBillingStatusSummary | null, error: error.message }
   }
 
+  const effectivePlan = getEffectiveAgencyPlan((data as AgencySubscriptionRow | null | undefined) ?? null)
+  const definition = AGENCY_PLAN_DEFINITIONS[effectivePlan]
+  const [clientOverrideResult, activeTripsOverrideResult] = await Promise.all([
+    definition.maxClients === null
+      ? Promise.resolve({ data: 0, error: null })
+      : getAccountLimitOverrideQuantity(client, {
+          ownerType: "agency",
+          ownerId: agencyId,
+          limitType: "clients",
+        }),
+    getAccountLimitOverrideQuantity(client, {
+      ownerType: "agency",
+      ownerId: agencyId,
+      limitType: "active_trips",
+    }),
+  ])
+
+  if (clientOverrideResult.error || activeTripsOverrideResult.error) {
+    return {
+      data: null as AgencyBillingStatusSummary | null,
+      error: clientOverrideResult.error ?? activeTripsOverrideResult.error ?? "Nao foi possivel carregar os limites extras da agencia.",
+    }
+  }
+
   return {
-    data: data ? mapAgencySubscriptionRowToBillingStatus(data as AgencySubscriptionRow) : getDefaultAgencyBillingStatus(agencyId),
+    data: buildAgencyBillingStatus(
+      agencyId,
+      data ? normalizeAgencyCommercialPlanCode((data as AgencySubscriptionRow).plan_code) : "free",
+      data ? (data as AgencySubscriptionRow).status : "active",
+      data ? (data as AgencySubscriptionRow).started_at : null,
+      data ? (data as AgencySubscriptionRow).expires_at : null,
+      {
+        maxClients:
+          definition.maxClients === null ? null : definition.maxClients + Math.max(clientOverrideResult.data, 0),
+        maxActiveTrips: definition.maxActiveTrips + Math.max(activeTripsOverrideResult.data, 0),
+      },
+      data
+        ? {
+            stripeCustomerId: (data as AgencySubscriptionRow).stripe_customer_id,
+            stripeSubscriptionId: (data as AgencySubscriptionRow).stripe_subscription_id,
+            stripePriceId: (data as AgencySubscriptionRow).stripe_price_id,
+            currentPeriodStart: (data as AgencySubscriptionRow).current_period_start,
+            currentPeriodEnd: (data as AgencySubscriptionRow).current_period_end,
+            cancelAtPeriodEnd: (data as AgencySubscriptionRow).cancel_at_period_end,
+          }
+        : undefined,
+    ),
     error: null,
   }
 }
@@ -307,6 +357,23 @@ export async function getAgencyCreditBalance(client: SupabaseDbClient, agencyId:
 
   const effectivePlan = getEffectiveAgencyPlan(subscriptionResult.data)
   const definition = AGENCY_PLAN_DEFINITIONS[effectivePlan]
+  const [clientOverrideResult, activeTripsOverrideResult] = await Promise.all([
+    definition.maxClients === null
+      ? Promise.resolve({ data: 0, error: null })
+      : getAccountLimitOverrideQuantity(client, {
+          ownerType: "agency",
+          ownerId: agencyId,
+          limitType: "clients",
+        }),
+    getAccountLimitOverrideQuantity(client, {
+      ownerType: "agency",
+      ownerId: agencyId,
+      limitType: "active_trips",
+    }),
+  ])
+  if (clientOverrideResult.error || activeTripsOverrideResult.error) {
+    return { data: null, error: clientOverrideResult.error ?? activeTripsOverrideResult.error }
+  }
   const nowIso = new Date().toISOString()
   const currentCycleResult = await getCurrentAgencyPlanCycle(client, agencyId, nowIso)
   if (currentCycleResult.error) {
@@ -372,8 +439,8 @@ export async function getAgencyCreditBalance(client: SupabaseDbClient, agencyId:
       planCode: effectivePlan,
       status: subscriptionResult.data.status,
       maxUsers: definition.maxUsers,
-      maxClients: definition.maxClients,
-      maxActiveTrips: definition.maxActiveTrips,
+      maxClients: definition.maxClients === null ? null : definition.maxClients + Math.max(clientOverrideResult.data, 0),
+      maxActiveTrips: definition.maxActiveTrips + Math.max(activeTripsOverrideResult.data, 0),
       monthlyCredits: definition.monthlyCredits,
       planCreditsAvailable,
       purchasedCreditsAvailable,

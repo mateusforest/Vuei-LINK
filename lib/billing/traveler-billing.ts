@@ -4,6 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import type { Database } from "@/lib/supabase/types"
 import type { TravelerBillingStatusSummary, TravelerPlanCode, TravelerSubscriptionStatus } from "@/types"
 import { TRAVELER_PLAN_DEFINITIONS } from "@/lib/billing/traveler-plans"
+import { getAccountLimitOverrideQuantity } from "@/lib/billing/account-limit-overrides"
 
 type SupabaseDbClient = SupabaseClient<Database>
 type TravelerSubscriptionRow = Database["public"]["Tables"]["traveler_subscriptions"]["Row"]
@@ -451,6 +452,16 @@ export async function getTravelerCreditBalance(client: SupabaseDbClient, userId:
 
   const totalAvailable = Math.max(profileResult.data.credits_balance ?? 0, 0)
   const purchasedCreditsAvailable = Math.max(totalAvailable - planCreditsAvailable, 0)
+  const tripOverrideResult = await getAccountLimitOverrideQuantity(client, {
+    ownerType: "traveler",
+    ownerId: userId,
+    limitType: "active_trips",
+  })
+  if (tripOverrideResult.error) {
+    return { data: null, error: tripOverrideResult.error }
+  }
+  const baseMaxActiveTrips = TRAVELER_PLAN_DEFINITIONS[effectivePlan].limits.maxActiveTrips
+  const maxActiveTrips = baseMaxActiveTrips === null ? null : baseMaxActiveTrips + Math.max(tripOverrideResult.data, 0)
 
   return {
     data: {
@@ -463,6 +474,7 @@ export async function getTravelerCreditBalance(client: SupabaseDbClient, userId:
       stripeCustomerId: subscriptionResult.data.stripe_customer_id,
       stripeSubscriptionId: subscriptionResult.data.stripe_subscription_id,
       cancelAtPeriodEnd: subscriptionResult.data.cancel_at_period_end,
+      maxActiveTrips,
     },
     error: null,
   }

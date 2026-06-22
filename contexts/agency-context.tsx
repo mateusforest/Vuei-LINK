@@ -527,6 +527,7 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
         current.plan || billingStatusResult.data.currentPlan || "free",
         history.length > 0 ? history : current.history,
       ))
+      setSubscription(resolveAgencyPlanSnapshot({ billingStatus: billingStatusResult.data }))
     }
 
     const handleCreditsChanged = (event: Event) => {
@@ -537,10 +538,16 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
       void refreshAgencyCredits()
     }
 
+    const handleWindowFocus = () => {
+      void refreshAgencyCredits()
+    }
+
     window.addEventListener(CREDIT_BALANCE_CHANGED_EVENT, handleCreditsChanged as EventListener)
+    window.addEventListener("focus", handleWindowFocus)
     return () => {
       active = false
       window.removeEventListener(CREDIT_BALANCE_CHANGED_EVENT, handleCreditsChanged as EventListener)
+      window.removeEventListener("focus", handleWindowFocus)
     }
   }, [agency])
 

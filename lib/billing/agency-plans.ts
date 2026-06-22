@@ -134,7 +134,16 @@ export function resolveAgencyPlanSnapshot(input?: {
   const billingStatus = input?.billingStatus ?? null
   const code = billingStatus?.planCode
     ?? normalizeAgencyCommercialPlanCode(input?.planCode ?? (input?.agency ? mapLegacyAgencyPlanToCommercialPlan(input.agency.plan) : null))
-  const definition = AGENCY_PLAN_DEFINITIONS[code]
+  const baseDefinition = AGENCY_PLAN_DEFINITIONS[code]
+  const definition =
+    !billingStatus ||
+    (billingStatus.maxClients === baseDefinition.maxClients && billingStatus.maxActiveTrips === baseDefinition.maxActiveTrips)
+      ? baseDefinition
+      : {
+          ...baseDefinition,
+          maxClients: billingStatus.maxClients,
+          maxActiveTrips: billingStatus.maxActiveTrips,
+        }
 
   return {
     code,

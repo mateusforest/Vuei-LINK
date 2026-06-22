@@ -1,16 +1,16 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { AlertTriangle, CheckCircle2, LifeBuoy, MessageCircleReply, Search } from "lucide-react"
+import { AlertTriangle, CheckCircle2, Gift, LifeBuoy, MessageCircleReply, Search } from "lucide-react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
+import { applySupportBonus, getSupportTicketDetail, listSupportTickets, replySupportTicket, updateSupportTicketStatus } from "@/lib/repositories/support-repository"
 import { getSupportCategoryLabel, getSupportPortalLabel, getSupportPriorityLabel, getSupportSenderRoleLabel, getSupportStatusLabel } from "@/lib/support/labels"
-import { getSupportTicketDetail, listSupportTickets, replySupportTicket, updateSupportTicketStatus } from "@/lib/repositories/support-repository"
 import { cn } from "@/lib/utils"
-import type { SupportMessage, SupportTicket, SupportTicketPriority, SupportTicketStatus } from "@/types"
+import type { SupportBonusPayload, SupportBonusType, SupportMessage, SupportTicket, SupportTicketPriority, SupportTicketStatus } from "@/types"
 
 function TicketPriorityBadge({ priority }: { priority: SupportTicketPriority }) {
   return (
@@ -40,18 +40,29 @@ function TicketStatusBadge({ status }: { status: SupportTicketStatus }) {
   )
 }
 
+type TicketDetail = { ticket: SupportTicket; messages: SupportMessage[] }
+
 export default function MasterSupportPage() {
   const [tickets, setTickets] = useState<SupportTicket[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null)
-  const [detail, setDetail] = useState<{ ticket: SupportTicket; messages: SupportMessage[] } | null>(null)
+  const [detail, setDetail] = useState<TicketDetail | null>(null)
   const [reply, setReply] = useState("")
   const [replying, setReplying] = useState(false)
   const [statusUpdating, setStatusUpdating] = useState<SupportTicketStatus | null>(null)
   const [statusFilter, setStatusFilter] = useState<"all" | SupportTicketStatus>("all")
   const [priorityFilter, setPriorityFilter] = useState<"all" | SupportTicketPriority>("all")
   const [search, setSearch] = useState("")
+  const [bonusTarget, setBonusTarget] = useState("")
+  const [bonusType, setBonusType] = useState<SupportBonusType>("credits")
+  const [bonusQuantity, setBonusQuantity] = useState("1")
+  const [bonusReason, setBonusReason] = useState("")
+  const [bonusTripTitle, setBonusTripTitle] = useState("")
+  const [bonusClientName, setBonusClientName] = useState("")
+  const [bonusSubmitting, setBonusSubmitting] = useState(false)
+  const [bonusError, setBonusError] = useState<string | null>(null)
+  const [bonusSuccess, setBonusSuccess] = useState<string | null>(null)
 
   const loadTickets = async () => {
     setLoading(true)
@@ -61,6 +72,13 @@ export default function MasterSupportPage() {
     setLoading(false)
   }
 
+  const loadDetail = async (ticketId: string) => {
+    const result = await getSupportTicketDetail(ticketId)
+    setDetail(result.data)
+    setError(result.error)
+    return result.data
+  }
+
   useEffect(() => {
     void loadTickets()
   }, [])
@@ -68,18 +86,20 @@ export default function MasterSupportPage() {
   useEffect(() => {
     if (!selectedTicketId) {
       setDetail(null)
+      setReply("")
+      setBonusError(null)
+      setBonusSuccess(null)
       return
     }
 
     let active = true
-    const loadDetail = async () => {
+    void (async () => {
       const result = await getSupportTicketDetail(selectedTicketId)
       if (!active) return
       setDetail(result.data)
       setError(result.error)
-    }
+    })()
 
-    void loadDetail()
     return () => {
       active = false
     }
@@ -98,6 +118,56 @@ export default function MasterSupportPage() {
     })
   }, [tickets, statusFilter, priorityFilter, search])
 
+  const ticketTargets = useMemo(() => {
+    if (!detail?.ticket) return []
+
+    const portalType = detail.ticket.context?.portalType
+    const targets: Array<{ value: string; label: string; type: "agency" | "traveler" }> = []
+
+    if (detail.ticket.agencyId) {
+      targets.push({
+        value: `agency:${detail.ticket.agencyId}`,
+        type: "agency",
+        label: detail.ticket.context?.agencyName
+          ? `Agencia: ${detail.ticket.context.agencyName}`
+          : "Agencia vinculada",
+      })
+    }
+
+    if (portalType === "traveler" && detail.ticket.userId) {
+      const travelerLabel =
+        typeof detail.ticket.context?.name === "string" && detail.ticket.context.name.trim()
+          ? detail.ticket.context.name.trim()
+          : typeof detail.ticket.context?.email === "string" && detail.ticket.context.email.trim()
+            ? detail.ticket.context.email.trim()
+            : "Viajante"
+
+      targets.push({
+        value: `traveler:${detail.ticket.userId}`,
+        type: "traveler",
+        label: `Viajante: ${travelerLabel}`,
+      })
+    }
+
+    return targets
+  }, [detail])
+
+  useEffect(() => {
+    if (ticketTargets.length === 0) {
+      setBonusTarget("")
+      return
+    }
+
+    setBonusTarget((current) => (ticketTargets.some((target) => target.value === current) ? current : ticketTargets[0].value))
+  }, [ticketTargets])
+
+  useEffect(() => {
+    const targetType = bonusTarget.startsWith("agency:") ? "agency" : bonusTarget.startsWith("traveler:") ? "traveler" : null
+    if (targetType === "traveler" && bonusType === "client_extra") {
+      setBonusType("trip_extra")
+    }
+  }, [bonusTarget, bonusType])
+
   const handleReply = async () => {
     if (!selectedTicketId || !reply.trim()) return
     setReplying(true)
@@ -108,8 +178,7 @@ export default function MasterSupportPage() {
       return
     }
     setReply("")
-    const detailResult = await getSupportTicketDetail(selectedTicketId)
-    setDetail(detailResult.data)
+    await loadDetail(selectedTicketId)
     await loadTickets()
   }
 
@@ -122,19 +191,69 @@ export default function MasterSupportPage() {
       setError(result.error)
       return
     }
-    const detailResult = await getSupportTicketDetail(selectedTicketId)
-    setDetail(detailResult.data)
+    await loadDetail(selectedTicketId)
+    await loadTickets()
+  }
+
+  const handleBonusSubmit = async () => {
+    if (!selectedTicketId || !bonusTarget) {
+      setBonusError("Selecione a conta que vai receber a bonificacao.")
+      return
+    }
+
+    const normalizedQuantity = Number.parseInt(bonusQuantity, 10)
+    if (!Number.isFinite(normalizedQuantity) || normalizedQuantity <= 0) {
+      setBonusError("Informe uma quantidade positiva.")
+      return
+    }
+
+    if (!bonusReason.trim()) {
+      setBonusError("Informe o motivo da bonificacao.")
+      return
+    }
+
+    const [targetType, targetId] = bonusTarget.split(":") as ["agency" | "traveler", string]
+    const payload: SupportBonusPayload = {
+      targetType,
+      targetId,
+      bonusType,
+      quantity: normalizedQuantity,
+      reason: bonusReason.trim(),
+      relatedClientName: bonusClientName.trim() || null,
+      relatedTripTitle: bonusTripTitle.trim() || null,
+    }
+
+    setBonusSubmitting(true)
+    setBonusError(null)
+    setBonusSuccess(null)
+
+    const result = await applySupportBonus(selectedTicketId, payload)
+
+    setBonusSubmitting(false)
+
+    if (result.error) {
+      setBonusError(result.error)
+      return
+    }
+
+    setBonusSuccess("Bonificacao aplicada com sucesso.")
+    setBonusQuantity("1")
+    setBonusReason("")
+    setBonusTripTitle("")
+    setBonusClientName("")
+    await loadDetail(selectedTicketId)
     await loadTickets()
   }
 
   const urgentCount = tickets.filter((ticket) => ticket.priority === "urgent" && ticket.status !== "resolved").length
+  const selectedTargetType = bonusTarget.startsWith("agency:") ? "agency" : "traveler"
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Suporte</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Acompanhe chamados enviados pelos portais viajante e agência.</p>
+          <p className="mt-1 text-sm text-muted-foreground">Acompanhe chamados enviados pelos portais viajante e agencia.</p>
         </div>
         <div className="flex items-center gap-2 rounded-2xl border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700">
           <AlertTriangle className="h-4 w-4" />
@@ -147,7 +266,7 @@ export default function MasterSupportPage() {
           <div className="mb-4 flex flex-col gap-3 lg:flex-row">
             <div className="relative flex-1">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar por assunto, usuário ou portal..." className="pl-9" />
+              <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar por assunto, usuario ou portal..." className="pl-9" />
             </div>
             <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as "all" | SupportTicketStatus)} className="h-10 rounded-md border border-input bg-background px-3 text-sm">
               <option value="all">Todos os status</option>
@@ -172,7 +291,7 @@ export default function MasterSupportPage() {
 
             {filteredTickets.map((ticket) => {
               const portalType = typeof ticket.context?.portalType === "string" ? ticket.context.portalType : "traveler"
-              const travelerName = typeof ticket.context?.name === "string" ? ticket.context.name : "Usuário"
+              const travelerName = typeof ticket.context?.name === "string" ? ticket.context.name : "Usuario"
               return (
                 <button
                   key={ticket.id}
@@ -211,7 +330,7 @@ export default function MasterSupportPage() {
         </Card>
 
         <Card className="border-border/60 bg-card/80 p-4">
-          <p className="text-sm font-semibold text-foreground">Resumo rápido</p>
+          <p className="text-sm font-semibold text-foreground">Resumo rapido</p>
           <div className="mt-4 space-y-3 text-sm text-muted-foreground">
             <div className="flex items-center justify-between rounded-2xl border border-border/60 bg-background/70 px-4 py-3">
               <span>Chamados abertos</span>
@@ -235,7 +354,7 @@ export default function MasterSupportPage() {
       </div>
 
       <Dialog open={Boolean(selectedTicketId)} onOpenChange={(open) => !open && setSelectedTicketId(null)}>
-        <DialogContent className="max-w-3xl border-border/60 bg-white">
+        <DialogContent className="max-h-[90vh] overflow-y-auto border-border/60 bg-white sm:max-w-4xl">
           <DialogHeader>
             <DialogTitle>{detail?.ticket.title ?? "Chamado"}</DialogTitle>
             <DialogDescription>
@@ -247,26 +366,34 @@ export default function MasterSupportPage() {
             <div className="space-y-5">
               <div className="grid gap-3 rounded-2xl border border-border/60 bg-slate-50 p-4 text-sm text-slate-700 sm:grid-cols-2">
                 <div>
-                  <p className="text-xs uppercase tracking-wide text-slate-500">Usuário</p>
-                  <p className="mt-1 font-medium">{String(detail.ticket.context?.name ?? "Usuário")}</p>
+                  <p className="text-xs uppercase tracking-wide text-slate-500">Usuario</p>
+                  <p className="mt-1 font-medium">{String(detail.ticket.context?.name ?? "Usuario")}</p>
                   <p className="text-xs text-slate-500">{String(detail.ticket.context?.email ?? "Sem email")}</p>
                 </div>
                 <div>
                   <p className="text-xs uppercase tracking-wide text-slate-500">Origem</p>
                   <p className="mt-1 font-medium">{getSupportPortalLabel((detail.ticket.context?.portalType as any) ?? "traveler")}</p>
-                  <p className="text-xs text-slate-500">{String(detail.ticket.context?.currentRoute ?? "Rota não informada")}</p>
+                  <p className="text-xs text-slate-500">{String(detail.ticket.context?.currentRoute ?? "Rota nao informada")}</p>
+                </div>
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-slate-500">Agencia</p>
+                  <p className="mt-1 font-medium">{String(detail.ticket.context?.agencyName ?? detail.ticket.agencyId ?? "Nao vinculada")}</p>
+                </div>
+                <div className="text-xs text-slate-500">
+                  Criado em {new Date(detail.ticket.createdAt).toLocaleString("pt-BR")}
                 </div>
                 <div className="flex items-center gap-2">
                   <TicketPriorityBadge priority={detail.ticket.priority as any} />
                   <TicketStatusBadge status={detail.ticket.status as any} />
                 </div>
-                <div className="text-xs text-slate-500">
-                  Criado em {new Date(detail.ticket.createdAt).toLocaleString("pt-BR")}
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-slate-500">Mensagem inicial</p>
+                  <p className="mt-1 text-sm text-slate-700">{detail.ticket.message}</p>
                 </div>
               </div>
 
               <div className="space-y-3">
-                <p className="text-sm font-semibold text-slate-900">Histórico</p>
+                <p className="text-sm font-semibold text-slate-900">Historico</p>
                 <div className="max-h-80 space-y-3 overflow-y-auto rounded-2xl border border-border/60 bg-slate-50 p-4">
                   {detail.messages.map((message) => (
                     <div key={message.id} className="rounded-2xl border border-white bg-white p-3 shadow-sm">
@@ -291,6 +418,67 @@ export default function MasterSupportPage() {
                   <CheckCircle2 className="mr-2 h-4 w-4" />
                   Resolver
                 </Button>
+              </div>
+
+              <div className="space-y-3 rounded-2xl border border-border/60 bg-slate-50 p-4">
+                <div className="flex items-center gap-2">
+                  <Gift className="h-4 w-4 text-primary" />
+                  <p className="text-sm font-semibold text-slate-900">Bonificar conta</p>
+                </div>
+                <div className="grid gap-3 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <label className="text-xs font-medium uppercase tracking-wide text-slate-500">Conta alvo</label>
+                    <select
+                      value={bonusTarget}
+                      onChange={(event) => setBonusTarget(event.target.value)}
+                      className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900"
+                    >
+                      {ticketTargets.length === 0 ? <option value="">Sem conta disponivel</option> : null}
+                      {ticketTargets.map((target) => (
+                        <option key={target.value} value={target.value}>
+                          {target.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-medium uppercase tracking-wide text-slate-500">Tipo de bonificacao</label>
+                    <select
+                      value={bonusType}
+                      onChange={(event) => setBonusType(event.target.value as SupportBonusType)}
+                      className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900"
+                    >
+                      <option value="credits">Creditos extras</option>
+                      {selectedTargetType === "agency" ? <option value="client_extra">Cliente extra</option> : null}
+                      <option value="trip_extra">Viagem extra</option>
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-medium uppercase tracking-wide text-slate-500">Quantidade</label>
+                    <Input value={bonusQuantity} onChange={(event) => setBonusQuantity(event.target.value)} placeholder="1" />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-medium uppercase tracking-wide text-slate-500">Viagem relacionada</label>
+                    <Input value={bonusTripTitle} onChange={(event) => setBonusTripTitle(event.target.value)} placeholder="Opcional" />
+                  </div>
+                  <div className="space-y-2 md:col-span-2">
+                    <label className="text-xs font-medium uppercase tracking-wide text-slate-500">Cliente relacionado</label>
+                    <Input value={bonusClientName} onChange={(event) => setBonusClientName(event.target.value)} placeholder="Opcional" />
+                  </div>
+                  <div className="space-y-2 md:col-span-2">
+                    <label className="text-xs font-medium uppercase tracking-wide text-slate-500">Motivo</label>
+                    <Textarea value={bonusReason} onChange={(event) => setBonusReason(event.target.value)} placeholder="Explique a compensacao aplicada." className="min-h-28" />
+                  </div>
+                </div>
+
+                {bonusError ? <p className="text-sm text-red-600">{bonusError}</p> : null}
+                {bonusSuccess ? <p className="text-sm text-emerald-700">{bonusSuccess}</p> : null}
+
+                <div className="flex justify-end">
+                  <Button className="bg-gradient-to-r from-primary to-accent text-white" disabled={bonusSubmitting || ticketTargets.length === 0} onClick={() => void handleBonusSubmit()}>
+                    {bonusSubmitting ? "Aplicando..." : "Aplicar bonificacao"}
+                  </Button>
+                </div>
               </div>
 
               <div className="space-y-3">

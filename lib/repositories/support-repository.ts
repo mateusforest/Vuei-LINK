@@ -1,4 +1,5 @@
 import type {
+  SupportBonusPayload,
   SupportMessage,
   SupportPortalType,
   SupportTicket,
@@ -45,7 +46,7 @@ export async function createSupportTicket(payload: SupportTicketPayload) {
 
   return {
     data: response.ok ? data?.ticket ?? null : null,
-    error: response.ok ? null : data?.error ?? "Não foi possível enviar o chamado.",
+    error: response.ok ? null : data?.error ?? "Nao foi possivel enviar o chamado.",
   }
 }
 
@@ -59,7 +60,7 @@ export async function listSupportTickets() {
 
   return {
     data: response.ok ? data?.tickets ?? [] : [],
-    error: response.ok ? null : data?.error ?? "Não foi possível carregar os chamados.",
+    error: response.ok ? null : data?.error ?? "Nao foi possivel carregar os chamados.",
   }
 }
 
@@ -73,7 +74,7 @@ export async function getSupportTicketDetail(ticketId: string) {
 
   return {
     data: response.ok ? data?.detail ?? null : null,
-    error: response.ok ? null : data?.error ?? "Não foi possível carregar o detalhe do chamado.",
+    error: response.ok ? null : data?.error ?? "Nao foi possivel carregar o detalhe do chamado.",
   }
 }
 
@@ -90,7 +91,7 @@ export async function updateSupportTicketStatus(ticketId: string, status: Suppor
 
   return {
     data: response.ok ? data?.ticket ?? null : null,
-    error: response.ok ? null : data?.error ?? "Não foi possível atualizar o chamado.",
+    error: response.ok ? null : data?.error ?? "Nao foi possivel atualizar o chamado.",
   }
 }
 
@@ -107,6 +108,23 @@ export async function replySupportTicket(ticketId: string, body: string) {
 
   return {
     data: response.ok ? data?.message ?? null : null,
-    error: response.ok ? null : data?.error ?? "Não foi possível responder o chamado.",
+    error: response.ok ? null : data?.error ?? "Nao foi possivel responder o chamado.",
+  }
+}
+
+export async function applySupportBonus(ticketId: string, payload: SupportBonusPayload) {
+  const response = await fetch(`/api/support/tickets/${ticketId}/bonus`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  })
+
+  const data = await parseJson<{ error?: string | null; success?: boolean }>(response)
+
+  return {
+    data: response.ok ? data ?? { success: true } : null,
+    error: response.ok ? null : data?.error ?? "Nao foi possivel aplicar a bonificacao.",
   }
 }

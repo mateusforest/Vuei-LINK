@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { usePathname } from "next/navigation"
-import { HelpCircle, MessageSquareWarning, Send, CheckCircle2 } from "lucide-react"
+import { CheckCircle2, Headphones, MessageSquareWarning, Send } from "lucide-react"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -14,10 +14,10 @@ import { SUPPORT_WHATSAPP } from "@/lib/support/labels"
 import type { SupportTicketCategory, SupportTicketPriority } from "@/types"
 
 const categories: Array<{ value: SupportTicketCategory; label: string }> = [
-  { value: "vuei_help", label: "Dúvida sobre o Vuei" },
-  { value: "technical_issue", label: "Problema técnico" },
-  { value: "billing", label: "Plano ou cobrança" },
-  { value: "credits", label: "Créditos" },
+  { value: "vuei_help", label: "Duvida sobre o Vuei" },
+  { value: "technical_issue", label: "Problema tecnico" },
+  { value: "billing", label: "Plano ou cobranca" },
+  { value: "credits", label: "Creditos" },
   { value: "trip_link", label: "Viagem ou link" },
   { value: "other", label: "Outro" },
 ]
@@ -50,6 +50,12 @@ export function SupportFab({
       message: "",
       priority: "normal",
     })
+  }
+
+  const handleClose = () => {
+    setOpen(false)
+    setError(null)
+    setSuccess(null)
   }
 
   const handleSubmit = async () => {
@@ -92,41 +98,42 @@ export function SupportFab({
         type="button"
         onClick={() => setOpen(true)}
         className={cn(
-          "fixed right-4 z-40 flex items-center gap-2 rounded-full border border-primary/15 bg-white/96 px-4 py-3 text-sm font-medium text-slate-900 shadow-[0_18px_40px_rgba(15,23,42,0.12)] backdrop-blur-xl transition hover:scale-[1.01] hover:shadow-[0_24px_48px_rgba(15,23,42,0.16)]",
+          "fixed right-4 z-40 flex items-center gap-2 rounded-full border border-slate-200 bg-white/95 px-4 py-3 text-sm font-medium text-slate-900 shadow-[0_18px_40px_rgba(15,23,42,0.12)] backdrop-blur-xl transition hover:scale-[1.01] hover:shadow-[0_24px_48px_rgba(15,23,42,0.16)]",
           "bottom-[calc(env(safe-area-inset-bottom)+84px)] lg:bottom-6 lg:right-6",
         )}
         aria-label="Abrir suporte"
       >
-        <HelpCircle className="h-4 w-4 text-primary" />
+        <Headphones className="h-4 w-4 text-primary" />
         <span>Suporte</span>
       </button>
 
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-lg border-border/60 bg-white">
-          <DialogHeader>
-            <DialogTitle>Falar com o suporte</DialogTitle>
-            <DialogDescription>
-              Abra um chamado pelo portal. Casos urgentes também podem ser acompanhados pelo WhatsApp.
+      <Dialog open={open} onOpenChange={(nextOpen) => (nextOpen ? setOpen(true) : handleClose())}>
+        <DialogContent className="max-h-[min(90vh,760px)] overflow-y-auto rounded-[28px] border border-slate-200 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] p-0 shadow-[0_28px_80px_rgba(15,23,42,0.18)] sm:max-w-xl">
+          <DialogHeader className="border-b border-slate-200 px-6 pb-4 pt-6">
+            <DialogTitle className="text-xl font-semibold text-slate-950">Falar com o suporte</DialogTitle>
+            <DialogDescription className="text-sm text-slate-600">
+              Abra um chamado pelo portal. Casos urgentes tambem podem ser acompanhados pelo WhatsApp.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4">
+          <div className="space-y-5 px-6 pb-[calc(env(safe-area-inset-bottom)+24px)] pt-5">
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2 sm:col-span-2">
-                <Label>Assunto</Label>
+                <Label className="text-sm font-medium text-slate-800">Assunto</Label>
                 <Input
                   value={form.title}
                   onChange={(event) => setForm((prev) => ({ ...prev, title: event.target.value }))}
-                  placeholder="Ex: Não consegui abrir minha viagem"
+                  placeholder="Ex: Nao consegui abrir minha viagem"
+                  className="h-11 rounded-2xl border-slate-200 bg-white text-slate-900 placeholder:text-slate-400"
                 />
               </div>
 
               <div className="space-y-2">
-                <Label>Categoria</Label>
+                <Label className="text-sm font-medium text-slate-800">Categoria</Label>
                 <select
                   value={form.category}
                   onChange={(event) => setForm((prev) => ({ ...prev, category: event.target.value as SupportTicketCategory }))}
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  className="flex h-11 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none"
                 >
                   {categories.map((category) => (
                     <option key={category.value} value={category.value}>
@@ -137,11 +144,11 @@ export function SupportFab({
               </div>
 
               <div className="space-y-2">
-                <Label>Prioridade</Label>
+                <Label className="text-sm font-medium text-slate-800">Prioridade</Label>
                 <select
                   value={form.priority}
                   onChange={(event) => setForm((prev) => ({ ...prev, priority: event.target.value as SupportTicketPriority }))}
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  className="flex h-11 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none"
                 >
                   <option value="normal">Normal</option>
                   <option value="urgent">Urgente</option>
@@ -150,31 +157,26 @@ export function SupportFab({
             </div>
 
             <div className="space-y-2">
-              <Label>Mensagem</Label>
+              <Label className="text-sm font-medium text-slate-800">Mensagem</Label>
               <Textarea
                 value={form.message}
                 onChange={(event) => setForm((prev) => ({ ...prev, message: event.target.value }))}
-                placeholder="Conte o que aconteceu e em qual tela você estava."
-                className="min-h-32"
+                placeholder="Conte o que aconteceu e em qual tela voce estava."
+                className="min-h-36 rounded-3xl border-slate-200 bg-white text-slate-900 placeholder:text-slate-400"
               />
             </div>
 
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-600">
-              Contexto enviado automaticamente:
-              {" "}
-              {portalType === "agency" ? "portal da agência" : "portal viajante"}
-              , rota atual, usuário autenticado, timestamp e vínculo de agência
-              {agencyId ? " disponível" : " não aplicável"}.
+            <div className="rounded-3xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs leading-5 text-slate-600">
+              Contexto enviado automaticamente: {portalType === "agency" ? "portal da agencia" : "portal viajante"}, rota atual,
+              usuario autenticado, timestamp e vinculo de agencia {agencyId ? "disponivel" : "nao aplicavel"}.
             </div>
 
             {showUrgentHint ? (
-              <div className="rounded-2xl border border-amber-300/70 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+              <div className="rounded-3xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
                 <div className="flex items-start gap-3">
                   <MessageSquareWarning className="mt-0.5 h-4 w-4 flex-shrink-0" />
                   <p>
-                    Para situações urgentes, entre em contato também pelo WhatsApp:
-                    {" "}
-                    <strong>{SUPPORT_WHATSAPP}</strong>
+                    Para situacoes urgentes, entre em contato tambem pelo WhatsApp: <strong>{SUPPORT_WHATSAPP}</strong>
                   </p>
                 </div>
               </div>
@@ -182,17 +184,26 @@ export function SupportFab({
 
             {error ? <p className="text-sm text-red-600">{error}</p> : null}
             {success ? (
-              <div className="flex items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+              <div className="flex items-center gap-2 rounded-3xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
                 <CheckCircle2 className="h-4 w-4" />
                 {success}
               </div>
             ) : null}
 
-            <div className="flex justify-end gap-3">
-              <Button variant="outline" onClick={() => setOpen(false)} disabled={submitting}>
+            <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+              <Button
+                variant="outline"
+                onClick={handleClose}
+                disabled={submitting}
+                className="rounded-2xl border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+              >
                 Cancelar
               </Button>
-              <Button className="gap-2 bg-gradient-to-r from-primary to-accent text-white" onClick={() => void handleSubmit()} disabled={submitting}>
+              <Button
+                className="gap-2 rounded-2xl bg-gradient-to-r from-primary to-accent text-white"
+                onClick={() => void handleSubmit()}
+                disabled={submitting}
+              >
                 <Send className="h-4 w-4" />
                 {submitting ? "Enviando..." : "Enviar chamado"}
               </Button>

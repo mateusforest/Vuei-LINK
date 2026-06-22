@@ -633,7 +633,7 @@ export interface Database {
       support_tickets: {
         Row: {
           id: string
-          user_id: string
+          user_id: string | null
           agency_id: string | null
           title: string
           category: "vuei_help" | "technical_issue" | "billing" | "credits" | "trip_link" | "other"
@@ -646,7 +646,7 @@ export interface Database {
         }
         Insert: {
           id?: string
-          user_id: string
+          user_id?: string | null
           agency_id?: string | null
           title: string
           category: "vuei_help" | "technical_issue" | "billing" | "credits" | "trip_link" | "other"
@@ -658,7 +658,7 @@ export interface Database {
           updated_at?: string
         }
         Update: {
-          user_id?: string
+          user_id?: string | null
           agency_id?: string | null
           title?: string
           category?: "vuei_help" | "technical_issue" | "billing" | "credits" | "trip_link" | "other"
@@ -667,6 +667,42 @@ export interface Database {
           message?: string
           context?: Json
           updated_at?: string
+        }
+      }
+      account_limit_overrides: {
+        Row: {
+          id: string
+          owner_type: "agency" | "traveler"
+          owner_id: string
+          limit_type: "clients" | "active_trips"
+          quantity: number
+          reason: string | null
+          ticket_id: string | null
+          granted_by: string | null
+          expires_at: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          owner_type: "agency" | "traveler"
+          owner_id: string
+          limit_type: "clients" | "active_trips"
+          quantity: number
+          reason?: string | null
+          ticket_id?: string | null
+          granted_by?: string | null
+          expires_at?: string | null
+          created_at?: string
+        }
+        Update: {
+          owner_type?: "agency" | "traveler"
+          owner_id?: string
+          limit_type?: "clients" | "active_trips"
+          quantity?: number
+          reason?: string | null
+          ticket_id?: string | null
+          granted_by?: string | null
+          expires_at?: string | null
         }
       }
       support_messages: {

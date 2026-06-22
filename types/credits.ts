@@ -74,4 +74,5 @@ export interface TravelerBillingStatusSummary extends TravelerCreditBalanceSumma
   stripeCustomerId: string | null
   stripeSubscriptionId: string | null
   cancelAtPeriodEnd: boolean
+  maxActiveTrips: number | null
 }

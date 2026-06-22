@@ -14,6 +14,7 @@ type SupportProfile = {
   name: string | null
   role: "traveler" | "agency_owner" | "agency_member" | "master"
   agency_id: string | null
+  agency_name?: string | null
 }
 
 function mapTicket(row: SupportTicketRow) {
@@ -66,7 +67,25 @@ async function getAuthenticatedProfile() {
     }
   }
 
-  return { supabase, profile: profileResult.data as SupportProfile, error: null, status: 200 }
+  let agencyName: string | null = null
+  if (profileResult.data.agency_id) {
+    const agencyResult = await supabase
+      .from("agencies")
+      .select("name")
+      .eq("id", profileResult.data.agency_id)
+      .maybeSingle()
+    agencyName = agencyResult.data?.name ?? null
+  }
+
+  return {
+    supabase,
+    profile: {
+      ...(profileResult.data as SupportProfile),
+      agency_name: agencyName,
+    },
+    error: null,
+    status: 200,
+  }
 }
 
 function isValidCategory(value: unknown): value is SupportTicketCategory {
@@ -149,6 +168,7 @@ export async function POST(request: NextRequest) {
       name: auth.profile.name,
       portalType,
       agencyId: auth.profile.agency_id,
+      agencyName: auth.profile.agency_name ?? null,
       currentRoute: typeof body?.currentRoute === "string" ? body.currentRoute : null,
       timestamp: new Date().toISOString(),
       deletionRequest: body?.deletionRequest === true,

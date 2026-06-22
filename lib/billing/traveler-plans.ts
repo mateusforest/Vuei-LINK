@@ -168,7 +168,17 @@ export function resolveTravelerPlan(profile: Profile | null | undefined): Travel
 }
 
 export function resolveTravelerPlanFromBillingStatus(status: TravelerBillingStatusSummary): TravelerPlanSnapshot {
-  const definition = getTravelerPlanDefinition(status.currentPlan)
+  const baseDefinition = getTravelerPlanDefinition(status.currentPlan)
+  const definition =
+    status.maxActiveTrips === undefined || status.maxActiveTrips === baseDefinition.limits.maxActiveTrips
+      ? baseDefinition
+      : {
+          ...baseDefinition,
+          limits: {
+            ...baseDefinition.limits,
+            maxActiveTrips: status.maxActiveTrips,
+          },
+        }
 
   return {
     code: status.currentPlan,
