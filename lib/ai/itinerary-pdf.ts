@@ -107,11 +107,11 @@ function escapeHtml(value: string) {
     .replace(/'/g, "&#39;")
 }
 
-function safeText(value: string | null | undefined, fallback = "Nao informado") {
+function safeText(value: string | null | undefined, fallback = "Não informado") {
   return value && value.trim() ? escapeHtml(value.trim()) : fallback
 }
 
-function formatDate(value: string | null | undefined, fallback = "Nao informado") {
+function formatDate(value: string | null | undefined, fallback = "Não informado") {
   if (!value) return fallback
   const parsed = new Date(`${value}T12:00:00`)
   if (Number.isNaN(parsed.getTime())) return escapeHtml(value)
@@ -147,9 +147,9 @@ function activityTypeLabel(type: GeneratedItineraryActivity["type"]) {
     case "food":
       return "Gastronomia"
     case "transport":
-      return "Transportes"
+      return "Transporte"
     case "experience":
-      return "Experiencia"
+      return "Experiência"
     case "flight":
       return "Voo"
     case "hotel":
@@ -194,18 +194,11 @@ async function assetToDataUrl(url: string | null | undefined) {
   }
 }
 
-function renderPeriodCard(title: string, activities: GeneratedItineraryActivity[]) {
-  if (activities.length === 0) {
-    return `
-      <div class="period-card">
-        <div class="period-title">${title}</div>
-        <p class="period-empty">Sem atividade confirmada para este periodo.</p>
-      </div>
-    `
-  }
+function renderPeriodCard(title: string, activities: GeneratedItineraryActivity[], options?: { wide?: boolean }) {
+  if (activities.length === 0) return ""
 
   return `
-    <div class="period-card">
+    <div class="period-card${options?.wide ? " period-card-wide" : ""}">
       <div class="period-title">${title}</div>
       <div class="period-list">
         ${activities
@@ -213,11 +206,11 @@ function renderPeriodCard(title: string, activities: GeneratedItineraryActivity[
             (activity) => `
               <div class="period-item">
                 <div class="period-item-head">
-                  <span class="period-time">${safeText(activity.time, "Sugestao")}</span>
+                  <span class="period-time">${safeText(activity.time, "Horário livre")}</span>
                   <span class="period-type">${activityTypeLabel(activity.type)}</span>
                 </div>
                 <div class="period-name">${safeText(activity.title)}</div>
-                <div class="period-location">${safeText(activity.location, "Local a confirmar")}</div>
+                ${activity.location ? `<div class="period-location">${safeText(activity.location, "")}</div>` : ""}
                 ${activity.description ? `<div class="period-description">${safeText(activity.description, "")}</div>` : ""}
               </div>
             `,
@@ -226,6 +219,27 @@ function renderPeriodCard(title: string, activities: GeneratedItineraryActivity[
       </div>
     </div>
   `
+}
+
+function renderPeriodGrid(day: GeneratedItineraryDay) {
+  const periods = groupActivitiesByPeriod(day)
+  const cards = [
+    renderPeriodCard("Manhã", periods.morning),
+    renderPeriodCard("Tarde", periods.afternoon),
+    renderPeriodCard("Noite", periods.evening, { wide: periods.flexible.length > 0 }),
+    renderPeriodCard("Ao longo do dia", periods.flexible, { wide: true }),
+  ].filter(Boolean)
+
+  if (cards.length === 0) {
+    return `
+      <div class="period-card period-card-wide">
+        <div class="period-title">Agenda do dia</div>
+        <p class="period-empty">Sem atividade confirmada para este dia.</p>
+      </div>
+    `
+  }
+
+  return cards.join("")
 }
 
 function renderExperiences(days: GeneratedItineraryDay[]) {
@@ -241,7 +255,7 @@ function renderExperiences(days: GeneratedItineraryDay[]) {
   )
 
   if (cards.length === 0) {
-    return `<div class="empty-card compact-empty">Nenhuma experiencia adicional foi cadastrada alem do roteiro dia a dia.</div>`
+    return `<div class="empty-card compact-empty">Nenhuma experiência adicional foi cadastrada além do roteiro principal.</div>`
   }
 
   const gridClass = cards.length >= 6 ? "experience-grid experience-grid-3" : "experience-grid"
@@ -272,7 +286,7 @@ function renderImportantInfo(input: TripPdfInput) {
   const baggageInfo = input.flights.map((flight) => flight.baggageInfo).filter((value): value is string => Boolean(value && value.trim()))
   const flightContacts = input.contacts.length
     ? input.contacts.map((contact) => `<li><strong>${safeText(contact.label)}</strong>: ${safeText(contact.value)}</li>`).join("")
-    : `<li>Nenhum contato util cadastrado.</li>`
+    : `<li>Nenhum contato útil cadastrado.</li>`
 
   return `
     <div class="info-grid">
@@ -293,11 +307,11 @@ function renderImportantInfo(input: TripPdfInput) {
         <ul>
           <li><strong>Clima</strong>: ${safeText(input.quickInfo.weather ?? null)}</li>
           <li><strong>Bagagem</strong>: ${safeText(baggageInfo[0] ?? input.quickInfo.baggage ?? null)}</li>
-          <li><strong>Emergencia</strong>: ${safeText(input.quickInfo.emergency ?? null)}</li>
+          <li><strong>Emergência</strong>: ${safeText(input.quickInfo.emergency ?? null)}</li>
         </ul>
       </article>
       <article class="info-card">
-        <h3>Contatos uteis</h3>
+        <h3>Contatos úteis</h3>
         <ul>${flightContacts}</ul>
       </article>
     </div>
@@ -318,11 +332,11 @@ function renderHotels(input: TripPdfInput) {
               <div class="hotel-image"></div>
               <div class="hotel-content">
                 <h3>${safeText(hotel.name, "Hospedagem")}</h3>
-                <p class="hotel-address">${safeText(hotel.address, "Endereco nao informado")}</p>
+                <p class="hotel-address">${safeText(hotel.address, "Endereço não informado")}</p>
                 <div class="hotel-grid">
                   <div><span>Check-in</span><strong>${formatDate(hotel.checkIn)}</strong></div>
                   <div><span>Check-out</span><strong>${formatDate(hotel.checkOut)}</strong></div>
-                  <div><span>Confirmacao</span><strong>${safeText(hotel.confirmationCode, "Nao informada")}</strong></div>
+                  <div><span>Confirmação</span><strong>${safeText(hotel.confirmationCode, "Não informada")}</strong></div>
                 </div>
                 ${hotel.notes ? `<div class="hotel-notes">${safeText(hotel.notes, "")}</div>` : ""}
               </div>
@@ -335,13 +349,13 @@ function renderHotels(input: TripPdfInput) {
 }
 
 function renderSummaryCards(input: TripPdfInput) {
-  const accommodation = input.hotels[0]?.name ?? "Nao informada"
+  const accommodation = input.hotels[0]?.name ?? "Não informada"
   const documentsStatus = input.documents.length > 0 ? `${input.documents.length} documento(s) cadastrado(s)` : "Nenhum documento cadastrado"
   const flightStatus = input.flights.length > 0 ? `${input.flights.length} voo(s) cadastrado(s)` : "Nenhuma passagem cadastrada"
-  const duration = calculateTripDuration(input.startDate, input.endDate) ?? "Periodo nao informado"
+  const duration = calculateTripDuration(input.startDate, input.endDate) ?? "Período não informado"
   const summaryItems = [
     ["Destino", `${input.destination}${input.country ? `, ${input.country}` : ""}`],
-    ["Periodo", `${formatDate(input.startDate)} - ${formatDate(input.endDate)}`],
+    ["Período", `${formatDate(input.startDate)} - ${formatDate(input.endDate)}`],
     ["Viajantes", input.travelersLabel || `${input.travelersCount} pessoa(s)`],
     ["Hospedagem", accommodation],
     ["Passagens", flightStatus],
@@ -396,75 +410,78 @@ function renderHtml(input: TripPdfInput, assets: { heroImage: string | null; age
         @page { size: A4; margin: 0; }
         * { box-sizing: border-box; }
         html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-        body { margin: 0; font-family: Arial, Helvetica, sans-serif; color: ${TEXT}; background: #ffffff; }
+        body { margin: 0; font-family: "Geist", "Inter", "Segoe UI", Arial, Helvetica, sans-serif; color: ${TEXT}; background: #ffffff; }
         main { width: 100%; }
         section.page-break { page-break-after: always; break-after: page; }
         section.page-break:last-child { page-break-after: auto; break-after: auto; }
         p, li, strong, span, h1, h2, h3, h4, div { overflow-wrap: anywhere; word-break: break-word; }
-        .page { padding: 40px 42px; }
-        .flow-page { padding-bottom: 34px; }
+        p, li { orphans: 3; widows: 3; }
+        .page { padding: 42px 44px; }
+        .flow-page { padding-bottom: 28px; }
+        .content-flow { page-break-after: auto; break-after: auto; }
         .cover { min-height: 1122px; position: relative; color: #fff; background: ${DARK}; overflow: hidden; }
-        .cover::before { content: ""; position: absolute; inset: 0; background-image: ${assets.heroImage ? `url('${assets.heroImage}')` : `linear-gradient(135deg, ${PRIMARY}, ${SECONDARY})`}; background-size: cover; background-position: center; transform: scale(1.04); }
-        .cover::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(15,23,42,0.42), rgba(15,23,42,0.78) 55%, rgba(15,23,42,0.9)); }
-        .cover-inner { position: relative; z-index: 2; min-height: 1122px; padding: 52px 56px; display: flex; flex-direction: column; }
+        .cover::before { content: ""; position: absolute; inset: 0; background-image: ${assets.heroImage ? `url('${assets.heroImage}')` : `linear-gradient(135deg, ${PRIMARY}, ${SECONDARY})`}; background-size: cover; background-position: center; transform: scale(1.02); }
+        .cover::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(15,23,42,0.2), rgba(15,23,42,0.58) 46%, rgba(15,23,42,0.88)); }
+        .cover-inner { position: relative; z-index: 2; min-height: 1122px; padding: 52px 56px 58px; display: flex; flex-direction: column; }
         .cover-top { display: flex; justify-content: space-between; align-items: flex-start; }
-        .vuei-badge { display: inline-flex; align-items: center; gap: 10px; border: 1px solid rgba(255,255,255,0.22); border-radius: 999px; padding: 12px 18px; background: rgba(255,255,255,0.08); backdrop-filter: blur(12px); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; }
-        .agency-card { display: inline-flex; align-items: center; gap: 14px; border: 1px solid rgba(255,255,255,0.18); border-radius: 20px; padding: 14px 18px; background: rgba(255,255,255,0.08); max-width: 340px; }
+        .vuei-badge { display: inline-flex; align-items: center; gap: 10px; border: 1px solid rgba(255,255,255,0.18); border-radius: 999px; padding: 11px 17px; background: rgba(255,255,255,0.07); backdrop-filter: blur(12px); font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; }
+        .agency-card { display: inline-flex; align-items: center; gap: 14px; border: 1px solid rgba(255,255,255,0.18); border-radius: 20px; padding: 14px 18px; background: rgba(255,255,255,0.08); max-width: 360px; }
         .agency-card img { width: 56px; height: 56px; object-fit: contain; border-radius: 16px; background: rgba(255,255,255,0.96); padding: 6px; }
         .agency-card strong { display: block; font-size: 16px; margin-bottom: 4px; }
         .agency-card span { display: block; font-size: 12px; color: rgba(255,255,255,0.78); }
-        .cover-main { margin-top: auto; max-width: 610px; }
-        .eyebrow { font-size: 13px; text-transform: uppercase; letter-spacing: 0.22em; color: rgba(255,255,255,0.8); margin-bottom: 16px; }
-        .cover-title { font-size: 56px; line-height: 1.03; font-weight: 700; margin: 0 0 18px; }
-        .cover-meta { display: flex; flex-wrap: wrap; gap: 14px; margin-bottom: 24px; }
-        .cover-meta span { background: rgba(255,255,255,0.12); border-radius: 999px; padding: 9px 14px; font-size: 14px; }
-        .cover-summary { font-size: 20px; line-height: 1.6; color: rgba(255,255,255,0.84); margin: 0; }
+        .cover-main { margin-top: auto; max-width: 620px; padding-bottom: 42px; }
+        .eyebrow { font-size: 12px; text-transform: uppercase; letter-spacing: 0.24em; color: rgba(255,255,255,0.78); margin-bottom: 18px; }
+        .cover-title { font-size: 60px; line-height: 0.98; letter-spacing: -0.05em; font-weight: 700; margin: 0 0 20px; }
+        .cover-meta { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 28px; }
+        .cover-meta span { background: rgba(255,255,255,0.11); border-radius: 999px; padding: 9px 14px; font-size: 13px; }
+        .cover-summary { font-size: 19px; line-height: 1.7; color: rgba(255,255,255,0.82); margin: 0; max-width: 560px; }
         .cover-line { margin-top: auto; width: 92px; height: 4px; border-radius: 999px; background: ${SECONDARY}; }
-        .section-head { margin-bottom: 24px; break-inside: avoid; page-break-inside: avoid; }
+        .section-head { margin-bottom: 22px; break-inside: avoid; page-break-inside: avoid; }
         .section-head .eyebrow-dark, .subsection-head .eyebrow-dark { display: inline-flex; align-items: center; margin-bottom: 10px; padding: 8px 14px; border-radius: 999px; background: rgba(31,143,214,0.1); color: ${PRIMARY}; font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; font-weight: 700; }
-        .section-head h2 { display: inline-block; width: 100%; font-size: 34px; margin: 0; color: #fff; background: linear-gradient(90deg, ${PRIMARY}, ${SECONDARY}); border-radius: 22px; padding: 16px 22px; }
-        .section-head p { margin: 14px 4px 0; color: ${MUTED}; line-height: 1.65; max-width: 640px; }
-        .subsection { margin-top: 28px; break-inside: auto; page-break-inside: auto; }
+        .section-head h2 { display: block; width: 100%; font-size: 34px; line-height: 1.06; letter-spacing: -0.04em; margin: 0; color: ${DARK}; }
+        .section-head p { margin: 12px 2px 0; color: ${MUTED}; line-height: 1.62; max-width: 620px; font-size: 14px; }
+        .subsection { margin-top: 24px; break-inside: auto; page-break-inside: auto; }
         .subsection:first-of-type { margin-top: 0; }
-        .subsection-head { margin-bottom: 18px; break-inside: avoid; page-break-inside: avoid; }
-        .subsection-head h2 { display: inline-block; width: 100%; font-size: 26px; margin: 0; color: #fff; background: linear-gradient(90deg, ${PRIMARY}, ${SECONDARY}); border-radius: 20px; padding: 14px 20px; }
-        .subsection-head p { margin: 12px 4px 0; color: ${MUTED}; line-height: 1.65; max-width: 640px; }
-        .subsection-muted .subsection-head h2 { background: linear-gradient(90deg, rgba(31,143,214,0.94), rgba(55,198,224,0.86)); }
-        .summary-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 20px; }
-        .summary-card { border: 1px solid ${BORDER}; border-radius: 20px; padding: 18px; background: #fff; min-height: 100px; break-inside: avoid; page-break-inside: avoid; }
+        .subsection-head { margin-bottom: 16px; break-inside: avoid; page-break-inside: avoid; }
+        .subsection-head h2 { display: block; width: 100%; font-size: 28px; line-height: 1.08; letter-spacing: -0.04em; margin: 0; color: ${DARK}; }
+        .subsection-head p { margin: 10px 2px 0; color: ${MUTED}; line-height: 1.62; max-width: 620px; font-size: 14px; }
+        .summary-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 18px; }
+        .summary-card { border: 1px solid ${BORDER}; border-radius: 18px; padding: 16px; background: #fff; min-height: 90px; break-inside: avoid; page-break-inside: avoid; }
         .summary-card span { display: block; color: ${MUTED}; font-size: 12px; text-transform: uppercase; letter-spacing: 0.12em; margin-bottom: 10px; }
-        .summary-card strong { font-size: 17px; line-height: 1.5; color: ${DARK}; }
-        .summary-panels { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 16px; margin-top: 20px; }
-        .panel { border-radius: 22px; padding: 20px; border: 1px solid ${BORDER}; background: ${SOFT}; break-inside: avoid; page-break-inside: avoid; }
-        .panel h3 { margin: 0 0 12px; font-size: 20px; color: ${DARK}; }
-        .panel p, .panel li { color: ${TEXT}; line-height: 1.7; }
+        .summary-card strong { font-size: 16px; line-height: 1.45; color: ${DARK}; }
+        .summary-panels { display: grid; grid-template-columns: 1.05fr 0.95fr; gap: 14px; margin-top: 18px; }
+        .panel { border-radius: 20px; padding: 18px; border: 1px solid ${BORDER}; background: ${SOFT}; break-inside: avoid; page-break-inside: avoid; }
+        .panel h3 { margin: 0 0 10px; font-size: 18px; color: ${DARK}; letter-spacing: -0.02em; }
+        .panel p, .panel li { color: ${TEXT}; line-height: 1.65; font-size: 14px; }
         .panel ul { padding-left: 18px; margin: 0; }
-        .duration-pill { display: inline-flex; align-items: center; justify-content: center; padding: 12px 22px; border-radius: 999px; background: rgba(55,198,224,0.14); color: ${PRIMARY}; font-weight: 700; margin-top: 8px; }
+        .duration-pill { display: inline-flex; align-items: center; justify-content: center; padding: 10px 18px; border-radius: 999px; background: rgba(55,198,224,0.12); color: ${PRIMARY}; font-weight: 700; margin-top: 4px; font-size: 13px; }
         .days-flow { display: block; }
-        .day-card { border: 1px solid ${BORDER}; border-radius: 26px; background: #fff; padding: 18px; margin-bottom: 14px; break-inside: avoid; page-break-inside: avoid; }
+        .day-card { border: 1px solid ${BORDER}; border-radius: 24px; background: #fff; padding: 16px; margin-bottom: 12px; break-inside: avoid; page-break-inside: avoid; }
         .day-card:last-child { margin-bottom: 0; }
-        .day-header { display: grid; grid-template-columns: 82px 1fr; gap: 16px; align-items: start; margin-bottom: 16px; padding: 16px; border-radius: 22px; background: linear-gradient(90deg, ${PRIMARY}, ${SECONDARY}); break-inside: avoid; page-break-inside: avoid; }
-        .day-badge { width: 82px; border-radius: 22px; background: ${PRIMARY}; color: #fff; padding: 14px 10px; text-align: center; }
+        .day-header { display: grid; grid-template-columns: 76px 1fr; gap: 14px; align-items: start; margin-bottom: 14px; padding: 16px; border-radius: 20px; background: linear-gradient(180deg, rgba(31,143,214,0.12), rgba(55,198,224,0.06)); border: 1px solid rgba(31,143,214,0.1); break-inside: avoid; page-break-inside: avoid; }
+        .day-badge { width: 76px; border-radius: 20px; background: linear-gradient(180deg, ${PRIMARY}, #167fc0); color: #fff; padding: 12px 8px; text-align: center; box-shadow: 0 10px 28px rgba(31,143,214,0.18); }
         .day-badge span { display: block; font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; opacity: 0.86; }
-        .day-badge strong { display: block; font-size: 30px; margin-top: 6px; }
-        .day-header h3 { margin: 0 0 6px; font-size: 26px; color: #fff; }
-        .day-date { color: rgba(255,255,255,0.86); margin-bottom: 10px; font-weight: 600; }
-        .day-summary { color: rgba(255,255,255,0.96); line-height: 1.72; }
-        .period-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 12px; }
-        .period-card { background: #f8fbfe; border: 1px solid ${BORDER}; border-radius: 20px; padding: 14px; min-height: 0; break-inside: avoid; page-break-inside: avoid; }
-        .period-title { font-size: 13px; text-transform: uppercase; letter-spacing: 0.16em; color: #fff; margin: -14px -14px 12px; font-weight: 700; background: ${PRIMARY}; padding: 11px 14px; border-radius: 20px 20px 14px 14px; }
-        .period-empty { color: ${MUTED}; font-size: 14px; line-height: 1.6; margin: 0; }
-        .period-item { padding: 0 0 10px; margin-bottom: 10px; border-bottom: 1px solid rgba(31,143,214,0.12); break-inside: avoid; page-break-inside: avoid; }
+        .day-badge strong { display: block; font-size: 28px; margin-top: 5px; }
+        .day-header h3 { margin: 0 0 4px; font-size: 24px; letter-spacing: -0.03em; color: ${DARK}; }
+        .day-date { color: ${PRIMARY}; margin-bottom: 8px; font-weight: 700; font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em; }
+        .day-summary { color: ${TEXT}; line-height: 1.66; font-size: 14px; }
+        .period-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-bottom: 10px; }
+        .period-card { background: #f8fbfe; border: 1px solid ${BORDER}; border-radius: 18px; padding: 14px; min-height: 0; break-inside: avoid; page-break-inside: avoid; }
+        .period-card-wide { grid-column: 1 / -1; }
+        .period-title { font-size: 12px; text-transform: uppercase; letter-spacing: 0.14em; color: ${PRIMARY}; margin: 0 0 12px; font-weight: 700; }
+        .period-empty { color: ${MUTED}; font-size: 13px; line-height: 1.55; margin: 0; }
+        .period-item { padding: 0 0 9px; margin-bottom: 9px; border-bottom: 1px solid rgba(31,143,214,0.12); break-inside: avoid; page-break-inside: avoid; }
         .period-item:last-child { margin-bottom: 0; padding-bottom: 0; border-bottom: 0; }
-        .period-item-head { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 7px; align-items: center; }
-        .period-time { color: ${PRIMARY}; font-size: 12px; font-weight: 700; }
+        .period-item-head { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 6px; align-items: center; }
+        .period-time { color: ${PRIMARY}; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; }
         .period-type { color: ${MUTED}; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; }
-        .period-name { color: ${DARK}; font-size: 16px; font-weight: 700; margin-bottom: 4px; }
-        .period-location, .period-description { color: ${TEXT}; font-size: 13px; line-height: 1.58; }
-        .day-bottom { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; break-inside: avoid; page-break-inside: avoid; }
-        .note-box { border-radius: 18px; padding: 14px; background: #f8fbfe; border: 1px solid ${BORDER}; min-height: 0; }
-        .note-box strong { display: block; margin-bottom: 8px; font-size: 14px; color: ${DARK}; }
-        .note-box p { margin: 0; line-height: 1.68; color: ${TEXT}; }
+        .period-name { color: ${DARK}; font-size: 15px; font-weight: 700; margin-bottom: 3px; letter-spacing: -0.02em; }
+        .period-location, .period-description { color: ${TEXT}; font-size: 13px; line-height: 1.54; }
+        .period-location { color: ${MUTED}; margin-bottom: 4px; }
+        .day-bottom { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; break-inside: avoid; page-break-inside: avoid; }
+        .note-box { border-radius: 16px; padding: 14px; background: #fbfdff; border: 1px solid ${BORDER}; min-height: 0; }
+        .note-box strong { display: block; margin-bottom: 8px; font-size: 13px; color: ${DARK}; text-transform: uppercase; letter-spacing: 0.08em; }
+        .note-box p { margin: 0; line-height: 1.64; color: ${TEXT}; font-size: 13px; }
         .hotel-list { display: grid; gap: 14px; }
         .hotel-card { display: grid; grid-template-columns: 200px 1fr; border: 1px solid ${BORDER}; border-radius: 24px; overflow: hidden; background: #fff; break-inside: avoid; page-break-inside: avoid; }
         .hotel-image { min-height: 220px; background: linear-gradient(135deg, ${PRIMARY}, ${SECONDARY}); background-size: cover; background-position: center; }
@@ -492,7 +509,7 @@ function renderHtml(input: TripPdfInput, assets: { heroImage: string | null; age
         .info-card li { line-height: 1.75; color: ${TEXT}; margin-bottom: 4px; }
         .empty-card { border: 1px dashed ${BORDER}; border-radius: 24px; padding: 24px; color: ${MUTED}; background: #fbfdff; break-inside: avoid; page-break-inside: avoid; }
         .compact-empty { padding: 18px 20px; min-height: 0; }
-        .footer-page { background: ${DARK}; color: #fff; min-height: 1122px; }
+        .footer-page { background: ${DARK}; color: #fff; min-height: 1122px; page-break-before: always; break-before: page; }
         .footer-main { display: flex; flex-direction: column; justify-content: center; align-items: center; min-height: 1014px; text-align: center; }
         .footer-stack { width: 100%; max-width: 720px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 26px; }
         .footer-hero h2 { margin: 0 0 14px; font-size: 48px; }
@@ -518,10 +535,10 @@ function renderHtml(input: TripPdfInput, assets: { heroImage: string | null; age
             <div class="cover-top">
               ${isAgency ? `
                 <div class="agency-card">
-                  ${assets.agencyLogo ? `<img src="${assets.agencyLogo}" alt="${safeText(input.branding.agencyName, "Agencia")}" />` : ""}
+                  ${assets.agencyLogo ? `<img src="${assets.agencyLogo}" alt="${safeText(input.branding.agencyName, "Agência")}" />` : ""}
                   <div>
-                    <strong>${safeText(input.branding.agencyName, "Agencia parceira")}</strong>
-                    <span>${input.branding.consultantName ? `Consultor: ${safeText(input.branding.consultantName, "")}` : "Roteiro produzido com branding da agencia"}</span>
+                    <strong>${safeText(input.branding.agencyName, "Agência parceira")}</strong>
+                    <span>${input.branding.consultantName ? `Consultor: ${safeText(input.branding.consultantName, "")}` : "Roteiro produzido com branding da agência"}</span>
                   </div>
                 </div>
               ` : `<div></div>`}
@@ -535,42 +552,41 @@ function renderHtml(input: TripPdfInput, assets: { heroImage: string | null; age
                 <span>${travelWindow}</span>
                 <span>${safeText(input.country, "Destino internacional")}</span>
               </div>
-              <p class="cover-summary">${safeText(input.tripSummary, "Uma experiencia organizada com contexto real da sua viagem.")}</p>
+              <p class="cover-summary">${safeText(input.tripSummary, "Uma experiência organizada com contexto real da sua viagem.")}</p>
             </div>
             <div class="cover-line"></div>
           </div>
         </section>
 
-        <section class="page page-break">
+        <section class="page content-flow">
           <div class="section-head">
-            <div class="eyebrow-dark">Visao Geral</div>
-            <h2>Resumo da Viagem</h2>
+            <div class="eyebrow-dark">Visão geral</div>
+            <h2>Resumo da viagem</h2>
             <p>Dados reais da sua viagem reunidos em um resumo claro, consistente e pronto para consulta.</p>
           </div>
           ${renderSummaryCards(input)}
           <div class="summary-panels">
             <article class="panel">
               <h3>Resumo executivo</h3>
-              <p>${safeText(input.content.summary ?? input.tripSummary, "Resumo indisponivel no momento.")}</p>
+              <p>${safeText(input.content.summary ?? input.tripSummary, "Resumo indisponível no momento.")}</p>
               ${input.usefulInfo.length > 0 ? `<ul>${input.usefulInfo.map((item) => `<li>${safeText(item, "")}</li>`).join("")}</ul>` : ""}
             </article>
             <article class="panel">
-              <h3>Observacoes</h3>
-              ${input.content.observations.length > 0 ? `<ul>${input.content.observations.map((item) => `<li>${safeText(item, "")}</li>`).join("")}</ul>` : `<p>Nenhuma observacao adicional cadastrada.</p>`}
+              <h3>Observações</h3>
+              ${input.content.observations.length > 0 ? `<ul>${input.content.observations.map((item) => `<li>${safeText(item, "")}</li>`).join("")}</ul>` : `<p>Nenhuma observação adicional cadastrada.</p>`}
             </article>
           </div>
         </section>
 
-        <section class="page flow-page page-break" style="background:#f7fafc;">
+        <section class="page flow-page content-flow" style="background:#f7fafc;">
           <div class="section-head" style="text-align:center;">
-            <div class="eyebrow-dark">Programacao Completa</div>
-            <h2>Dia a Dia</h2>
-            <p>Cada dia segue a estrutura do template oficial, agora preenchida com o contexto real da viagem e as sugestoes geradas pela IA.</p>
+            <div class="eyebrow-dark">Programação completa</div>
+            <h2>Dia a dia</h2>
+            <p>Cada dia foi organizado para leitura rápida, com ritmo editorial mais limpo e melhor distribuição entre atividades, observações e períodos.</p>
           </div>
           <div class="days-flow">
             ${input.content.days
               .map((day) => {
-                const periods = groupActivitiesByPeriod(day)
                 return `
                   <article class="day-card">
                     <div class="day-header">
@@ -582,18 +598,16 @@ function renderHtml(input: TripPdfInput, assets: { heroImage: string | null; age
                       </div>
                     </div>
                     <div class="period-grid">
-                      ${renderPeriodCard("Manha", periods.morning)}
-                      ${renderPeriodCard("Tarde", periods.afternoon)}
-                      ${renderPeriodCard("Noite", periods.evening.length > 0 ? periods.evening : periods.flexible)}
+                      ${renderPeriodGrid(day)}
                     </div>
                     <div class="day-bottom">
                       <div class="note-box">
-                        <strong>Dicas e notas uteis</strong>
+                        <strong>Dicas e notas úteis</strong>
                         <p>${safeText(day.tips, "Sem dicas adicionais para este dia.")}</p>
                       </div>
                       <div class="note-box">
-                        <strong>Observacoes importantes</strong>
-                        <p>${safeText(day.important, "Nenhuma observacao critica registrada para este dia.")}</p>
+                        <strong>Observações importantes</strong>
+                        <p>${safeText(day.important, "Nenhuma observação crítica registrada para este dia.")}</p>
                       </div>
                     </div>
                   </article>
@@ -603,25 +617,25 @@ function renderHtml(input: TripPdfInput, assets: { heroImage: string | null; age
           </div>
         </section>
 
-        <section class="page flow-page page-break">
+        <section class="page flow-page content-flow">
           ${renderCompactSubsection({
-            eyebrow: "Onde Voce Vai Ficar",
+            eyebrow: "Onde você vai ficar",
             title: "Hospedagem",
             content: renderHotels(input),
           })}
 
           ${renderCompactSubsection({
-            eyebrow: "Momentos Especiais",
-            title: "Experiencias e Passeios",
-            description: "Recortes de experiencias, gastronomia e deslocamentos derivados do roteiro completo.",
+            eyebrow: "Momentos especiais",
+            title: "Experiências e passeios",
+            description: "Recortes de experiências, gastronomia e deslocamentos derivados do roteiro completo.",
             content: renderExperiences(input.content.days),
             muted: true,
           })}
 
           ${renderCompactSubsection({
             eyebrow: "Prepare-se",
-            title: "Informacoes Importantes",
-            description: "Somente informacoes reais cadastradas ou estados honestos quando algo ainda nao estiver disponivel.",
+            title: "Informações importantes",
+            description: "Somente informações reais cadastradas ou estados honestos quando algo ainda não estiver disponível.",
             content: renderImportantInfo(input),
           })}
         </section>
@@ -631,19 +645,19 @@ function renderHtml(input: TripPdfInput, assets: { heroImage: string | null; age
             <div class="footer-stack">
               <div class="footer-hero">
                 <h2>Boa viagem!</h2>
-                <p>Esperamos que esta experiencia seja inesquecivel. Este roteiro foi preparado para facilitar seu acesso aos principais detalhes da viagem.</p>
+                <p>Esperamos que esta experiência seja inesquecível. Este roteiro foi preparado para facilitar seu acesso aos principais detalhes da viagem.</p>
               </div>
               <div class="footer-card">
                 <div class="footer-card-row">
                   <div class="footer-brand">
                     ${isAgency
                       ? assets.agencyLogo
-                        ? `<img src="${assets.agencyLogo}" alt="${safeText(input.branding.agencyName, "Agencia")}" />`
+                        ? `<img src="${assets.agencyLogo}" alt="${safeText(input.branding.agencyName, "Agência")}" />`
                         : `<div class="footer-brand-badge">${safeText(input.branding.agencyName?.charAt(0) ?? "A", "A")}</div>`
                       : `<div class="footer-brand-badge">V</div>`}
                     <div>
-                      <h3>${isAgency ? safeText(input.branding.agencyName, "Agencia parceira") : "Vuei"}</h3>
-                      <p>${isAgency ? safeText(input.branding.website ?? input.branding.contactEmail ?? "Branding da agencia", "Branding da agencia") : "Criado com Vuei"}</p>
+                      <h3>${isAgency ? safeText(input.branding.agencyName, "Agência parceira") : "Vuei"}</h3>
+                      <p>${isAgency ? safeText(input.branding.website ?? input.branding.contactEmail ?? "Branding da agência", "Branding da agência") : "Criado com Vuei"}</p>
                     </div>
                   </div>
                   <div class="footer-links">
@@ -655,7 +669,7 @@ function renderHtml(input: TripPdfInput, assets: { heroImage: string | null; age
               </div>
               <div class="footer-bottom">
                 <div class="powered"><span>Roteiro gerado com</span><span class="vuei-wordmark">Vuei</span></div>
-                <div>${isAgency ? "Branding da agencia aplicado" : "Versao individual do roteiro"}</div>
+                <div>${isAgency ? "Branding da agência aplicado" : "Versão individual do roteiro"}</div>
               </div>
             </div>
           </div>
@@ -688,7 +702,7 @@ async function resolveExecutablePath(chromium: ChromiumRuntime | null) {
   }
 
   if (!chromium) {
-    throw new Error("Chromium serverless indisponivel para este runtime.")
+    throw new Error("Chromium serverless indisponível para este runtime.")
   }
 
   chromium.setGraphicsMode = false
