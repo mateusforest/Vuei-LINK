@@ -37,7 +37,7 @@ export const TRAVELER_PLAN_DEFINITIONS: Record<TravelerPlanCode, TravelerPlanDef
     features: [
       "1 viagem ativa",
       "Concierge IA completo",
-      "40 cr\u00e9ditos iniciais",
+      "40 cr\u00e9ditos por m\u00eas",
       "Compartilhamento da viagem",
       "Offline",
       "Passagens",

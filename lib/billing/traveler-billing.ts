@@ -126,19 +126,6 @@ async function getCurrentTravelerPlanCycle(client: SupabaseDbClient, userId: str
   return { data: (data as TravelerPlanCycleRow | null) ?? null, error: error?.message ?? null }
 }
 
-async function getLatestTravelerFreePlanCycle(client: SupabaseDbClient, userId: string) {
-  const { data, error } = await (client
-    .from("traveler_plan_credit_cycles" as any) as any)
-    .select("*")
-    .eq("user_id", userId)
-    .eq("plan_code", "free")
-    .order("period_start", { ascending: false })
-    .limit(1)
-    .maybeSingle()
-
-  return { data: (data as TravelerPlanCycleRow | null) ?? null, error: error?.message ?? null }
-}
-
 async function getTravelerTransactionsCount(client: SupabaseDbClient, userId: string) {
   const { count, error } = await client
     .from("credit_transactions")
@@ -272,22 +259,32 @@ export async function ensureTravelerFreePlanCycle(client: SupabaseDbClient, user
     return { data: currentCycleResult.data, error: null }
   }
 
-  const existingFreeCycle = await getLatestTravelerFreePlanCycle(client, userId)
-  if (existingFreeCycle.error) {
-    return { data: null as TravelerPlanCycleRow | null, error: existingFreeCycle.error }
+  const { periodStart, periodEnd } = getCurrentFreeCycleWindow(profileResult.data.created_at, new Date())
+
+  const expirationError = await expireRemainingPlanCycles(client, userId, userId, {
+    planCode: "free",
+    periodStart,
+    periodEnd,
+  })
+  if (expirationError) {
+    return { data: null as TravelerPlanCycleRow | null, error: expirationError }
   }
 
-  if (existingFreeCycle.data) {
-    return { data: existingFreeCycle.data, error: null }
+  const existingForWindow = await (client
+    .from("traveler_plan_credit_cycles" as any) as any)
+    .select("*")
+    .eq("user_id", userId)
+    .eq("plan_code", "free")
+    .eq("period_start", periodStart)
+    .eq("period_end", periodEnd)
+    .maybeSingle()
+
+  if (existingForWindow.error) {
+    return { data: null as TravelerPlanCycleRow | null, error: existingForWindow.error.message }
   }
 
-  const allCyclesResult = await listTravelerPlanCycles(client, userId)
-  if (allCyclesResult.error) {
-    return { data: null as TravelerPlanCycleRow | null, error: allCyclesResult.error }
-  }
-
-  if (allCyclesResult.data.length > 0) {
-    return { data: null as TravelerPlanCycleRow | null, error: null }
+  if (existingForWindow.data) {
+    return { data: existingForWindow.data as TravelerPlanCycleRow, error: null }
   }
 
   const subscriptionResult = await ensureTravelerSubscriptionRow(client, userId)
@@ -295,8 +292,6 @@ export async function ensureTravelerFreePlanCycle(client: SupabaseDbClient, user
     return { data: null as TravelerPlanCycleRow | null, error: subscriptionResult.error ?? "Nao foi possivel garantir a assinatura free do traveler." }
   }
 
-  const periodStart = profileResult.data.created_at ?? nowIso
-  const periodEnd = "2999-12-31T23:59:59.999Z"
   const grantedCredits = getPlanCreditsForCode("free")
   const insertedCycle = await (client
     .from("traveler_plan_credit_cycles" as any) as any)
