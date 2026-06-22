@@ -280,6 +280,64 @@ async function fetchConversationHistory(
   }))
 }
 
+function normalizeTripPermissions(trip: TripRow) {
+  const permissions = (trip.permissions ?? {}) as Record<string, unknown>
+
+  return {
+    publicCanViewItinerary: typeof permissions.publicCanViewItinerary === "boolean" ? permissions.publicCanViewItinerary : true,
+    publicCanViewAccommodation: typeof permissions.publicCanViewAccommodation === "boolean" ? permissions.publicCanViewAccommodation : true,
+    publicCanViewFlights: typeof permissions.publicCanViewFlights === "boolean" ? permissions.publicCanViewFlights : false,
+    publicCanViewPublicDocuments: typeof permissions.publicCanViewPublicDocuments === "boolean" ? permissions.publicCanViewPublicDocuments : true,
+  }
+}
+
+function filterContextDocuments(
+  trip: TripRow,
+  documents: DocumentRow[],
+  accessMode: "admin" | "public" | "authenticated",
+) {
+  if (accessMode !== "public") return documents
+
+  const permissions = normalizeTripPermissions(trip)
+  if (!permissions.publicCanViewPublicDocuments) return []
+
+  return documents.filter((document) =>
+    document.visibility === "public_trip"
+    && document.is_private !== true
+  )
+}
+
+function filterContextHotels(
+  trip: TripRow,
+  hotels: HotelRow[],
+  accessMode: "admin" | "public" | "authenticated",
+) {
+  if (accessMode !== "public") return hotels
+  return normalizeTripPermissions(trip).publicCanViewAccommodation ? hotels : []
+}
+
+function filterContextFlights(
+  trip: TripRow,
+  flights: FlightRow[],
+  accessMode: "admin" | "public" | "authenticated",
+) {
+  if (accessMode !== "public") return flights
+  return normalizeTripPermissions(trip).publicCanViewFlights ? flights : []
+}
+
+function filterContextItineraries(
+  trip: TripRow,
+  itineraries: TripItineraryRow[],
+  accessMode: "admin" | "public" | "authenticated",
+) {
+  if (accessMode !== "public") return itineraries
+  return normalizeTripPermissions(trip).publicCanViewItinerary ? itineraries : []
+}
+
+function logConciergeContextDebug(details: Record<string, unknown>) {
+  console.info("[AI][CONCIERGE][CONTEXT]", details)
+}
+
 export async function POST(request: Request) {
   if (!shouldUseSupabase()) {
     return NextResponse.json(
@@ -397,29 +455,34 @@ export async function POST(request: Request) {
   }
 
   const promptResult = await resolvePrompt(dataClient, ownerType === "agency" ? "concierge_agency" : "concierge_traveler")
-  const hotelsResult = await dataClient
-    .from("trip_hotels")
-    .select("*")
-    .eq("trip_id", accessResult.trip.id)
-    .order("created_at", { ascending: true })
-  const flightsResult = await dataClient
-    .from("trip_flights")
-    .select("*")
-    .eq("trip_id", accessResult.trip.id)
-    .order("departure_at", { ascending: true, nullsFirst: false })
-  const documentsResult = await dataClient
-    .from("documents")
-    .select("*")
-    .eq("trip_id", accessResult.trip.id)
-    .order("created_at", { ascending: true })
-  const itinerariesResult = await dataClient
-    .from("trip_itineraries")
-    .select("*")
-    .eq("trip_id", accessResult.trip.id)
-    .order("created_at", { ascending: false })
-  const clientResult = accessResult.trip.client_id
-    ? await dataClient.from("clients").select("id, name").eq("id", accessResult.trip.client_id).maybeSingle()
-    : { data: null as ClientRow | null, error: null }
+  const [hotelsResult, flightsResult, documentsResult, itinerariesResult, clientResult, ownerProfileResult] = await Promise.all([
+    dataClient
+      .from("trip_hotels")
+      .select("*")
+      .eq("trip_id", accessResult.trip.id)
+      .order("created_at", { ascending: true }),
+    dataClient
+      .from("trip_flights")
+      .select("*")
+      .eq("trip_id", accessResult.trip.id)
+      .order("departure_at", { ascending: true, nullsFirst: false }),
+    dataClient
+      .from("documents")
+      .select("*")
+      .eq("trip_id", accessResult.trip.id)
+      .order("created_at", { ascending: true }),
+    dataClient
+      .from("trip_itineraries")
+      .select("*")
+      .eq("trip_id", accessResult.trip.id)
+      .order("created_at", { ascending: false }),
+    accessResult.trip.client_id
+      ? dataClient.from("clients").select("id, name").eq("id", accessResult.trip.client_id).maybeSingle()
+      : Promise.resolve({ data: null as ClientRow | null, error: null }),
+    accessResult.trip.owner_user_id
+      ? dataClient.from("profiles").select("id, name").eq("id", accessResult.trip.owner_user_id).maybeSingle()
+      : Promise.resolve({ data: null as Pick<ProfileRow, "id" | "name"> | null, error: null }),
+  ])
 
   const conversationResult = await createOrReuseConversation(
     dataClient,
@@ -440,14 +503,31 @@ export async function POST(request: Request) {
   }
 
   const history = await fetchConversationHistory(dataClient, conversationResult.conversationId)
-  const contextSummary = buildTripContextSummary({
+  const visibleHotels = filterContextHotels(accessResult.trip, (hotelsResult.data ?? []) as HotelRow[], accessMode)
+  const visibleFlights = filterContextFlights(accessResult.trip, (flightsResult.data ?? []) as FlightRow[], accessMode)
+  const visibleDocuments = filterContextDocuments(accessResult.trip, (documentsResult.data ?? []) as DocumentRow[], accessMode)
+  const visibleItineraries = filterContextItineraries(accessResult.trip, (itinerariesResult.data ?? []) as TripItineraryRow[], accessMode)
+  const contextResult = buildTripContextSummary({
     trip: accessResult.trip,
-    hotels: (hotelsResult.data ?? []) as HotelRow[],
-    flights: (flightsResult.data ?? []) as FlightRow[],
-    itineraries: (itinerariesResult.data ?? []) as TripItineraryRow[],
-    documents: (documentsResult.data ?? []) as DocumentRow[],
+    hotels: visibleHotels,
+    flights: visibleFlights,
+    itineraries: visibleItineraries,
+    documents: visibleDocuments,
     audience: ownerType,
+    accessMode,
+    clientName: clientResult.data?.name ?? null,
+    travelerName: ownerProfileResult.data?.name ?? null,
     recentMessages: history,
+  })
+  const contextSummary = contextResult.summary
+
+  logConciergeContextDebug({
+    tripId: accessResult.trip.id,
+    tripSlug: accessResult.trip.slug,
+    accessMode,
+    ownerType,
+    promptCode: promptResult.prompt.code,
+    ...contextResult.debug,
   })
 
   const userPrompt = buildPromptInput(promptResult.prompt.userPromptTemplate, message, contextSummary)

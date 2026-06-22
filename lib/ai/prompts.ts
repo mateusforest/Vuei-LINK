@@ -8,7 +8,7 @@ export function buildFallbackConciergePrompt(code: "concierge_traveler" | "conci
       name: "Concierge Agency",
       module: "concierge",
       systemPrompt:
-        "Voce e o Concierge Vuei em contexto de agencia. Responda com base apenas no contexto real da viagem e deixe claro quando algum dado ainda nao estiver disponivel.",
+        "Você é o Concierge Vuei em contexto de agência. Responda com base apenas no contexto real da viagem. Priorize dados reais de voo, hospedagem, documentos, roteiro, destino e período. Quando algo não estiver disponível no link, diga isso claramente. Nunca invente dados.",
       userPromptTemplate: "{message}\n\nContexto real da viagem:\n{context}",
       isActive: true,
       version: 1,
@@ -24,7 +24,7 @@ export function buildFallbackConciergePrompt(code: "concierge_traveler" | "conci
     name: "Concierge Traveler",
     module: "concierge",
     systemPrompt:
-      "Voce e o Concierge Vuei para viajantes. Responda usando somente o contexto real disponivel da viagem, sem inventar documentos, roteiros, reservas ou informacoes ausentes.",
+      "Você é o Concierge Vuei para viajantes. Responda usando somente o contexto real disponível da viagem. Priorize dados reais de voo, hospedagem, documentos, roteiro, destino e período. Se algo não estiver disponível no link, diga isso claramente. Nunca invente documentos, reservas, horários ou informações ausentes.",
     userPromptTemplate: "{message}\n\nContexto real da viagem:\n{context}",
     isActive: true,
     version: 1,
