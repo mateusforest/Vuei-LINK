@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createSupabaseAdminClient, hasSupabaseAdminEnv, isMissingSupabaseAdminEnvError } from "@/lib/supabase/admin"
+import { resolveTripLinkAccess } from "@/lib/security/trip-link-access"
 import type { Database } from "@/lib/supabase/types"
 
 export const runtime = "nodejs"
@@ -103,36 +104,18 @@ async function resolveTripAdminAccess(params: {
   adminToken?: string | null
 }) {
   const supabase = createSupabaseAdminClient()
-  let query = supabase.from("trips").select("*")
+  const accessResult = await resolveTripLinkAccess(supabase, {
+    tripId: params.tripId,
+    tripSlug: params.tripSlug,
+    adminToken: params.adminToken,
+    accessMode: "admin",
+  })
 
-  if (params.tripId) {
-    query = query.eq("id", params.tripId)
-  } else if (params.tripSlug) {
-    query = query.eq("slug", params.tripSlug)
-  } else if (params.adminToken) {
-    query = query.eq("admin_token", params.adminToken)
-  } else {
-    return { supabase, trip: null as TripRow | null, error: "Viagem administrativa invalida." }
+  return {
+    supabase,
+    trip: accessResult.trip,
+    error: accessResult.error,
   }
-
-  const { data, error } = await query.maybeSingle()
-  if (error) {
-    return { supabase, trip: null as TripRow | null, error: error.message }
-  }
-
-  const trip = data as TripRow | null
-  if (!trip) {
-    return { supabase, trip: null as TripRow | null, error: "Viagem administrativa n?o ?ncontrada." }
-  }
-
-  const tokenMatches = Boolean(params.adminToken && trip.admin_token === params.adminToken)
-  const slugMatches = Boolean(params.tripSlug && trip.slug === params.tripSlug)
-
-  if (!tokenMatches && !slugMatches) {
-    return { supabase, trip: null as TripRow | null, error: "Acesso administrativo inv?lido para esta viagem." }
-  }
-
-  return { supabase, trip, error: null as string | null }
 }
 
 function getMissingAdminConfigResponse() {

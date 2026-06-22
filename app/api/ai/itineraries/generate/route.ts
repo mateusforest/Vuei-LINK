@@ -13,6 +13,7 @@ import type { Document } from "@/types/document"
 import type { TripItineraryRecord, TripItineraryContent } from "@/types/itinerary"
 import { consumeTravelerCredits, getTravelerCreditBalance } from "@/lib/billing/traveler-billing"
 import { consumeAgencyCredits, getAgencyCreditBalance } from "@/lib/billing/agency-billing"
+import { hasAgencyMutationAccess, resolveTripLinkAccess } from "@/lib/security/trip-link-access"
 
 export const runtime = "nodejs"
 export const maxDuration = 60
@@ -92,24 +93,18 @@ async function getTripByAdminAccess(
   client: ReturnType<typeof createSupabaseAdminClient>,
   payload: { tripId: string; tripSlug?: string | null; adminToken?: string | null },
 ) {
-  const { data, error } = await client.from("trips").select("*").eq("id", payload.tripId).maybeSingle()
-  if (error) {
-    return { trip: null as TripRow | null, membership: null as AgencyMemberRow | null, error: error.message }
+  const accessResult = await resolveTripLinkAccess(client, {
+    tripId: payload.tripId,
+    tripSlug: payload.tripSlug,
+    adminToken: payload.adminToken,
+    accessMode: "admin",
+  })
+
+  return {
+    trip: accessResult.trip,
+    membership: null as AgencyMemberRow | null,
+    error: accessResult.error ?? (accessResult.trip ? null : "Voc? n?o tem permiss?o para gerar roteiros desta viagem."),
   }
-
-  const trip = data as TripRow | null
-  if (!trip) {
-    return { trip: null as TripRow | null, membership: null as AgencyMemberRow | null, error: "Viagem n?o ?ncontrada." }
-  }
-
-  const tokenMatches = Boolean(payload.adminToken && trip.admin_token === payload.adminToken)
-  const slugMatches = Boolean(payload.tripSlug && trip.slug === payload.tripSlug)
-
-  if (!tokenMatches && !slugMatches) {
-    return { trip: null as TripRow | null, membership: null as AgencyMemberRow | null, error: "Voc? n?o tem permiss?o para gerar roteiros desta viagem." }
-  }
-
-  return { trip, membership: null as AgencyMemberRow | null, error: null }
 }
 
 async function getProfile(client: NonNullable<Awaited<ReturnType<typeof createSupabaseServerClient>>>, userId: string) {
@@ -158,7 +153,7 @@ async function getAccessibleTrip(
     return { trip: null as TripRow | null, membership: null as AgencyMemberRow | null, error: membershipResult.error.message }
   }
 
-  if (!membershipResult.data || !["owner", "admin", "member"].includes(membershipResult.data.role)) {
+  if (!membershipResult.data || !hasAgencyMutationAccess(membershipResult.data.role)) {
     return { trip: null as TripRow | null, membership: null as AgencyMemberRow | null, error: "Voc? n?o tem permiss?o para gerar roteiros desta viagem." }
   }
 

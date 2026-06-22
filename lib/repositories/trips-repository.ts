@@ -32,6 +32,15 @@ interface RepositoryTripResult {
   config?: ReturnType<typeof createSupabaseBrowserClientPlaceholder>
 }
 
+function stripSensitiveTripTokens<T extends Trip | null>(trip: T): T {
+  if (!trip) return trip
+  return {
+    ...trip,
+    adminToken: null,
+    publicToken: null,
+  } as T
+}
+
 const CREATE_TRIP_ERROR_MESSAGE = "Nao foi possivel criar a viagem. Tente novamente."
 const FREE_PLAN_TRIP_LIMIT_ERROR_MESSAGE = "Seu plano Free permite 1 viagem ativa. Para criar novas viagens, finalize uma viagem existente ou fa\u00e7a upgrade."
 const MAX_TRIP_SLUG_ATTEMPTS = 5
@@ -354,7 +363,7 @@ export async function getTripBySlug(slug: string) {
         return {
           source: "supabase" as const,
           config: createSupabaseBrowserClientPlaceholder(),
-          data: isDeletedTripStatus(mappedTrip.status) ? null : mappedTrip,
+          data: isDeletedTripStatus(mappedTrip.status) ? null : stripSensitiveTripTokens(mappedTrip),
         }
       }
       if (error) {
@@ -429,7 +438,7 @@ export async function getTripByPublicToken(token: string) {
         return {
           source: "supabase" as const,
           config: createSupabaseBrowserClientPlaceholder(),
-          data: isDeletedTripStatus(mappedTrip.status) ? null : mappedTrip,
+          data: isDeletedTripStatus(mappedTrip.status) ? null : stripSensitiveTripTokens(mappedTrip),
         }
       }
       return {

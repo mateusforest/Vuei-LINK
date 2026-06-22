@@ -6674,6 +6674,12 @@ export default function TripPage() {
       const routeMode = isAdminRoute ? "admin" : isPublicRoute ? "public" : "portal"
       const isMobileViewport = typeof window !== "undefined" ? window.innerWidth < 768 : false
 
+      if (isAdminRoute && !adminToken) {
+        setLoadError("Este link administrativo é inválido ou expirou.")
+        setIsLoadingTrip(false)
+        return
+      }
+
       logTripDocumentsDev("trip_load_started", {
         routeSlug,
         routeMode,

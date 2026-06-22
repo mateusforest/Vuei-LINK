@@ -11,6 +11,7 @@ import { buildTripContextSummary } from "@/lib/ai/trip-context"
 import { createAiUsageLog } from "@/lib/ai/usage-logs"
 import { consumeTravelerCredits, getTravelerCreditBalance } from "@/lib/billing/traveler-billing"
 import { consumeAgencyCredits, getAgencyCreditBalance } from "@/lib/billing/agency-billing"
+import { hasAgencyMutationAccess, resolveTripLinkAccess } from "@/lib/security/trip-link-access"
 
 type JsonObject = Record<string, unknown>
 
@@ -115,6 +116,10 @@ async function getAccessibleTrip(
     return { trip: null as TripRow | null, membership: null as AgencyMemberRow | null, error: "Voc? n?o tem permiss?o para usar o concierge desta viagem." }
   }
 
+  if (!hasAgencyMutationAccess(membershipResult.data.role)) {
+    return { trip: null as TripRow | null, membership: null as AgencyMemberRow | null, error: "Voc? n?o tem permiss?o para usar o concierge desta viagem." }
+  }
+
   return { trip, membership: membershipResult.data as AgencyMemberRow, error: null }
 }
 
@@ -126,34 +131,19 @@ async function getTripByLinkAccess(payload: {
   accessMode: "admin" | "public"
 }) {
   const adminClient = createSupabaseAdminClient()
-  const tripResult = await adminClient.from("trips").select("*").eq("id", payload.tripId).maybeSingle()
+  const accessResult = await resolveTripLinkAccess(adminClient, {
+    tripId: payload.tripId,
+    tripSlug: payload.tripSlug,
+    adminToken: payload.adminToken,
+    publicToken: payload.publicToken,
+    accessMode: payload.accessMode,
+  })
 
-  if (tripResult.error) {
-    return { trip: null as TripRow | null, membership: null as AgencyMemberRow | null, error: tripResult.error.message }
+  return {
+    trip: accessResult.trip,
+    membership: null as AgencyMemberRow | null,
+    error: accessResult.error ?? (accessResult.trip ? null : "Voc? n?o tem permiss?o para usar o concierge desta viagem."),
   }
-
-  const trip = tripResult.data as TripRow | null
-  if (!trip) {
-    return { trip: null as TripRow | null, membership: null as AgencyMemberRow | null, error: "Viagem n?o ?ncontrada." }
-  }
-
-  if (payload.accessMode === "admin") {
-    const tokenMatches = Boolean(payload.adminToken && trip.admin_token === payload.adminToken)
-    const slugMatches = Boolean(payload.tripSlug && trip.slug === payload.tripSlug)
-
-    if (!tokenMatches && !slugMatches) {
-      return { trip: null as TripRow | null, membership: null as AgencyMemberRow | null, error: "Voc? n?o tem permiss?o para usar o concierge desta viagem." }
-    }
-  } else {
-    const tokenMatches = Boolean(payload.publicToken && trip.public_token === payload.publicToken)
-    const slugMatches = Boolean(payload.tripSlug && trip.slug === payload.tripSlug && trip.visibility === "public")
-
-    if (trip.visibility !== "public" || (!tokenMatches && !slugMatches)) {
-      return { trip: null as TripRow | null, membership: null as AgencyMemberRow | null, error: "Voc? n?o tem permiss?o para usar o concierge desta viagem." }
-    }
-  }
-
-  return { trip, membership: null as AgencyMemberRow | null, error: null }
 }
 
 async function getCreditsBalance(

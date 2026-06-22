@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createSupabaseAdminClient, hasSupabaseAdminEnv, isMissingSupabaseAdminEnvError } from "@/lib/supabase/admin"
+import { resolveTripLinkAccess as resolveTripLinkRequest } from "@/lib/security/trip-link-access"
 import { createSupabaseServerClient } from "@/lib/supabase/server"
 import type { Database } from "@/lib/supabase/types"
 
@@ -83,51 +84,19 @@ async function resolveTripByLinkAccess(params: {
   accessMode: AccessMode
 }) {
   const supabase = createSupabaseAdminClient()
+  const accessResult = await resolveTripLinkRequest(supabase, {
+    tripId: params.tripId,
+    tripSlug: params.tripSlug,
+    adminToken: params.adminToken,
+    publicToken: params.publicToken,
+    accessMode: params.accessMode,
+  })
 
-  let query = supabase.from("trips").select("*")
-  if (params.tripId) {
-    query = query.eq("id", params.tripId)
-  } else if (params.tripSlug) {
-    query = query.eq("slug", params.tripSlug)
-  } else if (params.accessMode === "admin" && params.adminToken) {
-    query = query.eq("admin_token", params.adminToken)
-  } else if (params.accessMode === "public" && params.publicToken) {
-    query = query.eq("public_token", params.publicToken)
-  } else {
-    return { supabase, trip: null as TripRow | null, error: "Link da viagem inv?lido." }
+  return {
+    supabase,
+    trip: accessResult.trip,
+    error: accessResult.error,
   }
-
-  const { data, error } = await query.maybeSingle()
-  if (error) {
-    return { supabase, trip: null as TripRow | null, error: error.message }
-  }
-
-  const trip = data as TripRow | null
-  if (!trip) {
-    return { supabase, trip: null as TripRow | null, error: "Viagem n?o ?ncontrada." }
-  }
-
-  if (params.accessMode === "admin") {
-    const tokenMatches = Boolean(params.adminToken && trip.admin_token === params.adminToken)
-    const slugMatches = Boolean(params.tripSlug && trip.slug === params.tripSlug)
-
-    if (!tokenMatches && !slugMatches) {
-      return { supabase, trip: null as TripRow | null, error: "Acesso administrativo inv?lido para este documento." }
-    }
-  } else {
-    const tokenMatches = Boolean(params.publicToken && trip.public_token === params.publicToken)
-    const slugMatches = Boolean(params.tripSlug && trip.slug === params.tripSlug && trip.visibility === "public")
-
-    if (!trip.visibility || trip.visibility !== "public") {
-      return { supabase, trip: null as TripRow | null, error: "Esta viagem n?o ?sta dispon?vel publicamente." }
-    }
-
-    if (!tokenMatches && !slugMatches) {
-      return { supabase, trip: null as TripRow | null, error: "Acesso publico inv?lido para este documento." }
-    }
-  }
-
-  return { supabase, trip, error: null as string | null }
 }
 
 async function resolveDocument(
