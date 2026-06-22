@@ -2,7 +2,6 @@
 
 import { useState } from "react"
 import { motion } from "framer-motion"
-import { useRouter } from "next/navigation"
 import { 
   Share2, 
   Copy, 
@@ -26,6 +25,7 @@ import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
 import { useTrips } from "@/contexts/trips-context"
 import { ensureTripIsPublic } from "@/lib/repositories/trips-repository"
+import { CreateTripButton } from "@/components/portal/create-trip-button"
 
 const fadeInUp = {
   initial: { opacity: 0, y: 20 },
@@ -42,7 +42,6 @@ const staggerContainer = {
 }
 
 export default function CompartilharPage() {
-  const router = useRouter()
   const { activeTrip, trips } = useTrips()
   const [adminCopied, setAdminCopied] = useState(false)
   const [shareCopied, setShareCopied] = useState(false)
@@ -101,13 +100,12 @@ export default function CompartilharPage() {
             <p className="text-muted-foreground text-sm mb-6">
               Para compartilhar, voce precisa criar uma viagem.
             </p>
-            <Button 
+            <CreateTripButton 
               className="bg-gradient-to-r from-[#5de0e6] to-[#004aad] text-white border-0"
-              onClick={() => router.push("/portal/criar-viagem")}
             >
               <Plus size={18} className="mr-2" />
               Nova Viagem
-            </Button>
+            </CreateTripButton>
           </Card>
         </motion.div>
       </motion.div>

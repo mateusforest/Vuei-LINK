@@ -16,9 +16,10 @@ export const AGENCY_PLAN_DEFINITIONS: Record<AgencyCommercialPlanCode, AgencyPla
     priceLabel: "R$ 0",
     monthlyCredits: 40,
     maxUsers: 1,
+    maxClients: 1,
     maxActiveTrips: 1,
     features: [
-      "Portal Agencia completo",
+      "Portal Ag\u00eancia completo",
       "Dashboard",
       "Clientes",
       "Viagens",
@@ -30,20 +31,22 @@ export const AGENCY_PLAN_DEFINITIONS: Record<AgencyCommercialPlanCode, AgencyPla
       "Analytics",
       "Compartilhamento",
       "Offline",
-      "1 usuario",
+      "1 usu\u00e1rio",
+      "1 cliente",
       "1 viagem ativa",
-      "40 creditos por mes",
+      "40 cr\u00e9ditos por m\u00eas",
     ],
   },
   start: {
     code: "start",
     name: "Start",
-    priceLabel: "R$ 69,90/mes",
+    priceLabel: "R$ 69,90/m\u00eas",
     monthlyCredits: 350,
     maxUsers: 3,
+    maxClients: null,
     maxActiveTrips: 20,
     features: [
-      "Portal Agencia",
+      "Portal Ag\u00eancia",
       "Dashboard",
       "Clientes",
       "Viagens",
@@ -55,46 +58,49 @@ export const AGENCY_PLAN_DEFINITIONS: Record<AgencyCommercialPlanCode, AgencyPla
       "Analytics",
       "Compartilhamento ilimitado",
       "Offline",
-      "3 usuarios",
+      "3 usu\u00e1rios",
       "20 viagens ativas",
-      "350 creditos por mes",
+      "350 cr\u00e9ditos por m\u00eas",
     ],
   },
   pro: {
     code: "pro",
     name: "Pro",
-    priceLabel: "R$ 109,90/mes",
+    priceLabel: "R$ 109,90/m\u00eas",
     monthlyCredits: 600,
     maxUsers: 5,
+    maxClients: null,
     maxActiveTrips: 100,
     badge: "Mais popular",
     features: [
       "Tudo do Start",
-      "5 usuarios",
+      "5 usu\u00e1rios",
       "100 viagens ativas",
-      "600 creditos por mes",
+      "600 cr\u00e9ditos por m\u00eas",
       "Analytics igual ao Start",
     ],
   },
   business: {
     code: "business",
     name: "Business",
-    priceLabel: "R$ 249,90/mes",
+    priceLabel: "R$ 249,90/m\u00eas",
     monthlyCredits: 1500,
     maxUsers: 15,
+    maxClients: null,
     maxActiveTrips: 220,
     features: [
       "Tudo do Pro",
-      "15 usuarios",
+      "15 usu\u00e1rios",
       "220 viagens ativas",
-      "1.500 creditos por mes",
-      "Atendimento prioritario",
+      "1.500 cr\u00e9ditos por m\u00eas",
+      "Atendimento priorit\u00e1rio",
     ],
   },
 }
 
 export const AGENCY_PLAN_LIMIT_ERROR = "AGENCY_PLAN_LIMIT_REACHED"
 export const AGENCY_TEAM_LIMIT_ERROR = "AGENCY_TEAM_LIMIT_REACHED"
+export const AGENCY_CLIENT_LIMIT_ERROR = "AGENCY_CLIENT_LIMIT_REACHED"
 
 export function normalizeAgencyCommercialPlanCode(value: string | null | undefined): AgencyCommercialPlanCode {
   if (value === "free") return "free"
@@ -141,16 +147,45 @@ export function resolveAgencyPlanSnapshot(input?: {
 
 export function getAgencyPlanLimitDialog(
   planCode: AgencyCommercialPlanCode,
-  kind: "trip_limit" | "team_limit",
+  kind: "trip_limit" | "team_limit" | "client_limit",
 ): AgencyLimitDialogState {
   const definition = AGENCY_PLAN_DEFINITIONS[planCode]
+
+  if (kind === "client_limit") {
+    if (planCode === "free") {
+      return {
+        kind,
+        title: "Limite do plano Free atingido",
+        description: "Seu plano Free permite 1 cliente. Para adicionar mais clientes, fa\u00e7a upgrade.",
+        actionLabel: "Conhecer planos",
+        actionHref: "/agencia/planos",
+      }
+    }
+
+    if (definition.maxClients === null) {
+      return {
+        kind,
+        title: "Limite de clientes indispon\u00edvel",
+        description: "Seu plano atual n\u00e3o possui limite fixo de clientes nesta tela.",
+        actionLabel: "Entendi",
+      }
+    }
+
+    return {
+      kind,
+      title: "Limite do plano atingido",
+      description: `Seu plano atual permite at\u00e9 ${definition.maxClients} clientes. Fa\u00e7a upgrade para ampliar sua base.`,
+      actionLabel: "Conhecer planos",
+      actionHref: "/agencia/planos",
+    }
+  }
 
   if (kind === "trip_limit") {
     if (planCode === "free") {
       return {
         kind,
         title: "Limite do plano gratuito atingido",
-        description: "O plano gratuito da agencia permite 1 viagem ativa para testar o Vuei. Faca upgrade para criar mais viagens e ampliar sua operacao.",
+        description: "Seu plano Free permite 1 viagem ativa. Para criar novas viagens, finalize uma viagem existente ou fa\u00e7a upgrade.",
         actionLabel: "Conhecer planos",
         actionHref: "/agencia/planos",
       }
@@ -160,7 +195,7 @@ export function getAgencyPlanLimitDialog(
       return {
         kind,
         title: "Limite operacional atingido",
-        description: "Seu plano permite ate 220 viagens ativas. Finalize ou arquive viagens concluidas para liberar espaco.",
+        description: "Seu plano permite at\u00e9 220 viagens ativas. Finalize ou arquive viagens conclu\u00eddas para liberar espa\u00e7o.",
         actionLabel: "Entendi",
       }
     }
@@ -168,7 +203,7 @@ export function getAgencyPlanLimitDialog(
     return {
       kind,
       title: "Limite do plano atingido",
-      description: `Seu plano atual permite ate ${definition.maxActiveTrips} viagens ativas. Faca upgrade para aumentar sua capacidade operacional.`,
+      description: `Seu plano atual permite at\u00e9 ${definition.maxActiveTrips} viagens ativas. Fa\u00e7a upgrade para aumentar sua capacidade operacional.`,
       actionLabel: "Conhecer planos",
       actionHref: "/agencia/planos",
     }
@@ -177,8 +212,8 @@ export function getAgencyPlanLimitDialog(
   if (planCode === "free") {
     return {
       kind,
-      title: "Limite de usuarios atingido",
-      description: "O plano gratuito permite 1 usuario. Faca upgrade para adicionar mais pessoas a equipe.",
+      title: "Limite de usu\u00e1rios atingido",
+      description: "O plano gratuito permite 1 usu\u00e1rio. Fa\u00e7a upgrade para adicionar mais pessoas \u00e0 equipe.",
       actionLabel: "Conhecer planos",
       actionHref: "/agencia/planos",
     }
@@ -188,7 +223,7 @@ export function getAgencyPlanLimitDialog(
     return {
       kind,
       title: "Limite operacional atingido",
-      description: `Seu plano permite ate ${definition.maxUsers} usuarios ativos na operacao. Revise membros inativos para liberar espaco.`,
+      description: `Seu plano permite at\u00e9 ${definition.maxUsers} usu\u00e1rios ativos na opera\u00e7\u00e3o. Revise membros inativos para liberar espa\u00e7o.`,
       actionLabel: "Entendi",
     }
   }
@@ -196,7 +231,7 @@ export function getAgencyPlanLimitDialog(
   return {
     kind,
     title: "Limite do plano atingido",
-    description: `Seu plano atual permite ate ${definition.maxUsers} usuarios ativos na equipe. Faca upgrade para ampliar sua capacidade operacional.`,
+    description: `Seu plano atual permite at\u00e9 ${definition.maxUsers} usu\u00e1rios ativos na equipe. Fa\u00e7a upgrade para ampliar sua capacidade operacional.`,
     actionLabel: "Conhecer planos",
     actionHref: "/agencia/planos",
   }

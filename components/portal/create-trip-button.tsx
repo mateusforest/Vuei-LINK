@@ -39,7 +39,7 @@ export function CreateTripButton({ children, onClick, ...props }: CreateTripButt
         open={showLimitDialog}
         onOpenChange={setShowLimitDialog}
         title="Limite do plano gratuito atingido"
-        description="O plano gratuito permite apenas uma viagem ativa por vez. Faça upgrade para o Premium para criar viagens ilimitadas."
+        description="Seu plano Free permite 1 viagem ativa. Para criar novas viagens, finalize uma viagem existente ou fa\u00e7a upgrade."
         actionLabel="Conhecer Premium"
         actionHref="/portal/planos"
       />

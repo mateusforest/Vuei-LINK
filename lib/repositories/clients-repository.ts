@@ -6,6 +6,8 @@ import type { Database } from "@/lib/supabase/types"
 import { mapLegacyClientToClient, type LegacyAgencyClient, type LegacyAgencyTrip } from "@/lib/mappers/agency-mappers"
 import { mapAgencyTripToTrip } from "@/lib/mappers/trip-mappers"
 import { listTripsByAgency } from "@/lib/repositories/trips-repository"
+import { AGENCY_CLIENT_LIMIT_ERROR } from "@/lib/billing/agency-plans"
+import { countAgencyClientsForClient, getAgencyBillingStatusForClient } from "@/lib/billing/agency-billing"
 
 const ACTIVE_CLIENT_TRIP_STATUSES = ["draft", "upcoming", "ongoing"] as const
 
@@ -179,6 +181,37 @@ export async function createClient(payload: Omit<Client, "id" | "createdAt" | "u
 
     const client = createSupabaseBrowserClient()
     if (client) {
+      const billingStatus = await getAgencyBillingStatusForClient(client, payload.agencyId)
+      if (billingStatus.error || !billingStatus.data) {
+        return {
+          source: "supabase" as const,
+          config: createSupabaseBrowserClientPlaceholder(),
+          data: null as Client | null,
+          error: billingStatus.error ?? "Nao foi possivel validar o plano da agencia.",
+        }
+      }
+
+      if (billingStatus.data.maxClients !== null) {
+        const clientsCountResult = await countAgencyClientsForClient(client, payload.agencyId)
+        if (clientsCountResult.error) {
+          return {
+            source: "supabase" as const,
+            config: createSupabaseBrowserClientPlaceholder(),
+            data: null as Client | null,
+            error: clientsCountResult.error,
+          }
+        }
+
+        if (clientsCountResult.count >= billingStatus.data.maxClients) {
+          return {
+            source: "supabase" as const,
+            config: createSupabaseBrowserClientPlaceholder(),
+            data: null as Client | null,
+            error: AGENCY_CLIENT_LIMIT_ERROR,
+          }
+        }
+      }
+
       const insertPayload: Database["public"]["Tables"]["clients"]["Insert"] = {
         agency_id: payload.agencyId,
         name: payload.name,

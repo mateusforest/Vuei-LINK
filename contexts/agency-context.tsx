@@ -43,6 +43,7 @@ import {
 } from "@/lib/repositories/ai-repository"
 import type { Agency, AgencyCommercialPlanCode, AgencyLimitDialogState, AgencyPlanSnapshot } from "@/types"
 import {
+  AGENCY_CLIENT_LIMIT_ERROR,
   AGENCY_PLAN_LIMIT_ERROR,
   AGENCY_TEAM_LIMIT_ERROR,
   getAgencyPlanLimitDialog,
@@ -196,10 +197,14 @@ interface AgencyContextType {
   removeTeamMember: (id: string) => Promise<{ success: boolean; error: string | null }>
   credits: AgencyCredits
   subscription: AgencyPlanSnapshot
+  activeClientsCount: number
   activeTripsCount: number
   teamSeatsUsed: number
+  canCreateMoreClients: boolean
+  canCreateMoreTrips: boolean
   limitDialog: AgencyLimitDialogState | null
   clearLimitDialog: () => void
+  showPlanLimitDialog: (kind: AgencyLimitDialogState["kind"]) => void
   updateSubscriptionPlan: (planCode: AgencyCommercialPlanCode) => Promise<{ success: boolean; error: string | null }>
   useCredits: (amount: number, source: string, action: string) => boolean
   addCredits: (amount: number) => void
@@ -288,6 +293,10 @@ function parseDestination(destination: string): { city: string; country: string 
 
 function isVisibleAgencyClient(client: Pick<Client, "status"> | null | undefined) {
   return !client || client.status === "active"
+}
+
+function isCountedAgencyClientStatus(status: Client["status"] | null | undefined) {
+  return status !== "archived"
 }
 
 function sanitizeFileName(name: string) {
@@ -486,7 +495,10 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
   const clientNameById = useMemo(() => new Map(clients.map((client) => [client.id, client.name])), [clients])
   const lastWorkspaceKeyRef = useRef<string | null>(null)
   const hasWarmStateRef = useRef(false)
+  const activeClientsCount = clients.filter((client) => isCountedAgencyClientStatus(client.status)).length
   const activeTripsCount = trips.filter((trip) => isAgencyActiveTripStatus(trip.status)).length
+  const canCreateMoreClients = subscription.definition.maxClients === null || activeClientsCount < subscription.definition.maxClients
+  const canCreateMoreTrips = activeTripsCount < subscription.definition.maxActiveTrips
   const teamSeatsUsed = getActiveAgencyTeamMembersCount(teamMembers)
 
   useEffect(() => {
@@ -949,6 +961,12 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const addClient = useCallback(async (data: Omit<Client, "id" | "createdAt">) => {
+    if (!canCreateMoreClients) {
+      setWorkspaceError(null)
+      setLimitDialog(getAgencyPlanLimitDialog(subscription.code, "client_limit"))
+      return null
+    }
+
     if (isUsingRealData) {
       if (!agencyId) {
         const message = "Agencia nao configurada no Supabase. Finalize o cadastro da agencia antes de criar clientes."
@@ -968,6 +986,11 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
       })
 
       if (!result.data) {
+        if (result.error === AGENCY_CLIENT_LIMIT_ERROR) {
+          setWorkspaceError(null)
+          setLimitDialog(getAgencyPlanLimitDialog(subscription.code, "client_limit"))
+          return null
+        }
         setWorkspaceError(result.error ?? "Nao foi possivel criar o cliente no Supabase.")
         return null
       }
@@ -997,7 +1020,7 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
     setClients((prev) => [newClient, ...prev])
     addActivity("Cliente cadastrado", newClient.name, "client")
     return newClient
-  }, [addActivity, agencyId, isUsingRealData])
+  }, [addActivity, agencyId, canCreateMoreClients, isUsingRealData, subscription.code])
 
   const updateClient = useCallback(async (id: string, data: Partial<Client>) => {
     if (isUsingRealData) {
@@ -1073,7 +1096,7 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
   const getClientById = useCallback((id: string) => clients.find((client) => client.id === id), [clients])
 
   const addTrip = useCallback(async (data: Omit<AgencyTrip, "id" | "slug" | "adminLink" | "shareLink" | "createdAt" | "coverImage"> & { coverImage?: string | null }) => {
-    if (activeTripsCount >= subscription.definition.maxActiveTrips) {
+    if (!canCreateMoreTrips) {
       setWorkspaceError(null)
       setLimitDialog(getAgencyPlanLimitDialog(subscription.code, "trip_limit"))
       return null
@@ -1157,7 +1180,7 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
     setTrips((prev) => [newTrip, ...prev])
     addActivity("Viagem criada", `${data.name} para ${data.clientName}`, "trip")
     return newTrip
-  }, [activeTripsCount, addActivity, agencyId, clientNameById, isUsingRealData, subscription.code, subscription.definition.maxActiveTrips, trips, user?.id])
+  }, [addActivity, agencyId, canCreateMoreTrips, clientNameById, isUsingRealData, subscription.code, trips, user?.id])
 
   const updateTrip = useCallback(async (id: string, data: Partial<AgencyTrip>) => {
     if (isUsingRealData) {
@@ -1706,6 +1729,11 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
     setLimitDialog(null)
   }, [])
 
+  const showPlanLimitDialog = useCallback((kind: AgencyLimitDialogState["kind"]) => {
+    setWorkspaceError(null)
+    setLimitDialog(getAgencyPlanLimitDialog(subscription.code, kind))
+  }, [subscription.code])
+
   const updateSubscriptionPlan = useCallback(async (planCode: AgencyCommercialPlanCode) => {
     if (!agencyId) {
       return { success: false, error: "Agencia nao configurada para atualizar o plano." }
@@ -1756,10 +1784,14 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
         removeTeamMember,
         credits,
         subscription,
+        activeClientsCount,
         activeTripsCount,
         teamSeatsUsed,
+        canCreateMoreClients,
+        canCreateMoreTrips,
         limitDialog,
         clearLimitDialog,
+        showPlanLimitDialog,
         updateSubscriptionPlan,
         useCredits,
         addCredits,

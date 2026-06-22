@@ -224,7 +224,7 @@ const CREDITS_KEY = "vuei_credits"
 const TRIPS_BOOT_TIMEOUT_MS = 10_000
 
 function isActiveTripStatus(status: Trip["status"]) {
-  return status === "upcoming" || status === "ongoing"
+  return status === "draft" || status === "upcoming" || status === "ongoing"
 }
 
 export function TripsProvider({ children }: { children: ReactNode }) {

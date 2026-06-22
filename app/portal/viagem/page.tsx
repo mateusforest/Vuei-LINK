@@ -27,6 +27,7 @@ import { useTrips } from "@/contexts/trips-context"
 import { ensureTripIsPublic } from "@/lib/repositories/trips-repository"
 import { resolveTripHeroImage } from "@/lib/trip-destination"
 import { ImageWithFallback } from "@/components/system/image-with-fallback"
+import { CreateTripButton } from "@/components/portal/create-trip-button"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -147,13 +148,12 @@ export default function ViagemListPage() {
           <h1 className="text-2xl font-bold">Minhas Viagens</h1>
           <p className="text-muted-foreground text-sm">{trips.length} {trips.length === 1 ? "viagem" : "viagens"} criadas</p>
         </div>
-        <Button 
+        <CreateTripButton 
           className="bg-gradient-to-r from-[#5de0e6] to-[#004aad] text-white border-0"
-          onClick={() => router.push("/portal/criar-viagem")}
         >
           <Plus size={18} className="mr-2" />
           Nova Viagem
-        </Button>
+        </CreateTripButton>
       </motion.div>
 
       <motion.div variants={fadeInUp} className="flex gap-2 overflow-x-auto pb-2">
@@ -314,13 +314,12 @@ export default function ViagemListPage() {
                 ? "Crie sua primeira viagem e organize tudo em um único link."
                 : "Altere o filtro ou crie uma nova viagem."}
             </p>
-            <Button 
+            <CreateTripButton 
               className="bg-gradient-to-r from-[#5de0e6] to-[#004aad] text-white border-0"
-              onClick={() => router.push("/portal/criar-viagem")}
             >
               <Plus size={18} className="mr-2" />
               Nova Viagem
-            </Button>
+            </CreateTripButton>
           </Card>
         </motion.div>
       )}

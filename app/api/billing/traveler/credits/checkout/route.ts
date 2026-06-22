@@ -63,8 +63,8 @@ export async function POST(request: Request) {
           quantity: 1,
         },
       ],
-      success_url: buildAbsoluteAppUrl("/portal/cr?ditos?checkout=success"),
-      cancel_url: buildAbsoluteAppUrl("/portal/cr?ditos?checkout=canceled"),
+      success_url: buildAbsoluteAppUrl("/portal/creditos?checkout=success"),
+      cancel_url: buildAbsoluteAppUrl("/portal/creditos?checkout=canceled"),
       metadata: {
         user_id: user.id,
         billing_scope: "traveler",

@@ -40,8 +40,6 @@ const staggerContainer = {
 }
 
 function NoTripModal({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const router = useRouter()
-
   if (!open) return null
 
   return (
@@ -64,12 +62,11 @@ function NoTripModal({ open, onClose }: { open: boolean; onClose: () => void }) 
             <Button variant="outline" className="flex-1 border-black/8 bg-white text-[#344054]" onClick={onClose}>
               Voltar
             </Button>
-            <Button
+            <CreateTripButton
               className="flex-1 border-0 bg-gradient-to-r from-[#37beff] to-[#0b56d8] text-white shadow-[0_18px_36px_rgba(11,86,216,0.18)]"
-              onClick={() => router.push("/portal/criar-viagem")}
             >
               Criar Viagem
-            </Button>
+            </CreateTripButton>
           </div>
         </div>
       </motion.div>

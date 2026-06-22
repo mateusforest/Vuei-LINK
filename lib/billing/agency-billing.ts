@@ -124,6 +124,7 @@ function buildAgencyBillingStatus(
     startedAt,
     expiresAt,
     maxUsers: definition.maxUsers,
+    maxClients: definition.maxClients,
     maxActiveTrips: definition.maxActiveTrips,
     monthlyCredits: definition.monthlyCredits,
     features: definition.features,
@@ -371,6 +372,7 @@ export async function getAgencyCreditBalance(client: SupabaseDbClient, agencyId:
       planCode: effectivePlan,
       status: subscriptionResult.data.status,
       maxUsers: definition.maxUsers,
+      maxClients: definition.maxClients,
       maxActiveTrips: definition.maxActiveTrips,
       monthlyCredits: definition.monthlyCredits,
       planCreditsAvailable,
@@ -698,6 +700,16 @@ export async function countActiveAgencyMembersForClient(client: SupabaseDbClient
     .select("id", { count: "exact", head: true })
     .eq("agency_id", agencyId)
     .in("status", ["active", "pending"])
+
+  return { count: count ?? 0, error: error?.message ?? null }
+}
+
+export async function countAgencyClientsForClient(client: SupabaseDbClient, agencyId: string) {
+  const { count, error } = await client
+    .from("clients")
+    .select("id", { count: "exact", head: true })
+    .eq("agency_id", agencyId)
+    .neq("status", "archived")
 
   return { count: count ?? 0, error: error?.message ?? null }
 }

@@ -55,6 +55,7 @@ export interface AgencyPlanDefinition {
   priceLabel: string
   monthlyCredits: number
   maxUsers: number
+  maxClients: number | null
   maxActiveTrips: number
   badge?: string
   features: string[]
@@ -67,6 +68,7 @@ export interface AgencyBillingStatusSummary {
   startedAt: string | null
   expiresAt: string | null
   maxUsers: number
+  maxClients: number | null
   maxActiveTrips: number
   monthlyCredits: number
   features: string[]
@@ -100,6 +102,7 @@ export interface AgencyBillingApiStatus extends AgencyCreditBalanceSummary {
   planCode: AgencyCommercialPlanCode
   status: AgencySubscriptionStatus
   maxUsers: number
+  maxClients: number | null
   maxActiveTrips: number
   monthlyCredits: number
   stripeCustomerId: string | null
@@ -109,7 +112,7 @@ export interface AgencyBillingApiStatus extends AgencyCreditBalanceSummary {
 }
 
 export interface AgencyLimitDialogState {
-  kind: "trip_limit" | "team_limit"
+  kind: "trip_limit" | "team_limit" | "client_limit"
   title: string
   description: string
   actionLabel: string

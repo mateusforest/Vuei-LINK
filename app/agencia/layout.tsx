@@ -4,7 +4,7 @@ import type React from "react"
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import Image from "next/image"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import {
   LayoutDashboard,
@@ -65,11 +65,12 @@ export default function AgencyLayout({ children }: { children: React.ReactNode }
 
 function AgencyLayoutInner({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
+  const router = useRouter()
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [notificationsOpen, setNotificationsOpen] = useState(false)
   const { profile } = useAuth()
-  const { credits, conciergeRequests, agency, workspaceLoading, subscription, limitDialog, clearLimitDialog } = useAgency()
+  const { credits, conciergeRequests, agency, workspaceLoading, subscription, limitDialog, clearLimitDialog, canCreateMoreTrips, showPlanLimitDialog } = useAgency()
   const [agencyNotifications, setAgencyNotifications] = useState<Array<{
     id: string
     title: string
@@ -97,6 +98,15 @@ function AgencyLayoutInner({ children }: { children: React.ReactNode }) {
 
   const clearAgencyNotifications = () => {
     setAgencyNotifications([])
+  }
+
+  const handleOpenCreateTrip = () => {
+    if (!canCreateMoreTrips) {
+      showPlanLimitDialog("trip_limit")
+      return
+    }
+
+    router.push("/agencia/viagens/criar")
   }
 
   useEffect(() => {
@@ -433,12 +443,10 @@ function AgencyLayoutInner({ children }: { children: React.ReactNode }) {
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <Link href="/agencia/viagens/criar">
-              <Button size="sm" className="gap-2 bg-gradient-to-r from-primary to-accent text-white hover:opacity-90">
-                <Plus className="h-4 w-4" />
-                Nova Viagem
-              </Button>
-            </Link>
+            <Button size="sm" className="gap-2 bg-gradient-to-r from-primary to-accent text-white hover:opacity-90" onClick={handleOpenCreateTrip}>
+              <Plus className="h-4 w-4" />
+              Nova Viagem
+            </Button>
             <div className="relative">
               <Button variant="ghost" size="icon" className="relative h-10 w-10" onClick={() => setNotificationsOpen((prev) => !prev)}>
                 <Bell className="h-5 w-5" />
