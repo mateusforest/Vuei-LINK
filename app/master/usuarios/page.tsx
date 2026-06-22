@@ -28,10 +28,10 @@ function formatDate(dateStr: string) {
 function getRoleLabel(type: "traveler" | "agency" | "admin") {
   if (type === "admin") return "Master"
   if (type === "agency") return "Agência"
-  return "Viaj?nte"
+  return "Viajante"
 }
 
-function MasterUsuariosPageContent() {
+function MasterUsuáriosPageContent() {
   const searchParams = useSearchParams()
   const highlightId = searchParams.get("id")
   const { users, stats, dataErrors } = useMaster()
@@ -54,8 +54,8 @@ function MasterUsuariosPageContent() {
   const selectedUser = showDetailsModal ? users.find((user) => user.id === showDetailsModal) ?? null : null
 
   const pageStats = [
-    { label: "Total Usuarios", value: stats.totalUsers.toString(), icon: Users },
-    { label: "Usuarios Ativos", value: stats.activeUsers.toString(), icon: Activity },
+    { label: "Total de usuários", value: stats.totalUsers.toString(), icon: Users },
+    { label: "Usuários ativos", value: stats.activeUsers.toString(), icon: Activity },
     { label: "Usuários da agência", value: users.filter((user) => user.type === "agency").length.toString(), icon: Building2 },
     { label: "Masters", value: users.filter((user) => user.type === "admin").length.toString(), icon: Shield },
   ]
@@ -115,7 +115,7 @@ function MasterUsuariosPageContent() {
                     <p className="text-sm font-medium">{selectedUser.tripsCount}</p>
                   </div>
                   <div className="p-3 rounded-lg bg-white/5">
-                    <p className="text-xs text-muted-foreground mb-1">?ltima atualiza??o</p>
+                    <p className="text-xs text-muted-foreground mb-1">Última atualização</p>
                     <p className="text-sm font-medium">{formatDate(selectedUser.lastActive)}</p>
                   </div>
                 </div>
@@ -133,14 +133,14 @@ function MasterUsuariosPageContent() {
       </AnimatePresence>
 
       <motion.div variants={fadeInUp} className="space-y-1">
-        <h1 className="text-2xl lg:text-3xl font-bold text-foreground tracking-tight">Usuarios</h1>
+        <h1 className="text-2xl lg:text-3xl font-bold text-foreground tracking-tight">Usuários</h1>
         <p className="text-sm text-muted-foreground">Leitura real de profiles e roles do Supabase</p>
       </motion.div>
 
       {dataErrors.profiles ? (
         <motion.div variants={fadeInUp}>
           <Card className="border-red-500/20 bg-red-500/5 p-4">
-            <p className="text-sm font-medium text-foreground">Falha ao carregar usuarios reais</p>
+            <p className="text-sm font-medium text-foreground">Falha ao carregar usuários reais</p>
             <p className="mt-1 text-xs text-muted-foreground">{dataErrors.profiles}</p>
           </Card>
         </motion.div>
@@ -166,7 +166,7 @@ function MasterUsuariosPageContent() {
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Buscar usuarios..."
+            placeholder="Buscar usuários..."
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.target.value)}
             className="pl-10 bg-black/40 border-white/10 focus:border-primary/50"
@@ -178,7 +178,7 @@ function MasterUsuariosPageContent() {
           </SelectTrigger>
           <SelectContent className="bg-card border-white/10">
             <SelectItem value="all">Todos</SelectItem>
-            <SelectItem value="traveler">Viaj?ntes</SelectItem>
+            <SelectItem value="traveler">Viajantes</SelectItem>
             <SelectItem value="agency">Agência</SelectItem>
             <SelectItem value="admin">Master</SelectItem>
           </SelectContent>
@@ -235,7 +235,7 @@ function MasterUsuariosPageContent() {
                         </div>
                       </td>
                       <td className="px-6 py-4 text-sm text-foreground">{getRoleLabel(user.type)}</td>
-                      <td className="px-6 py-4 text-sm text-muted-foreground">{user.agencyName || "Sem ag?ncia"}</td>
+                      <td className="px-6 py-4 text-sm text-muted-foreground">{user.agencyName || "Sem agência"}</td>
                       <td className="px-6 py-4 text-sm text-muted-foreground">{formatDate(user.createdAt)}</td>
                     </tr>
                   ))
@@ -249,10 +249,10 @@ function MasterUsuariosPageContent() {
   )
 }
 
-export default function MasterUsuariosPage() {
+export default function MasterUsuáriosPage() {
   return (
     <Suspense fallback={<div className="space-y-8"><div className="h-24 rounded-2xl border border-white/5 bg-black/20" /></div>}>
-      <MasterUsuariosPageContent />
+      <MasterUsuáriosPageContent />
     </Suspense>
   )
 }

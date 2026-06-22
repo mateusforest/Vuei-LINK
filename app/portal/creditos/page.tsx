@@ -121,7 +121,7 @@ export default function CreditosPage() {
 
     if (diffDays === 0) return "Hoje"
     if (diffDays === 1) return "Ontem"
-    if (diffDays < 7) return `Ha ${diffDays} dias`
+    if (diffDays < 7) return `Há ${diffDays} dias`
     return date.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })
   }
 
@@ -160,7 +160,7 @@ export default function CreditosPage() {
       {checkoutStatus === "success" ? (
         <motion.div variants={fadeInUp}>
           <Card className="border-emerald-500/20 bg-emerald-500/10 p-4 text-sm text-emerald-300">
-            Checkout concluido. Os creditos so aparecem no saldo apos o webhook real do Stripe.
+            Checkout concluído. Os créditos só aparecem no saldo após o webhook real do Stripe.
           </Card>
         </motion.div>
       ) : null}
@@ -168,7 +168,7 @@ export default function CreditosPage() {
       {checkoutStatus === "canceled" ? (
         <motion.div variants={fadeInUp}>
           <Card className="border-amber-500/20 bg-amber-500/10 p-4 text-sm text-amber-300">
-            Checkout cancelado. Nenhuma alteracao foi aplicada ao saldo.
+            Checkout cancelado. Nenhuma alteração foi aplicada ao saldo.
           </Card>
         </motion.div>
       ) : null}
@@ -192,7 +192,7 @@ export default function CreditosPage() {
                   <div className="flex items-center gap-2 text-green-400">
                     <Gift size={14} />
                     <span>
-                      {planCreditsAvailable} de {monthlyPlanCredits} creditos do plano disponiveis neste ciclo
+                      {planCreditsAvailable} de {monthlyPlanCredits} creditos do plano disponíveis neste ciclo
                     </span>
                   </div>
                   <div className="text-muted-foreground">
@@ -214,7 +214,7 @@ export default function CreditosPage() {
                     ? `Ciclo atual ate ${new Date(billingStatus.currentPeriodEnd).toLocaleDateString("pt-BR")}`
                     : isRealMode
                       ? "Saldo sincronizado com o Supabase"
-                      : "Ciclo do plano ainda sem renovacao automatica nesta fase."}
+                      : "Ciclo do plano ainda sem renovação automática nesta fase."}
                 </p>
               </div>
             </div>
@@ -303,7 +303,7 @@ export default function CreditosPage() {
                 <Crown size={24} className="text-primary-foreground" />
               </div>
               <div>
-                <h3 className="font-semibold mb-1">Planos e beneficios</h3>
+                <h3 className="font-semibold mb-1">Planos e benefícios</h3>
                 <p className="text-sm text-muted-foreground">
                   Compare Free e Premium, veja os creditos inclusos e gerencie sua assinatura traveler.
                 </p>
@@ -321,11 +321,11 @@ export default function CreditosPage() {
 
       <motion.div variants={fadeInUp}>
         <div className="flex items-center justify-between mb-4">
-          <h2 className="font-semibold">Historico de Uso</h2>
+          <h2 className="font-semibold">Histórico de uso</h2>
         </div>
         <Card className="bg-card/50 border-border/50 vuei-glass divide-y divide-border/50">
           {effectiveHistory.length === 0 ? (
-            <div className="p-4 text-sm text-muted-foreground">Nenhum consumo de creditos registrado ainda.</div>
+            <div className="p-4 text-sm text-muted-foreground">Nenhum consumo de créditos registrado ainda.</div>
           ) : (
             effectiveHistory.slice(0, 5).map((item, index) => {
               const Icon = iconMap[item.source] || Gift

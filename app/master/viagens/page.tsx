@@ -22,7 +22,7 @@ const stagger = {
 }
 
 const statusConfig = {
-  upcoming: { label: "Proxima", color: "bg-yellow-500/10 text-yellow-400", dot: "bg-yellow-400" },
+  upcoming: { label: "Próxima", color: "bg-yellow-500/10 text-yellow-400", dot: "bg-yellow-400" },
   ongoing: { label: "Em andamento", color: "bg-emerald-500/10 text-emerald-400", dot: "bg-emerald-400" },
   completed: { label: "Finalizada", color: "bg-primary/10 text-primary", dot: "bg-primary" },
 }
@@ -116,11 +116,11 @@ function MasterViagensPageContent() {
                       <p className="text-sm font-medium">{selectedTrip.agencyName || "Viagem de viajante"}</p>
                     </div>
                     <div className="p-3 rounded-lg bg-white/5">
-                      <p className="text-xs text-muted-foreground mb-1">Responsavel</p>
-                      <p className="text-sm font-medium">{selectedTrip.userName || "N?o informado"}</p>
+                      <p className="text-xs text-muted-foreground mb-1">Responsável</p>
+                      <p className="text-sm font-medium">{selectedTrip.userName || "Não informado"}</p>
                     </div>
                     <div className="p-3 rounded-lg bg-white/5">
-                      <p className="text-xs text-muted-foreground mb-1">Periodo</p>
+                      <p className="text-xs text-muted-foreground mb-1">Período</p>
                       <p className="text-sm font-medium">
                         {formatDate(selectedTrip.startDate)} - {formatDate(selectedTrip.endDate)}
                       </p>
@@ -140,7 +140,7 @@ function MasterViagensPageContent() {
                       </Button>
                     </div>
                     <div className="flex items-center gap-2 p-3 rounded-lg bg-white/5">
-                      <span className="text-xs text-muted-foreground flex-shrink-0">Publico:</span>
+                      <span className="text-xs text-muted-foreground flex-shrink-0">Público:</span>
                       <code className="flex-1 text-xs truncate">{selectedTrip.shareLink}</code>
                       <Button variant="ghost" size="sm" onClick={() => void copyLink(selectedTrip.shareLink, `${selectedTrip.id}-public`)}>
                         {copiedLink === `${selectedTrip.id}-public` ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
@@ -158,7 +158,7 @@ function MasterViagensPageContent() {
                     <Link href={selectedTrip.shareLink.replace(/^https?:\/\/[^/]+/, "")} className="flex-1">
                       <Button variant="outline" className="w-full border-white/10">
                         <Share2 className="h-4 w-4 mr-2" />
-                        Abrir Publico
+                        Abrir público
                       </Button>
                     </Link>
                   </div>
@@ -206,7 +206,7 @@ function MasterViagensPageContent() {
           </SelectTrigger>
           <SelectContent className="bg-card border-white/10">
             <SelectItem value="all">Todos</SelectItem>
-            <SelectItem value="upcoming">Proximas</SelectItem>
+            <SelectItem value="upcoming">Próximas</SelectItem>
             <SelectItem value="ongoing">Em andamento</SelectItem>
             <SelectItem value="completed">Finalizadas</SelectItem>
           </SelectContent>

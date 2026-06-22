@@ -121,7 +121,7 @@ export default function DocumentsPage() {
     if (created) {
       if (uploadData.type === "ticket") {
         if (created.flightExtractionStatus === "failed") {
-          setActionError(created.extractionError || "Passagem anexada, mas n?o foi poss?vel iniciar a extra??o agora.")
+          setActionError(created.extractionError || "Passagem anexada, mas não foi possível iniciar a extração agora.")
         } else {
           setActionNotice("Passagem anexada. Estamos extraindo as informa??es.")
         }
@@ -136,7 +136,7 @@ export default function DocumentsPage() {
       return
     }
 
-    setActionError(workspaceError || "N?o foi poss?vel enviar o documento.")
+    setActionError(workspaceError || "Não foi possível enviar o documento.")
   }
 
   const handleDelete = async (id: string) => {
@@ -164,7 +164,7 @@ export default function DocumentsPage() {
     if (doc.filePath && isUsingRealData) {
       const result = await getSignedDocumentUrl(doc.filePath)
       if (!result.data) {
-        setActionError(result.error || "N?o foi poss?vel abrir o documento.")
+        setActionError(result.error || "Não foi possível abrir o documento.")
         return
       }
 
@@ -177,7 +177,7 @@ export default function DocumentsPage() {
       return
     }
 
-    setActionError("Documento sem arquivo dispon?vel para visualiza??o.")
+    setActionError("Documento sem arquivo disponível para visualização.")
   }
 
   const handleTogglePrivacy = async (doc: AgencyDocument) => {
@@ -190,7 +190,7 @@ export default function DocumentsPage() {
     })
 
     if (!result.data) {
-      setActionError(result.error || "N?o foi poss?vel atualizar a privacidade do documento.")
+      setActionError(result.error || "Não foi possível atualizar a privacidade do documento.")
       return
     }
 
@@ -228,7 +228,7 @@ export default function DocumentsPage() {
           <div className="flex-1">
             <p className="text-sm font-medium text-foreground">Documentos protegidos</p>
             <p className="text-xs text-muted-foreground">
-              Docs privados requerem PIN/Face ID e n?o aparecem nos links compartilhados
+              Docs privados requerem PIN/Face ID e não aparecem nos links compartilhados
             </p>
           </div>
         </CardContent>
@@ -307,7 +307,7 @@ export default function DocumentsPage() {
           <FolderOpen className="w-12 h-12 text-muted-foreground mb-4" />
           <h3 className="text-lg font-medium text-foreground mb-2">Nenhum documento encontrado</h3>
           <p className="text-sm text-muted-foreground mb-4">
-            {searchQuery ? "Tente buscar com outros termos" : "Faca upload do primeiro documento"}
+            {searchQuery ? "Tente buscar com outros termos" : "Faça upload do primeiro documento"}
           </p>
           {!searchQuery && (
             <Button onClick={() => setUploadModalOpen(true)} className="gap-2">
@@ -384,7 +384,7 @@ export default function DocumentsPage() {
                             {doc.isPrivate ? (
                               <>
                                 <Unlock className="mr-2 h-4 w-4" />
-                                Tornar compartilh?vel
+                                Tornar compartilhável
                               </>
                             ) : (
                               <>

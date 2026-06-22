@@ -279,7 +279,7 @@ export default function ConfiguracoesPage() {
       if (shouldUseSupabase() && authProfile) {
         const client = createSupabaseBrowserClient()
         if (!client) {
-          throw new Error("Cliente Supabase indispon?vel para upload da foto.")
+          throw new Error("Cliente Supabase indisponível para upload da foto.")
         }
 
         const file = photoFile
@@ -296,7 +296,7 @@ export default function ConfiguracoesPage() {
             console.error("[UPLOAD] error", uploadResult.error.message)
             throw new Error(
               uploadResult.error.message.includes("Bucket not found")
-                ? "Bucket 'vuei-avatars' n?o ?xiste. Rode o SQL de configura??o do bucket antes de salvar a foto."
+                ? "Bucket 'vuei-avatars' não existe. Rode o SQL de configuração do bucket antes de salvar a foto."
                 : uploadResult.error.message
             )
           }
@@ -313,7 +313,7 @@ export default function ConfiguracoesPage() {
       if (shouldUseSupabase() && authProfile) {
         const result = await updateProfileRepository(authProfile.id, { avatarUrl: nextAvatar })
         if (!result.data) {
-          throw new Error("N?o foi poss?vel salvar a foto no perfil.")
+          throw new Error("Não foi possível salvar a foto no perfil.")
         }
         await refreshProfile()
       }
@@ -322,7 +322,7 @@ export default function ConfiguracoesPage() {
       setPhotoFile(null)
       showToast("Foto atualizada com sucesso.")
     } catch (error) {
-      const message = error instanceof Error ? error.message : "N?o foi poss?vel atualizar a foto."
+      const message = error instanceof Error ? error.message : "Não foi possível atualizar a foto."
       console.error("[PROFILE] save error", message)
       setActionError(message)
     } finally {
@@ -346,7 +346,7 @@ export default function ConfiguracoesPage() {
         })
 
         if (!result.data) {
-          throw new Error("N?o foi poss?vel salvar o perfil.")
+          throw new Error("Não foi possível salvar o perfil.")
         }
 
         await refreshProfile()
@@ -355,7 +355,7 @@ export default function ConfiguracoesPage() {
       setShowProfileModal(false)
       showToast("Perfil atualizado com sucesso.")
     } catch (error) {
-      const message = error instanceof Error ? error.message : "N?o foi poss?vel salvar o perfil."
+      const message = error instanceof Error ? error.message : "Não foi possível salvar o perfil."
       console.error("[PROFILE] save error", message)
       setActionError(message)
     } finally {
@@ -367,7 +367,7 @@ export default function ConfiguracoesPage() {
     if (pinForm.pin.length !== 4 || pinForm.pin !== pinForm.confirmPin) return
 
     if (!authProfile?.id) {
-      setActionError("Faca login novamente para configurar o PIN desta conta.")
+      setActionError("Faça login novamente para configurar o PIN desta conta.")
       return
     }
 
@@ -392,7 +392,7 @@ export default function ConfiguracoesPage() {
         })
 
         if (!result.data) {
-          throw new Error("N?o foi poss?vel salvar a configura??o de PIN.")
+          throw new Error("Não foi possível salvar a configuração de PIN.")
         }
 
         await refreshProfile()
@@ -404,7 +404,7 @@ export default function ConfiguracoesPage() {
       setShowPinModal(false)
       showToast("PIN salvo com sucesso.")
     } catch (error) {
-      const message = error instanceof Error ? error.message : "N?o foi poss?vel configurar o PIN."
+      const message = error instanceof Error ? error.message : "Não foi possível configurar o PIN."
       console.error("[PROFILE] save error", message)
       setActionError(message)
     } finally {
@@ -424,7 +424,7 @@ export default function ConfiguracoesPage() {
     setBillingActionLoading(false)
 
     if (result.error || !result.data?.url) {
-      setActionError(result.error ?? "N?o foi poss?vel abrir o portal de assinatura.")
+      setActionError(result.error ?? "Não foi possível abrir o portal de assinatura.")
       return
     }
 
@@ -467,12 +467,12 @@ export default function ConfiguracoesPage() {
 
     try {
       if (!authProfile?.id) {
-        throw new Error("Faca login novamente para configurar a biometria.")
+        throw new Error("Faça login novamente para configurar a biometria.")
       }
 
       if (settings.faceId) {
         if (!biometricSupported) {
-          throw new Error("Biometria indispon?vel neste dispositivo ou navegador.")
+          throw new Error("Biometria indisponível neste dispositivo ou navegador.")
         }
 
         await registerQuickAccessBiometric(authProfile.id, authProfile.name || authProfile.email)
@@ -493,7 +493,7 @@ export default function ConfiguracoesPage() {
         })
 
         if (!result.data) {
-          throw new Error("N?o foi poss?vel salvar a preferencia de biometria.")
+          throw new Error("Não foi possível salvar a preferência de biometria.")
         }
 
         await refreshProfile()
@@ -507,7 +507,7 @@ export default function ConfiguracoesPage() {
       }))
       showToast(settings.faceId ? "Biometria ativada." : "Biometria desativada.")
     } catch (error) {
-      const message = error instanceof Error ? error.message : "N?o foi poss?vel salvar a configura??o."
+      const message = error instanceof Error ? error.message : "Não foi possível salvar a configuração."
       console.error("[PROFILE] save error", message)
       setSettings((prev) => ({ ...prev, faceId: authProfile?.settings?.biometricEnabled ?? false }))
       setActionError(message)
@@ -518,12 +518,12 @@ export default function ConfiguracoesPage() {
 
   const handleTogglePinPreference = async () => {
     if (!authProfile?.id) {
-      setActionError("Faca login novamente para atualizar a prote??o por PIN.")
+      setActionError("Faça login novamente para atualizar a proteção por PIN.")
       return
     }
 
     if (!settings.pinEnabled) {
-      showToast("Defina um novo PIN para ativar o acesso r?pido desta conta.")
+      showToast("Defina um novo PIN para ativar o acesso rápido desta conta.")
       return
     }
 
@@ -550,7 +550,7 @@ export default function ConfiguracoesPage() {
         })
 
         if (!result.data) {
-          throw new Error("N?o foi poss?vel desativar a prote??o por PIN.")
+          throw new Error("Não foi possível desativar a proteção por PIN.")
         }
 
         await refreshProfile()
@@ -565,7 +565,7 @@ export default function ConfiguracoesPage() {
       setPinForm({ pin: "", confirmPin: "" })
       showToast("PIN desativado nesta conta.")
     } catch (error) {
-      const message = error instanceof Error ? error.message : "N?o foi poss?vel atualizar a prote??o por PIN."
+      const message = error instanceof Error ? error.message : "Não foi possível atualizar a proteção por PIN."
       console.error("[PROFILE] save error", message)
       setActionError(message)
     } finally {
@@ -599,18 +599,18 @@ export default function ConfiguracoesPage() {
       ],
     },
     {
-      title: "Seguran?a",
+      title: "Segurança",
       items: [
         {
           icon: Fingerprint,
           label: "Face ID / Biometria",
-          description: settings.faceId ? "Protecao ativa" : "Protecao desativada",
+          description: settings.faceId ? "Proteção ativa" : "Proteção desativada",
           action: () => setShowBiometricModal(true),
         },
         {
           icon: Lock,
           label: "PIN de seguranca",
-          description: settings.pinEnabled ? "PIN da conta configurado" : "Defina um PIN de 4 digitos",
+          description: settings.pinEnabled ? "PIN da conta configurado" : "Defina um PIN de 4 dígitos",
           action: () => setShowPinModal(true),
         },
         {
@@ -628,7 +628,7 @@ export default function ConfiguracoesPage() {
     {
       title: "Preferencias",
       items: [
-        { icon: Bell, label: "Notificacoes", description: "Alertas e lembretes", switchKey: "notifications" as const },
+        { icon: Bell, label: "Notificações", description: "Alertas e lembretes", switchKey: "notifications" as const },
         {
           icon: Globe,
           label: "Idioma",
@@ -774,15 +774,15 @@ export default function ConfiguracoesPage() {
               </p>
               <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
                 <Badge variant="secondary" className="border-border/50 bg-background/50">
-                  {deviceQuickAccess.pinEnabled ? "PIN da conta ativo" : "PIN da conta n?o configurado"}
+                  {deviceQuickAccess.pinEnabled ? "PIN da conta ativo" : "PIN da conta não configurado"}
                 </Badge>
                 <Badge variant="secondary" className="border-border/50 bg-background/50">
-                  {deviceQuickAccess.biometricEnabled ? "Biometria ativa neste dispositivo" : biometricSupported ? "Biometria dispon?vel" : "Biometria indispon?vel"}
+                  {deviceQuickAccess.biometricEnabled ? "Biometria ativa neste dispositivo" : biometricSupported ? "Biometria disponível" : "Biometria indisponível"}
                 </Badge>
               </div>
               {setupQuickAccess && (
                 <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 p-3 text-sm text-amber-300">
-                  Este dispositivo ainda n?o tinha acesso r?pido configurado. O PIN da conta pode ser usado aqui depois do login, e a biometria pode ser ativada localmente neste aparelho.
+                  Este dispositivo ainda não tinha acesso rápido configurado. O PIN da conta pode ser usado aqui depois do login, e a biometria pode ser ativada localmente neste aparelho.
                 </div>
               )}
               {returnTo && (

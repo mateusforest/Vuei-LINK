@@ -46,8 +46,8 @@ import type { AgencyBillingApiStatus, AgencyCommercialPlanCode } from "@/types"
 const settingsSections = [
   { id: "agency", label: "Dados da Agência", icon: Building2 },
   { id: "branding", label: "Branding", icon: Palette },
-  { id: "security", label: "Seguran?a", icon: Shield },
-  { id: "notifications", label: "Notificacoes", icon: Bell },
+  { id: "security", label: "Segurança", icon: Shield },
+  { id: "notifications", label: "Notificações", icon: Bell },
   { id: "plan", label: "Assinatura", icon: CreditCard },
 ]
 
@@ -214,7 +214,7 @@ export default function SettingsPage() {
         const client = createSupabaseBrowserClient()
         if (!client) {
           setSaving(false)
-          showToast("Cliente Supabase indispon?vel para upload da logo.")
+          showToast("Cliente Supabase indisponível para upload da logo.")
           return
         }
 
@@ -229,7 +229,7 @@ export default function SettingsPage() {
           setSaving(false)
           showToast(
             uploadResult.error.message.includes("Bucket not found")
-              ? "Bucket 'vuei-avatars' n?o ?xiste. Rode o SQL de configura??o antes de salvar a logo."
+              ? "Bucket 'vuei-avatars' não existe. Rode o SQL de configuração antes de salvar a logo."
               : uploadResult.error.message
           )
           return
@@ -261,7 +261,7 @@ export default function SettingsPage() {
 
       if (!updateResult.data) {
         setSaving(false)
-        showToast(updateResult.error || "N?o foi poss?vel salvar a ag?ncia no Supabase.")
+        showToast(updateResult.error || "Não foi possível salvar a agência no Supabase.")
         return
       }
 
@@ -322,7 +322,7 @@ export default function SettingsPage() {
         const client = createSupabaseBrowserClient()
         if (!client) {
           setSaving(false)
-          showToast("Cliente Supabase indispon?vel para upload da logo.")
+          showToast("Cliente Supabase indisponível para upload da logo.")
           return
         }
 
@@ -337,7 +337,7 @@ export default function SettingsPage() {
           setSaving(false)
           showToast(
             uploadResult.error.message.includes("Bucket not found")
-              ? "Bucket 'vuei-avatars' n?o ?xiste. Rode o SQL de configura??o antes de salvar a logo."
+              ? "Bucket 'vuei-avatars' não existe. Rode o SQL de configuração antes de salvar a logo."
               : uploadResult.error.message
           )
           return
@@ -355,7 +355,7 @@ export default function SettingsPage() {
 
       if (!updateResult.data) {
         setSaving(false)
-        showToast(updateResult.error || "N?o foi poss?vel salvar a ag?ncia no Supabase.")
+        showToast(updateResult.error || "Não foi possível salvar a agência no Supabase.")
         return
       }
 
@@ -368,7 +368,7 @@ export default function SettingsPage() {
 
     setSaving(false)
     setSaved(true)
-    showToast("Logo da ag?ncia salva com sucesso.")
+    showToast("Logo da agência salva com sucesso.")
     setTimeout(() => setSaved(false), 1500)
   }
 
@@ -393,7 +393,7 @@ export default function SettingsPage() {
     setBillingActionLoading(false)
 
     if (result.error || !result.data?.url) {
-      showToast(result.error || "N?o foi poss?vel abrir o portal de assinatura.")
+      showToast(result.error || "Não foi possível abrir o portal de assinatura.")
       return
     }
 
@@ -402,7 +402,7 @@ export default function SettingsPage() {
 
   const handleArchiveAgency = async () => {
     if (hasPaidSubscriptionActive) {
-      showToast("Cancele a assinatura ativa antes de arquivar a ag?ncia.")
+      showToast("Cancele a assinatura ativa antes de arquivar a agência.")
       return
     }
 
@@ -422,7 +422,7 @@ export default function SettingsPage() {
       const result = await updateAgencyRepository(agency.id, { status: "archived" })
 
       if (!result.data) {
-        showToast(result.error || "N?o foi poss?vel arquivar a ag?ncia.")
+        showToast(result.error || "Não foi possível arquivar a agência.")
         return
       }
 
@@ -442,7 +442,7 @@ export default function SettingsPage() {
       {setupIncomplete && (
         <Card className="border-amber-500/20 bg-amber-500/5">
           <CardContent className="p-4 text-sm text-amber-200">
-            Sua conta de ag?ncia existe, mas a ag?ncia ainda n?o foi persistida corretamente no Supabase.
+            Sua conta de agência existe, mas a agência ainda não foi persistida corretamente no Supabase.
           </CardContent>
         </Card>
       )}
@@ -457,7 +457,7 @@ export default function SettingsPage() {
 
       <div>
         <h1 className="text-2xl font-bold text-foreground">Configurações</h1>
-        <p className="mt-1 text-muted-foreground">Gerencie sua ag?ncia</p>
+        <p className="mt-1 text-muted-foreground">Gerencie sua agência</p>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-4">
@@ -554,7 +554,7 @@ export default function SettingsPage() {
                     ) : (
                       <>
                         <Save className="h-4 w-4" />
-                        Salvar altera??es
+                        Salvar alterações
                       </>
                     )}
                   </Button>
@@ -571,19 +571,19 @@ export default function SettingsPage() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <p className="text-sm text-muted-foreground">
-                    Personalize o logo exibido nos links compartilhaveis sem alterar a foto de perfil do usuario.
+                    Personalize o logo exibido nos links compartilháveis sem alterar a foto de perfil do usuario.
                   </p>
                   <div className="rounded-2xl border border-border/60 bg-[#fbfbfc] p-4">
                     <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
                       <div className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-2xl border border-border/60 bg-muted/20">
                         {brandingData.linkLogo ? (
-                          <img src={brandingData.linkLogo} alt="Logo da ag?ncia" className="h-full w-full object-cover" />
+                          <img src={brandingData.linkLogo} alt="Logo da agência" className="h-full w-full object-cover" />
                         ) : (
                           <Upload className="h-6 w-6 text-muted-foreground" />
                         )}
                       </div>
                       <div className="flex-1">
-                        <Label className="text-muted-foreground">Logo da ag?ncia</Label>
+                        <Label className="text-muted-foreground">Logo da agência</Label>
                         <Input type="file" accept="image/*" onChange={(e) => handleBrandingLogoSelected(e.target.files?.[0])} className="mt-1.5 border-border/70 bg-white" />
                       </div>
                     </div>
@@ -601,7 +601,7 @@ export default function SettingsPage() {
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
               <Card className="border-border/60 bg-white/88">
                 <CardHeader>
-                  <CardTitle className="text-base">Seguran?a</CardTitle>
+                  <CardTitle className="text-base">Segurança</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="rounded-2xl border border-border/60 bg-[#fbfbfc] p-4">
@@ -623,8 +623,8 @@ export default function SettingsPage() {
 
                   <div className="flex items-center justify-between rounded-2xl border border-border/60 bg-[#fbfbfc] p-4">
                     <div>
-                      <p className="font-medium text-foreground">Autentica??o 2FA</p>
-                      <p className="text-xs text-muted-foreground">Adicione uma camada extra de seguranca</p>
+                      <p className="font-medium text-foreground">Autenticação 2FA</p>
+                      <p className="text-xs text-muted-foreground">Adicione uma camada extra de segurança</p>
                     </div>
                     <Switch />
                   </div>
@@ -641,8 +641,8 @@ export default function SettingsPage() {
                 <CardContent>
                   <p className="mb-4 text-sm text-muted-foreground">
                     {hasPaidSubscriptionActive
-                      ? "Se existe uma assinatura ativa, cancele-a antes de arquivar a ag?ncia."
-                      : "Arquive a ag?ncia com seguranca sem apagar clientes, viagens, documentos ou historico."}
+                      ? "Se existe uma assinatura ativa, cancele-a antes de arquivar a agência."
+                      : "Arquive a agência com segurança sem apagar clientes, viagens, documentos ou histórico."}
                   </p>
                   <div className="flex flex-col gap-3 sm:flex-row">
                     <Button
@@ -673,12 +673,12 @@ export default function SettingsPage() {
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
               <Card className="border-border/60 bg-white/88">
                 <CardHeader>
-                  <CardTitle className="text-base">Notificacoes</CardTitle>
+                  <CardTitle className="text-base">Notificações</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
                   {[
                     { key: "concierge", label: "Novas mensagens concierge", desc: "Receba alertas de mensagens" },
-                    { key: "trips", label: "Viagens proximas", desc: "Lembretes de embarques" },
+                    { key: "trips", label: "Viagens próximas", desc: "Lembretes de embarques" },
                     { key: "credits", label: "Créditos baixos", desc: "Aviso quando os créditos acabarem" },
                     { key: "newClients", label: "Novos clientes", desc: "Notificar cadastros" },
                   ].map((item) => (
@@ -711,8 +711,8 @@ export default function SettingsPage() {
                           : billingStatus?.currentPlan === "free"
                             ? "Você está utilizando o plano Free."
                             : agency
-                              ? "Assinatura vinculada ao billing da ag?ncia."
-                              : "Plano ainda n?o vinculado a uma ag?ncia real"}
+                              ? "Assinatura vinculada ao billing da agência."
+                              : "Plano ainda não vinculado a uma agência real"}
                       </p>
                     </div>
                     <div className="flex flex-col gap-2 sm:flex-row">
@@ -763,19 +763,19 @@ export default function SettingsPage() {
                   <div className="mt-4 grid gap-2 text-sm">
                     <div className="flex items-center gap-2 text-muted-foreground">
                       <div className="h-1.5 w-1.5 rounded-full bg-primary" />
-                      {subscription.definition.monthlyCredits} cr?ditos IA inclusos por mes (Saldo atual: {credits.balance})
+                      {subscription.definition.monthlyCredits} créditos IA inclusos por mês (Saldo atual: {credits.balance})
                     </div>
                     <div className="flex items-center gap-2 text-muted-foreground">
                       <div className="h-1.5 w-1.5 rounded-full bg-primary" />
-                      Ate {subscription.definition.maxUsers} usuarios ativos na equipe
+                      Até {subscription.definition.maxUsers} usuários ativos na equipe
                     </div>
                     <div className="flex items-center gap-2 text-muted-foreground">
                       <div className="h-1.5 w-1.5 rounded-full bg-primary" />
-                      Ate {subscription.definition.maxActiveTrips} viagens ativas
+                      Até {subscription.definition.maxActiveTrips} viagens ativas
                     </div>
                     <div className="flex items-center gap-2 text-muted-foreground">
                       <div className="h-1.5 w-1.5 rounded-full bg-primary" />
-                      Em uso agora: {teamSeatsUsed} usuarios e {activeTripsCount} viagens ativas
+                      Em uso agora: {teamSeatsUsed} usuários e {activeTripsCount} viagens ativas
                     </div>
                   </div>
                   {billingStatus?.cancelAtPeriodEnd ? (
@@ -794,13 +794,13 @@ export default function SettingsPage() {
         <DialogContent className="agency-dialog sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Atualizar branding</DialogTitle>
-            <DialogDescription>Envie o logo da ag?ncia que sera exibido no link da viagem.</DialogDescription>
+            <DialogDescription>Envie o logo da agência que sera exibido no link da viagem.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="flex justify-center">
               <div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-2xl border border-border/60 bg-muted/20">
                 {agencyData.logo ? (
-                  <img src={agencyData.logo} alt="Preview da ag?ncia" className="h-full w-full object-cover" />
+                  <img src={agencyData.logo} alt="Preview da agência" className="h-full w-full object-cover" />
                 ) : (
                   <Camera className="h-6 w-6 text-muted-foreground" />
                 )}
@@ -819,7 +819,7 @@ export default function SettingsPage() {
                     showToast("Agência não encontrada para salvar o branding.")
                     return
                   }
-                  void handleSave("Logo da ag?ncia atualizado.")
+                  void handleSave("Logo da agência atualizado.")
                 }}
               >
                 Salvar logo
@@ -833,7 +833,7 @@ export default function SettingsPage() {
         <DialogContent className="agency-dialog sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Alterar senha</DialogTitle>
-            <DialogDescription>Atualize sua senha de acesso da ag?ncia.</DialogDescription>
+            <DialogDescription>Atualize sua senha de acesso da agência.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>
@@ -890,7 +890,7 @@ export default function SettingsPage() {
                     onClick={async () => {
                       const result = await updateSubscriptionPlan(plan.id as AgencyCommercialPlanCode)
                       if (!result.success) {
-                        showToast(result.error || "N?o foi poss?vel atualizar o plano.")
+                        showToast(result.error || "Não foi possível atualizar o plano.")
                         return
                       }
 
@@ -919,18 +919,18 @@ export default function SettingsPage() {
       >
         <DialogContent className="agency-dialog border-red-500/20 sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="text-red-400">Arquivar ag?ncia</DialogTitle>
+            <DialogTitle className="text-red-400">Arquivar agência</DialogTitle>
             <DialogDescription>
               {hasPaidSubscriptionActive
-                ? "Existe uma assinatura ativa nesta ag?ncia. Cancele-a antes de arquivar a conta."
-                : "A ag?ncia sera desativada e arquivada com seguranca, sem excluir dados reais nem remover historico operacional."}
+                ? "Existe uma assinatura ativa nesta agência. Cancele-a antes de arquivar a conta."
+                : "A agência sera desativada e arquivada com segurança, sem excluir dados reais nem remover histórico operacional."}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             {hasPaidSubscriptionActive ? (
               <>
                 <div className="rounded-xl border border-amber-300/70 bg-amber-50 p-4 text-sm text-amber-900">
-                  Se voce possui uma assinatura ativa, cancele-a antes de excluir ou arquivar a ag?ncia.
+                  Se voce possui uma assinatura ativa, cancele-a antes de excluir ou arquivar a agência.
                 </div>
                 <div className="flex gap-3">
                   <Button variant="outline" className="flex-1 border-border/70 bg-white" onClick={() => setShowArchiveModal(false)}>
@@ -948,7 +948,7 @@ export default function SettingsPage() {
             ) : (
               <>
                 <div className="rounded-xl border border-red-500/20 bg-red-500/5 p-4 text-sm text-muted-foreground">
-                  Digite <span className="font-medium text-foreground">ARQUIVAR</span> para confirmar a desativa??o da ag?ncia.
+                  Digite <span className="font-medium text-foreground">ARQUIVAR</span> para confirmar a desativa??o da agência.
                 </div>
                 <div>
                   <Label className="text-muted-foreground">Confirma??o</Label>
@@ -968,7 +968,7 @@ export default function SettingsPage() {
                     onClick={() => void handleArchiveAgency()}
                     disabled={isArchivingAgency || archiveConfirmation.trim().toUpperCase() !== "ARQUIVAR"}
                   >
-                    {isArchivingAgency ? "Arquivando..." : "Arquivar ag?ncia"}
+                    {isArchivingAgency ? "Arquivando..." : "Arquivar agência"}
                   </Button>
                 </div>
               </>

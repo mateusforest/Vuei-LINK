@@ -22,7 +22,7 @@ function sanitizeFileName(name: string) {
 }
 
 function formatShortDate(value?: string | null) {
-  if (!value) return "N?o informado"
+  if (!value) return "Não informado"
   const parsed = new Date(value)
   if (Number.isNaN(parsed.getTime())) return value
   return parsed.toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" })
@@ -97,7 +97,7 @@ export default function AgencyHotelsPage() {
     if (!file) return
     const validation = validateDocumentFile(file)
     if (!validation.valid) {
-      setActionError(validation.error || "Arquivo inv?lido para voucher.")
+      setActionError(validation.error || "Arquivo inválido para voucher.")
       setActionNotice("")
       return
     }
@@ -110,14 +110,14 @@ export default function AgencyHotelsPage() {
   const handleOpenVoucher = async (hotel: TripHotelRecord) => {
     const linkedDocument = documents.find((document) => document.id === hotel.documentId)
     if (!linkedDocument) {
-      setActionError("Voucher n?o ?ncontrado para esta hospedagem.")
+      setActionError("Voucher não encontrado para esta hospedagem.")
       return
     }
 
     if (linkedDocument.filePath) {
       const signedUrlResult = await getSignedDocumentUrl(linkedDocument.filePath)
       if (!signedUrlResult.data) {
-        setActionError(signedUrlResult.error || "N?o foi poss?vel abrir o voucher.")
+        setActionError(signedUrlResult.error || "Não foi possível abrir o voucher.")
         return
       }
 
@@ -130,7 +130,7 @@ export default function AgencyHotelsPage() {
       return
     }
 
-    setActionError("Voucher sem arquivo dispon?vel para abertura.")
+    setActionError("Voucher sem arquivo disponível para abertura.")
   }
 
   const resetForm = () => {
@@ -147,7 +147,7 @@ export default function AgencyHotelsPage() {
 
   const handleSaveHotel = async () => {
     if (!agencyId || !user?.id) {
-      setActionError("Sessao da ag?ncia indispon?vel para cadastrar hospedagem.")
+      setActionError("Sessão da agência indisponível para cadastrar hospedagem.")
       return
     }
 
@@ -178,7 +178,7 @@ export default function AgencyHotelsPage() {
 
     if (!hotelResult.data) {
       setSaving(false)
-      setActionError(hotelResult.error || "N?o foi poss?vel salvar a hospedagem.")
+      setActionError(hotelResult.error || "Não foi possível salvar a hospedagem.")
       return
     }
 
@@ -191,7 +191,7 @@ export default function AgencyHotelsPage() {
       const uploadResult = await uploadDocumentFile({ file: voucherFile, path })
 
       if (!uploadResult.data) {
-        notice = "Hospedagem salva, mas o voucher n?o foi anexado."
+        notice = "Hospedagem salva, mas o voucher não foi anexado."
       } else {
         const documentResult = await createDocumentMetadata({
           tripId: selectedTrip.id,
@@ -213,7 +213,7 @@ export default function AgencyHotelsPage() {
         })
 
         if (!documentResult.data) {
-          notice = "Hospedagem salva, mas o voucher n?o foi vinculado."
+          notice = "Hospedagem salva, mas o voucher não foi vinculado."
         } else {
           const hotelWithVoucher = await updateTripHotel(savedHotel.id, {
             documentId: documentResult.data.id,
@@ -222,7 +222,7 @@ export default function AgencyHotelsPage() {
           if (hotelWithVoucher.data) {
             savedHotel = hotelWithVoucher.data
           } else {
-            notice = "Hospedagem salva, mas o voucher n?o foi vinculado."
+            notice = "Hospedagem salva, mas o voucher não foi vinculado."
           }
         }
       }
@@ -241,7 +241,7 @@ export default function AgencyHotelsPage() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Hospedagens</h1>
-          <p className="mt-1 text-muted-foreground">Cadastre hotel, endereco e voucher da viagem do cliente.</p>
+          <p className="mt-1 text-muted-foreground">Cadastre hotel, endereço e voucher da viagem do cliente.</p>
         </div>
       </div>
 

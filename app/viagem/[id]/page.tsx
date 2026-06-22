@@ -505,8 +505,8 @@ function normalizeHotelForDisplay(hotel: any) {
     location,
     checkInRaw,
     checkOutRaw,
-    checkIn: checkIn || "Nao informado",
-    checkOut: checkOut || "Nao informado",
+    checkIn: checkIn || "Não informado",
+    checkOut: checkOut || "Não informado",
     nights,
     reservationCode,
     confirmationCode: reservationCode || null,
@@ -604,10 +604,10 @@ function formatFlightDateTime(dateString?: string | null) {
 }
 
 function calculateFlightDuration(departureAt?: string | null, arrivalAt?: string | null) {
-  if (!departureAt || !arrivalAt) return "Horario n?o informado"
+  if (!departureAt || !arrivalAt) return "Horário não informado"
 
   const diff = new Date(arrivalAt).getTime() - new Date(departureAt).getTime()
-  if (!Number.isFinite(diff) || diff <= 0) return "Horario n?o informado"
+  if (!Number.isFinite(diff) || diff <= 0) return "Horário não informado"
 
   const totalMinutes = Math.round(diff / 60000)
   const hours = Math.floor(totalMinutes / 60)
@@ -1386,12 +1386,12 @@ async function openOfflineDocumentFromPackage(params: {
   const { document, context, onUnavailable, registerCleanup, getPreparedUrl } = params
 
   if (!context || !document?.id) {
-    onUnavailable("Este arquivo n?o ?sta dispon?vel offline.")
+    onUnavailable("Este arquivo não está disponível offline.")
     return false
   }
 
   if (context.packageStatus === "legacy_snapshot") {
-    onUnavailable("Este arquivo n?o ?sta dispon?vel offline.")
+    onUnavailable("Este arquivo não está disponível offline.")
     return false
   }
 
@@ -1406,7 +1406,7 @@ async function openOfflineDocumentFromPackage(params: {
     const preparedWindow = window.open(preparedUrl, "_blank", "noopener,noreferrer")
     if (preparedWindow) return true
 
-    onUnavailable("N?o foi poss?vel abrir automaticamente. Toque novamente para abrir o arquivo.")
+    onUnavailable("Não foi possível abrir automaticamente. Toque novamente para abrir o arquivo.")
     return false
   }
 
@@ -1418,7 +1418,7 @@ async function openOfflineDocumentFromPackage(params: {
 
   if (!blobRecord?.blob) {
     pendingWindow?.close()
-    onUnavailable("Este arquivo n?o ?sta dispon?vel offline.")
+    onUnavailable("Este arquivo não está disponível offline.")
     return false
   }
 
@@ -1435,7 +1435,7 @@ async function openOfflineDocumentFromPackage(params: {
     return true
   }
 
-  onUnavailable("N?o foi poss?vel abrir automaticamente. Toque novamente para abrir o arquivo.")
+  onUnavailable("Não foi possível abrir automaticamente. Toque novamente para abrir o arquivo.")
   return false
 }
 
@@ -1443,7 +1443,7 @@ function resolveProtectedWriteError(error?: string | null) {
   const normalized = (error ?? "").toLowerCase()
 
   if (normalized.includes("auth session missing")) {
-    return "N?o foi poss?vel concluir a opera??o. Atualize a p?gina e tente novamente."
+    return "Não foi possível concluir a operação. Atualize a página e tente novamente."
   }
 
   if (
@@ -1454,17 +1454,17 @@ function resolveProtectedWriteError(error?: string | null) {
     normalized.includes("auth") ||
     normalized.includes("unauthorized")
   ) {
-    return "N?o foi poss?vel concluir esta a??o administrativa neste dispositivo."
+    return "Não foi possível concluir esta ação administrativa neste dispositivo."
   }
 
-  return error || "N?o foi poss?vel concluir esta a??o."
+  return error || "Não foi possível concluir esta ação."
 }
 
 function resolvePublicTripErrorMessage(error?: string | null) {
   const normalized = (error ?? "").toLowerCase()
 
   if (normalized.includes("auth session missing")) {
-    return "N?o foi poss?vel concluir a opera??o. Atualize a p?gina e tente novamente."
+    return "Não foi possível concluir a operação. Atualize a página e tente novamente."
   }
 
   if (
@@ -1474,10 +1474,10 @@ function resolvePublicTripErrorMessage(error?: string | null) {
     normalized.includes("not authenticated") ||
     normalized.includes("jwt")
   ) {
-    return "Faca login novamente para continuar."
+    return "Faça login novamente para continuar."
   }
 
-  return error || "N?o foi poss?vel concluir a opera??o."
+  return error || "Não foi possível concluir a operação."
 }
 
 function buildTripDocumentAccessHref(params: {
@@ -1636,14 +1636,14 @@ function TripHeader({
                 {agencyBranding.logoUrl ? (
                   <Image
                     src={agencyBranding.logoUrl}
-                    alt={agencyBranding.name || "Ag?ncia"}
+                    alt={agencyBranding.name || "Agência"}
                     width={144}
                     height={48}
                     className="h-7 w-auto max-w-[120px] object-contain sm:h-8 sm:max-w-[150px]"
                   />
                 ) : (
                   <span className="max-w-[150px] truncate text-sm font-semibold tracking-[-0.03em] text-slate-900">
-                    {agencyBranding.name || "Ag?ncia parceira"}
+                    {agencyBranding.name || "Agência parceira"}
                   </span>
                 )}
                 <span className="text-[9px] uppercase tracking-[0.16em] text-black/40">
@@ -1935,7 +1935,7 @@ function buildTravelerCardSummaries(tripData: any) {
           ? `${documents.filter((document: any) => document.type === "ticket").length} bilhete(s)`
           : "Nenhuma passagem",
       detail: flight
-        ? `${flight.date || "Data pendente"}${flight.origin?.time ? ` • ${flight.origin.time}` : ""}${flight.destination?.time ? ` - ${flight.destination.time || "Hor?rio n?o informado"}` : ""}`
+        ? `${flight.date || "Data pendente"}${flight.origin?.time ? ` • ${flight.origin.time}` : ""}${flight.destination?.time ? ` - ${flight.destination.time || "Horário não informado"}` : ""}`
         : "Abra para ver",
       status: flight ? "Confirmado" : "Pendente",
       statusClassName: flight ? "text-emerald-600" : "text-slate-400",
@@ -1998,7 +1998,7 @@ function buildTravelerCardSummariesClean(tripData: any) {
           ? `${documents.filter((document: any) => document.type === "ticket").length} bilhete(s)`
           : "Nenhuma passagem",
       detail: flight
-        ? `${flight.date || "Data pendente"}${flight.origin?.time ? ` • ${flight.origin.time}` : ""}${flight.destination?.time ? ` - ${flight.destination.time || "Hor?rio n?o informado"}` : ""}`
+        ? `${flight.date || "Data pendente"}${flight.origin?.time ? ` • ${flight.origin.time}` : ""}${flight.destination?.time ? ` - ${flight.destination.time || "Horário não informado"}` : ""}`
         : "Abra para ver",
       status: flight ? "Confirmado" : "Pendente",
       statusClassName: flight ? "text-emerald-600" : "text-slate-400",
@@ -2076,7 +2076,7 @@ function TravelerPublicShell({
                 {agencyBranding.logoUrl ? (
                   <Image
                     src={agencyBranding.logoUrl}
-                    alt={agencyBranding.name || "Ag?ncia"}
+                    alt={agencyBranding.name || "Agência"}
                     width={156}
                     height={46}
                     className="h-7 w-auto max-w-[124px] shrink-0 object-contain sm:h-8 sm:max-w-[144px]"
@@ -2176,7 +2176,7 @@ function TravelerPublicShell({
               {offlineReady ? <CheckCircle2 className="h-4.5 w-4.5" /> : <Download className="h-4.5 w-4.5" />}
             </div>
             <div className="min-w-0 flex-1 text-left">
-              <p className="truncate text-[0.96rem] font-semibold tracking-[-0.03em] text-slate-950">Disponivel offline</p>
+              <p className="truncate text-[0.96rem] font-semibold tracking-[-0.03em] text-slate-950">Disponível offline</p>
               <p className="truncate text-[0.84rem] text-slate-500">{offlineReady ? "Baixado neste dispositivo" : "Baixe os documentos"}</p>
             </div>
             <div className="flex shrink-0 items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[0.82rem] font-medium text-[#2563eb] shadow-[0_8px_20px_rgba(148,163,184,0.12)]">
@@ -2612,7 +2612,7 @@ function QRCodeModal({ open, onClose, flight }: { open: boolean; onClose: () => 
         </div>
         <p className="text-white font-semibold text-lg">{flight.flightNumber}</p>
         <p className="text-white/60 text-sm mt-1">{flight.origin.code} → {flight.destination.code}</p>
-        <p className="text-white/40 text-xs mt-4">{flight.qrCodePayload ? "Apresente este codigo no embarque" : "Quando o QR code estiver dispon?vel, ele aparecera aqui."}</p>
+        <p className="text-white/40 text-xs mt-4">{flight.qrCodePayload ? "Apresente este código no embarque" : "Quando o QR code estiver disponível, ele aparecerá aqui."}</p>
       </div>
     </Modal>
   )
@@ -2648,7 +2648,7 @@ function FlightDetailsModal({
           </div>
           <div>
             <p className="text-xs uppercase tracking-wider text-white/40">Voo</p>
-            <p className="mt-2 text-sm text-white">{flight.flightNumber || "N?o identificado"}</p>
+            <p className="mt-2 text-sm text-white">{flight.flightNumber || "Não identificado"}</p>
           </div>
           <div>
             <p className="text-xs uppercase tracking-wider text-white/40">Localizador</p>
@@ -2667,20 +2667,20 @@ function FlightDetailsModal({
             <p className="mt-2 text-sm text-white">{flight.destination.city}</p>
           </div>
           <div>
-            <p className="text-xs uppercase tracking-wider text-white/40">Sa?da</p>
+            <p className="text-xs uppercase tracking-wider text-white/40">Saída</p>
             <p className="mt-2 text-sm text-white">{flight.date} • {flight.origin.time}</p>
           </div>
           <div>
             <p className="text-xs uppercase tracking-wider text-white/40">Chegada</p>
-            <p className="mt-2 text-sm text-white">{flight.destination.time || "Hor?rio n?o informado"}</p>
+            <p className="mt-2 text-sm text-white">{flight.destination.time || "Horário não informado"}</p>
           </div>
           <div>
             <p className="text-xs uppercase tracking-wider text-white/40">Terminal / Port?o</p>
-            <p className="mt-2 text-sm text-white">{[flight.terminal, flight.gate].filter(Boolean).join(" / ") || "N?o informado"}</p>
+            <p className="mt-2 text-sm text-white">{[flight.terminal, flight.gate].filter(Boolean).join(" / ") || "Não informado"}</p>
           </div>
           <div>
             <p className="text-xs uppercase tracking-wider text-white/40">Assento / Bagagem</p>
-            <p className="mt-2 text-sm text-white">{[flight.seat, flight.baggageInfo].filter(Boolean).join(" / ") || "N?o informado"}</p>
+            <p className="mt-2 text-sm text-white">{[flight.seat, flight.baggageInfo].filter(Boolean).join(" / ") || "Não informado"}</p>
           </div>
         </div>
 
@@ -2758,7 +2758,7 @@ function FlightsSection({
     }
 
     if (!document?.id) {
-      showToast("N?o foi poss?vel abrir este documento agora. Tente novamente.", "error")
+      showToast("Não foi possível abrir este documento agora. Tente novamente.", "error")
       return
     }
 
@@ -2902,7 +2902,7 @@ function AddFlightModal({ open, onClose, onSave, tripId, ownerUserId, agencyId, 
     setError("")
     const validation = validateDocumentFile(file)
     if (!validation.valid) {
-      setError(validation.error || "Arquivo inv?lido.")
+      setError(validation.error || "Arquivo inválido.")
       return
     }
 
@@ -2920,7 +2920,7 @@ function AddFlightModal({ open, onClose, onSave, tripId, ownerUserId, agencyId, 
           const response = await fetch("/api/trip-admin", { method: "POST", body: formData })
           const data = await response.json().catch(() => null)
           return {
-            error: response.ok ? null : data?.error || "N?o foi poss?vel registrar a passagem anexada.",
+            error: response.ok ? null : data?.error || "Não foi possível registrar a passagem anexada.",
             document: data?.document ?? null,
             flight: data?.flight ?? null,
           }
@@ -2929,7 +2929,7 @@ function AddFlightModal({ open, onClose, onSave, tripId, ownerUserId, agencyId, 
           const path = `${ownerUserId}/${tripId}/tickets/${Date.now()}-${file.name.replace(/\s+/g, "-")}`
           const uploadResult = await uploadDocumentFile(file, path)
           if (uploadResult.error || !uploadResult.data) {
-            return { error: resolveProtectedWriteError(uploadResult.error || "N?o foi poss?vel anexar a passagem."), document: null, flight: null }
+            return { error: resolveProtectedWriteError(uploadResult.error || "Não foi possível anexar a passagem."), document: null, flight: null }
           }
 
           const metadataResult = await createDocumentMetadata({
@@ -2949,7 +2949,7 @@ function AddFlightModal({ open, onClose, onSave, tripId, ownerUserId, agencyId, 
           })
 
           if (metadataResult.error || !metadataResult.data) {
-            return { error: resolveProtectedWriteError(metadataResult.error || "N?o foi poss?vel registrar a passagem."), document: null, flight: null }
+            return { error: resolveProtectedWriteError(metadataResult.error || "Não foi possível registrar a passagem."), document: null, flight: null }
           }
 
           const flightResult = await upsertTripFlight({
@@ -2960,7 +2960,7 @@ function AddFlightModal({ open, onClose, onSave, tripId, ownerUserId, agencyId, 
           })
 
           if (flightResult.error || !flightResult.data) {
-            return { error: resolveProtectedWriteError(flightResult.error || "N?o foi poss?vel registrar a passagem anexada."), document: null, flight: null }
+            return { error: resolveProtectedWriteError(flightResult.error || "Não foi possível registrar a passagem anexada."), document: null, flight: null }
           }
 
           return { error: null, document: metadataResult.data, flight: flightResult.data }
@@ -2968,7 +2968,7 @@ function AddFlightModal({ open, onClose, onSave, tripId, ownerUserId, agencyId, 
 
     if (savedTicket.error || !savedTicket.document || !savedTicket.flight) {
       console.error("[TICKET] upload error", savedTicket.error)
-      setError(savedTicket.error || "N?o foi poss?vel registrar a passagem anexada.")
+      setError(savedTicket.error || "Não foi possível registrar a passagem anexada.")
       setUploading(false)
       return
     }
@@ -3165,7 +3165,7 @@ function HotelSection({
                       <h3 className="text-xl font-semibold text-white">{hotel.displayName}</h3>
                       <div className="mt-1 flex items-center gap-2 text-white/60">
                         <MapPin className="h-3 w-3" />
-                        <span className="text-sm">{hotel.location || "Localizacao nao informada"}</span>
+                        <span className="text-sm">{hotel.location || "Localização não informada"}</span>
                       </div>
                     </div>
                   </div>
@@ -3186,7 +3186,7 @@ function HotelSection({
                         {nights > 0 ? `${nights} noite${nights > 1 ? "s" : ""}` : "Noites a confirmar"}
                       </span>
                       <span className="rounded-full border border-white/[0.08] bg-white/[0.03] px-3 py-1.5">
-                        {hotel.reservationCode || "Codigo nao informado"}
+                        {hotel.reservationCode || "Código não informado"}
                       </span>
                     </div>
 
@@ -3204,7 +3204,7 @@ function HotelSection({
                           Abrir voucher
                         </Button>
                       ) : (
-                        <span className="text-sm text-white/40">Voucher nao informado</span>
+                        <span className="text-sm text-white/40">Voucher não informado</span>
                       )}
                       {canWrite && (
                         <div className="flex items-center gap-2">
@@ -3372,7 +3372,7 @@ function UploadExistingItineraryModal({
 
     const validation = validateDocumentFile(file)
     if (!validation.valid) {
-      setError(validation.error || "Arquivo inv?lido.")
+      setError(validation.error || "Arquivo inválido.")
       return
     }
 
@@ -3391,7 +3391,7 @@ function UploadExistingItineraryModal({
           const response = await fetch("/api/trip-admin", { method: "POST", body: formData })
           const data = await response.json().catch(() => null)
           return {
-            error: response.ok ? null : data?.error || "N?o foi poss?vel registrar o roteiro anexado.",
+            error: response.ok ? null : data?.error || "Não foi possível registrar o roteiro anexado.",
             itinerary: data?.itinerary ?? null,
             document: data?.document ?? null,
           }
@@ -3400,7 +3400,7 @@ function UploadExistingItineraryModal({
           const path = `${ownerUserId}/${tripId}/itineraries/${Date.now()}-${file.name.replace(/\s+/g, "-")}`
           const uploadResult = await uploadDocumentFile(file, path)
           if (uploadResult.error || !uploadResult.data) {
-            return { error: uploadResult.error || "N?o foi poss?vel anexar o roteiro.", itinerary: null, document: null }
+            return { error: uploadResult.error || "Não foi possível anexar o roteiro.", itinerary: null, document: null }
           }
 
           const metadataResult = await createDocumentMetadata({
@@ -3423,7 +3423,7 @@ function UploadExistingItineraryModal({
           })
 
           if (metadataResult.error || !metadataResult.data) {
-            return { error: metadataResult.error || "N?o foi poss?vel registrar o roteiro anexado.", itinerary: null, document: null }
+            return { error: metadataResult.error || "Não foi possível registrar o roteiro anexado.", itinerary: null, document: null }
           }
 
           const itineraryResult = await upsertTripItinerary({
@@ -3438,14 +3438,14 @@ function UploadExistingItineraryModal({
           })
 
           if (itineraryResult.error || !itineraryResult.data) {
-            return { error: itineraryResult.error || "N?o foi poss?vel registrar o modo de roteiro anexado.", itinerary: null, document: null }
+            return { error: itineraryResult.error || "Não foi possível registrar o modo de roteiro anexado.", itinerary: null, document: null }
           }
 
           return { error: null, itinerary: itineraryResult.data, document: metadataResult.data }
         })()
 
     if (savedUpload.error || !savedUpload.itinerary || !savedUpload.document) {
-      setError(savedUpload.error || "N?o foi poss?vel registrar o roteiro anexado.")
+      setError(savedUpload.error || "Não foi possível registrar o roteiro anexado.")
       setUploading(false)
       return
     }
@@ -3479,7 +3479,7 @@ function UploadExistingItineraryModal({
             <>
               <Upload className="w-8 h-8 mx-auto text-white/40 mb-3" />
               <p className="text-sm text-white/60">Clique para selecionar PDF, imagem ou documento</p>
-              <p className="text-xs text-white/30 mt-1">Sem leitura de IA e sem consumo de cr?ditos</p>
+              <p className="text-xs text-white/30 mt-1">Sem leitura de IA e sem consumo de créditos</p>
             </>
           )}
           <input type="file" accept=".pdf,.png,.jpg,.jpeg,.doc,.docx" className="hidden" onChange={(event) => void handleUpload(event.target.files?.[0])} />
@@ -3592,7 +3592,7 @@ function ItinerarySection({
 
   const handleGenerate = async (mode: "simple" | "complete") => {
     if (offlineReadOnly) {
-      showToast("Indispon?vel offline.", "info")
+      showToast("Indisponível offline.", "info")
       return
     }
     if (!ensureSensitiveAccess()) return
@@ -3622,7 +3622,7 @@ function ItinerarySection({
     }
 
     if (!document && !record.pdfUrl) {
-      showToast("Documento do roteiro n?o ?ncontrado.", "error")
+      showToast("Documento do roteiro não encontrado.", "error")
       return
     }
 
@@ -3642,10 +3642,10 @@ function ItinerarySection({
 
     const resolvedUrl = record.pdfUrl
       ? await getSignedDocumentUrl(record.pdfUrl)
-      : { data: null, error: "Arquivo indispon?vel para visualiza??o." }
+      : { data: null, error: "Arquivo indisponível para visualização." }
 
     if (resolvedUrl.error || !resolvedUrl.data) {
-      showToast("N?o foi poss?vel abrir o roteiro neste dispositivo.", "error")
+      showToast("Não foi possível abrir o roteiro neste dispositivo.", "error")
       return
     }
 
@@ -3844,7 +3844,7 @@ function ItinerarySection({
                   </div>
                   <span className="rounded-full border border-white/10 px-2 py-1 text-[10px] uppercase tracking-wider text-white/50">
                     {record.status === "completed"
-                      ? "Conclu?do"
+                      ? "Concluído"
                       : record.status === "uploaded"
                         ? "Anexado"
                         : record.status === "failed"
@@ -3855,7 +3855,7 @@ function ItinerarySection({
                   </span>
                 </div>
                 {record.status === "failed" ? (
-                  <p className="mt-3 text-sm text-red-300">Falha honesta na gera??o. Este roteiro n?o possui arquivo valido para abrir.</p>
+                  <p className="mt-3 text-sm text-red-300">Falha honesta na geração. Este roteiro não possui arquivo válido para abrir.</p>
                 ) : null}
                 {record.status === "generating" ? (
                   <p className="mt-3 text-sm text-white/55">Gerando roteiro e vinculando arquivo real no backend...</p>
@@ -4231,7 +4231,7 @@ function DocumentsSection({
           </div>
         ) : documents.length === 0 ? (
           <div className="rounded-3xl border border-white/[0.06] bg-white/[0.02] p-6 text-sm text-white/50">
-            {isAdmin ? "Nenhum documento adicionado." : "Nenhum documento publico adicionado."}
+            {isAdmin ? "Nenhum documento adicionado." : "Nenhum documento público adicionado."}
           </div>
         ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
@@ -4355,7 +4355,7 @@ function DocumentsSection({
 
         <div className="mt-4 flex items-center gap-2 text-white/30">
           <Shield className="w-4 h-4" />
-          <p className="text-xs">Documentos privados n?o aparecem no link compartilh?vel</p>
+          <p className="text-xs">Documentos privados não aparecem no link compartilhável</p>
         </div>
       </div>
 
@@ -4423,14 +4423,14 @@ function PinModal({
     try {
       const isValid = await verifyTripLinkPin(tripId, pin)
       if (!isValid) {
-        setError("PIN inv?lido")
+        setError("PIN inválido")
         return
       }
 
       onSuccess()
       setPin("")
     } catch (pinError) {
-      const message = pinError instanceof Error ? pinError.message : "Acesso r?pido n?o configurado neste dispositivo"
+      const message = pinError instanceof Error ? pinError.message : "Acesso rápido não configurado neste dispositivo"
       setError(message)
     } finally {
       setIsSubmitting(false)
@@ -4440,7 +4440,7 @@ function PinModal({
   const handleCreatePin = async () => {
     if (pin.length !== 4 || confirmPin.length !== 4) return
     if (pin !== confirmPin) {
-      setError("Os PINs n?o conferem.")
+      setError("Os PINs não conferem.")
       return
     }
 
@@ -4453,7 +4453,7 @@ function PinModal({
       setPin("")
       setConfirmPin("")
     } catch (pinError) {
-      const message = pinError instanceof Error ? pinError.message : "N?o foi poss?vel configurar o PIN neste dispositivo."
+      const message = pinError instanceof Error ? pinError.message : "Não foi possível configurar o PIN neste dispositivo."
       setError(message)
     } finally {
       setIsSubmitting(false)
@@ -4467,13 +4467,13 @@ function PinModal({
     try {
       const isValid = await authenticateTripLinkBiometric(tripId)
       if (!isValid) {
-        setError("N?o foi poss?vel validar a biometria neste dispositivo.")
+        setError("Não foi possível validar a biometria neste dispositivo.")
         return
       }
 
       onSuccess()
     } catch (pinError) {
-      const message = pinError instanceof Error ? pinError.message : "Biometria indispon?vel neste dispositivo."
+      const message = pinError instanceof Error ? pinError.message : "Biometria indisponível neste dispositivo."
       setError(message)
     } finally {
       setIsSubmitting(false)
@@ -4528,7 +4528,7 @@ function PinModal({
             Usar Face ID / biometria
           </Button>
         )}
-        <p className="text-xs text-white/30 mt-4">O PIN deste link pertence apenas a este dispositivo e n?o ? compartilhado com o portal ou com outros aparelhos.</p>
+        <p className="text-xs text-white/30 mt-4">O PIN deste link pertence apenas a este dispositivo e não é compartilhado com o portal ou com outros aparelhos.</p>
       </div>
     </Modal>
   )
@@ -4653,8 +4653,8 @@ function ViewDocumentModal({
             <p className="text-white/20 text-sm">
               {offlineReadOnly
                 ? offlineDocumentContext?.packageStatus === "legacy_snapshot"
-                  ? "Arquivos n?o sao garantidos neste snapshot salvo."
-                  : offlineMessage || "Arquivo salvo localmente quando dispon?vel."
+                  ? "Arquivos não são garantidos neste snapshot salvo."
+                  : offlineMessage || "Arquivo salvo localmente quando disponível."
                 : "Visualiza??o do PDF/Imagem"}
             </p>
           </div>
@@ -4726,7 +4726,7 @@ function AddDocumentModal({ open, onClose, onSave, tripId, ownerUserId, agencyId
     setError("")
     const validation = validateDocumentFile(file)
     if (!validation.valid) {
-      setError(validation.error || "Arquivo inv?lido.")
+      setError(validation.error || "Arquivo inválido.")
       return
     }
 
@@ -4746,7 +4746,7 @@ function AddDocumentModal({ open, onClose, onSave, tripId, ownerUserId, agencyId
           const response = await fetch("/api/trip-admin", { method: "POST", body: uploadForm })
           const data = await response.json().catch(() => null)
           return {
-            error: response.ok ? null : data?.error || "N?o foi poss?vel registrar o documento.",
+            error: response.ok ? null : data?.error || "Não foi possível registrar o documento.",
             document: data?.document ?? null,
           }
         })()
@@ -4754,7 +4754,7 @@ function AddDocumentModal({ open, onClose, onSave, tripId, ownerUserId, agencyId
           const path = `${ownerUserId}/${tripId}/documents/${Date.now()}-${file.name.replace(/\s+/g, "-")}`
           const uploadResult = await uploadDocumentFile(file, path)
           if (uploadResult.error || !uploadResult.data) {
-            return { error: resolveProtectedWriteError(uploadResult.error || "N?o foi poss?vel anexar o documento."), document: null }
+            return { error: resolveProtectedWriteError(uploadResult.error || "Não foi possível anexar o documento."), document: null }
           }
 
           const metadataResult = await createDocumentMetadata({
@@ -4774,14 +4774,14 @@ function AddDocumentModal({ open, onClose, onSave, tripId, ownerUserId, agencyId
           })
 
           return {
-            error: metadataResult.error ? resolveProtectedWriteError(metadataResult.error || "N?o foi poss?vel registrar o documento.") : null,
+            error: metadataResult.error ? resolveProtectedWriteError(metadataResult.error || "Não foi possível registrar o documento.") : null,
             document: metadataResult.data ?? null,
           }
         })()
 
     if (savedDocument.error || !savedDocument.document) {
       console.error("[DOCUMENT] upload error", savedDocument.error)
-      setError(savedDocument.error || "N?o foi poss?vel registrar o documento.")
+      setError(savedDocument.error || "Não foi possível registrar o documento.")
       setUploading(false)
       return
     }
@@ -4839,7 +4839,7 @@ function AddDocumentModal({ open, onClose, onSave, tripId, ownerUserId, agencyId
           />
           <div>
             <label htmlFor="private" className="text-sm text-white font-medium">Documento privado</label>
-            <p className="text-xs text-white/40">N?o aparece no link compartilh?vel</p>
+            <p className="text-xs text-white/40">Não aparece no link compartilhável</p>
           </div>
         </div>
         {error && <p className="text-sm text-red-300">{error}</p>}
@@ -4949,24 +4949,24 @@ function ConciergeSection({
   ]
 
   const buildResponse = (userMessage: string) => {
-    let response = "Ainda n?o ?ncontrei dados reais suficientes nessa viagem para responder com precis?o."
+    let response = "Ainda não encontrei dados reais suficientes nessa viagem para responder com precisão."
 
     if (userMessage.includes("hosped")) {
       response = hasHotel
         ? `Sua hospedagem atual e ${tripData.hotel.name}. Check-in: ${tripData.hotel.checkIn}. Check-out: ${tripData.hotel.checkOut}.`
-        : "Ainda n?o ha hospedagem real adicionada."
+        : "Ainda não há hospedagem real adicionada."
     } else if (userMessage.includes("roteiro")) {
       response = hasItinerary
         ? `Seu roteiro possui ${tripData.itinerary.length} dias planej?dos. Abra a secao de roteiro para ver os detalhes reais.`
-        : "Ainda n?o ha roteiro real criado."
+        : "Ainda não há roteiro real criado."
     } else if (userMessage.includes("passag")) {
       response = hasFlights
         ? `Sua viagem possui ${tripData.flights.length} passagem(ns) adicionada(s).`
-        : "Ainda n?o ha passagens reais adicionadas."
+        : "Ainda não há passagens reais adicionadas."
     } else if (userMessage.includes("document")) {
       response = Array.isArray(tripData.documents) && tripData.documents.length > 0
         ? `Sua viagem possui ${tripData.documents.length} documento(s) real(is) cadastrado(s).`
-        : "Ainda n?o ha documentos reais adicionados."
+        : "Ainda não há documentos reais adicionados."
     }
 
     return response
@@ -4995,7 +4995,7 @@ function ConciergeSection({
     if (!response.ok) {
       return {
         ok: false as const,
-        error: data?.error || "N?o foi poss?vel obter uma resposta real do concierge desta viagem.",
+        error: data?.error || "Não foi possível obter uma resposta real do concierge desta viagem.",
       }
     }
 
@@ -5010,7 +5010,7 @@ function ConciergeSection({
 
   const handleSend = async () => {
     if (offlineReadOnly) {
-      showToast("Indispon?vel offline.", "info")
+      showToast("Indisponível offline.", "info")
       return
     }
     if (!message.trim()) return
@@ -5071,7 +5071,7 @@ function ConciergeSection({
         <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="rounded-2xl bg-white/[0.02] backdrop-blur-xl border border-white/[0.06] overflow-hidden">
           {offlineReadOnly ? (
             <div className="border-b border-white/[0.06] bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
-              Indispon?vel offline.
+              Indisponível offline.
             </div>
           ) : null}
           <div className="h-80 overflow-y-auto p-4 space-y-4">
@@ -5136,7 +5136,7 @@ function ConciergeSection({
               <div className="flex items-center gap-2">
                 <CreditCard className="w-4 h-4 text-[#5de0e6]" />
                 <span className="text-xs text-white/40">
-                  {typeof creditsBalance === "number" ? `${creditsBalance} cr?ditos restantes` : "Sincronizando saldo real"}
+                  {typeof creditsBalance === "number" ? `${creditsBalance} créditos restantes` : "Sincronizando saldo real"}
                 </span>
               </div>
               <Button size="sm" variant="ghost" onClick={onOpenCredits} className="text-[#5de0e6] text-xs">
@@ -5225,7 +5225,7 @@ function ShareModal({ open, onClose, tripData }: { open: boolean; onClose: () =>
           <Shield className="w-5 h-5 text-[#5de0e6] flex-shrink-0 mt-0.5" />
           <div>
             <p className="text-sm text-white font-medium">Privacidade garantida</p>
-            <p className="text-xs text-white/40 mt-1">Documentos privados (passaportes, vistos) n?o aparecem no link compartilh?vel.</p>
+            <p className="text-xs text-white/40 mt-1">Documentos privados (passaportes, vistos) não aparecem no link compartilhável.</p>
           </div>
         </div>
       </div>
@@ -5419,7 +5419,7 @@ function TravelersModal({
           </div>
         ) : (
           <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4 text-sm text-white/50">
-            Este link esta em modo de visualiza??o. O gerenciamento de viaj?ntes fica dispon?vel apenas no link administrador.
+            Este link está em modo de visualização. O gerenciamento de viajantes fica disponível apenas no link administrador.
           </div>
         )}
       </div>
@@ -5468,7 +5468,7 @@ function TripSettingsModal({
           <div>
             <Label className="text-white/60">Privacidade</Label>
             <div className="mt-2 grid gap-2">
-              {["privado", "compartilh?vel"].map((privacy) => (
+              {["privado", "compartilhável"].map((privacy) => (
                 <button
                   key={privacy}
                   onClick={() => canWrite && setForm((prev) => ({ ...prev, privacy }))}
@@ -5478,7 +5478,7 @@ function TripSettingsModal({
                     form.privacy === privacy ? "border-[#5de0e6]/40 bg-[#5de0e6]/10 text-[#5de0e6]" : "border-white/10 bg-white/[0.03] text-white/60"
                   )}
                 >
-                  {privacy === "privado" ? "Somente administradores" : "Liberar link compartilh?vel"}
+                  {privacy === "privado" ? "Somente administradores" : "Liberar link compartilhável"}
                 </button>
               ))}
             </div>
@@ -5515,7 +5515,7 @@ function TripSettingsModal({
                   form.status === status ? "border-[#5de0e6]/40 bg-[#5de0e6]/10 text-[#5de0e6]" : "border-white/10 bg-white/[0.03] text-white/60"
                 )}
               >
-                {status === "upcoming" ? "Planej?da" : status === "ongoing" ? "Em andamento" : "Concluida"}
+                {status === "upcoming" ? "Planejada" : status === "ongoing" ? "Em andamento" : "Concluída"}
               </button>
             ))}
           </div>
@@ -5526,7 +5526,7 @@ function TripSettingsModal({
           </Button>
         ) : (
           <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4 text-sm text-white/50">
-            Este link esta em modo de visualiza??o. As configuracoes da viagem ficam dispon?veis apenas no link administrador.
+            Este link está em modo de visualização. As configurações da viagem ficam disponíveis apenas no link administrador.
           </div>
         )}
       </div>
@@ -5565,7 +5565,7 @@ function TripSecurityModal({
   const handleSavePin = async () => {
     if (pin.length !== 4 || confirmPin.length !== 4) return
     if (pin !== confirmPin) {
-      setError("Os PINs n?o conferem.")
+      setError("Os PINs não conferem.")
       return
     }
 
@@ -5578,7 +5578,7 @@ function TripSecurityModal({
       setConfirmPin("")
       onSecurityUpdated()
     } catch (securityError) {
-      const message = securityError instanceof Error ? securityError.message : "N?o foi poss?vel salvar o PIN neste dispositivo."
+      const message = securityError instanceof Error ? securityError.message : "Não foi possível salvar o PIN neste dispositivo."
       setError(message)
     } finally {
       setIsSubmitting(false)
@@ -5606,7 +5606,7 @@ function TripSecurityModal({
 
       onSecurityUpdated()
     } catch (securityError) {
-      const message = securityError instanceof Error ? securityError.message : "N?o foi poss?vel atualizar a biometria neste dispositivo."
+      const message = securityError instanceof Error ? securityError.message : "Não foi possível atualizar a biometria neste dispositivo."
       setError(message)
     } finally {
       setIsSubmitting(false)
@@ -5614,22 +5614,22 @@ function TripSecurityModal({
   }
 
   return (
-    <Modal open={open} onClose={onClose} title="Seguran?a">
+    <Modal open={open} onClose={onClose} title="Segurança">
       <div className="space-y-5">
         <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4">
           <p className="text-sm font-medium text-white">Protej? acoes sens?veis desta viagem utilizando PIN ou biometria neste dispositivo.</p>
-          <p className="mt-2 text-xs text-white/40">O PIN do link e independente do portal, n?o ? compartilhado com a ag?ncia e fica restrito a este aparelho.</p>
+          <p className="mt-2 text-xs text-white/40">O PIN do link e independente do portal, não é compartilhado com a agência e fica restrito a este aparelho.</p>
         </div>
 
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4">
             <p className="text-xs uppercase tracking-wider text-white/40">Status do PIN</p>
-            <p className="mt-2 text-sm text-white">{securityMethods.pinEnabled ? "PIN configurado" : "PIN n?o configurado"}</p>
+            <p className="mt-2 text-sm text-white">{securityMethods.pinEnabled ? "PIN configurado" : "PIN não configurado"}</p>
           </div>
           <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4">
             <p className="text-xs uppercase tracking-wider text-white/40">Biometria</p>
             <p className="mt-2 text-sm text-white">
-              {securityMethods.biometricEnabled ? "Biometria ativa" : securityMethods.biometricSupported ? "Biometria inativa" : "Biometria indispon?vel"}
+              {securityMethods.biometricEnabled ? "Biometria ativa" : securityMethods.biometricSupported ? "Biometria inativa" : "Biometria indisponível"}
             </p>
           </div>
         </div>
@@ -5771,7 +5771,7 @@ function OfflineSection({
       )
     } catch (error) {
       console.error("[OFFLINE] save failed", error)
-      showToast(resolvePublicTripErrorMessage(error instanceof Error ? error.message : "N?o foi poss?vel salvar esta viagem offline."), "error")
+      showToast(resolvePublicTripErrorMessage(error instanceof Error ? error.message : "Não foi possível salvar esta viagem offline."), "error")
     } finally {
       setDownloading(false)
     }
@@ -5834,10 +5834,10 @@ function OfflineSection({
 function OfflineModeBanner({ status }: { status: OfflineTripPackageStatus }) {
   const message =
     status === "partial"
-      ? "Modo offline ativo. Algumas funcionalidades estao indispon?veis e alguns arquivos podem n?o ?star dispon?veis offline."
+      ? "Modo offline ativo. Algumas funcionalidades estão indisponíveis e alguns arquivos podem não estar disponíveis offline."
       : status === "legacy_snapshot"
-        ? "Modo offline ativo. Esta e uma versao salva anterior. Arquivos podem n?o ?star dispon?veis offline."
-        : "Modo offline ativo. Algumas funcionalidades estao indispon?veis."
+        ? "Modo offline ativo. Esta é uma versão salva anterior. Arquivos podem não estar disponíveis offline."
+        : "Modo offline ativo. Algumas funcionalidades estão indisponíveis."
 
   return (
     <section className="px-4 pt-24">
@@ -5860,7 +5860,7 @@ function QuickInfoSection({ tripData }: { tripData: any }) {
     { id: "language", icon: "🗣️", label: "Idioma", value: quickInfo.language, detail: "As informa??es de idioma sao exibidas com base no destino informado da viagem." },
     { id: "timezone", icon: "🕐", label: "Fuso Horario", value: quickInfo.timezone, detail: "O fuso horario e apresentado a partir do destino configurado. Confirme horarios finais com a opera??o da viagem." },
     { id: "emergency", icon: "🆘", label: "Emergencia", value: quickInfo.emergency, detail: "Use este numero para emergencias locais quando houver confirma??o do destino." },
-    { id: "embassy", icon: "🏛️", label: "Embaixada BR", value: quickInfo.embassy, detail: "Contato consular exibido conforme o destino informado. Se estiver indispon?vel, mantenha os contatos da sua ag?ncia." },
+    { id: "embassy", icon: "🏛️", label: "Embaixada BR", value: quickInfo.embassy, detail: "Contato consular exibido conforme o destino informado. Se estiver indisponível, mantenha os contatos da sua agência." },
   ]
 
   return (
@@ -5934,7 +5934,7 @@ function TravelerPublicCreditsModal({
   const usagePercentage = monthlyCredits > 0 ? Math.min((planCreditsUsed / monthlyCredits) * 100, 100) : 0
 
   return (
-    <Modal tone="light" open={open} onClose={onClose} title="Cr?ditos">
+    <Modal tone="light" open={open} onClose={onClose} title="Créditos">
       <div className="space-y-5">
         {!credits ? (
           <div className="rounded-2xl border border-slate-200 bg-white/92 p-4 text-sm text-slate-600">
@@ -5944,7 +5944,7 @@ function TravelerPublicCreditsModal({
         <div className="rounded-[26px] border border-[#dbe5f4] bg-[linear-gradient(180deg,#ffffff_0%,#eef5ff_100%)] p-5">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <p className="text-sm text-slate-500">Cr?ditos dispon?veis</p>
+              <p className="text-sm text-slate-500">Créditos disponíveis</p>
               <p className="mt-1 text-4xl font-semibold tracking-[-0.04em] text-slate-950">{balance}</p>
             </div>
             <div className="rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-600 ring-1 ring-slate-200">
@@ -5961,7 +5961,7 @@ function TravelerPublicCreditsModal({
 
         <div className="grid grid-cols-2 gap-3">
           <div className="rounded-2xl border border-slate-200 bg-white/92 p-4">
-            <p className="text-xs text-slate-500">Cr?ditos do plano</p>
+            <p className="text-xs text-slate-500">Créditos do plano</p>
             <p className="mt-2 text-2xl font-semibold text-slate-950">{planCredits}</p>
             <p className="mt-1 text-xs text-slate-500">Disponiveis neste ciclo</p>
           </div>
@@ -5970,7 +5970,7 @@ function TravelerPublicCreditsModal({
             <p className="mt-2 text-2xl font-semibold text-slate-950">{balance}</p>
           </div>
           <div className="rounded-2xl border border-slate-200 bg-white/92 p-4">
-            <p className="text-xs text-slate-500">Cr?ditos comprados</p>
+            <p className="text-xs text-slate-500">Créditos comprados</p>
             <p className="mt-2 text-2xl font-semibold text-slate-950">{purchasedCredits}</p>
             <p className="mt-1 text-xs text-slate-500">Acumulados fora do ciclo mensal</p>
           </div>
@@ -6005,7 +6005,7 @@ function LinkCreditsSummaryModal({
   const usagePercentage = monthlyCredits > 0 ? Math.min((planCreditsUsed / monthlyCredits) * 100, 100) : 0
 
   return (
-    <Modal tone="light" open={open} onClose={onClose} title="Cr?ditos">
+    <Modal tone="light" open={open} onClose={onClose} title="Créditos">
       <div className="space-y-5">
         {!credits ? (
           <div className="rounded-2xl border border-slate-200 bg-white/92 p-4 text-sm text-slate-600">
@@ -6015,7 +6015,7 @@ function LinkCreditsSummaryModal({
         <div className="rounded-[26px] border border-[#dbe5f4] bg-[linear-gradient(180deg,#ffffff_0%,#eef5ff_100%)] p-5">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <p className="text-sm text-slate-500">Cr?ditos dispon?veis</p>
+              <p className="text-sm text-slate-500">Créditos disponíveis</p>
               <p className="mt-1 text-4xl font-semibold tracking-[-0.04em] text-slate-950">{balance}</p>
             </div>
             <div className="rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-600 ring-1 ring-slate-200">
@@ -6032,7 +6032,7 @@ function LinkCreditsSummaryModal({
 
         <div className="grid grid-cols-2 gap-3">
           <div className="rounded-2xl border border-slate-200 bg-white/92 p-4">
-            <p className="text-xs text-slate-500">Cr?ditos do plano</p>
+            <p className="text-xs text-slate-500">Créditos do plano</p>
             <p className="mt-2 text-2xl font-semibold text-slate-950">{planCredits}</p>
             <p className="mt-1 text-xs text-slate-500">Disponiveis neste ciclo</p>
           </div>
@@ -6041,7 +6041,7 @@ function LinkCreditsSummaryModal({
             <p className="mt-2 text-2xl font-semibold text-slate-950">{balance}</p>
           </div>
           <div className="rounded-2xl border border-slate-200 bg-white/92 p-4">
-            <p className="text-xs text-slate-500">Cr?ditos comprados</p>
+            <p className="text-xs text-slate-500">Créditos comprados</p>
             <p className="mt-2 text-2xl font-semibold text-slate-950">{purchasedCredits}</p>
             <p className="mt-1 text-xs text-slate-500">Acumulados fora do ciclo mensal</p>
           </div>
@@ -6138,13 +6138,13 @@ function SensitiveAccessModal({
     try {
       const isValid = await verifyTripLinkPin(tripId, pin)
       if (!isValid) {
-        setError("PIN inv?lido")
+        setError("PIN inválido")
         return
       }
 
       onSuccess()
     } catch (unlockError) {
-      const message = unlockError instanceof Error ? unlockError.message : "Acesso r?pido n?o configurado neste dispositivo"
+      const message = unlockError instanceof Error ? unlockError.message : "Acesso rápido não configurado neste dispositivo"
       setError(message)
     } finally {
       setIsSubmitting(false)
@@ -6155,7 +6155,7 @@ function SensitiveAccessModal({
   const handleCreatePin = async () => {
     if (pin.length !== 4 || confirmPin.length !== 4) return
     if (pin !== confirmPin) {
-      setError("Os PINs n?o conferem.")
+      setError("Os PINs não conferem.")
       return
     }
 
@@ -6166,7 +6166,7 @@ function SensitiveAccessModal({
       await saveTripLinkPin(tripId, pin)
       onSuccess()
     } catch (unlockError) {
-      const message = unlockError instanceof Error ? unlockError.message : "N?o foi poss?vel configurar o PIN neste dispositivo."
+      const message = unlockError instanceof Error ? unlockError.message : "Não foi possível configurar o PIN neste dispositivo."
       setError(message)
     } finally {
       setIsSubmitting(false)
@@ -6182,13 +6182,13 @@ function SensitiveAccessModal({
     try {
       const success = await authenticateTripLinkBiometric(tripId)
       if (!success) {
-        setError("N?o foi poss?vel validar a biometria neste dispositivo.")
+        setError("Não foi possível validar a biometria neste dispositivo.")
         return
       }
 
       onSuccess()
     } catch (unlockError) {
-      const message = unlockError instanceof Error ? unlockError.message : "Biometria indispon?vel neste dispositivo."
+      const message = unlockError instanceof Error ? unlockError.message : "Biometria indisponível neste dispositivo."
       setError(message)
     } finally {
       setIsSubmitting(false)
@@ -6331,13 +6331,13 @@ function TravelerPublicSensitiveAccessModal({
     try {
       const isValid = await verifyTripLinkPin(tripId, pin)
       if (!isValid) {
-        setError("PIN inv?lido.")
+        setError("PIN inválido.")
         return
       }
 
       onSuccess()
     } catch (unlockError) {
-      const message = unlockError instanceof Error ? unlockError.message : "PIN indispon?vel neste dispositivo."
+      const message = unlockError instanceof Error ? unlockError.message : "PIN indisponível neste dispositivo."
       setError(message)
     } finally {
       setIsSubmitting(false)
@@ -6352,13 +6352,13 @@ function TravelerPublicSensitiveAccessModal({
     try {
       const success = await authenticateTripLinkBiometric(tripId)
       if (!success) {
-        setError("N?o foi poss?vel validar a biometria neste dispositivo.")
+        setError("Não foi possível validar a biometria neste dispositivo.")
         return
       }
 
       onSuccess()
     } catch (unlockError) {
-      const message = unlockError instanceof Error ? unlockError.message : "Biometria indispon?vel neste dispositivo."
+      const message = unlockError instanceof Error ? unlockError.message : "Biometria indisponível neste dispositivo."
       setError(message)
     } finally {
       setIsSubmitting(false)
@@ -6774,7 +6774,7 @@ export default function TripPage() {
               itineraries: false,
               documents: false,
             })
-            setLoadError("N?o foi poss?vel carregar esta viagem offline neste dispositivo.")
+            setLoadError("Não foi possível carregar esta viagem offline neste dispositivo.")
             setIsLoadingTrip(false)
           }
           return false
@@ -6784,7 +6784,7 @@ export default function TripPage() {
       if (isOfflineModeActive()) {
         const offlineLoaded = await loadOfflinePackage("offline")
         if (!offlineLoaded) {
-          setLoadError("Esta viagem n?o foi salva para uso offline neste dispositivo.")
+          setLoadError("Esta viagem não foi salva para uso offline neste dispositivo.")
           setIsLoadingTrip(false)
         }
         return
@@ -6854,7 +6854,7 @@ export default function TripPage() {
           )
           const preloadedAgencyName =
             preloadedAgencyBranding?.name ??
-            (resolvedAgencyId ? "Ag?ncia parceira" : null)
+            (resolvedAgencyId ? "Agência parceira" : null)
 
           setAgencyBranding({
             name: preloadedAgencyName,
@@ -6880,8 +6880,8 @@ export default function TripPage() {
           })
 
           if (isPublicLinkRequest && repositoryTrip.data.visibility !== "public") {
-            console.error("[TRIP] erro ao carregar link", "Esta viagem n?o ?sta publicada para acesso publico.")
-            setLoadError("Esta viagem n?o ?sta dispon?vel publicamente.")
+            console.error("[TRIP] erro ao carregar link", "Esta viagem não está publicada para acesso público.")
+            setLoadError("Esta viagem não está disponível publicamente.")
             setIsLoadingTrip(false)
             return
           }
@@ -6975,7 +6975,7 @@ export default function TripPage() {
               flightsResult.error,
               itinerariesResult.error,
               hotelsResult.error,
-              agencySettled.status === "rejected" ? agencySettled.reason instanceof Error ? agencySettled.reason.message : "Falha ao buscar branding da ag?ncia." : null,
+              agencySettled.status === "rejected" ? agencySettled.reason instanceof Error ? agencySettled.reason.message : "Falha ao buscar branding da agência." : null,
             ].filter((value): value is string => Boolean(value))
 
             if (typeof navigator !== "undefined" && navigator.onLine === false && sectionErrors.some((error) => isOfflineRecoverableError(error))) {
@@ -7078,9 +7078,9 @@ export default function TripPage() {
               return
             }
           }
-          const message = repositoryTrip.error || "Viagem n?o ?ncontrada ou link expirado."
+          const message = repositoryTrip.error || "Viagem não encontrada ou link expirado."
           console.error("[TRIP] erro ao carregar link", message)
-          setLoadError("Viagem n?o ?ncontrada ou link expirado.")
+          setLoadError("Viagem não encontrada ou link expirado.")
           setIsLoadingTrip(false)
           return
         }
@@ -7094,7 +7094,7 @@ export default function TripPage() {
           }
         }
         if (useSupabase) {
-          setLoadError("Viagem n?o ?ncontrada ou link expirado.")
+          setLoadError("Viagem não encontrada ou link expirado.")
           setIsLoadingTrip(false)
           return
         }
@@ -7102,7 +7102,7 @@ export default function TripPage() {
 
       if (isPublicRoute || isAdminRoute) {
         devLog("trip.notFound", routeSlug)
-        setLoadError("Viagem n?o ?ncontrada ou link expirado.")
+        setLoadError("Viagem não encontrada ou link expirado.")
         setIsLoadingTrip(false)
         return
       }
@@ -7131,7 +7131,7 @@ export default function TripPage() {
       }
 
       devLog("trip.notFound", routeSlug)
-      setLoadError("Viagem n?o ?ncontrada ou link expirado.")
+      setLoadError("Viagem não encontrada ou link expirado.")
       setIsLoadingTrip(false)
     }
 
@@ -7144,7 +7144,7 @@ export default function TripPage() {
           itineraries: false,
           documents: false,
         })
-        setLoadError("N?o foi poss?vel carregar esta viagem offline neste dispositivo.")
+        setLoadError("Não foi possível carregar esta viagem offline neste dispositivo.")
         setIsLoadingTrip(false)
       }
     })
@@ -7226,7 +7226,7 @@ export default function TripPage() {
 
   const blockOfflineMutation = () => {
     if (!offlineModeEnabled) return false
-    showToast("Indispon?vel offline.", "info")
+    showToast("Indisponível offline.", "info")
     return true
   }
 
@@ -7248,7 +7248,7 @@ export default function TripPage() {
     return {
       ok: response.ok,
       data,
-      error: response.ok ? null : data?.error || "N?o foi poss?vel concluir a a??o administrativa.",
+      error: response.ok ? null : data?.error || "Não foi possível concluir a ação administrativa.",
     }
   }
 
@@ -7274,7 +7274,7 @@ export default function TripPage() {
     return {
       ok: response.ok,
       data,
-      error: response.ok ? null : data?.error || "N?o foi poss?vel concluir o upload administrativo.",
+      error: response.ok ? null : data?.error || "Não foi possível concluir o upload administrativo.",
     }
   }
 
@@ -7285,7 +7285,7 @@ export default function TripPage() {
 
   const requireSensitiveAccess = (onGranted: () => void) => {
     if (!tripData.id) {
-      showToast("N?o foi poss?vel validar a seguranca desta viagem.", "error")
+      showToast("Não foi possível validar a segurança desta viagem.", "error")
       return
     }
 
@@ -7300,7 +7300,7 @@ export default function TripPage() {
 
   const ensureSensitiveAccess = () => {
     if (!tripData.id) {
-      showToast("N?o foi poss?vel validar a seguranca desta viagem.", "error")
+      showToast("Não foi possível validar a segurança desta viagem.", "error")
       return false
     }
 
@@ -7416,7 +7416,7 @@ export default function TripPage() {
 
     const nextFlight = adminLinkMutationMode ? result.data?.flight ?? null : result.data
     if (result.error || !nextFlight) {
-      showToast(resolveProtectedWriteError(result.error || "N?o foi poss?vel atualizar a passagem."), "error")
+      showToast(resolveProtectedWriteError(result.error || "Não foi possível atualizar a passagem."), "error")
       return
     }
 
@@ -7515,10 +7515,10 @@ export default function TripPage() {
         if (extractionStatus === "completed" || extractionStatus === "manual" || extractionStatus === "failed") {
           flightPollingTimersRef.current.delete(pollingKey)
           if (extractionStatus === "manual" && !hasExtractedFlightData) {
-            showToast("Alguns dados n?o foram identificados. Revise a passagem manualmente.", "info")
+            showToast("Alguns dados não foram identificados. Revise a passagem manualmente.", "info")
           }
           if (extractionStatus === "failed" && !hasExtractedFlightData) {
-            showToast("N?o foi poss?vel identificar esta passagem.", "info")
+            showToast("Não foi possível identificar esta passagem.", "info")
           }
           return
         }
@@ -7543,7 +7543,7 @@ export default function TripPage() {
     console.log(data?.id ? "[HOTEL] update started" : "[HOTEL] create started")
 
     if (!tripData.id) {
-      showToast("Viagem n?o ?ncontrada para salvar a hospedagem.", "error")
+      showToast("Viagem não encontrada para salvar a hospedagem.", "error")
       return
     }
 
@@ -7585,7 +7585,7 @@ export default function TripPage() {
     const savedHotel = adminLinkMutationMode ? result.data?.hotel ?? null : result.data
     if (result.error || !savedHotel) {
       console.error("[HOTEL] error", result.error)
-      showToast(resolveProtectedWriteError(result.error || "N?o foi poss?vel salvar a hospedagem."), "error")
+      showToast(resolveProtectedWriteError(result.error || "Não foi possível salvar a hospedagem."), "error")
       return
     }
 
@@ -7635,7 +7635,7 @@ export default function TripPage() {
     const hotelDeleted = adminLinkMutationMode ? result.ok : result.success
     if (!hotelDeleted) {
       console.error("[HOTEL] error", result.error)
-      showToast(resolveProtectedWriteError(result.error || "N?o foi poss?vel excluir a hospedagem."), "error")
+      showToast(resolveProtectedWriteError(result.error || "Não foi possível excluir a hospedagem."), "error")
       return
     }
 
@@ -7696,7 +7696,7 @@ export default function TripPage() {
     const nextItineraryRecord = adminLinkMutationMode ? result.data?.itinerary ?? null : result.data
     if (result.error || !nextItineraryRecord) {
       console.error("[ITINERARY] save simple error", result.error)
-      showToast(resolveProtectedWriteError(result.error || "N?o foi poss?vel salvar o roteiro simples."), "error")
+      showToast(resolveProtectedWriteError(result.error || "Não foi possível salvar o roteiro simples."), "error")
       return
     }
 
@@ -7736,14 +7736,14 @@ export default function TripPage() {
 
     if (result.error || !result.data?.itinerary) {
       console.error("[ITINERARY] generate error", result.error || result.data?.error)
-      showToast(resolveProtectedWriteError(result.error || result.data?.error || `N?o foi poss?vel gerar o ${label}.`), "error")
+      showToast(resolveProtectedWriteError(result.error || result.data?.error || `Não foi possível gerar o ${label}.`), "error")
       return
     }
 
     const nextItinerary = result.data.itinerary as TripItineraryRecord
     if (mode === "complete_pdf" && nextItinerary.status === "completed" && !nextItinerary.documentId && !result.data.document) {
       console.error("[ITINERARY] complete pdf missing document", nextItinerary)
-      showToast("O roteiro foi marcado como conclu?do, mas nenhum documento valido foi retornado pelo backend.", "error")
+      showToast("O roteiro foi marcado como concluído, mas nenhum documento válido foi retornado pelo backend.", "error")
       return
     }
 
@@ -7806,7 +7806,7 @@ export default function TripPage() {
 
       if (!deleteResult.ok) {
         console.error("[ITINERARY] delete error", deleteResult.error)
-        showToast(resolveProtectedWriteError(deleteResult.error || "N?o foi poss?vel excluir o roteiro."), "error")
+        showToast(resolveProtectedWriteError(deleteResult.error || "Não foi possível excluir o roteiro."), "error")
         return
       }
     } else {
@@ -7814,14 +7814,14 @@ export default function TripPage() {
         const storageResult = await deleteDocumentFile(linkedDocument.filePath)
         if (!storageResult.success) {
           console.error("[ITINERARY] storage delete error", storageResult.error)
-          storageWarning = storageResult.error || "N?o foi poss?vel remover o arquivo do storage."
+          storageWarning = storageResult.error || "Não foi possível remover o arquivo do storage."
         }
       }
 
       const itineraryResult = await deleteTripItinerary(record.id)
       if (!itineraryResult.success) {
         console.error("[ITINERARY] delete error", itineraryResult.error)
-        showToast(resolveProtectedWriteError(itineraryResult.error || "N?o foi poss?vel excluir o roteiro."), "error")
+        showToast(resolveProtectedWriteError(itineraryResult.error || "Não foi possível excluir o roteiro."), "error")
         return
       }
 
@@ -7829,7 +7829,7 @@ export default function TripPage() {
         const documentResult = await deleteDocument(linkedDocument.id)
         if (!documentResult.success) {
           console.error("[ITINERARY] linked document delete error", documentResult.error)
-          showToast(resolveProtectedWriteError(documentResult.error || "O roteiro foi removido, mas o documento vinculado n?o foi excluido."), "error")
+          showToast(resolveProtectedWriteError(documentResult.error || "O roteiro foi removido, mas o documento vinculado não foi excluído."), "error")
           return
         }
       }
@@ -7848,7 +7848,7 @@ export default function TripPage() {
         : prev.documents,
     }))
 
-    showToast(storageWarning ? `Roteiro excluido. Aviso do storage: ${storageWarning}` : "Roteiro excluido com sucesso.", storageWarning ? "info" : "success")
+    showToast(storageWarning ? `Roteiro excluído. Aviso do storage: ${storageWarning}` : "Roteiro excluído com sucesso.", storageWarning ? "info" : "success")
   }
 
   const handleAddDocument = (data: any) => {
@@ -7870,7 +7870,7 @@ export default function TripPage() {
 
     const flight = (Array.isArray(tripData.flights) ? tripData.flights : []).find((entry: any) => entry.id === flightId)
     if (!flight) {
-      showToast("Passagem n?o ?ncontrada para exclusao.", "error")
+      showToast("Passagem não encontrada para exclusão.", "error")
       return
     }
 
@@ -7889,7 +7889,7 @@ export default function TripPage() {
       })
       if (!deleteResult.ok) {
         console.error("[TICKET] flight delete error", deleteResult.error)
-        showToast(resolveProtectedWriteError(deleteResult.error || "N?o foi poss?vel excluir a passagem."), "error")
+        showToast(resolveProtectedWriteError(deleteResult.error || "Não foi possível excluir a passagem."), "error")
         return
       }
     } else {
@@ -7897,14 +7897,14 @@ export default function TripPage() {
         const storageResult = await deleteDocumentFile(flight.document.filePath)
         if (!storageResult.success) {
           console.error("[TICKET] storage delete error", storageResult.error)
-          storageWarning = storageResult.error || "N?o foi poss?vel remover o arquivo do storage."
+          storageWarning = storageResult.error || "Não foi possível remover o arquivo do storage."
         }
       }
 
       const flightResult = await deleteTripFlight(flightId)
       if (!flightResult.success) {
         console.error("[TICKET] flight delete error", flightResult.error)
-        showToast(resolveProtectedWriteError(flightResult.error || "N?o foi poss?vel excluir a passagem."), "error")
+        showToast(resolveProtectedWriteError(flightResult.error || "Não foi possível excluir a passagem."), "error")
         return
       }
 
@@ -7912,7 +7912,7 @@ export default function TripPage() {
         const documentResult = await deleteDocument(flight.document.id)
         if (!documentResult.success) {
           console.error("[TICKET] document delete error", documentResult.error)
-          showToast(resolveProtectedWriteError(documentResult.error || "A passagem foi removida, mas o documento vinculado n?o foi excluido."), "error")
+          showToast(resolveProtectedWriteError(documentResult.error || "A passagem foi removida, mas o documento vinculado não foi excluído."), "error")
           return
         }
       }
@@ -7926,7 +7926,7 @@ export default function TripPage() {
         : prev.documents,
     }))
 
-    showToast(storageWarning ? `Passagem excluida. Aviso do storage: ${storageWarning}` : "Passagem excluida com sucesso.", storageWarning ? "info" : "success")
+    showToast(storageWarning ? `Passagem excluída. Aviso do storage: ${storageWarning}` : "Passagem excluída com sucesso.", storageWarning ? "info" : "success")
   }
 
   const handleDeleteDocument = async (documentId: string) => {
@@ -7938,7 +7938,7 @@ export default function TripPage() {
 
     const document = (Array.isArray(tripData.documents) ? tripData.documents : []).find((entry: any) => entry.id === documentId)
     if (!document) {
-      showToast("Arquivo n?o ?ncontrado para exclusao.", "error")
+      showToast("Arquivo não encontrado para exclusão.", "error")
       return
     }
 
@@ -7958,7 +7958,7 @@ export default function TripPage() {
       })
       if (!deleteResult.ok) {
         console.error("[DOCUMENT] delete error", deleteResult.error)
-        showToast(resolveProtectedWriteError(deleteResult.error || "N?o foi poss?vel excluir o arquivo."), "error")
+        showToast(resolveProtectedWriteError(deleteResult.error || "Não foi possível excluir o arquivo."), "error")
         return
       }
     } else {
@@ -7966,7 +7966,7 @@ export default function TripPage() {
         const storageResult = await deleteDocumentFile(document.filePath)
         if (!storageResult.success) {
           console.error("[DOCUMENT] storage delete error", storageResult.error)
-          storageWarning = storageResult.error || "N?o foi poss?vel remover o arquivo do storage."
+          storageWarning = storageResult.error || "Não foi possível remover o arquivo do storage."
         }
       }
 
@@ -7974,7 +7974,7 @@ export default function TripPage() {
         const flightResult = await deleteTripFlight(linkedFlight.id)
         if (!flightResult.success) {
           console.error("[DOCUMENT] linked flight delete error", flightResult.error)
-          showToast(resolveProtectedWriteError(flightResult.error || "N?o foi poss?vel excluir a passagem vinculada."), "error")
+          showToast(resolveProtectedWriteError(flightResult.error || "Não foi possível excluir a passagem vinculada."), "error")
           return
         }
       }
@@ -7982,7 +7982,7 @@ export default function TripPage() {
       const documentResult = await deleteDocument(documentId)
       if (!documentResult.success) {
         console.error("[DOCUMENT] delete error", documentResult.error)
-        showToast(resolveProtectedWriteError(documentResult.error || "N?o foi poss?vel excluir o arquivo."), "error")
+        showToast(resolveProtectedWriteError(documentResult.error || "Não foi possível excluir o arquivo."), "error")
         return
       }
     }
@@ -7995,7 +7995,7 @@ export default function TripPage() {
         : prev.flights,
     }))
 
-    showToast(storageWarning ? `Arquivo excluido. Aviso do storage: ${storageWarning}` : "Arquivo excluido com sucesso.", storageWarning ? "info" : "success")
+    showToast(storageWarning ? `Arquivo excluído. Aviso do storage: ${storageWarning}` : "Arquivo excluído com sucesso.", storageWarning ? "info" : "success")
   }
 
   const handleUpdateTravelers = (travelers: { name: string; avatar?: string; role: string }[]) => {
@@ -8033,9 +8033,9 @@ export default function TripPage() {
           </div>
           <h1 className={cn("text-xl font-semibold", isTripLinkRoute ? "text-slate-950" : "text-white")}>{loadError}</h1>
           <p className={cn("mt-3 text-sm", isTripLinkRoute ? "text-slate-500" : "text-white/50")}>
-            {loadError === "Voc? n?o tem permiss?o para editar esta viagem."
-              ? "Entre com a conta propriet?ria da viagem para acessar o modo administrador."
-              : "Confira se o link est? correto ou pe?a um novo compartilhamento."}
+            {loadError === "Você não tem permissão para editar esta viagem."
+              ? "Entre com a conta proprietária da viagem para acessar o modo administrador."
+              : "Confira se o link está correto ou peça um novo compartilhamento."}
           </p>
         </div>
       </main>
@@ -8064,7 +8064,7 @@ export default function TripPage() {
               setCanWrite(false)
               const pendingAction = pendingSensitiveActionRef.current
               pendingSensitiveActionRef.current = null
-              setToast({ message: "Acesso r?pido liberado para esta viagem.", type: "success" })
+              setToast({ message: "Acesso rápido liberado para esta viagem.", type: "success" })
               pendingAction?.()
             }}
             onLogin={handleRequireAuthenticatedAdmin}
@@ -8235,12 +8235,12 @@ export default function TripPage() {
             <EditTripModal open={editTripOpen} onClose={() => setEditTripOpen(false)} tripData={tripData} onSave={handleUpdateTrip} />
             <TravelersModal open={travelersOpen} onClose={() => setTravelersOpen(false)} travelers={tripData.travelers} onUpdateTravelers={handleUpdateTravelers} />
             <TripSettingsModal open={tripSettingsOpen} onClose={() => setTripSettingsOpen(false)} tripData={tripData} onSave={handleSaveTripSettings} />
-            <TripSecurityModal open={securitySettingsOpen} onClose={() => setSecuritySettingsOpen(false)} tripId={tripData.id} tripTitle={tripData.destination} onSecurityUpdated={() => setToast({ message: "Seguran?a do dispositivo atualizada.", type: "success" })} />
+            <TripSecurityModal open={securitySettingsOpen} onClose={() => setSecuritySettingsOpen(false)} tripId={tripData.id} tripTitle={tripData.destination} onSecurityUpdated={() => setToast({ message: "Segurança do dispositivo atualizada.", type: "success" })} />
             {!isAgencyTrip ? <TravelerPublicCreditsModal open={creditsOpen} onClose={() => setCreditsOpen(false)} credits={travelerCredits} /> : null}
-            <Modal open={premiumGateModalOpen} onClose={() => setPremiumGateModalOpen(false)} title="DisponÃ­vel no Premium">
+            <Modal open={premiumGateModalOpen} onClose={() => setPremiumGateModalOpen(false)} title="Disponível no Premium">
               <div className="space-y-5">
                 <p className="text-sm text-white/60">
-                  Assine o Premium para gerar roteiros inteligentes, criar viagens ilimitadas e receber crÃ©ditos mensais inclusos.
+                  Assine o Premium para gerar roteiros inteligentes, criar viagens ilimitadas e receber créditos mensais inclusos.
                 </p>
                 <Button
                   className="w-full rounded-2xl border-0 bg-gradient-to-r from-[#5de0e6] to-[#004aad] text-white"
@@ -8436,12 +8436,12 @@ export default function TripPage() {
             <EditTripModal open={editTripOpen} onClose={() => setEditTripOpen(false)} tripData={tripData} onSave={handleUpdateTrip} />
             <TravelersModal open={travelersOpen} onClose={() => setTravelersOpen(false)} travelers={tripData.travelers} onUpdateTravelers={handleUpdateTravelers} />
             <TripSettingsModal open={tripSettingsOpen} onClose={() => setTripSettingsOpen(false)} tripData={tripData} onSave={handleSaveTripSettings} />
-            <TripSecurityModal open={securitySettingsOpen} onClose={() => setSecuritySettingsOpen(false)} tripId={tripData.id} tripTitle={tripData.destination} onSecurityUpdated={() => setToast({ message: "Seguran?a do dispositivo atualizada.", type: "success" })} />
+            <TripSecurityModal open={securitySettingsOpen} onClose={() => setSecuritySettingsOpen(false)} tripId={tripData.id} tripTitle={tripData.destination} onSecurityUpdated={() => setToast({ message: "Segurança do dispositivo atualizada.", type: "success" })} />
             {!isAgencyTrip ? <LinkCreditsSummaryModal open={creditsOpen} onClose={() => setCreditsOpen(false)} credits={travelerCredits} /> : null}
-            <Modal open={premiumGateModalOpen} onClose={() => setPremiumGateModalOpen(false)} title="Disponivel no Premium">
+            <Modal open={premiumGateModalOpen} onClose={() => setPremiumGateModalOpen(false)} title="Disponível no Premium">
               <div className="space-y-5">
                 <p className="text-sm text-slate-600">
-                  Assine o Premium para gerar roteiros inteligentes, criar viagens ilimitadas e receber cr?ditos mensais inclusos.
+                  Assine o Premium para gerar roteiros inteligentes, criar viagens ilimitadas e receber créditos mensais inclusos.
                 </p>
                 <Button
                   className="w-full rounded-2xl border-0 bg-gradient-to-r from-[#5de0e6] to-[#004aad] text-white"
@@ -8527,7 +8527,7 @@ export default function TripPage() {
               setSecurityModalOpen(false)
               const pendingAction = pendingSensitiveActionRef.current
               pendingSensitiveActionRef.current = null
-              setToast({ message: "Acesso r?pido liberado para a??es sens?veis.", type: "success" })
+              setToast({ message: "Acesso rápido liberado para ações sensíveis.", type: "success" })
               pendingAction?.()
             }}
             onLogin={handleRequireAuthenticatedAdmin}
@@ -8558,7 +8558,7 @@ export default function TripPage() {
           <EditTripModal open={editTripOpen} onClose={() => setEditTripOpen(false)} tripData={tripData} onSave={handleUpdateTrip} />
           <TravelersModal open={travelersOpen} onClose={() => setTravelersOpen(false)} travelers={tripData.travelers} onUpdateTravelers={handleUpdateTravelers} />
           <TripSettingsModal open={tripSettingsOpen} onClose={() => setTripSettingsOpen(false)} tripData={tripData} onSave={handleSaveTripSettings} />
-          <TripSecurityModal open={securitySettingsOpen} onClose={() => setSecuritySettingsOpen(false)} tripId={tripData.id} tripTitle={tripData.destination} onSecurityUpdated={() => setToast({ message: "Seguran?a do dispositivo atualizada.", type: "success" })} />
+          <TripSecurityModal open={securitySettingsOpen} onClose={() => setSecuritySettingsOpen(false)} tripId={tripData.id} tripTitle={tripData.destination} onSecurityUpdated={() => setToast({ message: "Segurança do dispositivo atualizada.", type: "success" })} />
           {!isAgencyTrip ? <LinkCreditsSummaryModal open={creditsOpen} onClose={() => setCreditsOpen(false)} credits={travelerCredits} /> : null}
           <Modal open={premiumGateModalOpen} onClose={() => setPremiumGateModalOpen(false)} title="Disponível no Premium">
             <div className="space-y-5">
