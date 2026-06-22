@@ -42,15 +42,31 @@ function safePrice(getter: () => string) {
   }
 }
 
+function logUnknownStripePriceId(params: {
+  eventType: string
+  billingScope: "traveler" | "agency"
+  priceId: string | null | undefined
+  subscriptionId?: string | null
+  customerId?: string | null
+}) {
+  console.error("[stripe-webhook] price_id desconhecido", {
+    eventType: params.eventType,
+    billingScope: params.billingScope,
+    priceId: params.priceId ?? null,
+    subscriptionId: params.subscriptionId ?? null,
+    customerId: params.customerId ?? null,
+  })
+}
+
 function resolveTravelerPlanFromPriceId(priceId: string | null | undefined) {
-  return priceId === safePrice(getStripePriceIdForTravelerPremium) ? "premium" : "free"
+  return priceId === safePrice(getStripePriceIdForTravelerPremium) ? "premium" : null
 }
 
 function resolveAgencyPlanFromPriceId(priceId: string | null | undefined) {
   if (priceId === safePrice(() => getStripePriceIdForAgencyPlan("start"))) return "start" as const
   if (priceId === safePrice(() => getStripePriceIdForAgencyPlan("pro"))) return "pro" as const
   if (priceId === safePrice(() => getStripePriceIdForAgencyPlan("business"))) return "business" as const
-  return "free" as const
+  return null
 }
 
 function getMetadataValue(metadata: Record<string, string> | null | undefined, key: string) {
@@ -113,9 +129,21 @@ async function upsertTravelerSubscriptionFromStripeObject(subscription: Stripe.S
     return { error: "N?o foi poss?vel identificar o traveler desta assinatura Stripe." }
   }
 
+  const resolvedPlanCode = resolveTravelerPlanFromPriceId(priceId)
+  if (!resolvedPlanCode) {
+    logUnknownStripePriceId({
+      eventType: "customer.subscription",
+      billingScope: "traveler",
+      priceId,
+      subscriptionId: subscription.id,
+      customerId: typeof subscription.customer === "string" ? subscription.customer : null,
+    })
+    return { error: "Price ID da assinatura traveler n?o reconhecido." }
+  }
+
   const result = await upsertTravelerSubscriptionFromStripe(adminClient, {
     userId,
-    planCode: resolveTravelerPlanFromPriceId(priceId),
+    planCode: resolvedPlanCode,
     status: mapStripeSubscriptionStatus(subscription.status),
     stripeCustomerId: typeof subscription.customer === "string" ? subscription.customer : null,
     stripeSubscriptionId: subscription.id,
@@ -156,9 +184,21 @@ async function upsertAgencySubscriptionFromStripeObject(subscription: Stripe.Sub
     return { error: "N?o foi poss?vel identificar a ag?ncia desta assinatura Stripe." }
   }
 
+  const resolvedPlanCode = resolveAgencyPlanFromPriceId(priceId)
+  if (!resolvedPlanCode) {
+    logUnknownStripePriceId({
+      eventType: "customer.subscription",
+      billingScope: "agency",
+      priceId,
+      subscriptionId: subscription.id,
+      customerId: typeof subscription.customer === "string" ? subscription.customer : null,
+    })
+    return { error: "Price ID da assinatura da ag?ncia n?o reconhecido." }
+  }
+
   const result = await updateAgencySubscriptionFromStripe(adminClient, {
     agencyId,
-    planCode: resolveAgencyPlanFromPriceId(priceId),
+    planCode: resolvedPlanCode,
     status: mapStripeSubscriptionStatus(subscription.status),
     stripeCustomerId: typeof subscription.customer === "string" ? subscription.customer : null,
     stripeSubscriptionId: subscription.id,
@@ -318,8 +358,15 @@ async function handleTravelerInvoicePaid(invoice: Stripe.Invoice, subscription: 
 
   const priceId = subscription.items.data[0]?.price?.id ?? null
   const planCode = resolveTravelerPlanFromPriceId(priceId)
-  if (planCode !== "premium") {
-    return null
+  if (!planCode) {
+    logUnknownStripePriceId({
+      eventType: "invoice.paid",
+      billingScope: "traveler",
+      priceId,
+      subscriptionId: subscription.id,
+      customerId: typeof subscription.customer === "string" ? subscription.customer : null,
+    })
+    return "Price ID da assinatura traveler n?o reconhecido para conceder cr?ditos mensais."
   }
 
   const adminClient = createSupabaseAdminClient()
@@ -349,7 +396,14 @@ async function handleAgencyInvoicePaid(invoice: Stripe.Invoice, subscription: St
 
   const priceId = subscription.items.data[0]?.price?.id ?? null
   const planCode = resolveAgencyPlanFromPriceId(priceId)
-  if (planCode === "free") {
+  if (!planCode) {
+    logUnknownStripePriceId({
+      eventType: "invoice.paid",
+      billingScope: "agency",
+      priceId,
+      subscriptionId: subscription.id,
+      customerId: typeof subscription.customer === "string" ? subscription.customer : null,
+    })
     return "Price ID da assinatura da agência não reconhecido para conceder créditos mensais."
   }
 
