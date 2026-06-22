@@ -1,5 +1,6 @@
 type DestinationProfile = {
-  matches: string[]
+  locationAliases: string[]
+  countryAliases: string[]
   image: string
   country: string
   language: string
@@ -10,7 +11,8 @@ type DestinationProfile = {
 
 const destinationCoverMap: DestinationProfile[] = [
   {
-    matches: ["new york", "nova york", "orlando", "eua", "usa", "estados unidos"],
+    locationAliases: ["new york", "nova york"],
+    countryAliases: ["estados unidos", "usa", "eua", "united states", "united states of america"],
     image: "https://images.unsplash.com/photo-1496442226666-8d4d0e62e6e9?w=1920&q=80",
     country: "Estados Unidos",
     language: "Ingles",
@@ -19,7 +21,18 @@ const destinationCoverMap: DestinationProfile[] = [
     emergency: "911",
   },
   {
-    matches: ["paris", "franca", "france"],
+    locationAliases: ["orlando"],
+    countryAliases: ["estados unidos", "usa", "eua", "united states", "united states of america"],
+    image: "https://images.unsplash.com/photo-1514214246283-d427a95c5d2f?w=1920&q=80",
+    country: "Estados Unidos",
+    language: "Ingles",
+    timezone: "America/New_York",
+    currency: { name: "Dolar americano", symbol: "USD", rate: "Nao informado" },
+    emergency: "911",
+  },
+  {
+    locationAliases: ["paris"],
+    countryAliases: ["franca", "france"],
     image: "https://images.unsplash.com/photo-1502602898657-3e91760cbb34?w=1920&q=80",
     country: "Franca",
     language: "Frances",
@@ -28,7 +41,8 @@ const destinationCoverMap: DestinationProfile[] = [
     emergency: "112",
   },
   {
-    matches: ["roma", "rome", "italia", "italy"],
+    locationAliases: ["roma", "rome"],
+    countryAliases: ["italia", "italy"],
     image: "https://images.unsplash.com/photo-1552832230-c0197dd311b5?w=1920&q=80",
     country: "Italia",
     language: "Italiano",
@@ -37,7 +51,8 @@ const destinationCoverMap: DestinationProfile[] = [
     emergency: "112",
   },
   {
-    matches: ["tokyo", "toquio", "tóquio", "japao", "japan"],
+    locationAliases: ["tokyo", "toquio"],
+    countryAliases: ["japao", "japan"],
     image: "https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?w=1920&q=80",
     country: "Japao",
     language: "Japones",
@@ -46,7 +61,8 @@ const destinationCoverMap: DestinationProfile[] = [
     emergency: "110 / 119",
   },
   {
-    matches: ["bali"],
+    locationAliases: ["bali"],
+    countryAliases: ["indonesia"],
     image: "https://images.unsplash.com/photo-1537996194471-e657df975ab4?w=1920&q=80",
     country: "Indonesia",
     language: "Indonesio",
@@ -55,7 +71,8 @@ const destinationCoverMap: DestinationProfile[] = [
     emergency: "112",
   },
   {
-    matches: ["dubai", "emirados arabes", "emirados", "uae", "united arab emirates"],
+    locationAliases: ["dubai"],
+    countryAliases: ["emirados arabes", "emirados", "uae", "united arab emirates", "emirados arabes unidos"],
     image: "https://images.unsplash.com/photo-1512453979798-5ea266f8880c?w=1920&q=80",
     country: "Emirados Arabes Unidos",
     language: "Arabe",
@@ -64,7 +81,8 @@ const destinationCoverMap: DestinationProfile[] = [
     emergency: "999 / 998",
   },
   {
-    matches: ["londres", "london"],
+    locationAliases: ["londres", "london"],
+    countryAliases: ["reino unido", "united kingdom", "inglaterra", "england", "uk"],
     image: "https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?w=1920&q=80",
     country: "Reino Unido",
     language: "Ingles",
@@ -73,7 +91,8 @@ const destinationCoverMap: DestinationProfile[] = [
     emergency: "999",
   },
   {
-    matches: ["gramado"],
+    locationAliases: ["gramado"],
+    countryAliases: ["brasil", "brazil"],
     image: "https://images.unsplash.com/photo-1516483638261-f4dbaf036963?w=1920&q=80",
     country: "Brasil",
     language: "Portugues",
@@ -82,7 +101,8 @@ const destinationCoverMap: DestinationProfile[] = [
     emergency: "190 / 192 / 193",
   },
   {
-    matches: ["cancun", "cancún"],
+    locationAliases: ["cancun"],
+    countryAliases: ["mexico"],
     image: "https://images.unsplash.com/photo-1552074284-5e88ef1aef18?w=1920&q=80",
     country: "Mexico",
     language: "Espanhol",
@@ -91,7 +111,8 @@ const destinationCoverMap: DestinationProfile[] = [
     emergency: "911",
   },
   {
-    matches: ["lisboa", "lisbon", "portugal"],
+    locationAliases: ["lisboa", "lisbon"],
+    countryAliases: ["portugal"],
     image: "https://images.unsplash.com/photo-1585208798174-6cedd86e019a?w=1920&q=80",
     country: "Portugal",
     language: "Portugues",
@@ -100,13 +121,75 @@ const destinationCoverMap: DestinationProfile[] = [
     emergency: "112",
   },
   {
-    matches: ["buenos aires"],
+    locationAliases: ["buenos aires"],
+    countryAliases: ["argentina"],
     image: "https://images.unsplash.com/photo-1589909202802-8f4aadce1849?w=1920&q=80",
     country: "Argentina",
     language: "Espanhol",
     timezone: "America/Argentina/Buenos_Aires",
     currency: { name: "Peso argentino", symbol: "ARS", rate: "Nao informado" },
     emergency: "911",
+  },
+  {
+    locationAliases: ["cusco", "cuzco"],
+    countryAliases: ["peru"],
+    image: "https://images.unsplash.com/photo-1526392060635-9d6019884377?w=1920&q=80",
+    country: "Peru",
+    language: "Espanhol",
+    timezone: "America/Lima",
+    currency: { name: "Sol peruano", symbol: "PEN", rate: "Nao informado" },
+    emergency: "105 / 116",
+  },
+]
+
+const countryCoverMap: Array<{ aliases: string[]; image: string }> = [
+  {
+    aliases: ["estados unidos", "usa", "eua", "united states", "united states of america"],
+    image: "https://images.unsplash.com/photo-1501594907352-04cda38ebc29?w=1920&q=80",
+  },
+  {
+    aliases: ["franca", "france"],
+    image: "https://images.unsplash.com/photo-1502602898657-3e91760cbb34?w=1920&q=80",
+  },
+  {
+    aliases: ["italia", "italy"],
+    image: "https://images.unsplash.com/photo-1525874684015-58379d421a52?w=1920&q=80",
+  },
+  {
+    aliases: ["brasil", "brazil"],
+    image: "https://images.unsplash.com/photo-1483729558449-99ef09a8c325?w=1920&q=80",
+  },
+  {
+    aliases: ["mexico"],
+    image: "https://images.unsplash.com/photo-1512813195386-6cf811ad3542?w=1920&q=80",
+  },
+  {
+    aliases: ["peru"],
+    image: "https://images.unsplash.com/photo-1526392060635-9d6019884377?w=1920&q=80",
+  },
+  {
+    aliases: ["argentina"],
+    image: "https://images.unsplash.com/photo-1518638150340-f706e86654de?w=1920&q=80",
+  },
+  {
+    aliases: ["portugal"],
+    image: "https://images.unsplash.com/photo-1513735492246-483525079686?w=1920&q=80",
+  },
+  {
+    aliases: ["japao", "japan"],
+    image: "https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?w=1920&q=80",
+  },
+  {
+    aliases: ["reino unido", "united kingdom", "inglaterra", "england", "uk"],
+    image: "https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?w=1920&q=80",
+  },
+  {
+    aliases: ["emirados arabes", "emirados", "uae", "united arab emirates", "emirados arabes unidos"],
+    image: "https://images.unsplash.com/photo-1512453979798-5ea266f8880c?w=1920&q=80",
+  },
+  {
+    aliases: ["indonesia"],
+    image: "https://images.unsplash.com/photo-1537996194471-e657df975ab4?w=1920&q=80",
   },
 ]
 
@@ -119,6 +202,7 @@ function normalizeText(value?: string | null) {
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
+    .trim()
 }
 
 export function normalizeImageUrl(value?: string | null) {
@@ -135,46 +219,79 @@ export function normalizeImageUrl(value?: string | null) {
   return normalized
 }
 
+function extractNormalizedParts(value?: string | null) {
+  const raw = (value ?? "").trim()
+  if (!raw) return []
+
+  const parts = raw
+    .split(",")
+    .map((part) => normalizeText(part))
+    .filter(Boolean)
+
+  const direct = normalizeText(raw)
+  return Array.from(new Set([direct, ...parts]))
+}
+
+function buildLocationCandidates(destination?: string | null, city?: string | null) {
+  return Array.from(new Set([...extractNormalizedParts(city), ...extractNormalizedParts(destination)]))
+}
+
+function buildCountryCandidates(destination?: string | null, country?: string | null) {
+  const explicitCountry = extractNormalizedParts(country)
+  const destinationParts = extractNormalizedParts(destination)
+  const destinationTail = destinationParts.length > 1 ? destinationParts[destinationParts.length - 1] : null
+
+  return Array.from(new Set([...explicitCountry, ...(destinationTail ? [destinationTail] : [])]))
+}
+
+function locationAliasMatches(entry: DestinationProfile, locationCandidates: string[]) {
+  return locationCandidates.some((candidate) => entry.locationAliases.some((alias) => normalizeText(alias) === candidate))
+}
+
+function countryAliasMatches(countryAliases: string[], countryCandidates: string[]) {
+  return countryCandidates.some((candidate) => countryAliases.some((alias) => normalizeText(alias) === candidate))
+}
+
 function resolveDestinationEntry(destination?: string | null, city?: string | null, country?: string | null) {
-  const target = `${normalizeText(destination)} ${normalizeText(city)} ${normalizeText(country)}`.trim()
-  return destinationCoverMap.find((entry) => entry.matches.some((match) => target.includes(normalizeText(match)))) ?? null
-}
-
-function resolveDestinationCoverEntry(destination?: string | null, city?: string | null) {
-  const destinationTarget = normalizeText(destination)
-  const cityTarget = normalizeText(city)
-
-  if (cityTarget) {
-    const cityMatch = destinationCoverMap.find((entry) =>
-      entry.matches.some((match) => normalizeText(match) === cityTarget)
-    )
-    if (cityMatch) return cityMatch
-  }
-
-  if (destinationTarget) {
-    const exactDestinationMatch = destinationCoverMap.find((entry) =>
-      entry.matches.some((match) => normalizeText(match) === destinationTarget)
-    )
-    if (exactDestinationMatch) return exactDestinationMatch
-
-    const containedDestinationMatch = destinationCoverMap.find((entry) =>
-      entry.matches.some((match) => destinationTarget.includes(normalizeText(match)))
-    )
-    if (containedDestinationMatch) return containedDestinationMatch
-  }
-
-  return null
-}
-
-function resolveCountryEntry(country?: string | null) {
-  const normalizedCountry = normalizeText(country)
-  if (!normalizedCountry) return null
+  const locationCandidates = buildLocationCandidates(destination, city)
+  const countryCandidates = buildCountryCandidates(destination, country)
 
   return (
-    destinationCoverMap.find((entry) => normalizeText(entry.country) === normalizedCountry) ??
-    destinationCoverMap.find((entry) => entry.matches.some((match) => normalizeText(match) === normalizedCountry)) ??
-    null
+    destinationCoverMap.find((entry) => {
+      const locationMatch = locationAliasMatches(entry, locationCandidates)
+      const countryMatch = countryCandidates.length === 0 || countryAliasMatches(entry.countryAliases, countryCandidates)
+      return locationMatch && countryMatch
+    }) ?? null
   )
+}
+
+function resolveDestinationCoverEntry(destination?: string | null, city?: string | null, country?: string | null) {
+  const locationCandidates = buildLocationCandidates(destination, city)
+  const countryCandidates = buildCountryCandidates(destination, country)
+
+  if (countryCandidates.length > 0) {
+    return (
+      destinationCoverMap.find(
+        (entry) => locationAliasMatches(entry, locationCandidates) && countryAliasMatches(entry.countryAliases, countryCandidates)
+      ) ?? null
+    )
+  }
+
+  return destinationCoverMap.find((entry) => locationAliasMatches(entry, locationCandidates)) ?? null
+}
+
+function resolveCountryEntry(country?: string | null, destination?: string | null) {
+  const countryCandidates = buildCountryCandidates(destination, country)
+  if (countryCandidates.length === 0) return null
+
+  return countryCoverMap.find((entry) => countryAliasMatches(entry.aliases, countryCandidates)) ?? null
+}
+
+function resolveCountryMetadataEntry(country?: string | null, destination?: string | null) {
+  const countryCandidates = buildCountryCandidates(destination, country)
+  if (countryCandidates.length === 0) return null
+
+  return destinationCoverMap.find((entry) => countryAliasMatches(entry.countryAliases, countryCandidates)) ?? null
 }
 
 function buildEmbassyFallback(country?: string | null) {
@@ -188,7 +305,7 @@ function buildEmbassyFallback(country?: string | null) {
 }
 
 export function getDestinationCoverImage(destination?: string | null, city?: string | null, country?: string | null) {
-  return resolveDestinationCoverEntry(destination, city)?.image ?? resolveCountryEntry(country)?.image ?? neutralCover
+  return resolveDestinationCoverEntry(destination, city, country)?.image ?? resolveCountryEntry(country, destination)?.image ?? neutralCover
 }
 
 export function resolveTripHeroImage(params: {
@@ -210,7 +327,7 @@ export function resolveAgencyBrandLogo(...candidates: Array<string | null | unde
 }
 
 export function getDestinationMetadata(destination?: string | null, country?: string | null, city?: string | null) {
-  const entry = resolveDestinationEntry(destination, city, country) ?? resolveCountryEntry(country)
+  const entry = resolveDestinationEntry(destination, city, country) ?? resolveCountryMetadataEntry(country, destination)
 
   const resolvedCountry = country?.trim() || entry?.country || "Nao informado"
 

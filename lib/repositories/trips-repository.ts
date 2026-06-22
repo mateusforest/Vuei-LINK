@@ -251,6 +251,12 @@ async function resolveServerDestinationCoverImage(params: {
   destination?: string | null
   city?: string | null
   country?: string | null
+  tripId?: string | null
+  tripSlug?: string | null
+  adminToken?: string | null
+  publicToken?: string | null
+  accessMode?: "admin" | "public"
+  persist?: boolean
 }) {
   if (typeof window === "undefined") return null
   if (!(params.destination || params.city || params.country)) return null
@@ -259,6 +265,12 @@ async function resolveServerDestinationCoverImage(params: {
   if (params.destination) searchParams.set("destination", params.destination)
   if (params.city) searchParams.set("city", params.city)
   if (params.country) searchParams.set("country", params.country)
+  if (params.tripId) searchParams.set("tripId", params.tripId)
+  if (params.tripSlug) searchParams.set("tripSlug", params.tripSlug)
+  if (params.adminToken) searchParams.set("adminToken", params.adminToken)
+  if (params.publicToken) searchParams.set("publicToken", params.publicToken)
+  if (params.accessMode) searchParams.set("accessMode", params.accessMode)
+  if (params.persist) searchParams.set("persist", "1")
 
   try {
     const response = await fetch(`/api/destination-image?${searchParams.toString()}`, {
@@ -383,7 +395,21 @@ export async function getTripBySlug(slug: string) {
     try {
       const { data, error } = await supabase.from("trips").select("*").eq("slug", slug).maybeSingle()
       if (!error && data) {
-        const mappedTrip = mapTripRowToTrip(data)
+        const hydratedCoverImage =
+          data.cover_image ||
+          (await resolveServerDestinationCoverImage({
+            destination: data.destination,
+            city: data.city,
+            country: data.country,
+            tripId: data.id,
+            tripSlug: data.slug,
+            accessMode: "public",
+            persist: true,
+          }))
+        const mappedTrip = mapTripRowToTrip({
+          ...data,
+          cover_image: hydratedCoverImage ?? data.cover_image,
+        })
         return {
           source: "supabase" as const,
           config: createSupabaseBrowserClientPlaceholder(),
@@ -422,7 +448,22 @@ export async function getTripByAdminToken(token: string) {
     try {
       const { data, error } = await supabase.from("trips").select("*").eq("admin_token", token).maybeSingle()
       if (!error && data) {
-        const mappedTrip = mapTripRowToTrip(data)
+        const hydratedCoverImage =
+          data.cover_image ||
+          (await resolveServerDestinationCoverImage({
+            destination: data.destination,
+            city: data.city,
+            country: data.country,
+            tripId: data.id,
+            tripSlug: data.slug,
+            adminToken: token,
+            accessMode: "admin",
+            persist: true,
+          }))
+        const mappedTrip = mapTripRowToTrip({
+          ...data,
+          cover_image: hydratedCoverImage ?? data.cover_image,
+        })
         return {
           source: "supabase" as const,
           config: createSupabaseBrowserClientPlaceholder(),
@@ -458,7 +499,22 @@ export async function getTripByPublicToken(token: string) {
     try {
       const { data, error } = await supabase.from("trips").select("*").eq("public_token", token).maybeSingle()
       if (!error && data) {
-        const mappedTrip = mapTripRowToTrip(data)
+        const hydratedCoverImage =
+          data.cover_image ||
+          (await resolveServerDestinationCoverImage({
+            destination: data.destination,
+            city: data.city,
+            country: data.country,
+            tripId: data.id,
+            tripSlug: data.slug,
+            publicToken: token,
+            accessMode: "public",
+            persist: true,
+          }))
+        const mappedTrip = mapTripRowToTrip({
+          ...data,
+          cover_image: hydratedCoverImage ?? data.cover_image,
+        })
         return {
           source: "supabase" as const,
           config: createSupabaseBrowserClientPlaceholder(),

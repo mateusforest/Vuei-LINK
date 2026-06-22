@@ -8,9 +8,12 @@ type ResolveDestinationImageParams = {
   country?: string | null
 }
 
+type ResolveStrategy = "city_country" | "country" | "fallback"
+
 type ResolvedDestinationImage = {
   imageUrl: string | null
   source: "wikimedia" | "unsplash" | "fallback"
+  strategy: ResolveStrategy
 }
 
 type WikidataSearchResponse = {
@@ -65,16 +68,42 @@ function normalizeText(value?: string | null) {
     .trim()
 }
 
-function buildLocationQuery(params: ResolveDestinationImageParams) {
-  const city = params.city?.trim() || ""
-  const country = params.country?.trim() || ""
-  const destination = params.destination?.trim() || ""
+function extractDestinationSegments(value?: string | null) {
+  const raw = (value ?? "").trim()
+  if (!raw) return []
 
-  if (city && country) return `${city}, ${country}`
-  if (destination && country && !normalizeText(destination).includes(normalizeText(country))) {
-    return `${destination}, ${country}`
-  }
-  return destination || city || country
+  return raw
+    .split(",")
+    .map((part) => part.trim())
+    .filter(Boolean)
+}
+
+function buildPrimaryLocationLabel(params: ResolveDestinationImageParams) {
+  const city = params.city?.trim()
+  if (city) return city
+
+  const destinationSegments = extractDestinationSegments(params.destination)
+  return destinationSegments[0] ?? params.destination?.trim() ?? null
+}
+
+function buildCountryLabel(params: ResolveDestinationImageParams) {
+  const country = params.country?.trim()
+  if (country) return country
+
+  const destinationSegments = extractDestinationSegments(params.destination)
+  return destinationSegments.length > 1 ? destinationSegments[destinationSegments.length - 1] : null
+}
+
+function buildPrimaryQuery(params: ResolveDestinationImageParams) {
+  const location = buildPrimaryLocationLabel(params)
+  const country = buildCountryLabel(params)
+
+  if (location && country) return `${location}, ${country}`
+  return location || country || params.destination?.trim() || null
+}
+
+function buildCountryQuery(params: ResolveDestinationImageParams) {
+  return buildCountryLabel(params)
 }
 
 function buildCacheKey(params: ResolveDestinationImageParams) {
@@ -118,7 +147,11 @@ function buildCommonsImageUrl(fileName: string) {
   return `https://commons.wikimedia.org/wiki/Special:FilePath/${encodeURIComponent(fileName)}?width=1600`
 }
 
-function scoreWikidataCandidate(candidate: NonNullable<WikidataSearchResponse["search"]>[number], query: string, country?: string | null) {
+function scoreWikidataCandidate(
+  candidate: NonNullable<WikidataSearchResponse["search"]>[number],
+  query: string,
+  country?: string | null
+) {
   const haystack = [candidate.label, candidate.description, candidate.match?.text].map(normalizeText).join(" ")
   let score = 0
 
@@ -137,8 +170,7 @@ function scoreWikidataCandidate(candidate: NonNullable<WikidataSearchResponse["s
   return score
 }
 
-async function searchWikidataEntity(params: ResolveDestinationImageParams) {
-  const query = buildLocationQuery(params)
+async function searchWikidataEntity(query: string, country?: string | null) {
   if (!query) return null
 
   const searchUrl = new URL(WIKIDATA_API_URL)
@@ -163,7 +195,7 @@ async function searchWikidataEntity(params: ResolveDestinationImageParams) {
   const candidates = (searchPayload.search ?? [])
     .map((candidate) => ({
       candidate,
-      score: scoreWikidataCandidate(candidate, query, params.country),
+      score: scoreWikidataCandidate(candidate, query, country),
     }))
     .filter((entry) => typeof entry.candidate.id === "string" && entry.score > 0)
     .sort((left, right) => right.score - left.score)
@@ -171,8 +203,8 @@ async function searchWikidataEntity(params: ResolveDestinationImageParams) {
   return candidates[0]?.candidate?.id ?? null
 }
 
-async function resolveWikimediaImage(params: ResolveDestinationImageParams) {
-  const entityId = await searchWikidataEntity(params)
+async function resolveWikimediaImage(query: string, country?: string | null) {
+  const entityId = await searchWikidataEntity(query, country)
   if (!entityId) return null
 
   const entityUrl = `https://www.wikidata.org/wiki/Special:EntityData/${entityId}.json`
@@ -193,12 +225,9 @@ async function resolveWikimediaImage(params: ResolveDestinationImageParams) {
   return buildCommonsImageUrl(fileName)
 }
 
-async function resolveUnsplashImage(params: ResolveDestinationImageParams) {
+async function resolveUnsplashImage(query: string) {
   const accessKey = process.env.UNSPLASH_ACCESS_KEY || process.env.UNSPLASH_ACCESS_KEY_VUEI || null
-  if (!accessKey) return null
-
-  const query = buildLocationQuery(params)
-  if (!query) return null
+  if (!accessKey || !query) return null
 
   const searchUrl = new URL(UNSPLASH_API_URL)
   searchUrl.searchParams.set("query", query)
@@ -221,6 +250,30 @@ async function resolveUnsplashImage(params: ResolveDestinationImageParams) {
   return normalizeImageUrl(imageUrl)
 }
 
+async function resolveWithQuery(query: string | null, country: string | null | undefined, strategy: ResolveStrategy) {
+  if (!query) return null
+
+  const wikimediaImage = await resolveWikimediaImage(query, country)
+  if (wikimediaImage) {
+    return {
+      imageUrl: wikimediaImage,
+      source: "wikimedia" as const,
+      strategy,
+    }
+  }
+
+  const unsplashImage = await resolveUnsplashImage(query)
+  if (unsplashImage) {
+    return {
+      imageUrl: unsplashImage,
+      source: "unsplash" as const,
+      strategy,
+    }
+  }
+
+  return null
+}
+
 export async function resolveDestinationImage(params: ResolveDestinationImageParams): Promise<ResolvedDestinationImage> {
   const cacheKey = buildCacheKey(params)
   if (cacheKey) {
@@ -228,21 +281,25 @@ export async function resolveDestinationImage(params: ResolveDestinationImagePar
     if (cached) return cached
   }
 
-  const wikimediaImage = await resolveWikimediaImage(params)
-  if (wikimediaImage) {
-    const result = { imageUrl: wikimediaImage, source: "wikimedia" as const }
-    if (cacheKey) setCachedResult(cacheKey, result)
-    return result
+  const resolvedCountry = buildCountryLabel(params)
+  const primaryQuery = buildPrimaryQuery(params)
+  const countryQuery = buildCountryQuery(params)
+
+  const primaryResult = await resolveWithQuery(primaryQuery, resolvedCountry, "city_country")
+  if (primaryResult) {
+    if (cacheKey) setCachedResult(cacheKey, primaryResult)
+    return primaryResult
   }
 
-  const unsplashImage = await resolveUnsplashImage(params)
-  if (unsplashImage) {
-    const result = { imageUrl: unsplashImage, source: "unsplash" as const }
-    if (cacheKey) setCachedResult(cacheKey, result)
-    return result
+  if (countryQuery && normalizeText(countryQuery) !== normalizeText(primaryQuery)) {
+    const countryResult = await resolveWithQuery(countryQuery, resolvedCountry, "country")
+    if (countryResult) {
+      if (cacheKey) setCachedResult(cacheKey, countryResult)
+      return countryResult
+    }
   }
 
-  const fallback = { imageUrl: DEFAULT_TRIP_HERO_IMAGE, source: "fallback" as const }
+  const fallback = { imageUrl: DEFAULT_TRIP_HERO_IMAGE, source: "fallback" as const, strategy: "fallback" as const }
   if (cacheKey) setCachedResult(cacheKey, fallback)
   return fallback
 }

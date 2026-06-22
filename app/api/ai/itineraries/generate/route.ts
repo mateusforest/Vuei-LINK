@@ -7,7 +7,8 @@ import { requestItineraryGeneration } from "@/lib/ai/itinerary-generation"
 import { buildTripItineraryPdf } from "@/lib/ai/itinerary-pdf"
 import { getCompleteItineraryCreditCost, getSimpleItineraryCreditCost, estimateCostUsd } from "@/lib/ai/credit-consumption"
 import { createAiUsageLog } from "@/lib/ai/usage-logs"
-import { getDestinationCoverImage, getDestinationMetadata } from "@/lib/trip-destination"
+import { getDestinationMetadata, normalizeImageUrl } from "@/lib/trip-destination"
+import { resolveDestinationImage } from "@/lib/destination-image-resolver"
 import type { Document } from "@/types/document"
 import type { TripItineraryRecord, TripItineraryContent } from "@/types/itinerary"
 import { consumeTravelerCredits, getTravelerCreditBalance } from "@/lib/billing/traveler-billing"
@@ -474,7 +475,37 @@ export async function POST(request: Request) {
     const branding = (agencyResult.data?.branding ?? {}) as Record<string, unknown>
     const agencySettings = (agencyResult.data?.settings ?? {}) as Record<string, unknown>
     const destinationMetadata = getDestinationMetadata(accessResult.trip.destination, accessResult.trip.country, accessResult.trip.city)
-    const heroImage = accessResult.trip.cover_image || getDestinationCoverImage(accessResult.trip.destination, accessResult.trip.city, accessResult.trip.country)
+    let heroImage = normalizeImageUrl(accessResult.trip.cover_image)
+
+    if (!heroImage) {
+      const resolvedImage = await resolveDestinationImage({
+        destination: accessResult.trip.destination,
+        city: accessResult.trip.city,
+        country: accessResult.trip.country,
+      })
+
+      heroImage = normalizeImageUrl(resolvedImage.imageUrl)
+
+      if (heroImage && resolvedImage.source !== "fallback" && hasSupabaseAdminEnv()) {
+        const adminClient = createSupabaseAdminClient()
+        await adminClient
+          .from("trips")
+          .update({
+            cover_image: heroImage,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", accessResult.trip.id)
+          .is("cover_image", null)
+
+        console.info("[ITINERARY PDF] trip hero image resolved", {
+          tripId: accessResult.trip.id,
+          destination: accessResult.trip.destination,
+          country: accessResult.trip.country,
+          strategy: resolvedImage.strategy,
+        })
+      }
+    }
+
     const usefulInfo = [
       accessResult.trip.country ? `Pais: ${accessResult.trip.country}` : null,
       accessResult.trip.city ? `Cidade base: ${accessResult.trip.city}` : null,
