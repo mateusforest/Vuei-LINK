@@ -27,10 +27,12 @@ export interface TripHotelRecord {
   id: string
   tripId: string
   name: string
+  hotelName: string | null
   address: string | null
   checkIn: string | null
   checkOut: string | null
   confirmationCode: string | null
+  confirmationNumber: string | null
   notes: string | null
   documentId: string | null
   createdAt: string
@@ -45,11 +47,13 @@ function mapRow(row: TripHotelRow): TripHotelRecord {
   return {
     id: row.id,
     tripId: row.trip_id,
-    name: row.name ?? row.hotel_name ?? "",
+    name: row.hotel_name ?? row.name ?? "",
+    hotelName: row.hotel_name ?? null,
     address: row.address ?? null,
     checkIn: row.check_in ?? null,
     checkOut: row.check_out ?? null,
-    confirmationCode: row.confirmation_code ?? row.confirmation_number ?? null,
+    confirmationCode: row.confirmation_number ?? row.confirmation_code ?? null,
+    confirmationNumber: row.confirmation_number ?? null,
     notes: row.notes ?? null,
     documentId: row.document_id ?? null,
     createdAt: row.created_at,

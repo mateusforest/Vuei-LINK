@@ -338,6 +338,117 @@ function formatTripDate(dateString?: string) {
   })
 }
 
+function sanitizeHotelText(value: unknown) {
+  if (typeof value !== "string") return null
+
+  const normalized = value.replace(/\s+/g, " ").trim()
+  if (!normalized) return null
+
+  const lowered = normalized.toLowerCase()
+  if (["undefined", "null", "invalid date", "we", "nan"].includes(lowered)) {
+    return null
+  }
+
+  return normalized
+}
+
+function parseHotelDateValue(value?: string | null) {
+  const normalized = sanitizeHotelText(value)
+  if (!normalized) return null
+
+  const parsed = normalized.includes("T") ? new Date(normalized) : new Date(`${normalized}T12:00:00`)
+  if (Number.isNaN(parsed.getTime())) return null
+
+  return parsed
+}
+
+function formatHotelDate(value?: string | null) {
+  const parsed = parseHotelDateValue(value)
+  if (!parsed) return null
+
+  return parsed.toLocaleDateString("pt-BR", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  })
+}
+
+function resolveHotelDisplayName(hotel: any) {
+  return (
+    sanitizeHotelText(hotel?.hotelName) ||
+    sanitizeHotelText(hotel?.hotel_name) ||
+    sanitizeHotelText(hotel?.name) ||
+    "Hospedagem cadastrada"
+  )
+}
+
+function resolveHotelLocation(hotel: any) {
+  const parts = [
+    sanitizeHotelText(hotel?.address),
+    sanitizeHotelText(hotel?.city),
+    sanitizeHotelText(hotel?.country),
+  ].filter(Boolean)
+
+  return parts.length > 0 ? parts.join(", ") : null
+}
+
+function resolveHotelReservationCode(hotel: any) {
+  return (
+    sanitizeHotelText(hotel?.reservationCode) ||
+    sanitizeHotelText(hotel?.reservation_code) ||
+    sanitizeHotelText(hotel?.confirmationNumber) ||
+    sanitizeHotelText(hotel?.confirmation_number) ||
+    sanitizeHotelText(hotel?.confirmationCode) ||
+    sanitizeHotelText(hotel?.confirmation_code) ||
+    null
+  )
+}
+
+function calculateHotelNights(hotel: any) {
+  const checkIn = parseHotelDateValue(hotel?.checkIn ?? hotel?.check_in)
+  const checkOut = parseHotelDateValue(hotel?.checkOut ?? hotel?.check_out)
+  if (!checkIn || !checkOut) return 0
+
+  return Math.max(Math.round((checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24)), 0)
+}
+
+function sortHotelsForDisplay(hotels: any[]) {
+  return [...hotels].sort((left, right) => {
+    const leftDate = parseHotelDateValue(left?.checkIn ?? left?.check_in)?.getTime() ?? Number.MAX_SAFE_INTEGER
+    const rightDate = parseHotelDateValue(right?.checkIn ?? right?.check_in)?.getTime() ?? Number.MAX_SAFE_INTEGER
+    return leftDate - rightDate
+  })
+}
+
+function normalizeHotelForDisplay(hotel: any) {
+  const name = resolveHotelDisplayName(hotel)
+  const location = resolveHotelLocation(hotel)
+  const reservationCode = resolveHotelReservationCode(hotel)
+  const checkInRaw = sanitizeHotelText(hotel?.checkIn ?? hotel?.check_in)
+  const checkOutRaw = sanitizeHotelText(hotel?.checkOut ?? hotel?.check_out)
+  const checkIn = formatHotelDate(checkInRaw)
+  const checkOut = formatHotelDate(checkOutRaw)
+  const nights = calculateHotelNights(hotel)
+  const notes = sanitizeHotelText(hotel?.notes)
+
+  return {
+    ...hotel,
+    image: null,
+    name,
+    displayName: name,
+    location,
+    checkInRaw,
+    checkOutRaw,
+    checkIn: checkIn || "Nao informado",
+    checkOut: checkOut || "Nao informado",
+    nights,
+    reservationCode,
+    confirmationCode: reservationCode || null,
+    notes,
+    documentId: sanitizeHotelText(hotel?.documentId ?? hotel?.document_id),
+  }
+}
+
 function formatTravelerHeroDateRange(startDate?: string | null, endDate?: string | null) {
   if (!startDate || !endDate) return "Datas a definir"
 
@@ -665,7 +776,9 @@ function getItineraryPeriodLabel(period?: string | null) {
 function normalizeTripViewData(tripData: any) {
   const travelers = normalizeTravelers(tripData?.travelers, tripData?.travelersCount)
   const flights = Array.isArray(tripData?.flights) ? tripData.flights : []
-  const hotels = Array.isArray(tripData?.hotels) ? tripData.hotels : tripData?.hotel ? [tripData.hotel] : []
+  const hotels = sortHotelsForDisplay(Array.isArray(tripData?.hotels) ? tripData.hotels : tripData?.hotel ? [tripData.hotel] : []).map(
+    normalizeHotelForDisplay,
+  )
   const itinerary = Array.isArray(tripData?.itinerary) ? tripData.itinerary : []
   const documents = Array.isArray(tripData?.documents) ? tripData.documents : []
   const weatherIcon =
@@ -788,7 +901,7 @@ function buildTripDataFromStoredTrip(storedTrip: any) {
           room: hotel.room || "",
           phone: hotel.phone || "",
           confirmationCode: hotel.confirmationCode || "",
-          image: hotel.image || heroImage,
+          image: null,
           amenities: Array.isArray(hotel.amenities) ? hotel.amenities : [],
         }
       : null,
@@ -1706,6 +1819,67 @@ function buildTravelerCardSummaries(tripData: any) {
   ]
 }
 
+function buildTravelerCardSummariesClean(tripData: any) {
+  const flights = Array.isArray(tripData?.flights) ? tripData.flights : []
+  const hotels = sortHotelsForDisplay(Array.isArray(tripData?.hotels) ? tripData.hotels : tripData?.hotel ? [tripData.hotel] : []).map(
+    normalizeHotelForDisplay,
+  )
+  const documents = Array.isArray(tripData?.documents) ? tripData.documents : []
+  const itinerary = Array.isArray(tripData?.itinerary) ? tripData.itinerary : []
+  const flight = flights[0]
+  const hotel = hotels[0] ?? null
+  const hotelDetail = hotel
+    ? [hotel.checkIn || "Check-in a definir", hotel.nights > 0 ? `${hotel.nights} noite${hotel.nights > 1 ? "s" : ""}` : hotel.checkOut || null]
+        .filter(Boolean)
+        .join(" • ")
+    : "Abra para ver"
+
+  return [
+    {
+      id: "flights" as const,
+      icon: Plane,
+      title: "Passagens",
+      summary: flight
+        ? `${flight.origin?.city || "---"} -> ${flight.destination?.city || "---"}`
+        : documents.filter((document: any) => document.type === "ticket").length > 0
+          ? `${documents.filter((document: any) => document.type === "ticket").length} bilhete(s)`
+          : "Nenhuma passagem",
+      detail: flight
+        ? `${flight.date || "Data pendente"}${flight.origin?.time ? ` • ${flight.origin.time}` : ""}${flight.destination?.time ? ` - ${flight.destination.time}` : ""}`
+        : "Abra para ver",
+      status: flight ? "Confirmado" : "Pendente",
+      statusClassName: flight ? "text-emerald-600" : "text-slate-400",
+    },
+    {
+      id: "hotel" as const,
+      icon: Hotel,
+      title: "Hospedagem",
+      summary: hotel?.displayName || "Nenhuma hospedagem",
+      detail: hotelDetail,
+      status: hotel ? "Confirmado" : "Pendente",
+      statusClassName: hotel ? "text-emerald-600" : "text-slate-400",
+    },
+    {
+      id: "documents" as const,
+      icon: FileText,
+      title: "Documentos",
+      summary: documents.length > 0 ? `${documents.length} documento(s)` : "Nenhum documento",
+      detail: documents.length > 0 ? "Abra para ver" : "Adicione depois",
+      status: documents.length > 0 ? "Pronto" : "Vazio",
+      statusClassName: documents.length > 0 ? "text-[#2563eb]" : "text-slate-400",
+    },
+    {
+      id: "itinerary" as const,
+      icon: MapPin,
+      title: "Roteiro",
+      summary: itinerary.length > 0 ? `${itinerary.length} dia(s) planejado(s)` : "Nenhum roteiro",
+      detail: itinerary.length > 0 ? "Abra para ver" : "Monte depois",
+      status: itinerary.length > 0 ? "Ver" : "Vazio",
+      statusClassName: itinerary.length > 0 ? "text-[#2563eb]" : "text-slate-400",
+    },
+  ]
+}
+
 function TravelerPublicShell({
   tripData,
   agencyBranding,
@@ -1724,7 +1898,7 @@ function TravelerPublicShell({
   onOpenPanel: (panel: Exclude<TravelerPublicPanel, null> | "more" | "home") => void
 }) {
   const travelers = Array.isArray(tripData?.travelers) ? tripData.travelers : []
-  const cards = buildTravelerCardSummaries(tripData)
+  const cards = buildTravelerCardSummariesClean(tripData)
   const parsedDestination = parseTripDestination(tripData?.destination)
   const offlineReady = offlineModeEnabled || tripData?.offlineEnabled || Boolean(offlinePackageStatus)
   const avatarLetter = travelers[0]?.name?.charAt(0)?.toUpperCase() || parsedDestination.city.charAt(0).toUpperCase()
@@ -2760,7 +2934,9 @@ function HotelSection({
   const [editing, setEditing] = useState(false)
   const [selectedHotel, setSelectedHotel] = useState<any>(null)
   const { isAdmin, canWrite } = useContext(PermissionContext)
-  const hotels = Array.isArray(tripData.hotels) ? tripData.hotels : tripData.hotel ? [tripData.hotel] : []
+  const hotels = sortHotelsForDisplay(Array.isArray(tripData.hotels) ? tripData.hotels : tripData.hotel ? [tripData.hotel] : []).map(
+    normalizeHotelForDisplay,
+  )
 
   return (
     <section id="hotel" className="py-12 px-4">
@@ -2772,7 +2948,7 @@ function HotelSection({
             </div>
             <div>
               <h2 className="text-xl font-semibold text-white">Hospedagem</h2>
-              <p className="text-sm text-white/40">{hotels.length > 0 ? `${hotels.length} hospedagem(ns) cadastrada(s)` : "Nenhuma hospedagem cadastrada"}</p>
+              <p className="text-sm text-white/40">{hotels.length > 0 ? `${hotels.length} hospedagem${hotels.length > 1 ? "s" : ""} cadastrada${hotels.length > 1 ? "s" : ""}` : "Nenhuma hospedagem cadastrada"}</p>
             </div>
           </div>
           {canWrite && (
@@ -2819,13 +2995,7 @@ function HotelSection({
                       disposition: "inline",
                     })
                   : null
-              const nights =
-                hotel.checkIn && hotel.checkOut
-                  ? Math.max(
-                      Math.round((new Date(hotel.checkOut).getTime() - new Date(hotel.checkIn).getTime()) / (1000 * 60 * 60 * 24)),
-                      0,
-                    )
-                  : 0
+              const nights = hotel.nights ?? 0
 
               return (
                 <motion.div
@@ -2835,19 +3005,22 @@ function HotelSection({
                   viewport={{ once: true }}
                   className="relative rounded-3xl overflow-hidden bg-white/[0.02] backdrop-blur-xl border border-white/[0.06]"
                 >
-                  <div className="relative h-48 sm:h-64">
-                    <Image src={hotel.image || tripData.heroImage} alt={hotel.name || "Hospedagem"} fill className="object-cover" />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent" />
-                    <div className="absolute bottom-4 left-4 right-4">
-                      <h3 className="text-xl font-semibold text-white">{hotel.name || "Hospedagem sem nome"}</h3>
+                  <div className="grid gap-0 sm:grid-cols-[132px_minmax(0,1fr)]">
+                    <div className="relative flex min-h-[132px] items-center justify-center bg-gradient-to-br from-slate-100 via-white to-slate-50">
+                      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(37,99,235,0.14),transparent_62%)]" />
+                      <div className="relative flex h-16 w-16 items-center justify-center rounded-2xl border border-slate-200/80 bg-white/95 shadow-[0_20px_40px_rgba(15,23,42,0.08)]">
+                        <Hotel className="h-8 w-8 text-[#2563eb]" />
+                      </div>
+                    </div>
+                    <div className="p-5">
+                      <h3 className="text-xl font-semibold text-white">{hotel.displayName}</h3>
                       <div className="mt-1 flex items-center gap-2 text-white/60">
                         <MapPin className="h-3 w-3" />
-                        <span className="text-sm">{hotel.address || "Endere?o n?o informado"}</span>
+                        <span className="text-sm">{hotel.location || "Localizacao nao informada"}</span>
                       </div>
                     </div>
                   </div>
-
-                  <div className="p-5">
+                  <div className="p-5 pt-0 sm:pt-5">
                     <div className="mb-4 grid grid-cols-2 gap-4">
                       <div className="rounded-xl bg-white/[0.03] p-3">
                         <p className="text-[10px] uppercase tracking-wider text-white/40">Check-in</p>
@@ -2861,10 +3034,10 @@ function HotelSection({
 
                     <div className="mb-4 flex flex-wrap gap-2 text-xs text-white/60">
                       <span className="rounded-full border border-white/[0.08] bg-white/[0.03] px-3 py-1.5">
-                        {nights > 0 ? `${nights} noite(s)` : "Noites a confirmar"}
+                        {nights > 0 ? `${nights} noite${nights > 1 ? "s" : ""}` : "Noites a confirmar"}
                       </span>
                       <span className="rounded-full border border-white/[0.08] bg-white/[0.03] px-3 py-1.5">
-                        {hotel.confirmationCode || "Reserva n?o informada"}
+                        {hotel.reservationCode || "Codigo nao informado"}
                       </span>
                     </div>
 
@@ -2882,7 +3055,7 @@ function HotelSection({
                           Abrir voucher
                         </Button>
                       ) : (
-                        <span className="text-sm text-white/40">Voucher n?o informado</span>
+                        <span className="text-sm text-white/40">Voucher nao informado</span>
                       )}
                       {canWrite && (
                         <div className="flex items-center gap-2">
@@ -6708,13 +6881,13 @@ export default function TripPage() {
                 hotel: hotelsResult.data[0]
                   ? {
                       ...hotelsResult.data[0],
-                      image: repositoryTrip.data.coverImage ?? undefined,
+                      image: null,
                       amenities: [],
                     }
                   : repositoryTrip.data.accommodations?.[0] ?? null,
                 hotels: hotelsResult.data.map((hotel) => ({
                   ...hotel,
-                  image: repositoryTrip.data.coverImage ?? undefined,
+                  image: null,
                   amenities: [],
                 })),
                 itinerary: simpleItinerary ? mapItineraryContentToLegacyDays(simpleItinerary.content) : repositoryTrip.data.itinerary,
@@ -7273,23 +7446,23 @@ export default function TripPage() {
       hotels: data?.id
         ? (Array.isArray(prev.hotels) ? prev.hotels : []).map((hotel: any) =>
             hotel.id === savedHotel.id
-              ? { ...hotel, ...savedHotel, image: hotel.image || prev.heroImage, amenities: hotel.amenities || [] }
+              ? { ...hotel, ...savedHotel, image: hotel.image ?? null, amenities: hotel.amenities || [] }
               : hotel,
           )
         : [
             ...(Array.isArray(prev.hotels) ? prev.hotels : []),
             {
               ...savedHotel,
-              image: prev.heroImage,
+              image: null,
               amenities: [],
             },
           ],
       hotel:
         data?.id
           ? ((Array.isArray(prev.hotels) ? prev.hotels : []).find((hotel: any) => hotel.id === savedHotel.id)
-              ? { ...(Array.isArray(prev.hotels) ? prev.hotels : []).find((hotel: any) => hotel.id === savedHotel.id), ...savedHotel, image: prev.heroImage, amenities: [] }
-              : { ...savedHotel, image: prev.heroImage, amenities: [] })
-          : (prev.hotel ?? { ...savedHotel, image: prev.heroImage, amenities: [] }),
+              ? { ...(Array.isArray(prev.hotels) ? prev.hotels : []).find((hotel: any) => hotel.id === savedHotel.id), ...savedHotel, image: null, amenities: [] }
+              : { ...savedHotel, image: null, amenities: [] })
+          : (prev.hotel ?? { ...savedHotel, image: null, amenities: [] }),
     }))
     showToast("Hospedagem salva com sucesso.", "success")
   }
