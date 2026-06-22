@@ -1,11 +1,11 @@
 "use client"
 
-import Image from "next/image"
 import Link from "next/link"
 
 type BannerSectionProps = {
   id?: string
   src: string
+  mobileSrc: string
   alt: string
   width: number
   height: number
@@ -22,6 +22,7 @@ type BannerSectionProps = {
 function BannerSection({
   id,
   src,
+  mobileSrc,
   alt,
   width,
   height,
@@ -37,16 +38,20 @@ function BannerSection({
   return (
     <section id={id} className={className}>
       <div className="relative overflow-hidden rounded-[28px] bg-white shadow-[0_24px_70px_rgba(15,23,42,0.08)] sm:rounded-[34px]">
-        <Image
-          src={src}
-          alt={alt}
-          width={width}
-          height={height}
-          priority={priority}
-          loading={eager ? "eager" : "lazy"}
-          sizes={sizes}
-          className={`block h-auto w-full ${imageClassName}`.trim()}
-        />
+        <picture>
+          <source media="(max-width: 767px)" srcSet={mobileSrc} />
+          <img
+            src={src}
+            alt={alt}
+            width={width}
+            height={height}
+            loading={priority || eager ? "eager" : "lazy"}
+            fetchPriority={priority ? "high" : undefined}
+            sizes={sizes}
+            className={`block h-auto w-full ${imageClassName}`.trim()}
+            style={{ width: "100%", height: "auto" }}
+          />
+        </picture>
         {ctaHref ? (
           <Link
             href={ctaHref}
@@ -67,56 +72,61 @@ export function LandingBannerSections() {
       <div className="relative z-10 mx-auto flex w-full max-w-[1880px] flex-col gap-4 sm:gap-5 lg:gap-6">
         <BannerSection
           src="/images/landing-hero-banner.png"
+          mobileSrc="/images/landing-hero-banner-mobile.png"
           alt="Banner principal do Vuei com o texto Sua viagem. Sem caos."
-          width={2560}
-          height={1200}
+          width={1831}
+          height={859}
           priority
           eager
-          sizes="(max-width: 640px) 100vw, (max-width: 1280px) calc(100vw - 48px), 1880px"
+          sizes="(max-width: 767px) calc(100vw - 32px), (max-width: 1280px) calc(100vw - 48px), 1880px"
           className="scroll-mt-32"
           ctaHref="/signup"
           ctaLabel="Criar minha viagem"
-          ctaClassName="left-[8.4%] top-[63.4%] h-[10.6%] w-[20.5%] min-w-[10rem] rounded-[1.1rem] md:left-[8.9%] md:top-[64.1%] md:h-[10.2%] md:w-[18.4%]"
+          ctaClassName="left-[6.8%] top-[44.6%] h-[7.4%] w-[39.2%] rounded-[1.05rem] md:left-[8.9%] md:top-[64.1%] md:h-[10.2%] md:w-[18.4%] md:min-w-[10rem] md:rounded-[1.1rem]"
         />
 
         <BannerSection
           id="como-funciona"
           src="/images/landing-antes-depois-banner.png"
+          mobileSrc="/images/landing-antes-depois-banner-mobile.png"
           alt="Antes e depois de organizar a viagem com o Vuei."
-          width={2560}
-          height={800}
-          sizes="(max-width: 640px) 100vw, (max-width: 1280px) calc(100vw - 48px), 1880px"
+          width={2243}
+          height={701}
+          sizes="(max-width: 767px) calc(100vw - 32px), (max-width: 1280px) calc(100vw - 48px), 1880px"
           className="scroll-mt-32"
         />
 
         <BannerSection
           id="concierge"
           src="/images/landing-concierge-banner.png"
+          mobileSrc="/images/landing-concierge-banner-mobile.png"
           alt="Banner do concierge do Vuei com perguntas e respostas da viagem."
-          width={2560}
-          height={850}
-          sizes="(max-width: 640px) 100vw, (max-width: 1280px) calc(100vw - 48px), 1880px"
+          width={2176}
+          height={722}
+          sizes="(max-width: 767px) calc(100vw - 32px), (max-width: 1280px) calc(100vw - 48px), 1880px"
           className="scroll-mt-32"
         />
 
         <BannerSection
           src="/images/landing-compartilhamento-banner.png"
+          mobileSrc="/images/landing-compartilhamento-banner-mobile.png"
           alt="Banner de compartilhamento do Vuei mostrando a viagem compartilhada com toda a familia."
-          width={2560}
-          height={700}
-          sizes="(max-width: 640px) 100vw, (max-width: 1280px) calc(100vw - 48px), 1880px"
-          imageClassName="-mb-[12.5%] -mt-[12.5%] scale-[1.001]"
+          width={1695}
+          height={928}
+          sizes="(max-width: 767px) calc(100vw - 32px), (max-width: 1280px) calc(100vw - 48px), 1880px"
+          imageClassName="md:-mb-[12.5%] md:-mt-[12.5%] md:scale-[1.001]"
         />
 
         <BannerSection
           src="/images/landing-cta-final-banner.png"
+          mobileSrc="/images/landing-cta-final-banner-mobile.png"
           alt="Banner final do Vuei com chamada para criar viagem."
-          width={2560}
-          height={650}
-          sizes="(max-width: 640px) 100vw, (max-width: 1280px) calc(100vw - 48px), 1880px"
+          width={1983}
+          height={793}
+          sizes="(max-width: 767px) calc(100vw - 32px), (max-width: 1280px) calc(100vw - 48px), 1880px"
           ctaHref="/signup"
           ctaLabel="Criar viagem"
-          ctaClassName="left-[40.2%] top-[46%] h-[24%] w-[19.6%] min-w-[10rem] rounded-[1.2rem] md:left-[40.5%] md:top-[46.2%] md:h-[24.4%] md:w-[19.3%]"
+          ctaClassName="left-[26.5%] top-[40.6%] h-[6.8%] w-[49.7%] rounded-[1rem] md:left-[40.5%] md:top-[46.2%] md:h-[24.4%] md:w-[19.3%] md:min-w-[10rem] md:rounded-[1.2rem]"
         />
       </div>
     </div>
