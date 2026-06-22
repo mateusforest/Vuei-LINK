@@ -13,7 +13,7 @@ import { deleteTripFlight, listPublicTripFlights, listTripFlights, requestTripFl
 import { createTripHotel, deleteTripHotel, listTripHotels, updateTripHotel } from "@/lib/repositories/trip-hotels-repository"
 import { deleteTripItinerary, listTripItineraries, requestAiItineraryGeneration, upsertTripItinerary } from "@/lib/repositories/trip-itineraries-repository"
 import { listConversationsByTrip, listMessages } from "@/lib/repositories/ai-repository"
-import { validateDocumentFile } from "@/lib/files/file-validation"
+import { resolveDocumentMimeType, validateDocumentFile } from "@/lib/files/file-validation"
 import {
   DEFAULT_TRIP_HERO_IMAGE,
   getDestinationCoverImage,
@@ -2906,6 +2906,7 @@ function AddFlightModal({ open, onClose, onSave, tripId, ownerUserId, agencyId, 
       return
     }
 
+    const resolvedMimeType = resolveDocumentMimeType(file)
     setUploading(true)
 
     const savedTicket = adminProxyMode
@@ -2941,7 +2942,7 @@ function AddFlightModal({ open, onClose, onSave, tripId, ownerUserId, agencyId, 
             type: "ticket",
             filePath: uploadResult.data.path,
             fileUrl: uploadResult.data.fileUrl,
-            mimeType: file.type,
+            mimeType: resolvedMimeType,
             size: file.size,
             isPrivate: false,
             visibility: "public_trip",
@@ -3052,10 +3053,15 @@ function AddFlightModal({ open, onClose, onSave, tripId, ownerUserId, agencyId, 
             <>
               <Upload className="w-8 h-8 mx-auto text-white/40 mb-3" />
               <p className="text-sm text-white/60">Clique para selecionar a passagem</p>
-              <p className="text-xs text-white/30 mt-1">PDF, PNG, JPG ou JPEG ate 10MB</p>
+              <p className="text-xs text-white/30 mt-1">PDF, PNG, JPG, JPEG, HEIC ou HEIF ate 10MB</p>
             </>
           )}
-          <input type="file" accept=".pdf,.png,.jpg,.jpeg" className="hidden" onChange={(e) => void handleFileUpload(e.target.files?.[0])} />
+          <input
+            type="file"
+            accept=".pdf,.png,.jpg,.jpeg,.heic,.heif,image/heic,image/heif"
+            className="hidden"
+            onChange={(e) => void handleFileUpload(e.target.files?.[0])}
+          />
         </label>
 
         <div className="rounded-xl border border-white/[0.08] bg-white/[0.03] p-4">

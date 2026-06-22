@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createSupabaseAdminClient, hasSupabaseAdminEnv, isMissingSupabaseAdminEnvError } from "@/lib/supabase/admin"
 import { resolveTripLinkAccess } from "@/lib/security/trip-link-access"
+import { resolveDocumentMimeType } from "@/lib/files/file-validation"
 import type { Database } from "@/lib/supabase/types"
 
 export const runtime = "nodejs"
@@ -128,10 +129,11 @@ function getMissingAdminConfigResponse() {
 async function uploadToStorage(supabase: ReturnType<typeof createSupabaseAdminClient>, file: File, path: string) {
   const arrayBuffer = await file.arrayBuffer()
   const buffer = Buffer.from(arrayBuffer)
+  const contentType = resolveDocumentMimeType(file) || undefined
   const { data, error } = await supabase.storage.from(DOCUMENTS_BUCKET).upload(path, buffer, {
     cacheControl: "3600",
     upsert: true,
-    contentType: file.type || undefined,
+    contentType,
   })
 
   if (error) {
@@ -241,6 +243,8 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: "Arquivo obrigatorio para esta a??o." }, { status: 400 })
       }
 
+      const resolvedMimeType = resolveDocumentMimeType(file) || null
+
       if (action === "uploadDocument") {
         const normalizedName = file.name.replace(/\s+/g, "-")
         const path = `${trip.owner_user_id ?? trip.agency_id ?? "trip"}/${trip.id}/documents/${Date.now()}-${normalizedName}`
@@ -254,7 +258,7 @@ export async function POST(request: NextRequest) {
           type: String(formData.get("type") ?? "other"),
           file_path: storedPath,
           file_url: null,
-          mime_type: file.type || null,
+          mime_type: resolvedMimeType,
           size_bytes: file.size ?? null,
           is_private: asBoolean(formData.get("isPrivate")),
           visibility: (String(formData.get("visibility") ?? "private") as Database["public"]["Tables"]["documents"]["Insert"]["visibility"]),
@@ -285,7 +289,7 @@ export async function POST(request: NextRequest) {
             type: "ticket",
             file_path: storedPath,
             file_url: null,
-            mime_type: file.type || null,
+            mime_type: resolvedMimeType,
             size_bytes: file.size ?? null,
             is_private: false,
             visibility: "public_trip",
@@ -336,7 +340,7 @@ export async function POST(request: NextRequest) {
             type: "itinerary",
             file_path: storedPath,
             file_url: null,
-            mime_type: file.type || null,
+            mime_type: resolvedMimeType,
             size_bytes: file.size ?? null,
             is_private: false,
             visibility: "public_trip",

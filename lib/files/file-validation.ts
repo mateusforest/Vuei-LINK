@@ -7,6 +7,17 @@ export const ALLOWED_DOCUMENT_MIME_TYPES = [
   "image/png",
   "image/jpg",
   "image/jpeg",
+  "image/heic",
+  "image/heif",
+] as const
+
+const ALLOWED_DOCUMENT_FILE_EXTENSIONS = [
+  ".pdf",
+  ".png",
+  ".jpg",
+  ".jpeg",
+  ".heic",
+  ".heif",
 ] as const
 
 export interface FileValidationResult {
@@ -15,9 +26,47 @@ export interface FileValidationResult {
   documentType: DocumentType
 }
 
+function getFileExtension(fileName: string) {
+  const normalized = fileName.trim().toLowerCase()
+  const match = normalized.match(/\.[^.]+$/)
+  return match?.[0] ?? ""
+}
+
+export function resolveDocumentMimeType(file: Pick<File, "type" | "name">) {
+  const normalizedType = typeof file.type === "string" ? file.type.trim().toLowerCase() : ""
+  if (normalizedType) {
+    return normalizedType
+  }
+
+  switch (getFileExtension(file.name)) {
+    case ".pdf":
+      return "application/pdf"
+    case ".png":
+      return "image/png"
+    case ".jpg":
+      return "image/jpg"
+    case ".jpeg":
+      return "image/jpeg"
+    case ".heic":
+      return "image/heic"
+    case ".heif":
+      return "image/heif"
+    default:
+      return ""
+  }
+}
+
 export function getDocumentTypeFromMime(mimeType: string): DocumentType {
   if (mimeType === "application/pdf") return "other"
-  if (mimeType === "image/png" || mimeType === "image/jpg" || mimeType === "image/jpeg") return "other"
+  if (
+    mimeType === "image/png" ||
+    mimeType === "image/jpg" ||
+    mimeType === "image/jpeg" ||
+    mimeType === "image/heic" ||
+    mimeType === "image/heif"
+  ) {
+    return "other"
+  }
   return "other"
 }
 
@@ -28,11 +77,17 @@ export function formatFileSize(sizeBytes: number): string {
 }
 
 export function validateDocumentFile(file: File): FileValidationResult {
-  if (!ALLOWED_DOCUMENT_MIME_TYPES.includes(file.type as (typeof ALLOWED_DOCUMENT_MIME_TYPES)[number])) {
+  const resolvedMimeType = resolveDocumentMimeType(file)
+  const resolvedExtension = getFileExtension(file.name)
+
+  if (
+    !ALLOWED_DOCUMENT_MIME_TYPES.includes(resolvedMimeType as (typeof ALLOWED_DOCUMENT_MIME_TYPES)[number]) &&
+    !ALLOWED_DOCUMENT_FILE_EXTENSIONS.includes(resolvedExtension as (typeof ALLOWED_DOCUMENT_FILE_EXTENSIONS)[number])
+  ) {
     return {
       valid: false,
-      error: "Formato invalido. Envie PDF, PNG, JPG ou JPEG.",
-      documentType: getDocumentTypeFromMime(file.type),
+      error: "Formato invalido. Envie PDF, PNG, JPG, JPEG, HEIC ou HEIF.",
+      documentType: getDocumentTypeFromMime(resolvedMimeType),
     }
   }
 
@@ -40,13 +95,13 @@ export function validateDocumentFile(file: File): FileValidationResult {
     return {
       valid: false,
       error: `Arquivo acima do limite de 10MB (${formatFileSize(file.size)}).`,
-      documentType: getDocumentTypeFromMime(file.type),
+      documentType: getDocumentTypeFromMime(resolvedMimeType),
     }
   }
 
   return {
     valid: true,
     error: null,
-    documentType: getDocumentTypeFromMime(file.type),
+    documentType: getDocumentTypeFromMime(resolvedMimeType),
   }
 }
