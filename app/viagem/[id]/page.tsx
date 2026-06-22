@@ -352,14 +352,80 @@ function sanitizeHotelText(value: unknown) {
   return normalized
 }
 
+const HOTEL_MONTH_INDEX: Record<string, number> = {
+  jan: 0,
+  janeiro: 0,
+  fev: 1,
+  fevereiro: 1,
+  mar: 2,
+  marco: 2,
+  março: 2,
+  abr: 3,
+  abril: 3,
+  mai: 4,
+  maio: 4,
+  jun: 5,
+  junho: 5,
+  jul: 6,
+  julho: 6,
+  ago: 7,
+  agosto: 7,
+  set: 8,
+  setembro: 8,
+  out: 9,
+  outubro: 9,
+  nov: 10,
+  novembro: 10,
+  dez: 11,
+  dezembro: 11,
+}
+
 function parseHotelDateValue(value?: string | null) {
   const normalized = sanitizeHotelText(value)
   if (!normalized) return null
 
-  const parsed = normalized.includes("T") ? new Date(normalized) : new Date(`${normalized}T12:00:00`)
-  if (Number.isNaN(parsed.getTime())) return null
+  const compactNormalized = normalized
+    .replace(/\s+-\s+\d{1,2}:\d{2}.*$/i, "")
+    .replace(/\s+as\s+\d{1,2}:\d{2}.*$/i, "")
+    .trim()
 
-  return parsed
+  const parsed = compactNormalized.includes("T") ? new Date(compactNormalized) : new Date(`${compactNormalized}T12:00:00`)
+  if (!Number.isNaN(parsed.getTime())) {
+    return parsed
+  }
+
+  const slashMatch = compactNormalized.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/)
+  if (slashMatch) {
+    const [, day, month, year] = slashMatch
+    const slashDate = new Date(Number(year), Number(month) - 1, Number(day), 12, 0, 0)
+    if (!Number.isNaN(slashDate.getTime())) {
+      return slashDate
+    }
+  }
+
+  const normalizedParts = compactNormalized
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/\./g, "")
+    .trim()
+
+  const longMonthMatch = normalizedParts.match(/^(\d{1,2})\s+de\s+([a-z]+)\s+de\s+(\d{4})$/)
+  const shortMonthMatch = normalizedParts.match(/^(\d{1,2})\s+([a-z]+)\s+(\d{4})$/)
+  const monthMatch = longMonthMatch ?? shortMonthMatch
+
+  if (monthMatch) {
+    const [, day, monthLabel, year] = monthMatch
+    const monthIndex = HOTEL_MONTH_INDEX[monthLabel]
+    if (typeof monthIndex === "number") {
+      const namedMonthDate = new Date(Number(year), monthIndex, Number(day), 12, 0, 0)
+      if (!Number.isNaN(namedMonthDate.getTime())) {
+        return namedMonthDate
+      }
+    }
+  }
+
+  return null
 }
 
 function formatHotelDate(value?: string | null) {
