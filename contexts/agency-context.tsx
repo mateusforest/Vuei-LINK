@@ -1131,12 +1131,7 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
         ownerUserId: user?.id ?? null,
         agencyId,
         clientId: data.clientId || null,
-        coverImage: resolveTripHeroImage({
-          coverImage: data.coverImage,
-          destination: data.destination,
-          city: data.city,
-          country: data.country,
-        }),
+        coverImage: data.coverImage ?? undefined,
         visibility: "public",
       })
 

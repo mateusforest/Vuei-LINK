@@ -123,7 +123,6 @@ function CreateTripPageContent() {
           style: formData.travelStyle,
           passengersCount: formData.passengersCount,
           status: "upcoming",
-          coverImage: resolvedDestination.coverImageUrl,
         })
         if (newTrip) {
           setCreatedTrip(newTrip)

@@ -232,7 +232,6 @@ export default function CriarViagemPage() {
             startDate: formData.startDate,
             endDate: formData.endDate,
             style: formData.style,
-            coverImage: resolvedDestination.coverImageUrl ?? undefined,
             status: "draft",
             visibility: "public",
             ownerType: "traveler",
@@ -278,7 +277,6 @@ export default function CriarViagemPage() {
           companions: formData.companions,
           passengersCount: companionTypes.find(c => c.id === formData.companions)?.count || 1,
           status: "upcoming",
-          coverImage: resolvedDestination.coverImageUrl,
         })
       }
       
