@@ -193,7 +193,7 @@ const countryCoverMap: Array<{ aliases: string[]; image: string }> = [
   },
 ]
 
-const neutralCover = "https://images.unsplash.com/photo-1488646953014-85cb44e25828?w=1920&q=80"
+const neutralCover = "/travel/default-trip-cover.png"
 
 export const DEFAULT_TRIP_HERO_IMAGE = neutralCover
 
@@ -305,7 +305,10 @@ function buildEmbassyFallback(country?: string | null) {
 }
 
 export function getDestinationCoverImage(destination?: string | null, city?: string | null, country?: string | null) {
-  return resolveDestinationCoverEntry(destination, city, country)?.image ?? resolveCountryEntry(country, destination)?.image ?? neutralCover
+  void destination
+  void city
+  void country
+  return neutralCover
 }
 
 export function resolveTripHeroImage(params: {
@@ -314,7 +317,7 @@ export function resolveTripHeroImage(params: {
   city?: string | null
   country?: string | null
 }) {
-  return normalizeImageUrl(params.coverImage) ?? getDestinationCoverImage(params.destination, params.city, params.country)
+  return normalizeImageUrl(params.coverImage) ?? neutralCover
 }
 
 export function resolveAgencyBrandLogo(...candidates: Array<string | null | undefined>) {

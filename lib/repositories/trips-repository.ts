@@ -7,7 +7,7 @@ import { extractAgencyStorageState } from "@/lib/mappers/agency-mappers"
 import { buildUniqueTripSlug, extractTripsStoragePayload, mapStoredTripToTrip, slugifyTripBase, type LegacyStoredTrip } from "@/lib/mappers/trip-mappers"
 import { buildAdminTripUrl, buildPublicTripUrl, generateSecureToken } from "@/lib/security/link-tokens"
 import type { Database } from "@/lib/supabase/types"
-import { getDestinationCoverImage, resolveTripHeroImage } from "@/lib/trip-destination"
+import { resolveTripHeroImage } from "@/lib/trip-destination"
 import { getTravelerBillingStatus } from "@/lib/repositories/traveler-billing-repository"
 import { AGENCY_PLAN_LIMIT_ERROR } from "@/lib/billing/agency-plans"
 import { countActiveAgencyTripsForClient, getAgencyBillingStatusForClient } from "@/lib/billing/agency-billing"
@@ -247,51 +247,6 @@ function parseDestinationParts(destination?: string | null) {
   }
 }
 
-async function resolveServerDestinationCoverImage(params: {
-  destination?: string | null
-  city?: string | null
-  country?: string | null
-  tripId?: string | null
-  tripSlug?: string | null
-  adminToken?: string | null
-  publicToken?: string | null
-  accessMode?: "admin" | "public"
-  persist?: boolean
-}) {
-  if (typeof window === "undefined") return null
-  if (!(params.destination || params.city || params.country)) return null
-
-  const searchParams = new URLSearchParams()
-  if (params.destination) searchParams.set("destination", params.destination)
-  if (params.city) searchParams.set("city", params.city)
-  if (params.country) searchParams.set("country", params.country)
-  if (params.tripId) searchParams.set("tripId", params.tripId)
-  if (params.tripSlug) searchParams.set("tripSlug", params.tripSlug)
-  if (params.adminToken) searchParams.set("adminToken", params.adminToken)
-  if (params.publicToken) searchParams.set("publicToken", params.publicToken)
-  if (params.accessMode) searchParams.set("accessMode", params.accessMode)
-  if (params.persist) searchParams.set("persist", "1")
-
-  try {
-    const response = await fetch(`/api/destination-image?${searchParams.toString()}`, {
-      cache: "no-store",
-    })
-    const payload = (await response.json().catch(() => null)) as { imageUrl?: string | null; source?: string | null } | null
-
-    if (!response.ok) {
-      return null
-    }
-
-    if (payload?.source === "fallback") {
-      return null
-    }
-
-    return payload?.imageUrl ?? null
-  } catch {
-    return null
-  }
-}
-
 function buildTrip(payload: CreateTripPayload, existingTrips: Trip[], slugOverride?: string): Trip {
   const now = new Date().toISOString()
   const baseSlug = slugifyTripBase(payload.title, payload.destination)
@@ -395,21 +350,7 @@ export async function getTripBySlug(slug: string) {
     try {
       const { data, error } = await supabase.from("trips").select("*").eq("slug", slug).maybeSingle()
       if (!error && data) {
-        const hydratedCoverImage =
-          data.cover_image ||
-          (await resolveServerDestinationCoverImage({
-            destination: data.destination,
-            city: data.city,
-            country: data.country,
-            tripId: data.id,
-            tripSlug: data.slug,
-            accessMode: "public",
-            persist: true,
-          }))
-        const mappedTrip = mapTripRowToTrip({
-          ...data,
-          cover_image: hydratedCoverImage ?? data.cover_image,
-        })
+        const mappedTrip = mapTripRowToTrip(data)
         return {
           source: "supabase" as const,
           config: createSupabaseBrowserClientPlaceholder(),
@@ -448,22 +389,7 @@ export async function getTripByAdminToken(token: string) {
     try {
       const { data, error } = await supabase.from("trips").select("*").eq("admin_token", token).maybeSingle()
       if (!error && data) {
-        const hydratedCoverImage =
-          data.cover_image ||
-          (await resolveServerDestinationCoverImage({
-            destination: data.destination,
-            city: data.city,
-            country: data.country,
-            tripId: data.id,
-            tripSlug: data.slug,
-            adminToken: token,
-            accessMode: "admin",
-            persist: true,
-          }))
-        const mappedTrip = mapTripRowToTrip({
-          ...data,
-          cover_image: hydratedCoverImage ?? data.cover_image,
-        })
+        const mappedTrip = mapTripRowToTrip(data)
         return {
           source: "supabase" as const,
           config: createSupabaseBrowserClientPlaceholder(),
@@ -499,22 +425,7 @@ export async function getTripByPublicToken(token: string) {
     try {
       const { data, error } = await supabase.from("trips").select("*").eq("public_token", token).maybeSingle()
       if (!error && data) {
-        const hydratedCoverImage =
-          data.cover_image ||
-          (await resolveServerDestinationCoverImage({
-            destination: data.destination,
-            city: data.city,
-            country: data.country,
-            tripId: data.id,
-            tripSlug: data.slug,
-            publicToken: token,
-            accessMode: "public",
-            persist: true,
-          }))
-        const mappedTrip = mapTripRowToTrip({
-          ...data,
-          cover_image: hydratedCoverImage ?? data.cover_image,
-        })
+        const mappedTrip = mapTripRowToTrip(data)
         return {
           source: "supabase" as const,
           config: createSupabaseBrowserClientPlaceholder(),
@@ -655,20 +566,6 @@ export async function createTrip(payload: CreateTripPayload) {
         const adminLink = buildAdminTripUrl(trip.slug)
         const publicLink = buildPublicTripUrl(trip.slug)
         const parsedDestination = parseDestinationParts(trip.destination)
-        const autoResolvedCoverImage = trip.coverImage
-          ? null
-          : await resolveServerDestinationCoverImage({
-              destination: trip.destination,
-              city: trip.city ?? parsedDestination.city,
-              country: trip.country ?? parsedDestination.country,
-            })
-        const resolvedCoverImage = resolveTripHeroImage({
-          coverImage: trip.coverImage ?? autoResolvedCoverImage,
-          destination: trip.destination,
-          city: trip.city ?? parsedDestination.city,
-          country: trip.country ?? parsedDestination.country,
-        })
-
         const insertPayload: Database["public"]["Tables"]["trips"]["Insert"] = {
           title: trip.title,
           slug: trip.slug,
@@ -687,7 +584,7 @@ export async function createTrip(payload: CreateTripPayload) {
           public_token: publicToken,
           admin_link: adminLink,
           public_link: publicLink,
-          cover_image: resolvedCoverImage,
+          cover_image: trip.coverImage ?? null,
           visibility: trip.visibility ?? "public",
           travelers_count: trip.travelersCount || 1,
           permissions: trip.permissions ?? {},
@@ -791,19 +688,6 @@ export async function updateTrip(id: string, payload: Partial<Trip>) {
         permissions: payload.permissions,
         credits_summary: payload.creditsSummary ?? undefined,
         offline_enabled: payload.offlineEnabled,
-      }
-
-      const autoResolvedCoverImage =
-        payload.coverImage || !(payload.destination || payload.city || payload.country)
-          ? null
-          : await resolveServerDestinationCoverImage({
-              destination: payload.destination,
-              city: payload.city,
-              country: payload.country,
-            })
-
-      if (!payload.coverImage && autoResolvedCoverImage) {
-        updatePayload.cover_image = autoResolvedCoverImage
       }
 
       const { data, error } = await supabase.from("trips").update(updatePayload).eq("id", id).select("*").maybeSingle()
