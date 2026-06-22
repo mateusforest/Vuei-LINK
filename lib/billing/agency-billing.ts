@@ -564,8 +564,56 @@ export async function createAgencyPlanCreditCycleFromInvoice(
     return { data: null as AgencyPlanCycleRow | null, error: existing.error.message }
   }
 
+  const ensureGrantTransaction = async (cycle: AgencyPlanCycleRow) => {
+    const existingGrant = await (client.from("credit_transactions") as any)
+      .select("id")
+      .eq("owner_type", "agency")
+      .eq("agency_id", params.agencyId)
+      .eq("type", "grant")
+      .eq("source", "plan_cycle")
+      .contains("metadata", {
+        kind: "plan_cycle_grant",
+        agency_plan_cycle_id: cycle.id,
+        stripe_invoice_id: params.stripeInvoiceId,
+      })
+      .maybeSingle()
+
+    if (existingGrant.error) {
+      return existingGrant.error.message
+    }
+
+    if (existingGrant.data) {
+      return null
+    }
+
+    const grantResult = await (client.from("credit_transactions") as any).insert({
+      owner_type: "agency",
+      agency_id: params.agencyId,
+      type: "grant",
+      amount: cycle.granted_credits,
+      reason: `Créditos do plano ${AGENCY_PLAN_DEFINITIONS[params.planCode].name}`,
+      source: "plan_cycle",
+      metadata: {
+        billing_scope: "agency",
+        kind: "plan_cycle_grant",
+        agency_plan_cycle_id: cycle.id,
+        plan_code: params.planCode,
+        stripe_invoice_id: params.stripeInvoiceId,
+        period_start: params.periodStart,
+        period_end: params.periodEnd,
+      },
+      created_by: null,
+    } as any)
+
+    return grantResult.error?.message ?? null
+  }
+
   if (existing.data) {
-    return { data: existing.data as AgencyPlanCycleRow, error: null }
+    const grantError = await ensureGrantTransaction(existing.data as AgencyPlanCycleRow)
+    return {
+      data: existing.data as AgencyPlanCycleRow,
+      error: grantError,
+    }
   }
 
   const inserted = await (client.from("agency_plan_credit_cycles" as any) as any)
@@ -581,7 +629,12 @@ export async function createAgencyPlanCreditCycleFromInvoice(
     .select("*")
     .single()
 
-  return { data: (inserted.data as AgencyPlanCycleRow | null) ?? null, error: inserted.error?.message ?? null }
+  if (inserted.error || !inserted.data) {
+    return { data: (inserted.data as AgencyPlanCycleRow | null) ?? null, error: inserted.error?.message ?? null }
+  }
+
+  const grantError = await ensureGrantTransaction(inserted.data as AgencyPlanCycleRow)
+  return { data: inserted.data as AgencyPlanCycleRow, error: grantError }
 }
 
 export async function grantAgencyPurchasedCredits(

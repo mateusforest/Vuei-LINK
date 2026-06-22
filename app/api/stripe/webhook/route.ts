@@ -350,7 +350,7 @@ async function handleAgencyInvoicePaid(invoice: Stripe.Invoice, subscription: St
   const priceId = subscription.items.data[0]?.price?.id ?? null
   const planCode = resolveAgencyPlanFromPriceId(priceId)
   if (planCode === "free") {
-    return null
+    return "Price ID da assinatura da agência não reconhecido para conceder créditos mensais."
   }
 
   const { currentPeriodStart, currentPeriodEnd } = getStripeSubscriptionPeriod(subscription)
