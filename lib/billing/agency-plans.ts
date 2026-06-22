@@ -112,15 +112,18 @@ export function normalizeAgencyCommercialPlanCode(value: string | null | undefin
 
 export function mapLegacyAgencyPlanToCommercialPlan(plan: AgencyPlan | string | null | undefined): AgencyCommercialPlanCode {
   if (plan === "free") return "free"
+  if (plan === "starter" || plan === "start") return "start"
   if (plan === "pro") return "pro"
   if (plan === "enterprise" || plan === "business") return "business"
   return "free"
 }
 
 export function mapCommercialPlanToLegacyAgencyPlan(planCode: AgencyCommercialPlanCode): AgencyPlan {
+  if (planCode === "free") return "free" as AgencyPlan
+  if (planCode === "start") return "starter"
   if (planCode === "pro") return "pro"
   if (planCode === "business") return "enterprise"
-  return "starter"
+  return "free" as AgencyPlan
 }
 
 export function resolveAgencyPlanSnapshot(input?: {
