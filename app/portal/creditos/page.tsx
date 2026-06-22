@@ -100,10 +100,15 @@ export default function CreditosPage() {
     [credits.history, isRealMode, realHistory],
   )
 
-  const grantedCredits = effectiveHistory.reduce((sum, item) => (item.amount > 0 ? sum + item.amount : sum), 0)
-  const usedCredits = effectiveHistory.reduce((sum, item) => (item.amount < 0 ? sum + Math.abs(item.amount) : sum), 0)
-  const usageBase = Math.max(grantedCredits, effectiveBalance + usedCredits, subscription.definition.monthlyCredits, 1)
-  const usagePercentage = (usedCredits / usageBase) * 100
+  const totalUsedHistory = effectiveHistory.reduce((sum, item) => (item.amount < 0 ? sum + Math.abs(item.amount) : sum), 0)
+  const monthlyPlanCredits = subscription.definition.monthlyCredits
+  const planCreditsAvailable = Math.max(
+    billingStatus?.planCreditsAvailable ?? Math.max(monthlyPlanCredits - totalUsedHistory, 0),
+    0,
+  )
+  const purchasedCreditsAvailable = Math.max(billingStatus?.purchasedCreditsAvailable ?? 0, 0)
+  const planCreditsUsed = Math.max(monthlyPlanCredits - planCreditsAvailable, 0)
+  const usagePercentage = monthlyPlanCredits > 0 ? (planCreditsUsed / monthlyPlanCredits) * 100 : 0
   const conciergeUsage = effectiveHistory.filter((item) => (item.source || "").toLowerCase().includes("concierge")).length
   const documentsUsage = effectiveHistory.filter((item) => (item.source || "").toLowerCase().includes("document")).length
   const offlineUsage = effectiveHistory.filter((item) => (item.source || "").toLowerCase().includes("offline")).length
@@ -186,10 +191,12 @@ export default function CreditosPage() {
                 <div className="space-y-1 text-sm">
                   <div className="flex items-center gap-2 text-green-400">
                     <Gift size={14} />
-                    <span>{billingStatus?.planCreditsAvailable ?? subscription.definition.monthlyCredits} creditos do plano disponiveis neste ciclo</span>
+                    <span>
+                      {planCreditsAvailable} de {monthlyPlanCredits} creditos do plano disponiveis neste ciclo
+                    </span>
                   </div>
                   <div className="text-muted-foreground">
-                    {billingStatus?.purchasedCreditsAvailable ?? 0} creditos comprados acumulados
+                    {purchasedCreditsAvailable} creditos comprados acumulados
                   </div>
                 </div>
               </div>
@@ -198,7 +205,7 @@ export default function CreditosPage() {
                 <div className="flex items-center gap-2 md:justify-end">
                   <TrendingUp size={14} className="text-muted-foreground" />
                   <span className="text-sm text-muted-foreground">
-                    {usedCredits} de {usageBase} utilizados
+                    {planCreditsUsed} de {monthlyPlanCredits} creditos mensais utilizados
                   </span>
                 </div>
                 <Progress value={usagePercentage} className="h-2 w-full md:w-48" />

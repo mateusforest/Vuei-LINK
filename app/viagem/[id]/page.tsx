@@ -1079,6 +1079,10 @@ function formatCreditsPeriodEnd(value?: string | null) {
   })
 }
 
+function getTravelerMonthlyCredits(plan?: "free" | "premium" | null) {
+  return plan === "premium" ? 150 : 40
+}
+
 type OfflineDocumentContext = {
   tripId: string
   audience: "public" | "admin"
@@ -5603,8 +5607,9 @@ function TravelerPublicCreditsModal({
   const balance = Math.max(credits?.balance ?? 0, 0)
   const planCredits = Math.max(credits?.planCreditsAvailable ?? 0, 0)
   const purchasedCredits = Math.max(credits?.purchasedCreditsAvailable ?? 0, 0)
-  const totalCredits = Math.max(balance, planCredits + purchasedCredits, 1)
-  const usagePercentage = Math.min((balance / totalCredits) * 100, 100)
+  const monthlyCredits = getTravelerMonthlyCredits(credits?.currentPlan)
+  const planCreditsUsed = Math.max(monthlyCredits - planCredits, 0)
+  const usagePercentage = monthlyCredits > 0 ? Math.min((planCreditsUsed / monthlyCredits) * 100, 100) : 0
 
   return (
     <Modal tone="light" open={open} onClose={onClose} title="Cr?ditos">
@@ -5627,12 +5632,16 @@ function TravelerPublicCreditsModal({
           <div className="mt-4 h-2 rounded-full bg-slate-200">
             <div className="h-full rounded-full bg-gradient-to-r from-[#5de0e6] to-[#004aad]" style={{ width: `${usagePercentage}%` }} />
           </div>
+          <p className="mt-3 text-xs text-slate-500">
+            {planCreditsUsed} de {monthlyCredits} creditos mensais utilizados neste ciclo
+          </p>
         </div>
 
         <div className="grid grid-cols-2 gap-3">
           <div className="rounded-2xl border border-slate-200 bg-white/92 p-4">
             <p className="text-xs text-slate-500">Cr?ditos do plano</p>
             <p className="mt-2 text-2xl font-semibold text-slate-950">{planCredits}</p>
+            <p className="mt-1 text-xs text-slate-500">Disponiveis neste ciclo</p>
           </div>
           <div className="rounded-2xl border border-slate-200 bg-white/92 p-4">
             <p className="text-xs text-slate-500">Saldo atual</p>
@@ -5641,6 +5650,7 @@ function TravelerPublicCreditsModal({
           <div className="rounded-2xl border border-slate-200 bg-white/92 p-4">
             <p className="text-xs text-slate-500">Cr?ditos comprados</p>
             <p className="mt-2 text-2xl font-semibold text-slate-950">{purchasedCredits}</p>
+            <p className="mt-1 text-xs text-slate-500">Acumulados fora do ciclo mensal</p>
           </div>
           <div className="rounded-2xl border border-slate-200 bg-white/92 p-4">
             <p className="text-xs text-slate-500">Ciclo atual</p>
@@ -5668,8 +5678,9 @@ function LinkCreditsSummaryModal({
   const balance = Math.max(credits?.balance ?? 0, 0)
   const planCredits = Math.max(credits?.planCreditsAvailable ?? 0, 0)
   const purchasedCredits = Math.max(credits?.purchasedCreditsAvailable ?? 0, 0)
-  const totalCredits = Math.max(balance, planCredits + purchasedCredits, 1)
-  const usagePercentage = Math.min((balance / totalCredits) * 100, 100)
+  const monthlyCredits = getTravelerMonthlyCredits(credits?.currentPlan)
+  const planCreditsUsed = Math.max(monthlyCredits - planCredits, 0)
+  const usagePercentage = monthlyCredits > 0 ? Math.min((planCreditsUsed / monthlyCredits) * 100, 100) : 0
 
   return (
     <Modal tone="light" open={open} onClose={onClose} title="Cr?ditos">
@@ -5692,12 +5703,16 @@ function LinkCreditsSummaryModal({
           <div className="mt-4 h-2 rounded-full bg-slate-200">
             <div className="h-full rounded-full bg-gradient-to-r from-[#5de0e6] to-[#004aad]" style={{ width: `${usagePercentage}%` }} />
           </div>
+          <p className="mt-3 text-xs text-slate-500">
+            {planCreditsUsed} de {monthlyCredits} creditos mensais utilizados neste ciclo
+          </p>
         </div>
 
         <div className="grid grid-cols-2 gap-3">
           <div className="rounded-2xl border border-slate-200 bg-white/92 p-4">
             <p className="text-xs text-slate-500">Cr?ditos do plano</p>
             <p className="mt-2 text-2xl font-semibold text-slate-950">{planCredits}</p>
+            <p className="mt-1 text-xs text-slate-500">Disponiveis neste ciclo</p>
           </div>
           <div className="rounded-2xl border border-slate-200 bg-white/92 p-4">
             <p className="text-xs text-slate-500">Saldo atual</p>
@@ -5706,6 +5721,7 @@ function LinkCreditsSummaryModal({
           <div className="rounded-2xl border border-slate-200 bg-white/92 p-4">
             <p className="text-xs text-slate-500">Cr?ditos comprados</p>
             <p className="mt-2 text-2xl font-semibold text-slate-950">{purchasedCredits}</p>
+            <p className="mt-1 text-xs text-slate-500">Acumulados fora do ciclo mensal</p>
           </div>
           <div className="rounded-2xl border border-slate-200 bg-white/92 p-4">
             <p className="text-xs text-slate-500">Ciclo atual</p>
