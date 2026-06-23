@@ -197,13 +197,13 @@ export default function MasterCreditosPage() {
     {
       label: "Uso Mensal",
       value: `${(overview.monthlyUsage / 1000).toFixed(1)}K`,
-      change: "mes atual",
+      change: "mês atual",
       icon: Zap,
     },
     {
-      label: "Transacoes",
+      label: "Transações",
       value: overview.transactionsCount.toString(),
-      change: "historico real",
+      change: "histórico real",
       icon: CreditCard,
     },
   ]
@@ -219,18 +219,18 @@ export default function MasterCreditosPage() {
     setGrantError(null)
 
     if (!selectedGrantTarget) {
-      setGrantError("Selecione quem vai receber os creditos.")
+      setGrantError("Selecione quem vai receber os créditos.")
       return
     }
 
     const normalizedAmount = Number.parseInt(grantAmount, 10)
     if (!Number.isFinite(normalizedAmount) || normalizedAmount <= 0) {
-      setGrantError("Informe uma quantidade positiva de creditos.")
+      setGrantError("Informe uma quantidade positiva de créditos.")
       return
     }
 
     if (!grantReason.trim()) {
-      setGrantError("Informe o motivo da concessao.")
+      setGrantError("Informe o motivo da concessão.")
       return
     }
 
@@ -278,12 +278,12 @@ export default function MasterCreditosPage() {
       <motion.div variants={fadeInUp} className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div className="space-y-1">
           <h1 className="text-2xl lg:text-3xl font-bold text-foreground tracking-tight">Créditos</h1>
-          <p className="text-sm text-muted-foreground">Leitura real do saldo e ledger de creditos da plataforma</p>
+          <p className="text-sm text-muted-foreground">Leitura real do saldo e ledger de créditos da plataforma</p>
         </div>
         <div className="flex gap-3">
           <Button variant="outline" className="gap-2 border-white/10 hover:bg-white/5" onClick={() => setGrantOpen(true)}>
             <Gift className="h-4 w-4" />
-            Enviar creditos
+            Enviar créditos
           </Button>
           <Button variant="outline" className="gap-2 border-white/10 hover:bg-white/5" disabled>
             <Gift className="h-4 w-4" />
@@ -326,7 +326,7 @@ export default function MasterCreditosPage() {
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-foreground">Pacotes de créditos</h2>
           <Badge variant="outline" className="border-white/10 bg-white/5 text-xs text-muted-foreground">
-            Pagamento ainda nao integrado
+            Pagamento ainda não integrado
           </Badge>
         </div>
 
@@ -347,7 +347,7 @@ export default function MasterCreditosPage() {
                 <div className="text-sm font-medium text-muted-foreground">{pkg.name}</div>
                 <div className="text-3xl font-bold text-foreground">
                   {pkg.credits.toLocaleString()}
-                  <span className="text-sm font-normal text-muted-foreground ml-1">creditos</span>
+                  <span className="text-sm font-normal text-muted-foreground ml-1">créditos</span>
                 </div>
                 <div className="text-2xl font-bold text-primary">R$ {pkg.price}</div>
                 <div className="text-xs text-muted-foreground">Pagamento real em breve</div>
@@ -361,7 +361,7 @@ export default function MasterCreditosPage() {
         <motion.div variants={fadeInUp}>
           <Card className="border-white/5 bg-black/40 backdrop-blur-xl p-6">
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-lg font-semibold text-foreground">Transacoes Recentes</h2>
+              <h2 className="text-lg font-semibold text-foreground">Transações Recentes</h2>
               <span className="text-xs text-muted-foreground">ledger operacional</span>
             </div>
 
@@ -411,13 +411,13 @@ export default function MasterCreditosPage() {
           <Card className="border-white/5 bg-black/40 backdrop-blur-xl p-6">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-lg font-semibold text-foreground">Maior Saldo Atual</h2>
-              <span className="text-xs text-muted-foreground">agencias, usuarios e clientes</span>
+              <span className="text-xs text-muted-foreground">agências, usuários e clientes</span>
             </div>
 
             <div className="space-y-4">
               {normalizedTopConsumers.length === 0 ? (
                 <div className="rounded-xl border border-white/5 bg-white/[0.02] p-4 text-sm text-muted-foreground">
-                  Nenhum saldo real disponivel ainda.
+                  Nenhum saldo real disponível ainda.
                 </div>
               ) : (
                 normalizedTopConsumers.map((consumer, index) => {
@@ -435,7 +435,7 @@ export default function MasterCreditosPage() {
                           </div>
                           <span className="text-sm font-medium text-foreground">{consumer.name}</span>
                         </div>
-                        <span className="text-xs text-muted-foreground">{consumer.currentBalance.toLocaleString()} creditos</span>
+                        <span className="text-xs text-muted-foreground">{consumer.currentBalance.toLocaleString()} créditos</span>
                       </div>
                       <div className="h-2 bg-white/5 rounded-full overflow-hidden">
                         <div
@@ -490,9 +490,9 @@ export default function MasterCreditosPage() {
       >
         <DialogContent className="border-white/10 bg-card/95 backdrop-blur-xl">
           <DialogHeader>
-            <DialogTitle>Enviar creditos</DialogTitle>
+            <DialogTitle>Enviar créditos</DialogTitle>
             <DialogDescription>
-              Conceda creditos manualmente para agencias, usuarios individuais ou clientes.
+              Conceda créditos manualmente para agências, usuários individuais ou clientes.
             </DialogDescription>
           </DialogHeader>
 
@@ -515,7 +515,7 @@ export default function MasterCreditosPage() {
                   </optgroup>
                 ) : null}
                 {groupedTargets.users.length > 0 ? (
-                  <optgroup label="Usuarios">
+                  <optgroup label="Usuários">
                     {groupedTargets.users.map((target) => (
                       <option key={target.id} value={target.id}>
                         {target.name} • {target.description}
@@ -535,7 +535,7 @@ export default function MasterCreditosPage() {
               </select>
               {selectedGrantTarget ? (
                 <p className="text-xs text-muted-foreground">
-                  Saldo atual: {selectedGrantTarget.balance.toLocaleString()} creditos
+                  Saldo atual: {selectedGrantTarget.balance.toLocaleString()} créditos
                 </p>
               ) : null}
             </div>
@@ -557,7 +557,7 @@ export default function MasterCreditosPage() {
               <Textarea
                 value={grantReason}
                 onChange={(event) => setGrantReason(event.target.value)}
-                placeholder="Ex.: concessao manual aprovada pelo Master"
+                placeholder="Ex.: concessão manual aprovada pelo Master"
                 className="min-h-24 border-white/10 bg-black/40"
               />
             </div>

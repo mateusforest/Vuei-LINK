@@ -191,7 +191,7 @@ function MasterUsuáriosPageContent() {
             <table className="w-full">
               <thead>
                 <tr className="border-b border-white/5">
-                  <th className="text-left text-xs font-medium text-muted-foreground px-6 py-4">Usuario</th>
+                  <th className="text-left text-xs font-medium text-muted-foreground px-6 py-4">Usuário</th>
                   <th className="text-left text-xs font-medium text-muted-foreground px-6 py-4">Role</th>
                   <th className="text-left text-xs font-medium text-muted-foreground px-6 py-4">Agência</th>
                   <th className="text-left text-xs font-medium text-muted-foreground px-6 py-4">Criado em</th>

@@ -129,8 +129,8 @@ export default function MasterSupportPage() {
         value: `agency:${detail.ticket.agencyId}`,
         type: "agency",
         label: detail.ticket.context?.agencyName
-          ? `Agencia: ${detail.ticket.context.agencyName}`
-          : "Agencia vinculada",
+          ? `Agência: ${detail.ticket.context.agencyName}`
+          : "Agência vinculada",
       })
     }
 
@@ -197,7 +197,7 @@ export default function MasterSupportPage() {
 
   const handleBonusSubmit = async () => {
     if (!selectedTicketId || !bonusTarget) {
-      setBonusError("Selecione a conta que vai receber a bonificacao.")
+      setBonusError("Selecione a conta que vai receber a bonificação.")
       return
     }
 
@@ -208,7 +208,7 @@ export default function MasterSupportPage() {
     }
 
     if (!bonusReason.trim()) {
-      setBonusError("Informe o motivo da bonificacao.")
+      setBonusError("Informe o motivo da bonificação.")
       return
     }
 
@@ -236,7 +236,7 @@ export default function MasterSupportPage() {
       return
     }
 
-    setBonusSuccess("Bonificacao aplicada com sucesso.")
+    setBonusSuccess("Bonificação aplicada com sucesso.")
     setBonusQuantity("1")
     setBonusReason("")
     setBonusTripTitle("")
@@ -253,7 +253,7 @@ export default function MasterSupportPage() {
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Suporte</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Acompanhe chamados enviados pelos portais viajante e agencia.</p>
+          <p className="mt-1 text-sm text-muted-foreground">Acompanhe chamados enviados pelos portais viajante e agência.</p>
         </div>
         <div className="flex items-center gap-2 rounded-2xl border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700">
           <AlertTriangle className="h-4 w-4" />
@@ -266,7 +266,7 @@ export default function MasterSupportPage() {
           <div className="mb-4 flex flex-col gap-3 lg:flex-row">
             <div className="relative flex-1">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar por assunto, usuario ou portal..." className="pl-9" />
+              <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar por assunto, usuário ou portal..." className="pl-9" />
             </div>
             <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as "all" | SupportTicketStatus)} className="h-10 rounded-md border border-input bg-background px-3 text-sm">
               <option value="all">Todos os status</option>
@@ -291,7 +291,7 @@ export default function MasterSupportPage() {
 
             {filteredTickets.map((ticket) => {
               const portalType = typeof ticket.context?.portalType === "string" ? ticket.context.portalType : "traveler"
-              const travelerName = typeof ticket.context?.name === "string" ? ticket.context.name : "Usuario"
+              const travelerName = typeof ticket.context?.name === "string" ? ticket.context.name : "Usuário"
               return (
                 <button
                   key={ticket.id}
@@ -366,18 +366,18 @@ export default function MasterSupportPage() {
             <div className="space-y-5">
               <div className="grid gap-3 rounded-2xl border border-border/60 bg-slate-50 p-4 text-sm text-slate-700 sm:grid-cols-2">
                 <div>
-                  <p className="text-xs uppercase tracking-wide text-slate-500">Usuario</p>
-                  <p className="mt-1 font-medium">{String(detail.ticket.context?.name ?? "Usuario")}</p>
+                  <p className="text-xs uppercase tracking-wide text-slate-500">Usuário</p>
+                  <p className="mt-1 font-medium">{String(detail.ticket.context?.name ?? "Usuário")}</p>
                   <p className="text-xs text-slate-500">{String(detail.ticket.context?.email ?? "Sem email")}</p>
                 </div>
                 <div>
                   <p className="text-xs uppercase tracking-wide text-slate-500">Origem</p>
                   <p className="mt-1 font-medium">{getSupportPortalLabel((detail.ticket.context?.portalType as any) ?? "traveler")}</p>
-                  <p className="text-xs text-slate-500">{String(detail.ticket.context?.currentRoute ?? "Rota nao informada")}</p>
+                  <p className="text-xs text-slate-500">{String(detail.ticket.context?.currentRoute ?? "Rota não informada")}</p>
                 </div>
                 <div>
-                  <p className="text-xs uppercase tracking-wide text-slate-500">Agencia</p>
-                  <p className="mt-1 font-medium">{String(detail.ticket.context?.agencyName ?? detail.ticket.agencyId ?? "Nao vinculada")}</p>
+                  <p className="text-xs uppercase tracking-wide text-slate-500">Agência</p>
+                  <p className="mt-1 font-medium">{String(detail.ticket.context?.agencyName ?? detail.ticket.agencyId ?? "Não vinculada")}</p>
                 </div>
                 <div className="text-xs text-slate-500">
                   Criado em {new Date(detail.ticket.createdAt).toLocaleString("pt-BR")}
@@ -393,7 +393,7 @@ export default function MasterSupportPage() {
               </div>
 
               <div className="space-y-3">
-                <p className="text-sm font-semibold text-slate-900">Historico</p>
+                <p className="text-sm font-semibold text-slate-900">Histórico</p>
                 <div className="max-h-80 space-y-3 overflow-y-auto rounded-2xl border border-border/60 bg-slate-50 p-4">
                   {detail.messages.map((message) => (
                     <div key={message.id} className="rounded-2xl border border-white bg-white p-3 shadow-sm">
@@ -433,7 +433,7 @@ export default function MasterSupportPage() {
                       onChange={(event) => setBonusTarget(event.target.value)}
                       className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900"
                     >
-                      {ticketTargets.length === 0 ? <option value="">Sem conta disponivel</option> : null}
+                      {ticketTargets.length === 0 ? <option value="">Sem conta disponível</option> : null}
                       {ticketTargets.map((target) => (
                         <option key={target.value} value={target.value}>
                           {target.label}
@@ -442,13 +442,13 @@ export default function MasterSupportPage() {
                     </select>
                   </div>
                   <div className="space-y-2">
-                    <label className="text-xs font-medium uppercase tracking-wide text-slate-500">Tipo de bonificacao</label>
+                    <label className="text-xs font-medium uppercase tracking-wide text-slate-500">Tipo de bonificação</label>
                     <select
                       value={bonusType}
                       onChange={(event) => setBonusType(event.target.value as SupportBonusType)}
                       className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900"
                     >
-                      <option value="credits">Creditos extras</option>
+                      <option value="credits">Créditos extras</option>
                       {selectedTargetType === "agency" ? <option value="client_extra">Cliente extra</option> : null}
                       <option value="trip_extra">Viagem extra</option>
                     </select>
@@ -467,7 +467,7 @@ export default function MasterSupportPage() {
                   </div>
                   <div className="space-y-2 md:col-span-2">
                     <label className="text-xs font-medium uppercase tracking-wide text-slate-500">Motivo</label>
-                    <Textarea value={bonusReason} onChange={(event) => setBonusReason(event.target.value)} placeholder="Explique a compensacao aplicada." className="min-h-28" />
+                    <Textarea value={bonusReason} onChange={(event) => setBonusReason(event.target.value)} placeholder="Explique a compensação aplicada." className="min-h-28" />
                   </div>
                 </div>
 
@@ -476,7 +476,7 @@ export default function MasterSupportPage() {
 
                 <div className="flex justify-end">
                   <Button className="bg-gradient-to-r from-primary to-accent text-white" disabled={bonusSubmitting || ticketTargets.length === 0} onClick={() => void handleBonusSubmit()}>
-                    {bonusSubmitting ? "Aplicando..." : "Aplicar bonificacao"}
+                    {bonusSubmitting ? "Aplicando..." : "Aplicar bonificação"}
                   </Button>
                 </div>
               </div>

@@ -138,7 +138,7 @@ function MasterAgenciasPageContent() {
                   <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Clientes vinculados</p>
                   {selectedAgencyClients.length === 0 ? (
                     <div className="rounded-lg border border-white/10 bg-white/5 p-3 text-sm text-muted-foreground">
-                      Nenhum cliente vinculado a esta agencia.
+                      Nenhum cliente vinculado a esta agência.
                     </div>
                   ) : (
                     <div className="space-y-2">
@@ -167,7 +167,7 @@ function MasterAgenciasPageContent() {
       {dataErrors.agencies ? (
         <motion.div variants={fadeInUp}>
           <Card className="border-red-500/20 bg-red-500/5 p-4">
-            <p className="text-sm font-medium text-foreground">Falha ao carregar agencias reais</p>
+            <p className="text-sm font-medium text-foreground">Falha ao carregar agências reais</p>
             <p className="mt-1 text-xs text-muted-foreground">{dataErrors.agencies}</p>
           </Card>
         </motion.div>
@@ -193,7 +193,7 @@ function MasterAgenciasPageContent() {
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Buscar agencias..."
+            placeholder="Buscar agências..."
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.target.value)}
             className="pl-10 bg-black/40 border-white/10 focus:border-primary/50"
@@ -228,7 +228,7 @@ function MasterAgenciasPageContent() {
                 {filteredAgencies.length === 0 ? (
                   <tr>
                     <td colSpan={4} className="px-6 py-10 text-sm text-center text-muted-foreground">
-                      Nenhuma agencia real encontrada.
+                      Nenhuma agência real encontrada.
                     </td>
                   </tr>
                 ) : (

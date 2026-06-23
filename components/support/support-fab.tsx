@@ -17,7 +17,7 @@ const categories: Array<{ value: SupportTicketCategory; label: string }> = [
   { value: "vuei_help", label: "Duvida sobre o Vuei" },
   { value: "technical_issue", label: "Problema tecnico" },
   { value: "billing", label: "Plano ou cobrança" },
-  { value: "credits", label: "Creditos" },
+  { value: "credits", label: "Créditos" },
   { value: "trip_link", label: "Viagem ou link" },
   { value: "other", label: "Outro" },
 ]

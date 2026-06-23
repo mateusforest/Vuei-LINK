@@ -19,7 +19,7 @@ export default function MasterAnalyticsPage() {
   const { stats } = useMaster()
 
   const cards = [
-    { label: "Usuarios", value: stats.totalUsers, icon: Users },
+    { label: "Usuários", value: stats.totalUsers, icon: Users },
     { label: "Agências", value: stats.totalAgencies, icon: Building2 },
     { label: "Viagens", value: stats.totalTrips, icon: Plane },
     { label: "Documentos", value: stats.totalDocuments, icon: FileText },
@@ -29,7 +29,7 @@ export default function MasterAnalyticsPage() {
     <motion.div initial="initial" animate="animate" variants={stagger} className="space-y-8">
       <motion.div variants={fadeInUp} className="space-y-1">
         <h1 className="text-2xl lg:text-3xl font-bold text-foreground tracking-tight">Analytics</h1>
-        <p className="text-sm text-muted-foreground">Leitura resumida dos dados reais disponiveis hoje no Supabase</p>
+        <p className="text-sm text-muted-foreground">Leitura resumida dos dados reais disponíveis hoje no Supabase</p>
       </motion.div>
 
       <motion.div variants={fadeInUp} className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -54,11 +54,11 @@ export default function MasterAnalyticsPage() {
             <div className="p-2 rounded-lg bg-gradient-to-br from-primary/20 to-accent/10 border border-primary/20">
               <BarChart3 className="h-4 w-4 text-primary" />
             </div>
-            <h2 className="text-lg font-semibold text-foreground">Status desta area</h2>
+            <h2 className="text-lg font-semibold text-foreground">Status desta área</h2>
           </div>
           <p className="text-sm text-muted-foreground">
-            O portal master agora exibe contagens reais de usuarios, agencias, viagens e documentos. Analiticos avancados,
-            receitas, churn e projeções ainda nao foram conectados a uma fonte operacional confiavel e por isso nao sao
+            O portal master agora exibe contagens reais de usuários, agências, viagens e documentos. Analíticos avançados,
+            receitas, churn e projeções ainda não foram conectados a uma fonte operacional confiável e por isso não são
             exibidos aqui.
           </p>
         </Card>

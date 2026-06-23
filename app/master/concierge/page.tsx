@@ -81,7 +81,7 @@ export default function MasterConciergePage() {
   const pageStats = [
     { label: "Pendentes", value: conciergeRequests.filter(r => r.status === "pending").length.toString(), change: "aguardando", icon: AlertTriangle },
     { label: "Em andamento", value: conciergeRequests.filter(r => r.status === "in_progress").length.toString(), change: "ativos", icon: MessageSquare },
-    { label: "Resolvidos", value: conciergeRequests.filter(r => r.status === "resolved").length.toString(), change: "historico real", icon: CheckCircle2 },
+    { label: "Resolvidos", value: conciergeRequests.filter(r => r.status === "resolved").length.toString(), change: "histórico real", icon: CheckCircle2 },
     { label: "Mensagens", value: conciergeRequests.reduce((total, request) => total + request.messages.length, 0).toString(), change: "persistidas", icon: Clock },
   ]
 
@@ -253,7 +253,7 @@ export default function MasterConciergePage() {
                   </div>
                   {selectedRequest.agencyName && (
                     <div>
-                      <div className="text-xs text-muted-foreground mb-1">Agencia</div>
+                      <div className="text-xs text-muted-foreground mb-1">Agência</div>
                       <div className="flex items-center gap-1 text-sm">
                         <Building2 className="h-3.5 w-3.5 text-primary" />
                         {selectedRequest.agencyName}
