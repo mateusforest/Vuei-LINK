@@ -620,7 +620,7 @@ export default function ConfiguracoesPage() {
           action: () =>
             openInfoModal(
               "Sessoes ativas",
-              "Em breve voce podera visualizar e encerrar dispositivos conectados a sua conta."
+              "Em breve você poderá visualizar e encerrar dispositivos conectados à sua conta."
             ),
         },
       ],
@@ -679,7 +679,7 @@ export default function ConfiguracoesPage() {
     >
       <motion.div variants={fadeInUp}>
         <h1 className="text-2xl font-bold">Configurações</h1>
-        <p className="text-sm text-muted-foreground">Gerencie sua conta e preferencias</p>
+        <p className="text-sm text-muted-foreground">Gerencie sua conta e preferências</p>
       </motion.div>
 
       <motion.div variants={fadeInUp}>
@@ -938,13 +938,13 @@ export default function ConfiguracoesPage() {
           <DialogHeader>
             <DialogTitle>Biometria / Face ID</DialogTitle>
             <DialogDescription>
-              A autentica??o biom?trica sera usada pelo dispositivo quando houver suporte a WebAuthn/passkey.
+              A autenticação biométrica será usada pelo dispositivo quando houver suporte a WebAuthn/passkey.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="rounded-xl border border-border/50 bg-muted/20 p-4">
               <p className="text-sm text-muted-foreground">
-                Quando ativado, o Vuei salva sua preferencia e pode solicitar biometria do dispositivo em fluxos suportados.
+                Quando ativado, o Vuei salva sua preferência e pode solicitar biometria do dispositivo em fluxos suportados.
               </p>
             </div>
             {!biometricSupported && (
@@ -954,7 +954,7 @@ export default function ConfiguracoesPage() {
             )}
             <div className="flex items-center justify-between rounded-xl border border-border/50 p-4">
               <div>
-                <p className="font-medium">Protecao biom?trica</p>
+                <p className="font-medium">Proteção biométrica</p>
                 <p className="text-sm text-muted-foreground">{settings.faceId ? "Ativa agora" : "Desativada agora"}</p>
               </div>
               <Switch checked={settings.faceId} onCheckedChange={(checked) => setSettings((prev) => ({ ...prev, faceId: checked }))} />
@@ -974,7 +974,7 @@ export default function ConfiguracoesPage() {
         <DialogContent className="portal-dialog max-w-sm border-border/50">
           <DialogHeader>
             <DialogTitle>Configurar PIN</DialogTitle>
-            <DialogDescription>Crie ou altere um PIN de 4 digitos para areas privadas.</DialogDescription>
+            <DialogDescription>Crie ou altere um PIN de 4 dígitos para áreas privadas.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-2">
@@ -1005,7 +1005,7 @@ export default function ConfiguracoesPage() {
               onClick={() => void handleTogglePinPreference()}
               disabled={isSavingSettings}
             >
-              {settings.pinEnabled ? "Desativar PIN atual" : "Ativar prote??o por PIN"}
+              {settings.pinEnabled ? "Desativar PIN atual" : "Ativar proteção por PIN"}
             </Button>
             <div className="flex gap-3">
               <Button variant="outline" className="flex-1" onClick={() => setShowPinModal(false)}>

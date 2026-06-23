@@ -555,7 +555,7 @@ function buildTravelers(count?: number) {
   const total = Math.max(count ?? 1, 1)
 
   return Array.from({ length: total }, (_, index) => ({
-    name: index === 0 ? "Viaj?nte Principal" : `Acompanhante ${index}`,
+    name: index === 0 ? "Viajante Principal" : `Acompanhante ${index}`,
     avatar: "/placeholder.svg?height=40&width=40",
     role: index === 0 ? "principal" : "acompanhante",
   }))
@@ -584,7 +584,7 @@ function normalizeQuickInfo(quickInfo?: any) {
 function normalizeTravelers(travelers?: any, fallbackCount?: number) {
   if (Array.isArray(travelers) && travelers.length > 0) {
     return travelers.map((traveler, index) => ({
-      name: traveler?.name || (index === 0 ? "Viaj?nte Principal" : `Acompanhante ${index}`),
+      name: traveler?.name || (index === 0 ? "Viajante Principal" : `Acompanhante ${index}`),
       avatar: traveler?.avatar || "/placeholder.svg?height=40&width=40",
       role: traveler?.role || (index === 0 ? "principal" : "acompanhante"),
     }))
@@ -1668,7 +1668,7 @@ function TripHeader({
           </div>
           {!isAdmin && (
             <span className="px-2 py-1 text-[10px] rounded-full bg-white/10 text-white/60 border border-white/10">
-              Visualiza??o
+              Visualização
             </span>
           )}
         </div>
@@ -1964,7 +1964,7 @@ function buildTravelerCardSummaries(tripData: any) {
       id: "itinerary" as const,
       icon: MapPin,
       title: "Roteiro",
-      summary: itinerary.length > 0 ? `${itinerary.length} dia(s) planej?do(s)` : "Nenhum roteiro",
+      summary: itinerary.length > 0 ? `${itinerary.length} dia(s) planejado(s)` : "Nenhum roteiro",
       detail: itinerary.length > 0 ? "Abra para ver" : "Monte depois",
       status: itinerary.length > 0 ? "Ver" : "Vazio",
       statusClassName: itinerary.length > 0 ? "text-[#2563eb]" : "text-slate-400",
@@ -2301,7 +2301,7 @@ function EditTripModal({ open, onClose, tripData, onSave }: { open: boolean; onC
   </select>
         </div>
         <Button onClick={handleSave} className="w-full mt-4 bg-gradient-to-r from-[#5de0e6] to-[#004aad] hover:opacity-90 text-white border-0">
-          Salvar altera??es
+          Salvar alterações
         </Button>
       </div>
     </Modal>
@@ -2594,7 +2594,7 @@ function EditFlightModal({ open, onClose, flight, onSave }: { open: boolean; onC
           />
         </div>
         <Button onClick={() => void handleSave()} disabled={saving} className="w-full mt-4 bg-gradient-to-r from-[#5de0e6] to-[#004aad] hover:opacity-90 text-white border-0 disabled:opacity-50">
-          {saving ? "Salvando..." : "Salvar altera??es"}
+          {saving ? "Salvando..." : "Salvar alterações"}
         </Button>
       </div>
     </Modal>
@@ -2838,7 +2838,7 @@ function FlightsSection({
           {ticketDocuments.map((document: any) => (
             <div key={document.id} className="rounded-3xl border border-white/[0.06] bg-white/[0.02] p-5">
               <p className="text-sm font-medium text-white">{document.name}</p>
-              <p className="mt-2 text-xs text-white/40">Passagem anexada. Estamos extraindo as informa??es.</p>
+              <p className="mt-2 text-xs text-white/40">Passagem anexada. Estamos extraindo as informações.</p>
               <p className="mt-1 text-xs text-white/30">{document.mimeType || "Não informado"}</p>
               <div className="mt-4 flex flex-wrap gap-2">
                 <Button size="sm" variant="outline" className="border-white/10 text-white/70" onClick={() => void handleOpenTicketDocument(document)}>
@@ -2874,7 +2874,7 @@ function FlightsSection({
         onTrackExtraction={onTrackExtraction}
         onSave={(data) => {
           onAddFlight(data)
-          showToast("Passagem anexada. Estamos extraindo as informa??es.", "info")
+          showToast("Passagem anexada. Estamos extraindo as informações.", "info")
           setAddingFlight(false)
         }}
       />
@@ -2905,7 +2905,7 @@ function AddFlightModal({ open, onClose, onSave, tripId, ownerUserId, agencyId, 
       return
     }
     if (!ownerUserId && !adminProxyMode) {
-      setError("Esta passagem exige autentica??o real para ser anexada no Supabase. Entre com login para continuar.")
+      setError("Esta passagem exige autenticação real para ser anexada no Supabase. Entre com login para continuar.")
       return
     }
 
@@ -3064,7 +3064,7 @@ function AddFlightModal({ open, onClose, onSave, tripId, ownerUserId, agencyId, 
             <>
               <Upload className="w-8 h-8 mx-auto text-white/40 mb-3" />
               <p className="text-sm text-white/60">Clique para selecionar a passagem</p>
-              <p className="text-xs text-white/30 mt-1">PDF, PNG, JPG, JPEG, HEIC ou HEIF ate 10MB</p>
+              <p className="text-xs text-white/30 mt-1">PDF, PNG, JPG, JPEG, HEIC ou HEIF até 10MB</p>
             </>
           )}
           <input
@@ -3077,7 +3077,7 @@ function AddFlightModal({ open, onClose, onSave, tripId, ownerUserId, agencyId, 
         </label>
 
         <div className="rounded-xl border border-white/[0.08] bg-white/[0.03] p-4">
-          <p className="text-sm text-white/70">A passagem sera salva imediatamente. Algumas informa??es podem aparecer em instantes.</p>
+          <p className="text-sm text-white/70">A passagem será salva imediatamente. Algumas informações podem aparecer em instantes.</p>
         </div>
 
         {error && <p className="text-sm text-red-300">{error}</p>}
@@ -3344,7 +3344,7 @@ function EditHotelModal({ open, onClose, hotel, onSave }: { open: boolean; onClo
           />
         </div>
         <Button onClick={() => void handleSave()} disabled={saving || !formData.name} className="w-full mt-4 bg-gradient-to-r from-[#5de0e6] to-[#004aad] hover:opacity-90 text-white border-0 disabled:opacity-50">
-          {saving ? "Salvando..." : "Salvar altera??es"}
+          {saving ? "Salvando..." : "Salvar alterações"}
         </Button>
       </div>
     </Modal>
@@ -3390,7 +3390,7 @@ function UploadExistingItineraryModal({
     if (!file) return
     if (!ensureSensitiveAccess()) return
     if (!ownerUserId && !adminProxyMode) {
-      setError("Este anexo exige autentica??o real para ser salvo no Supabase. Entre com login para continuar.")
+      setError("Este anexo exige autenticação real para ser salvo no Supabase. Entre com login para continuar.")
       return
     }
 
@@ -3484,7 +3484,7 @@ function UploadExistingItineraryModal({
     <Modal open={open} onClose={onClose} title="Anexar roteiro existente">
       <div className="space-y-4">
         <div>
-          <label className="text-xs text-white/50 uppercase tracking-wider">Titulo do roteiro</label>
+          <label className="text-xs text-white/50 uppercase tracking-wider">Título do roteiro</label>
           <input
             type="text"
             value={title}
@@ -3570,7 +3570,7 @@ function ItinerarySection({
   const hasGenerating = itineraryRecords.some((record) => record.status === "generating")
   const realPlannedDays = calculateTripDayCount(tripData?.startDate, tripData?.endDate)
   const plannedDaysLabel = simpleRecord
-    ? `${realPlannedDays ?? itinerary.length} dia(s) planej?do(s)`
+    ? `${realPlannedDays ?? itinerary.length} dia(s) planejado(s)`
     : documentRecords.length > 0
       ? `${documentRecords.length} roteiro(s) salvo(s)`
       : "Nenhum roteiro criado"
@@ -3732,7 +3732,7 @@ function ItinerarySection({
 
         {hasGenerating ? (
           <div className="mb-6 rounded-3xl border border-[#5de0e6]/20 bg-[#5de0e6]/10 p-6 text-sm text-white/80">
-            Gerando roteiro. Aguarde a finaliza??o no backend para ver o resultado real.
+            Gerando roteiro. Aguarde a finalização no backend para ver o resultado real.
           </div>
         ) : null}
 
@@ -3784,7 +3784,7 @@ function ItinerarySection({
                       <div className="grid gap-3 sm:grid-cols-2">
                         {activeItinerary.tips ? (
                           <div className="rounded-2xl border border-white/8 bg-white/[0.03] p-4">
-                            <p className="text-[10px] uppercase tracking-[0.18em] text-[#5de0e6]/80">Observa??o util</p>
+                            <p className="text-[10px] uppercase tracking-[0.18em] text-[#5de0e6]/80">Observação útil</p>
                             <p className="mt-2 text-sm text-white/70">{activeItinerary.tips}</p>
                           </div>
                         ) : null}
@@ -3976,7 +3976,7 @@ function EditItineraryItemModal({ open, onClose, item, onSave, onDelete }: { ope
           />
         </div>
         <div>
-          <label className="text-xs text-white/50 uppercase tracking-wider">Horario</label>
+          <label className="text-xs text-white/50 uppercase tracking-wider">Horário</label>
           <input
             type="text"
             value={formData.time || ""}
@@ -3992,8 +3992,8 @@ function EditItineraryItemModal({ open, onClose, item, onSave, onDelete }: { ope
   className="w-full mt-1 px-4 py-3 rounded-xl bg-[#0a0a0a] border border-white/[0.08] text-white focus:outline-none focus:border-[#5de0e6]/50 appearance-none"
   style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='rgba(255,255,255,0.4)'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center', backgroundSize: '16px' }}
   >
-  <option value="attraction" className="bg-[#0a0a0a] text-white">Atra??o</option>
-  <option value="food" className="bg-[#0a0a0a] text-white">Alimenta??o</option>
+  <option value="attraction" className="bg-[#0a0a0a] text-white">Atração</option>
+  <option value="food" className="bg-[#0a0a0a] text-white">Alimentação</option>
   <option value="transport" className="bg-[#0a0a0a] text-white">Transporte</option>
   <option value="hotel" className="bg-[#0a0a0a] text-white">Hospedagem</option>
   <option value="experience" className="bg-[#0a0a0a] text-white">Experiencia</option>
@@ -4066,7 +4066,7 @@ function AddItineraryItemModal({ open, onClose, day, onSave }: { open: boolean; 
         </div>
 
         <div>
-          <label className="text-xs text-white/50 uppercase tracking-wider">Horario</label>
+          <label className="text-xs text-white/50 uppercase tracking-wider">Horário</label>
           <input
             type="time"
             value={formData.time}
@@ -4083,8 +4083,8 @@ function AddItineraryItemModal({ open, onClose, day, onSave }: { open: boolean; 
             className="w-full mt-1 px-4 py-3 rounded-xl bg-[#0a0a0a] border border-white/[0.08] text-white focus:outline-none focus:border-[#5de0e6]/50 appearance-none"
             style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='rgba(255,255,255,0.4)'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center', backgroundSize: '16px' }}
           >
-            <option value="attraction" className="bg-[#0a0a0a] text-white">Atra??o</option>
-            <option value="food" className="bg-[#0a0a0a] text-white">Alimenta??o</option>
+            <option value="attraction" className="bg-[#0a0a0a] text-white">Atração</option>
+            <option value="food" className="bg-[#0a0a0a] text-white">Alimentação</option>
             <option value="transport" className="bg-[#0a0a0a] text-white">Transporte</option>
             <option value="hotel" className="bg-[#0a0a0a] text-white">Hospedagem</option>
             <option value="experience" className="bg-[#0a0a0a] text-white">Experiencia</option>
@@ -4670,7 +4670,7 @@ function ViewDocumentModal({
       <div className="text-center py-8">
         <span className="text-6xl">{getDocIcon(document.type)}</span>
         <p className="text-white font-medium mt-4">{document.name}</p>
-        <p className="text-white/40 text-sm mt-2">{document.private ? "Documento Privado" : "Documento Compartilhavel"}</p>
+        <p className="text-white/40 text-sm mt-2">{document.private ? "Documento Privado" : "Documento Compartilhável"}</p>
         
         <div className="mt-8 p-4 rounded-xl bg-white/[0.03] border border-white/[0.06]">
           <p className="text-xs text-white/40">Preview do documento</p>
@@ -4680,7 +4680,7 @@ function ViewDocumentModal({
                 ? offlineDocumentContext?.packageStatus === "legacy_snapshot"
                   ? "Arquivos não são garantidos neste snapshot salvo."
                   : offlineMessage || "Arquivo salvo localmente quando disponível."
-                : "Visualiza??o do PDF/Imagem"}
+                : "Visualização do PDF/Imagem"}
             </p>
           </div>
         </div>
@@ -4744,7 +4744,7 @@ function AddDocumentModal({ open, onClose, onSave, tripId, ownerUserId, agencyId
       return
     }
     if (!ownerUserId && !adminProxyMode) {
-      setError("Este documento exige autentica??o real para ser anexado no Supabase. Entre com login para continuar.")
+      setError("Este documento exige autenticação real para ser anexado no Supabase. Entre com login para continuar.")
       return
     }
     console.log("[DOCUMENT] file selected", file.name)
@@ -4830,7 +4830,7 @@ function AddDocumentModal({ open, onClose, onSave, tripId, ownerUserId, agencyId
             <>
               <Upload className="w-8 h-8 mx-auto text-white/40 mb-3" />
               <p className="text-sm text-white/60">Clique para selecionar um arquivo</p>
-              <p className="text-xs text-white/30 mt-1">PDF, PNG, JPG, JPEG, HEIC ou HEIF ate 10MB</p>
+              <p className="text-xs text-white/30 mt-1">PDF, PNG, JPG, JPEG, HEIC ou HEIF até 10MB</p>
             </>
           )}
           <input type="file" accept=".pdf,.png,.jpg,.jpeg,.heic,.heif,image/heic,image/heif" className="hidden" disabled={uploading} onChange={(e) => void handleUpload(e.target.files?.[0])} />
@@ -4908,7 +4908,7 @@ function ConciergeSection({
   const [open, setOpen] = useState(false)
   const [message, setMessage] = useState("")
   const [messages, setMessages] = useState([
-    { role: "assistant", content: `Ola! Sou o concierge da sua viagem para ${tripData.destination}. Posso ajudar com informa??es reais que j? estej?m adicionadas.` }
+    { role: "assistant", content: `Olá! Sou o concierge da sua viagem para ${tripData.destination}. Posso ajudar com informações reais que já estejam adicionadas.` }
   ])
   const [typing, setTyping] = useState(false)
   const [conversationId, setConversationId] = useState<string | null>(null)
@@ -4921,7 +4921,7 @@ function ConciergeSection({
 
   useEffect(() => {
     setMessages([
-      { role: "assistant", content: `Ola! Sou o concierge da sua viagem para ${tripData.destination}. Posso ajudar com informa??es reais que j? estej?m adicionadas.` }
+      { role: "assistant", content: `Olá! Sou o concierge da sua viagem para ${tripData.destination}. Posso ajudar com informações reais que já estejam adicionadas.` }
     ])
     setConversationId(null)
   }, [tripData.destination])
@@ -4981,7 +4981,7 @@ function ConciergeSection({
         : "Ainda não há hospedagem real adicionada."
     } else if (userMessage.includes("roteiro")) {
       response = hasItinerary
-        ? `Seu roteiro possui ${tripData.itinerary.length} dias planej?dos. Abra a secao de roteiro para ver os detalhes reais.`
+        ? `Seu roteiro possui ${tripData.itinerary.length} dias planejados. Abra a seção de roteiro para ver os detalhes reais.`
         : "Ainda não há roteiro real criado."
     } else if (userMessage.includes("passag")) {
       response = hasFlights
@@ -5076,7 +5076,7 @@ function ConciergeSection({
         setMessages((prev) => [...prev, { role: "assistant", content: response }])
       } catch (error) {
         console.error("[CONCIERGE] request failed", error)
-        showToast("NÃ£o conseguimos responder agora. Tente novamente.", "info")
+        showToast("Não conseguimos responder agora. Tente novamente.", "info")
       } finally {
         setTyping(false)
       }
@@ -5092,7 +5092,7 @@ function ConciergeSection({
           </div>
           <div>
             <h2 className="text-xl font-semibold text-white">Concierge IA</h2>
-            <p className="text-sm text-white/40">Tire duvidas sobre sua viagem</p>
+            <p className="text-sm text-white/40">Tire dúvidas sobre sua viagem</p>
           </div>
         </motion.div>
 
@@ -5481,7 +5481,7 @@ function TripSettingsModal({
   }, [open, tripData.status])
 
   return (
-    <Modal open={open} onClose={onClose} title="Configura??es">
+    <Modal open={open} onClose={onClose} title="Configurações">
       <div className="space-y-4">
         <div>
           <Label className="text-white/60">Preferencias da viagem</Label>
@@ -5670,7 +5670,7 @@ function TripSecurityModal({
             maxLength={4}
             value={pin}
             onChange={(event) => setPin(event.target.value.replace(/\D/g, "").slice(0, 4))}
-            placeholder="Digite 4 digitos"
+            placeholder="Digite 4 dígitos"
             className="text-center text-xl tracking-[0.6em]"
           />
           <Input
@@ -5719,7 +5719,7 @@ function TripSecurityModal({
               {securityMethods.devices.map((device) => (
                 <div key={device.updatedAt} className="rounded-xl border border-white/[0.06] bg-white/[0.03] p-3">
                   <p className="text-sm text-white">{device.label}</p>
-                  <p className="text-xs text-white/40">?ltima atualiza??o: {new Date(device.updatedAt).toLocaleString("pt-BR")}</p>
+                  <p className="text-xs text-white/40">Última atualização: {new Date(device.updatedAt).toLocaleString("pt-BR")}</p>
                 </div>
               ))}
             </div>
@@ -5793,7 +5793,7 @@ function OfflineSection({
 
       showToast(
         routePreparationIncomplete
-          ? "Offline preparado. Feche e abra novamente o link uma vez online para concluir a instala??o offline."
+          ? "Offline preparado. Feche e abra novamente o link uma vez online para concluir a instalação offline."
           : offlineResult.message,
         routePreparationIncomplete || offlineResult.persisted.failures.length > 0 ? "info" : "success",
       )
@@ -5822,7 +5822,7 @@ function OfflineSection({
           <div className="flex flex-col sm:flex-row items-center gap-6">
             <div className="flex-1 text-center sm:text-left">
               <h3 className="text-lg font-medium text-white mb-2">{downloaded ? "Viagem salva offline!" : "Salvar viagem offline"}</h3>
-              <p className="text-sm text-white/40 mb-4">{downloaded ? getOfflineWarningMessage() : "Salve o ultimo resumo, passagens extraidas, hospedagem, documentos j? abertos, roteiro e informa??es rapidas para consultar sem internet."}</p>
+              <p className="text-sm text-white/40 mb-4">{downloaded ? getOfflineWarningMessage() : "Salve o último resumo, passagens extraídas, hospedagem, documentos já abertos, roteiro e informações rápidas para consultar sem internet."}</p>
               
               <div className="flex flex-wrap gap-2 justify-center sm:justify-start">
                 {["Roteiro", "Vouchers", "Documentos", "Contatos"].map((item) => (
@@ -5884,10 +5884,10 @@ function QuickInfoSection({ tripData }: { tripData: any }) {
   const quickInfo = normalizeQuickInfo(tripData?.quickInfo)
 
   const infoCards = [
-    { id: "currency", icon: "💶", label: "Moeda", value: quickInfo.currency.name, sub: `1 ${quickInfo.currency.symbol} = ${quickInfo.currency.rate}`, detail: "Cota??o e disponibilidade podem variar. Consulte fontes locais antes da viagem." },
-    { id: "language", icon: "🗣️", label: "Idioma", value: quickInfo.language, detail: "As informa??es de idioma sao exibidas com base no destino informado da viagem." },
-    { id: "timezone", icon: "🕐", label: "Fuso Horario", value: quickInfo.timezone, detail: "O fuso horario e apresentado a partir do destino configurado. Confirme horarios finais com a opera??o da viagem." },
-    { id: "emergency", icon: "🆘", label: "Emergencia", value: quickInfo.emergency, detail: "Use este numero para emergencias locais quando houver confirma??o do destino." },
+    { id: "currency", icon: "💶", label: "Moeda", value: quickInfo.currency.name, sub: `1 ${quickInfo.currency.symbol} = ${quickInfo.currency.rate}`, detail: "Cotação e disponibilidade podem variar. Consulte fontes locais antes da viagem." },
+    { id: "language", icon: "🗣️", label: "Idioma", value: quickInfo.language, detail: "As informações de idioma são exibidas com base no destino informado da viagem." },
+    { id: "timezone", icon: "🕐", label: "Fuso horário", value: quickInfo.timezone, detail: "O fuso horário é apresentado a partir do destino configurado. Confirme horários finais com a operação da viagem." },
+    { id: "emergency", icon: "🆘", label: "Emergência", value: quickInfo.emergency, detail: "Use este número para emergências locais quando houver confirmação do destino." },
     { id: "embassy", icon: "🏛️", label: "Embaixada BR", value: quickInfo.embassy, detail: "Contato consular exibido conforme o destino informado. Se estiver indisponível, mantenha os contatos da sua agência." },
   ]
 
@@ -5899,8 +5899,8 @@ function QuickInfoSection({ tripData }: { tripData: any }) {
             <AlertCircle className="w-5 h-5 text-white" />
           </div>
           <div>
-            <h2 className="text-xl font-semibold text-white">Informa??es Rapidas</h2>
-            <p className="text-sm text-white/40">Dados ?teis sobre o destino</p>
+            <h2 className="text-xl font-semibold text-white">Informações rápidas</h2>
+            <p className="text-sm text-white/40">Dados úteis sobre o destino</p>
           </div>
         </motion.div>
 
@@ -6394,15 +6394,15 @@ function TravelerPublicSensitiveAccessModal({
   }
 
   return (
-    <Modal tone="light" open={open} onClose={onClose} title="Desbloquear areas sens?veis">
+    <Modal tone="light" open={open} onClose={onClose} title="Desbloquear áreas sensíveis">
       <div className="w-full">
         <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-[linear-gradient(180deg,#eff6ff,#dbeafe)]">
           <Lock className="h-8 w-8 text-[#2563eb]" />
         </div>
         <p className="text-center text-sm leading-6 text-slate-600">
           {quickAccessMethods.pinEnabled || quickAccessMethods.biometricEnabled
-            ? "Use o PIN ou a biometria j? configurados para abrir documentos, passagens, hospedagens e concierge."
-            : "O PIN e configurado pelo responsavel no portal/admin. Neste link voce apenas desbloqueia com um acesso j? existente."}
+            ? "Use o PIN ou a biometria já configurados para abrir documentos, passagens, hospedagens e concierge."
+            : "O PIN é configurado pelo responsável no portal/admin. Neste link você apenas desbloqueia com um acesso já existente."}
         </p>
 
         <div className="mt-6 space-y-3">
@@ -7561,7 +7561,7 @@ export default function TripPage() {
 
       if (attempts >= maxAttempts) {
         flightPollingTimersRef.current.delete(pollingKey)
-        showToast("A anÃ¡lise da passagem ainda estÃ¡ terminando. Atualize novamente em instantes.", "info")
+        showToast("A análise da passagem ainda está terminando. Atualize novamente em instantes.", "info")
         return
       }
 

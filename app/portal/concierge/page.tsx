@@ -33,10 +33,10 @@ type UiMessage = {
 }
 
 const quickSuggestions = [
-  "Qual o endereco da minha hospedagem?",
+  "Qual o endereço da minha hospedagem?",
   "Me mostra meus documentos",
-  "Qual o horario da minha passagem?",
-  "O que tenho planej?do no roteiro?",
+  "Qual o horário da minha passagem?",
+  "O que tenho planejado no roteiro?",
 ]
 
 const attachmentIcons = {
@@ -51,7 +51,7 @@ function buildInitialAssistantMessage(destination: string): UiMessage {
   return {
     id: "assistant-initial",
     role: "assistant",
-    content: `Ola! Sou seu concierge da viagem para ${destination}. Posso responder com base nos dados reais j? adicionados no Vuei.`,
+    content: `Olá! Sou seu concierge da viagem para ${destination}. Posso responder com base nos dados reais já adicionados no Vuei.`,
     timestamp: new Date(),
   }
 }
@@ -65,18 +65,18 @@ function buildTripAwareResponse(
 
   if (normalizedMessage.includes("hosped") || normalizedMessage.includes("hotel")) {
     return {
-      content: "As hospedagens reais ficam dispon?veis no link da viagem. Se ainda n?o aparecer nada, nenhuma hospedagem real foi adicionada.",
+      content: "As hospedagens reais ficam disponíveis no link da viagem. Se ainda não aparecer nada, nenhuma hospedagem real foi adicionada.",
       attachment: {
         type: "hotel",
         title: `Hospedagem em ${destination}`,
-        description: "Consulte a secao de hospedagem da viagem para ver os dados reais.",
+        description: "Consulte a seção de hospedagem da viagem para ver os dados reais.",
       },
     }
   }
 
   if (normalizedMessage.includes("document")) {
     return {
-      content: "Se houver documentos reais anexados a esta viagem, eles aparecem nas secoes protegidas do link e no portal.",
+      content: "Se houver documentos reais anexados a esta viagem, eles aparecem nas seções protegidas do link e no portal.",
       attachment: {
         type: "document",
         title: "Documentos da viagem",
@@ -87,28 +87,28 @@ function buildTripAwareResponse(
 
   if (normalizedMessage.includes("passag") || normalizedMessage.includes("voo")) {
     return {
-      content: "As passagens reais anexadas ficam dispon?veis no link da viagem. Se a secao estiver vazia, ainda n?o ha passagem real cadastrada.",
+      content: "As passagens reais anexadas ficam disponíveis no link da viagem. Se a seção estiver vazia, ainda não há passagem real cadastrada.",
       attachment: {
         type: "flight",
         title: "Passagens da viagem",
-        description: "Arquivos anexados reais ficam dispon?veis no historico da viagem.",
+        description: "Arquivos anexados reais ficam disponíveis no histórico da viagem.",
       },
     }
   }
 
   if (normalizedMessage.includes("roteiro") || normalizedMessage.includes("itiner")) {
     return {
-      content: "Seu roteiro real continua dispon?vel no link inteligente da viagem. Se estiver vazio, ainda n?o foi criado nenhum roteiro.",
+      content: "Seu roteiro real continua disponível no link inteligente da viagem. Se estiver vazio, ainda não foi criado nenhum roteiro.",
       attachment: {
         type: "itinerary",
         title: "Roteiro da viagem",
-        description: "O concierge n?o inventa atividades quando n?o ha roteiro real salvo.",
+        description: "O concierge não inventa atividades quando não há roteiro real salvo.",
       },
     }
   }
 
   return {
-    content: `Entendi. Vou considerar apenas os dados reais dispon?veis hoje para ${destination} ao continuar te ajudando por aqui.`,
+    content: `Entendi. Vou considerar apenas os dados reais disponíveis hoje para ${destination} ao continuar te ajudando por aqui.`,
   }
 }
 
@@ -135,7 +135,7 @@ async function requestRealConciergeReply(payload: {
   if (!response.ok) {
     return {
       ok: false as const,
-      error: data?.error || "N?o foi poss?vel obter uma resposta real do concierge.",
+      error: data?.error || "Não foi possível obter uma resposta real do concierge.",
     }
   }
 
@@ -309,7 +309,7 @@ export default function ConciergePage() {
         <MessageSquare className="mb-4 h-16 w-16 text-muted-foreground" />
         <h2 className="text-xl font-semibold text-foreground">Concierge da viagem</h2>
         <p className="mt-2 max-w-md text-sm text-muted-foreground">
-          Crie uma viagem real primeiro para iniciar um historico real do concierge.
+          Crie uma viagem real primeiro para iniciar um histórico real do concierge.
         </p>
       </div>
     )
@@ -469,7 +469,7 @@ export default function ConciergePage() {
           </Button>
         </div>
         <p className="text-[10px] text-muted-foreground text-center mt-2">
-          O historico fica vinculado a viagem real selecionada no seu portal.
+          O histórico fica vinculado à viagem real selecionada no seu portal.
         </p>
       </motion.div>
     </div>

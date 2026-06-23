@@ -155,7 +155,7 @@ export default function DocumentosPage() {
 
   const verifyPin = async () => {
     if (!quickAccessOwnerId) {
-      setPinErrorMessage("Faca login novamente para liberar documentos privados desta conta.")
+      setPinErrorMessage("Faça login novamente para liberar documentos privados desta conta.")
       return
     }
 
@@ -170,7 +170,7 @@ export default function DocumentosPage() {
     try {
       const isValid = await verifyQuickAccessPin(quickAccessOwnerId, pin, { profileSettings: profile?.settings })
       if (!isValid) {
-        setPinErrorMessage("PIN invalido.")
+        setPinErrorMessage("PIN inválido.")
         return
       }
 
@@ -188,12 +188,12 @@ export default function DocumentosPage() {
 
   const handleBiometricUnlock = async () => {
     if (!quickAccessOwnerId) {
-      setPinErrorMessage("Faca login novamente para liberar documentos privados desta conta.")
+      setPinErrorMessage("Faça login novamente para liberar documentos privados desta conta.")
       return
     }
 
     if (!quickAccessMethods.biometricEnabled) {
-      setPinErrorMessage("Biometria nao configurada neste dispositivo.")
+      setPinErrorMessage("Biometria não configurada neste dispositivo.")
       return
     }
 
@@ -237,7 +237,7 @@ export default function DocumentosPage() {
 
     const validation = validateDocumentFile(selectedFile)
     if (!validation.valid) {
-      setErrorMessage(validation.error ?? "Arquivo invalido.")
+      setErrorMessage(validation.error ?? "Arquivo inválido.")
       return
     }
 
@@ -295,7 +295,7 @@ export default function DocumentosPage() {
 
     setDocuments((prev) => prev.filter((document) => document.id !== documentId))
     setSelectedDoc((prev) => (prev?.id === documentId ? null : prev))
-    setToastMessage("Documento excluido.")
+    setToastMessage("Documento excluído.")
   }
 
   const handleTogglePrivacy = async (document: Document) => {
@@ -311,12 +311,12 @@ export default function DocumentosPage() {
     }
 
     setDocuments((prev) => prev.map((item) => (item.id === document.id ? result.data! : item)))
-    setToastMessage(nextPrivate ? "Documento privado." : "Documento compartilhavel.")
+    setToastMessage(nextPrivate ? "Documento privado." : "Documento compartilhável.")
   }
 
   const handleDownload = async (document: Document) => {
     if (!document.filePath && !document.fileUrl) {
-      setErrorMessage("Este documento ainda nao possui arquivo anexado.")
+      setErrorMessage("Este documento ainda não possui arquivo anexado.")
       return
     }
 
@@ -361,7 +361,7 @@ export default function DocumentosPage() {
             <div>
               <h3 className="font-medium text-sm">Documentos protegidos</h3>
               <p className="text-xs text-muted-foreground mt-1">
-                Documentos privados nao aparecem no link compartilhavel e exigem verificacao local antes da visualizacao.
+                Documentos privados não aparecem no link compartilhável e exigem verificação local antes da visualização.
               </p>
             </div>
           </div>
@@ -484,7 +484,7 @@ export default function DocumentosPage() {
           <div className="flex items-start gap-3">
             <AlertCircle size={18} className="text-muted-foreground shrink-0 mt-0.5" />
             <div className="text-sm text-muted-foreground">
-              <p>Documentos privados ficam visiveis apenas dentro do portal e nao entram no link publico.</p>
+              <p>Documentos privados ficam visíveis apenas dentro do portal e não entram no link público.</p>
               <p className="mt-1">Somente arquivos realmente anexados aparecem nesta area. Sem fallback de documentos falsos.</p>
             </div>
           </div>
@@ -590,7 +590,7 @@ export default function DocumentosPage() {
                 <span className="text-sm font-medium">Documento privado</span>
               </div>
               <Button type="button" variant="ghost" size="sm" className="text-xs" onClick={() => setUploadForm((prev) => ({ ...prev, isPrivate: !prev.isPrivate }))}>
-                {uploadForm.isPrivate ? "Ativado" : "Compartilhavel"}
+                {uploadForm.isPrivate ? "Ativado" : "Compartilhável"}
               </Button>
             </div>
           </div>
@@ -623,12 +623,12 @@ export default function DocumentosPage() {
             <div className="space-y-4 py-2">
               <div className="rounded-xl border border-border/50 bg-muted/20 p-4 text-sm text-muted-foreground">
                 <p>Tipo: {selectedDoc.type}</p>
-                <p>Visibilidade: {selectedDoc.isPrivate ? "Privado" : "Compartilhavel"}</p>
+                <p>Visibilidade: {selectedDoc.isPrivate ? "Privado" : "Compartilhável"}</p>
                 <p>Tamanho: {selectedDoc.size ? formatFileSize(selectedDoc.size) : "Não informado"}</p>
               </div>
               <div className="flex gap-3">
                 <Button variant="outline" className="flex-1" onClick={() => void handleTogglePrivacy(selectedDoc)}>
-                  {selectedDoc.isPrivate ? "Tornar publico" : "Tornar privado"}
+                  {selectedDoc.isPrivate ? "Tornar público" : "Tornar privado"}
                 </Button>
                 <Button className="flex-1" onClick={() => void handleDownload(selectedDoc)}>
                   <Download size={16} className="mr-2" />

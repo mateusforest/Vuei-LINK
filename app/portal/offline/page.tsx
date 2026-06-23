@@ -116,7 +116,7 @@ function mapStoredPackageItems(pkg: OfflineStoredTripPackage): OfflineTripPackag
 
   return [
     { id: "summary", name: "Resumo da viagem", type: "summary", sizeLabel: formatSizeLabel(payload.trip), saved: true },
-    { id: "flight", name: "Passagens extraidas", type: "flight", sizeLabel: formatSizeLabel(payload.flights), saved: Array.isArray(payload.flights) && payload.flights.length > 0 },
+    { id: "flight", name: "Passagens extraídas", type: "flight", sizeLabel: formatSizeLabel(payload.flights), saved: Array.isArray(payload.flights) && payload.flights.length > 0 },
     { id: "hotel", name: "Hospedagem", type: "hotel", sizeLabel: formatSizeLabel(payload.hotels), saved: Array.isArray(payload.hotels) && payload.hotels.length > 0 },
     { id: "itinerary", name: "Roteiro", type: "itinerary", sizeLabel: formatSizeLabel(payload.itineraries), saved: Array.isArray(payload.itineraries) && payload.itineraries.length > 0 },
     { id: "quick_info", name: "Informacoes rapidas", type: "quick_info", sizeLabel: formatSizeLabel(payload.quickInfo), saved: Boolean(payload.quickInfo) },
@@ -131,7 +131,7 @@ function mapStoredPackageWarning(pkg: OfflineStoredTripPackage) {
 
   const failures = Array.isArray(pkg.payload?.offlineMeta?.failures) ? pkg.payload.offlineMeta.failures : []
   if (failures.length > 0) {
-    return "Pacote offline salvo parcialmente. Alguns arquivos podem nao estar disponiveis offline."
+    return "Pacote offline salvo parcialmente. Alguns arquivos podem não estar disponíveis offline."
   }
 
   return getOfflineWarningMessage()
@@ -201,7 +201,7 @@ export default function OfflinePage() {
       <motion.div variants={fadeInUp} className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">Modo Offline</h1>
-          <p className="text-sm text-muted-foreground">Acesse o ultimo pacote salvo da sua viagem sem internet</p>
+          <p className="text-sm text-muted-foreground">Acesse o último pacote salvo da sua viagem sem internet</p>
         </div>
         <Badge className={statusMeta.badgeClass}>
           {latestPackage ? <CheckCircle2 size={14} className="mr-1" /> : <AlertCircle size={14} className="mr-1" />}
@@ -307,7 +307,7 @@ export default function OfflinePage() {
             </div>
             <Progress value={storageUsage} className="h-2" />
             <p className="text-xs text-muted-foreground">
-              O pacote offline inclui resumo da viagem, passagens extraidas, hospedagem, roteiro, documentos ja abertos e informacoes rapidas.
+              O pacote offline inclui resumo da viagem, passagens extraídas, hospedagem, roteiro, documentos já abertos e informações rápidas.
             </p>
           </div>
         </Card>
@@ -319,7 +319,7 @@ export default function OfflinePage() {
             <AlertCircle size={18} className="text-muted-foreground shrink-0 mt-0.5" />
             <div className="text-sm text-muted-foreground">
               <p>{getOfflineWarningMessage()}</p>
-              <p className="mt-1">O pacote offline nao promete concierge online, clima atualizado ou novos anexos sem internet.</p>
+              <p className="mt-1">O pacote offline não promete concierge online, clima atualizado ou novos anexos sem internet.</p>
             </div>
           </div>
         </Card>

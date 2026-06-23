@@ -62,7 +62,7 @@ export default function CompartilharPage() {
       setTimeout(() => setAdminCopied(false), 2000)
     } else {
       setShareCopied(true)
-      setShareFeedback("Link compartilh?vel copiado.")
+      setShareFeedback("Link compartilhável copiado.")
       setTimeout(() => setShareCopied(false), 2000)
     }
   }
@@ -71,7 +71,7 @@ export default function CompartilharPage() {
     const result = await ensureTripIsPublic(trip.id)
     if (result.error) {
       console.error("[TRIP] publish before share error", result.error)
-      setShareFeedback("N?o foi poss?vel publicar a viagem para compartilhamento.")
+      setShareFeedback("Não foi possível publicar a viagem para compartilhamento.")
       return false
     }
     return true
@@ -88,7 +88,7 @@ export default function CompartilharPage() {
       >
         <motion.div variants={fadeInUp}>
           <h1 className="text-2xl font-bold">Compartilhamento</h1>
-          <p className="text-sm text-muted-foreground">Compartilhe sua viagem com familia e amigos</p>
+          <p className="text-sm text-muted-foreground">Compartilhe sua viagem com família e amigos</p>
         </motion.div>
 
         <motion.div variants={fadeInUp}>
@@ -98,7 +98,7 @@ export default function CompartilharPage() {
             </div>
             <h3 className="text-lg font-semibold mb-2">Crie uma viagem primeiro</h3>
             <p className="text-muted-foreground text-sm mb-6">
-              Para compartilhar, voce precisa criar uma viagem.
+              Para compartilhar, você precisa criar uma viagem.
             </p>
             <CreateTripButton 
               className="bg-gradient-to-r from-[#5de0e6] to-[#004aad] text-white border-0"

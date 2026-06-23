@@ -251,7 +251,7 @@ export default function CriarViagemPage() {
           setErrorMessage(result.error)
           return
         } else {
-          setErrorMessage("N?o foi poss?vel criar a viagem no Supabase.")
+          setErrorMessage("Não foi possível criar a viagem no Supabase.")
           return
         }
       } else if (shouldUseSupabase() && !user) {
@@ -330,7 +330,7 @@ export default function CriarViagemPage() {
           {step === 1 && !isComplete && (
             <motion.div key="step1" {...fadeInUp} className="space-y-6">
               <div className="space-y-2">
-                <h2 className="text-2xl font-bold">Como voce quer chamar essa viagem?</h2>
+                <h2 className="text-2xl font-bold">Como você quer chamar essa viagem?</h2>
                 <p className="text-muted-foreground">
                   De um nome especial para sua aventura.
                 </p>
@@ -363,7 +363,7 @@ export default function CriarViagemPage() {
           {step === 2 && !isComplete && (
             <motion.div key="step2" {...fadeInUp} className="space-y-6">
               <div className="space-y-2">
-                <h2 className="text-2xl font-bold">Para onde voce vai?</h2>
+                <h2 className="text-2xl font-bold">Para onde você vai?</h2>
                 <p className="text-muted-foreground">
                   Digite o destino principal da sua viagem.
                 </p>
@@ -425,7 +425,7 @@ export default function CriarViagemPage() {
           {step === 3 && !isComplete && (
             <motion.div key="step3" {...fadeInUp} className="space-y-6">
               <div className="space-y-2">
-                <h2 className="text-2xl font-bold">Quando sera a viagem?</h2>
+                <h2 className="text-2xl font-bold">Quando será a viagem?</h2>
                 <p className="text-muted-foreground">
                   Selecione as datas de ida e volta.
                 </p>
@@ -459,7 +459,7 @@ export default function CriarViagemPage() {
               </div>
 
               {formData.startDate && formData.endDate && formData.endDate < formData.startDate ? (
-                <p className="text-sm text-red-400">A data de volta n?o pode ser anterior a data de ida.</p>
+                <p className="text-sm text-red-400">A data de volta não pode ser anterior à data de ida.</p>
               ) : null}
 
               {tripDays ? (
@@ -524,7 +524,7 @@ export default function CriarViagemPage() {
           {step === 5 && !isComplete && (
             <motion.div key="step5" {...fadeInUp} className="space-y-6">
               <div className="space-y-2">
-                <h2 className="text-2xl font-bold">Quem vai viaj?r com voce?</h2>
+                <h2 className="text-2xl font-bold">Quem vai viajar com você?</h2>
                 <p className="text-muted-foreground">
                   Selecione o tipo de grupo.
                 </p>
@@ -554,7 +554,7 @@ export default function CriarViagemPage() {
                       <div className="flex-1">
                         <h3 className="font-medium">{type.label}</h3>
                         <p className="text-sm text-muted-foreground">
-                          {type.count === 1 ? '1 pessoa' : `ate ${type.count} pessoas`}
+                          {type.count === 1 ? '1 pessoa' : `até ${type.count} pessoas`}
                         </p>
                       </div>
                       {formData.companions === type.id && (
@@ -576,7 +576,7 @@ export default function CriarViagemPage() {
               <div className="space-y-2">
                 <h2 className="text-2xl font-bold">Criando sua viagem...</h2>
                 <p className="text-muted-foreground">
-                  Estamos preparando tudo para voce.
+                  Estamos preparando tudo para você.
                 </p>
               </div>
             </motion.div>
@@ -692,7 +692,7 @@ export default function CriarViagemPage() {
         </div>
       )}
 
-      <Toast message={copiedLink === "admin" ? "Link admin copiado!" : "Link publico copiado!"} visible={!!copiedLink} />
+      <Toast message={copiedLink === "admin" ? "Link admin copiado!" : "Link público copiado!"} visible={!!copiedLink} />
       <PortalActionDialog
         open={showLimitDialog}
         onOpenChange={setShowLimitDialog}
