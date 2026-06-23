@@ -152,7 +152,7 @@ function Modal({
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
             className={cn(
-              "fixed inset-4 z-50 max-h-[90vh] overflow-auto rounded-3xl sm:inset-auto sm:left-1/2 sm:w-full sm:max-w-lg sm:-translate-x-1/2 sm:-translate-y-1/2 sm:top-1/2",
+              "fixed inset-3 z-50 max-h-[calc(100vh-1.5rem)] overflow-y-auto overscroll-contain rounded-3xl sm:inset-auto sm:left-1/2 sm:w-full sm:max-w-lg sm:-translate-x-1/2 sm:-translate-y-1/2 sm:top-1/2 sm:max-h-[90vh]",
               resolvedTone === "light"
                 ? "border border-slate-200 bg-[linear-gradient(180deg,#ffffff_0%,#f7f4ee_100%)] shadow-[0_24px_60px_rgba(148,163,184,0.26)]"
                 : "border border-white/10 bg-[#0a0a0a] shadow-2xl",
@@ -171,7 +171,7 @@ function Modal({
                 </button>
               </div>
             )}
-            <div className={cn("p-5", resolvedTone === "light" ? "trip-link-light-shell" : "")}>{children}</div>
+            <div className={cn("p-5 pb-[calc(env(safe-area-inset-bottom)+20px)]", resolvedTone === "light" ? "trip-link-light-shell" : "")}>{children}</div>
           </motion.div>
         </>
       )}
@@ -2469,16 +2469,25 @@ function FlightCard({
 }
 
 // Edit Flight Modal
-function EditFlightModal({ open, onClose, flight, onSave }: { open: boolean; onClose: () => void; flight: any; onSave: (data: any) => void }) {
+function EditFlightModal({ open, onClose, flight, onSave }: { open: boolean; onClose: () => void; flight: any; onSave: (data: any) => Promise<boolean> }) {
   const [formData, setFormData] = useState(flight || {})
+  const [saving, setSaving] = useState(false)
 
   useEffect(() => {
     if (flight) setFormData(flight)
   }, [flight])
 
-  const handleSave = () => {
-    onSave(formData)
-    onClose()
+  const handleSave = async () => {
+    if (saving) return
+    setSaving(true)
+    try {
+      const success = await onSave(formData)
+      if (success) {
+        onClose()
+      }
+    } finally {
+      setSaving(false)
+    }
   }
 
   if (!flight) return null
@@ -2486,7 +2495,7 @@ function EditFlightModal({ open, onClose, flight, onSave }: { open: boolean; onC
   return (
     <Modal open={open} onClose={onClose} title={`Editar passagem ${flight.flightNumber || ""}`.trim()}>
       <div className="space-y-4">
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
             <label className="text-xs text-white/50 uppercase tracking-wider">Companhia</label>
             <input
@@ -2506,7 +2515,7 @@ function EditFlightModal({ open, onClose, flight, onSave }: { open: boolean; onC
             />
           </div>
         </div>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
             <label className="text-xs text-white/50 uppercase tracking-wider">Origem</label>
             <input
@@ -2526,7 +2535,7 @@ function EditFlightModal({ open, onClose, flight, onSave }: { open: boolean; onC
             />
           </div>
         </div>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
             <label className="text-xs text-white/50 uppercase tracking-wider">Localizador</label>
             <input
@@ -2546,7 +2555,7 @@ function EditFlightModal({ open, onClose, flight, onSave }: { open: boolean; onC
             />
           </div>
         </div>
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <div>
             <label className="text-xs text-white/50 uppercase tracking-wider">Terminal</label>
             <input
@@ -2584,8 +2593,8 @@ function EditFlightModal({ open, onClose, flight, onSave }: { open: boolean; onC
             className="w-full mt-1 px-4 py-3 rounded-xl bg-white/[0.05] border border-white/[0.08] text-white focus:outline-none focus:border-[#5de0e6]/50"
           />
         </div>
-        <Button onClick={handleSave} className="w-full mt-4 bg-gradient-to-r from-[#5de0e6] to-[#004aad] hover:opacity-90 text-white border-0">
-          Salvar altera??es
+        <Button onClick={() => void handleSave()} disabled={saving} className="w-full mt-4 bg-gradient-to-r from-[#5de0e6] to-[#004aad] hover:opacity-90 text-white border-0 disabled:opacity-50">
+          {saving ? "Salvando..." : "Salvar altera??es"}
         </Button>
       </div>
     </Modal>
@@ -2719,7 +2728,7 @@ function FlightsSection({
   loading: boolean
   offlineReadOnly: boolean
   offlineDocumentContext: OfflineDocumentContext | null
-  onUpdateFlight: (id: string, data: any) => Promise<void>
+  onUpdateFlight: (id: string, data: any) => Promise<boolean>
   onAddFlight: (data: any) => void
   onDeleteFlight: (flightId: string) => Promise<void>
   onDeleteDocument: (documentId: string) => Promise<void>
@@ -2743,8 +2752,10 @@ function FlightsSection({
   const ticketDocuments = Array.isArray(tripData.documents) ? tripData.documents.filter((document: any) => document.type === "ticket" && !flights.some((flight: any) => flight.document?.id === document.id)) : []
 
   const handleSaveFlight = async (data: any) => {
-    await onUpdateFlight(data.id, data)
+    const success = await onUpdateFlight(data.id, data)
+    if (!success) return false
     showToast("Voo atualizado com sucesso!", "success")
+    return true
   }
 
   const handleOpenTicketDocument = async (document: any) => {
@@ -2847,7 +2858,7 @@ function FlightsSection({
         )}
       </div>
 
-      <EditFlightModal open={!!editingFlight} onClose={() => setEditingFlight(null)} flight={editingFlight} onSave={(data) => void handleSaveFlight(data)} />
+      <EditFlightModal open={!!editingFlight} onClose={() => setEditingFlight(null)} flight={editingFlight} onSave={handleSaveFlight} />
       <QRCodeModal open={!!viewingQR} onClose={() => setViewingQR(null)} flight={viewingQR} />
       <FlightDetailsModal open={!!selectedFlight} onClose={() => setSelectedFlight(null)} flight={selectedFlight} onOpenDocument={handleOpenTicketDocument} />
       <AddFlightModal
@@ -3043,7 +3054,7 @@ function AddFlightModal({ open, onClose, onSave, tripId, ownerUserId, agencyId, 
           />
         </div>
 
-        <label className="block p-8 rounded-xl border-2 border-dashed border-white/10 hover:border-[#5de0e6]/30 transition-colors text-center cursor-pointer">
+        <label className={cn("block rounded-xl border-2 border-dashed border-white/10 p-8 text-center transition-colors", uploading ? "cursor-not-allowed opacity-70" : "cursor-pointer hover:border-[#5de0e6]/30")}>
           {uploading ? (
             <div className="flex flex-col items-center gap-3">
               <div className="w-8 h-8 border-2 border-white/30 border-t-[#5de0e6] rounded-full animate-spin" />
@@ -3060,6 +3071,7 @@ function AddFlightModal({ open, onClose, onSave, tripId, ownerUserId, agencyId, 
             type="file"
             accept=".pdf,.png,.jpg,.jpeg,.heic,.heif,image/heic,image/heif"
             className="hidden"
+            disabled={uploading}
             onChange={(e) => void handleFileUpload(e.target.files?.[0])}
           />
         </label>
@@ -3083,7 +3095,7 @@ function HotelSection({
 }: {
   tripData: any
   loading: boolean
-  onSaveHotel: (data: any) => void
+  onSaveHotel: (data: any) => Promise<boolean>
   onDeleteHotel: (hotelId: string) => void
 }) {
   const [editing, setEditing] = useState(false)
@@ -3246,26 +3258,32 @@ function HotelSection({
         )}
       </div>
 
-      <EditHotelModal
-        open={editing}
-        onClose={() => setEditing(false)}
-        hotel={selectedHotel ?? {}}
-        onSave={(data) => {
-          void onSaveHotel(data)
-          setEditing(false)
-        }}
-      />
+      <EditHotelModal open={editing} onClose={() => setEditing(false)} hotel={selectedHotel ?? {}} onSave={onSaveHotel} />
     </section>
   )
 }
 
 // Edit Hotel Modal
-function EditHotelModal({ open, onClose, hotel, onSave }: { open: boolean; onClose: () => void; hotel: any; onSave: (data: any) => void }) {
+function EditHotelModal({ open, onClose, hotel, onSave }: { open: boolean; onClose: () => void; hotel: any; onSave: (data: any) => Promise<boolean> }) {
   const [formData, setFormData] = useState(hotel)
+  const [saving, setSaving] = useState(false)
 
   useEffect(() => {
     setFormData(hotel || {})
   }, [hotel])
+
+  const handleSave = async () => {
+    if (saving || !formData.name) return
+    setSaving(true)
+    try {
+      const success = await onSave(formData)
+      if (success) {
+        onClose()
+      }
+    } finally {
+      setSaving(false)
+    }
+  }
 
   return (
     <Modal open={open} onClose={onClose} title={formData?.id ? "Editar Hospedagem" : "Adicionar Hospedagem"}>
@@ -3288,7 +3306,7 @@ function EditHotelModal({ open, onClose, hotel, onSave }: { open: boolean; onClo
             className="w-full mt-1 px-4 py-3 rounded-xl bg-white/[0.05] border border-white/[0.08] text-white focus:outline-none focus:border-[#5de0e6]/50"
           />
         </div>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
             <label className="text-xs text-white/50 uppercase tracking-wider">Check-in</label>
             <input
@@ -3325,8 +3343,8 @@ function EditHotelModal({ open, onClose, hotel, onSave }: { open: boolean; onClo
             className="w-full mt-1 min-h-24 px-4 py-3 rounded-xl bg-white/[0.05] border border-white/[0.08] text-white focus:outline-none focus:border-[#5de0e6]/50"
           />
         </div>
-        <Button onClick={() => onSave(formData)} disabled={!formData.name} className="w-full mt-4 bg-gradient-to-r from-[#5de0e6] to-[#004aad] hover:opacity-90 text-white border-0 disabled:opacity-50">
-          Salvar altera??es
+        <Button onClick={() => void handleSave()} disabled={saving || !formData.name} className="w-full mt-4 bg-gradient-to-r from-[#5de0e6] to-[#004aad] hover:opacity-90 text-white border-0 disabled:opacity-50">
+          {saving ? "Salvando..." : "Salvar altera??es"}
         </Button>
       </div>
     </Modal>
@@ -3382,6 +3400,7 @@ function UploadExistingItineraryModal({
       return
     }
 
+    const resolvedMimeType = resolveDocumentMimeType(file)
     setUploading(true)
     setError("")
 
@@ -3418,7 +3437,7 @@ function UploadExistingItineraryModal({
             type: "itinerary",
             filePath: uploadResult.data.path,
             fileUrl: uploadResult.data.fileUrl,
-            mimeType: file.type,
+            mimeType: resolvedMimeType,
             size: file.size,
             isPrivate: false,
             visibility: "public_trip",
@@ -3475,7 +3494,7 @@ function UploadExistingItineraryModal({
           />
         </div>
 
-        <label className="block p-8 rounded-xl border-2 border-dashed border-white/10 hover:border-[#5de0e6]/30 transition-colors text-center cursor-pointer">
+        <label className={cn("block rounded-xl border-2 border-dashed border-white/10 p-8 text-center transition-colors", uploading ? "cursor-not-allowed opacity-70" : "cursor-pointer hover:border-[#5de0e6]/30")}>
           {uploading ? (
             <div className="flex flex-col items-center gap-3">
               <div className="w-8 h-8 border-2 border-white/30 border-t-[#5de0e6] rounded-full animate-spin" />
@@ -3488,7 +3507,7 @@ function UploadExistingItineraryModal({
               <p className="text-xs text-white/30 mt-1">Sem leitura de IA e sem consumo de créditos</p>
             </>
           )}
-          <input type="file" accept=".pdf,.png,.jpg,.jpeg,.doc,.docx" className="hidden" onChange={(event) => void handleUpload(event.target.files?.[0])} />
+          <input type="file" accept=".pdf,.png,.jpg,.jpeg,.heic,.heif,image/heic,image/heif" className="hidden" disabled={uploading} onChange={(event) => void handleUpload(event.target.files?.[0])} />
         </label>
 
         {error ? <p className="text-sm text-red-300">{error}</p> : null}
@@ -4736,6 +4755,7 @@ function AddDocumentModal({ open, onClose, onSave, tripId, ownerUserId, agencyId
       return
     }
 
+    const resolvedMimeType = resolveDocumentMimeType(file)
     setUploading(true)
     const savedDocument = adminProxyMode
       ? await (async () => {
@@ -4772,7 +4792,7 @@ function AddDocumentModal({ open, onClose, onSave, tripId, ownerUserId, agencyId
             type: formData.type,
             filePath: uploadResult.data.path,
             fileUrl: uploadResult.data.fileUrl,
-            mimeType: file.type,
+            mimeType: resolvedMimeType,
             size: file.size,
             isPrivate: formData.private,
             visibility: formData.private ? "private" : "public_trip",
@@ -4800,11 +4820,20 @@ function AddDocumentModal({ open, onClose, onSave, tripId, ownerUserId, agencyId
   return (
     <Modal open={open} onClose={onClose} title="Adicionar Documento">
       <div className="space-y-4">
-        <label className="block p-8 rounded-xl border-2 border-dashed border-white/10 hover:border-[#5de0e6]/30 transition-colors text-center cursor-pointer">
-          <Upload className="w-8 h-8 mx-auto text-white/40 mb-3" />
-          <p className="text-sm text-white/60">Clique para selecionar um arquivo</p>
-          <p className="text-xs text-white/30 mt-1">PDF, PNG, JPG ate 10MB</p>
-          <input type="file" accept=".pdf,.png,.jpg,.jpeg" className="hidden" onChange={(e) => void handleUpload(e.target.files?.[0])} />
+        <label className={cn("block rounded-xl border-2 border-dashed border-white/10 p-8 text-center transition-colors", uploading ? "cursor-not-allowed opacity-70" : "cursor-pointer hover:border-[#5de0e6]/30")}>
+          {uploading ? (
+            <div className="flex flex-col items-center gap-3">
+              <div className="w-8 h-8 border-2 border-white/30 border-t-[#5de0e6] rounded-full animate-spin" />
+              <p className="text-sm text-white/60">Enviando documento...</p>
+            </div>
+          ) : (
+            <>
+              <Upload className="w-8 h-8 mx-auto text-white/40 mb-3" />
+              <p className="text-sm text-white/60">Clique para selecionar um arquivo</p>
+              <p className="text-xs text-white/30 mt-1">PDF, PNG, JPG, JPEG, HEIC ou HEIF ate 10MB</p>
+            </>
+          )}
+          <input type="file" accept=".pdf,.png,.jpg,.jpeg,.heic,.heif,image/heic,image/heif" className="hidden" disabled={uploading} onChange={(e) => void handleUpload(e.target.files?.[0])} />
         </label>
 
         <div>
@@ -4849,17 +4878,6 @@ function AddDocumentModal({ open, onClose, onSave, tripId, ownerUserId, agencyId
           </div>
         </div>
         {error && <p className="text-sm text-red-300">{error}</p>}
-
-        <Button onClick={handleUpload} disabled={uploading || !formData.name} className="w-full bg-gradient-to-r from-[#5de0e6] to-[#004aad] hover:opacity-90 text-white border-0 disabled:opacity-50">
-          {uploading ? (
-            <div className="flex items-center gap-2">
-              <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-              Enviando...
-            </div>
-          ) : (
-            "Adicionar Documento"
-          )}
-        </Button>
       </div>
     </Modal>
   )
@@ -5027,38 +5045,42 @@ function ConciergeSection({
     setMessage("")
     setTyping(true)
 
-    window.setTimeout(async () => {
-      if (shouldUseSupabase() && tripData?.id) {
-        const result = await requestRealConciergeReply(userMessage)
+    void (async () => {
+      try {
+        if (shouldUseSupabase() && tripData?.id) {
+          const result = await requestRealConciergeReply(userMessage)
 
-        if (!result.ok) {
-          console.error("[CONCIERGE] real response error", result.error)
-          showToast(resolvePublicTripErrorMessage(result.error), "info")
-          setTyping(false)
+          if (!result.ok) {
+            console.error("[CONCIERGE] real response error", result.error)
+            showToast(resolvePublicTripErrorMessage(result.error), "info")
+            return
+          }
+
+          if (result.conversationId) {
+            setConversationId(result.conversationId)
+          }
+
+          if (result.warning) {
+            showToast(result.warning, "info")
+          }
+
+          if (!result.warning && result.creditsCharged > 0) {
+            dispatchCreditBalanceChanged({ amount: result.creditsCharged, feature: "concierge" })
+          }
+
+          setMessages((prev) => [...prev, { role: "assistant", content: result.assistantMessage }])
           return
         }
 
-        if (result.conversationId) {
-          setConversationId(result.conversationId)
-        }
-
-        if (result.warning) {
-          showToast(result.warning, "info")
-        }
-
-        if (!result.warning && result.creditsCharged > 0) {
-          dispatchCreditBalanceChanged({ amount: result.creditsCharged, feature: "concierge" })
-        }
-
-        setMessages((prev) => [...prev, { role: "assistant", content: result.assistantMessage }])
+        const response = buildResponse(normalizedUserMessage)
+        setMessages((prev) => [...prev, { role: "assistant", content: response }])
+      } catch (error) {
+        console.error("[CONCIERGE] request failed", error)
+        showToast("NÃ£o conseguimos responder agora. Tente novamente.", "info")
+      } finally {
         setTyping(false)
-        return
       }
-
-      const response = buildResponse(normalizedUserMessage)
-      setMessages((prev) => [...prev, { role: "assistant", content: response }])
-      setTyping(false)
-    }, 1500)
+    })()
   }
 
   return (
@@ -7382,8 +7404,8 @@ export default function TripPage() {
   }
 
   const handleUpdateFlight = async (id: string, data: any) => {
-    if (blockOfflineMutation()) return
-    if (!ensureSensitiveAccess()) return
+    if (blockOfflineMutation()) return false
+    if (!ensureSensitiveAccess()) return false
     const result = adminLinkMutationMode
       ? await callTripAdminApi<{ flight?: TripFlightRecord }>({
           action: "upsertFlight",
@@ -7429,7 +7451,7 @@ export default function TripPage() {
     const nextFlight = adminLinkMutationMode ? result.data?.flight ?? null : result.data
     if (result.error || !nextFlight) {
       showToast(resolveProtectedWriteError(result.error || "Não foi possível atualizar a passagem."), "error")
-      return
+      return false
     }
 
     setTripData(prev => ({
@@ -7438,6 +7460,7 @@ export default function TripPage() {
         flight.id === id ? mapFlightRecordToView(nextFlight, prev.documents) : flight
       )
     }))
+    return true
   }
 
   const mergeFlightPayloadIntoTripData = (data: any) => {
@@ -7538,6 +7561,7 @@ export default function TripPage() {
 
       if (attempts >= maxAttempts) {
         flightPollingTimersRef.current.delete(pollingKey)
+        showToast("A anÃ¡lise da passagem ainda estÃ¡ terminando. Atualize novamente em instantes.", "info")
         return
       }
 
@@ -7551,17 +7575,17 @@ export default function TripPage() {
   }
 
   const handleSaveHotel = async (data: any) => {
-    if (blockOfflineMutation()) return
+    if (blockOfflineMutation()) return false
     console.log(data?.id ? "[HOTEL] update started" : "[HOTEL] create started")
 
     if (!tripData.id) {
       showToast("Viagem não encontrada para salvar a hospedagem.", "error")
-      return
+      return false
     }
 
     if (!sensitiveAccessGranted) {
       requireSensitiveAccess(() => { void handleSaveHotel(data) })
-      return
+      return false
     }
 
     const result = adminLinkMutationMode
@@ -7598,7 +7622,7 @@ export default function TripPage() {
     if (result.error || !savedHotel) {
       console.error("[HOTEL] error", result.error)
       showToast(resolveProtectedWriteError(result.error || "Não foi possível salvar a hospedagem."), "error")
-      return
+      return false
     }
 
     console.log("[HOTEL] success", savedHotel.id)
@@ -7626,6 +7650,7 @@ export default function TripPage() {
           : (prev.hotel ?? { ...savedHotel, image: null, amenities: [] }),
     }))
     showToast("Hospedagem salva com sucesso.", "success")
+    return true
   }
 
   const handleDeleteHotel = async (hotelId: string) => {
