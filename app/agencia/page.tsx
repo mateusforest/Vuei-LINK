@@ -344,7 +344,7 @@ export default function AgencyDashboard() {
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: index * 0.1 + 0.5 }}
                     className="group flex items-center justify-between rounded-xl border border-white/5 bg-white/[0.02] p-4 transition-all hover:border-primary/20 hover:bg-white/5 cursor-pointer"
-                    onClick={() => window.open(`/viagem/${trip.slug}/admin`, "_blank")}
+                    onClick={() => window.open(trip.adminLink, "_blank")}
                   >
                     <div className="flex items-center gap-4">
                       <Avatar className="h-10 w-10 border border-white/10">

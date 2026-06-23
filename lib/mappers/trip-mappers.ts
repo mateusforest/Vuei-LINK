@@ -133,7 +133,7 @@ function normalizeLinks(slug: string, trip?: LegacyStoredTrip) {
   return {
     adminToken,
     publicToken,
-    adminLink: buildAdminTripUrl(slug),
+    adminLink: buildAdminTripUrl(slug, adminToken),
     publicLink: buildPublicTripUrl(slug),
   }
 }

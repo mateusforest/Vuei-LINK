@@ -226,7 +226,7 @@ export default function LinksPage() {
                             variant="ghost"
                             size="icon"
                             className="h-8 w-8"
-                            onClick={() => window.open(`/viagem/${trip.slug}/admin`, "_blank")}
+                            onClick={() => window.open(trip.adminLink, "_blank")}
                           >
                             <ExternalLink className="h-4 w-4" />
                           </Button>

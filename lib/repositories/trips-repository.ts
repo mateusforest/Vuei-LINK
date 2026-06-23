@@ -38,6 +38,7 @@ function stripSensitiveTripTokens<T extends Trip | null>(trip: T): T {
     ...trip,
     adminToken: null,
     publicToken: null,
+    adminLink: buildAdminTripUrl(trip.slug),
   } as T
 }
 
@@ -106,7 +107,7 @@ function mapTripRowToTrip(row: Database["public"]["Tables"]["trips"]["Row"]): Tr
     clientId: row.client_id,
     adminToken: row.admin_token,
     publicToken: row.public_token,
-    adminLink: buildAdminTripUrl(row.slug),
+    adminLink: buildAdminTripUrl(row.slug, row.admin_token),
     publicLink: buildPublicTripUrl(row.slug),
     coverImage: resolveTripHeroImage({
       coverImage: row.cover_image,

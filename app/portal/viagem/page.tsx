@@ -259,7 +259,7 @@ export default function ViagemListPage() {
                   <div className="flex gap-3">
                     <Button 
                       className="flex-1 bg-gradient-to-r from-[#5de0e6] to-[#004aad] text-white border-0"
-                      onClick={() => router.push(`/viagem/${trip.slug}/admin`)}
+                      onClick={() => router.push(trip.adminLink.replace(/^https?:\/\/[^/]+/, ""))}
                     >
                       <ExternalLink size={16} className="mr-2" />
                       Abrir Viagem
@@ -267,7 +267,7 @@ export default function ViagemListPage() {
                     <Button 
                       variant="outline" 
                       className="border-border/50"
-                      onClick={() => router.push(`/viagem/${trip.slug}/admin`)}
+                      onClick={() => router.push(trip.adminLink.replace(/^https?:\/\/[^/]+/, ""))}
                     >
                       <Shield size={16} className="mr-2" />
                       Admin

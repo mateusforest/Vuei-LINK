@@ -1752,7 +1752,7 @@ function TripHero({ tripData, onEditTrip }: { tripData: any; onEditTrip: () => v
             <div className="flex items-center gap-3 px-4 py-3 rounded-2xl bg-white/5 backdrop-blur-md border border-white/10">
               <Users className="w-5 h-5 text-[#5de0e6]" />
               <div>
-                <p className="text-xs text-white/50">Viaj?ntes</p>
+                <p className="text-xs text-white/50">Viajantes</p>
                 <p className="text-sm text-white font-medium">{travelersCount} pessoas</p>
               </div>
             </div>
@@ -5296,7 +5296,7 @@ function MenuModal({
       { icon: Shield, label: "Segurança", action: onOpenSecurity },
       ...(onOpenOffline ? [{ icon: WifiOff, label: "Offline", action: onOpenOffline }] : []),
       { icon: Settings, label: "Configurações", action: onOpenSettings },
-      { icon: User, label: "Viaj?ntes", action: onOpenTravelers },
+      { icon: User, label: "Viajantes", action: onOpenTravelers },
     ] : []),
     { icon: CreditCard, label: "Créditos", action: onOpenCredits },
   ]
@@ -5384,7 +5384,7 @@ function TravelersModal({
   }
 
   return (
-    <Modal open={open} onClose={onClose} title="Viaj?ntes">
+    <Modal open={open} onClose={onClose} title="Viajantes">
       <div className="space-y-6">
         <div className="space-y-3">
           {travelers.map((traveler, index) => (

@@ -16,8 +16,13 @@ export function generatePublicLink(slug: string) {
   return `/v/${slug}`
 }
 
-export function buildAdminTripUrl(slug: string) {
-  return buildAbsoluteAppUrl(generateAdminLink(slug))
+export function buildAdminTripUrl(slug: string, adminToken?: string | null) {
+  const baseUrl = buildAbsoluteAppUrl(generateAdminLink(slug))
+  if (!adminToken) return baseUrl
+
+  const url = new URL(baseUrl)
+  url.searchParams.set("adminToken", adminToken)
+  return url.toString()
 }
 
 export function buildPublicTripUrl(slug: string) {

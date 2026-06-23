@@ -224,7 +224,7 @@ export default function PortalHomePage() {
               <div className="flex flex-wrap gap-3">
                 <Button
                   className="border-0 bg-gradient-to-r from-[#5de0e6] to-[#004aad] text-white"
-                  onClick={() => router.push(`/viagem/${activeTrip.slug}/admin`)}
+                  onClick={() => router.push(activeTrip.adminLink.replace(/^https?:\/\/[^/]+/, ""))}
                 >
                   <ExternalLink size={16} className="mr-2" />
                   Abrir viagem
@@ -281,7 +281,7 @@ export default function PortalHomePage() {
                 <div className="flex flex-col gap-4 md:flex-row md:items-center">
                   <div
                     className="relative h-20 w-full overflow-hidden rounded-xl md:h-16 md:w-24 md:shrink-0"
-                    onClick={() => router.push(`/viagem/${trip.slug}/admin`)}
+                    onClick={() => router.push(trip.adminLink.replace(/^https?:\/\/[^/]+/, ""))}
                   >
                     <ImageWithFallback
                       src={trip.coverImage}
@@ -303,7 +303,7 @@ export default function PortalHomePage() {
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    <Button variant="outline" className="border-border/50" onClick={() => router.push(`/viagem/${trip.slug}/admin`)}>
+                    <Button variant="outline" className="border-border/50" onClick={() => router.push(trip.adminLink.replace(/^https?:\/\/[^/]+/, ""))}>
                       Abrir viagem
                     </Button>
                     <Button variant="outline" className="border-border/50" onClick={() => copyLink(trip.adminLink, "admin")}>

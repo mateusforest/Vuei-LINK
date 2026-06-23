@@ -329,7 +329,7 @@ function CreateTripPageContent() {
               <Button 
                 variant="outline" 
                 className="h-auto flex-col gap-2 border-border/70 bg-white py-4 hover:bg-slate-50"
-                onClick={() => window.open(`/viagem/${createdTrip.slug}/admin`, "_blank")}
+                onClick={() => window.open(createdTrip.adminLink, "_blank")}
               >
                 <ExternalLink className="h-5 w-5 text-primary" />
                 <span className="text-xs">Ver Viagem</span>
