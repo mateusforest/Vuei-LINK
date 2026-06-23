@@ -4841,6 +4841,7 @@ function PortalPinUnlockModal({
       setError("")
       setIsSubmitting(false)
       setIsLoadingStatus(false)
+      setPinStatus(null)
     }
   }, [open])
 
@@ -4850,6 +4851,7 @@ function PortalPinUnlockModal({
     let active = true
     setIsLoadingStatus(true)
     setError("")
+    setPinStatus(null)
 
     void loadTripPinStatus({
       tripId,
@@ -4918,6 +4920,16 @@ function PortalPinUnlockModal({
     }
   }
 
+  const isLoadingView = isLoadingStatus
+  const hasErrorView = !isLoadingView && Boolean(error)
+  const hasConfiguredPin = !isLoadingView && pinStatus?.pinConfigured === true
+  const hasMissingPin = !isLoadingView && !hasErrorView && pinStatus?.pinConfigured === false
+  const helperText = isLoadingView
+    ? "Estamos verificando a configuracao do PIN desta viagem."
+    : hasConfiguredPin
+      ? configuredDescription
+      : getTripPinSetupMessage(pinStatus)
+
   return (
     <Modal tone={tone} open={open} onClose={onClose} title={title}>
       <div className="w-full">
@@ -4925,18 +4937,21 @@ function PortalPinUnlockModal({
           <Lock className={cn("h-8 w-8", isLight ? "text-[#2563eb]" : "text-[#5de0e6]")} />
         </div>
         <p className={cn("text-center text-sm leading-6", isLight ? "text-slate-600" : "text-white/55")}>
-          {pinStatus?.pinConfigured ? configuredDescription : getTripPinSetupMessage(pinStatus)}
+          {helperText}
         </p>
 
         <div className="mt-6 space-y-3">
-          {isLoadingStatus ? (
-            <div className={cn("rounded-2xl border p-4 text-sm", isLight ? "border-slate-200 bg-white/92 text-slate-600" : "border-white/[0.06] bg-white/[0.02] text-white/60")}>
-              Verificando configuracao do PIN...
+          {isLoadingView ? (
+            <div className={cn("rounded-2xl border p-5 text-sm", isLight ? "border-slate-200 bg-[#fcfbf8] text-slate-600" : "border-white/[0.06] bg-white/[0.02] text-white/60")}>
+              <div className="flex items-center justify-center gap-3">
+                <div className={cn("h-5 w-5 animate-spin rounded-full border-2 border-transparent", isLight ? "border-slate-200 border-t-[#2563eb]" : "border-white/20 border-t-[#5de0e6]")} />
+                <span>Verificando configuracao do PIN...</span>
+              </div>
             </div>
           ) : null}
 
-          {!isLoadingStatus && pinStatus?.pinConfigured ? (
-            <div className={cn("space-y-3 rounded-2xl border p-4", isLight ? "border-slate-200 bg-white/92" : "border-white/[0.06] bg-white/[0.02]")}>
+          {hasConfiguredPin ? (
+            <div className={cn("space-y-3 rounded-2xl border p-4", isLight ? "border-slate-200 bg-[#fcfbf8]" : "border-white/[0.06] bg-white/[0.02]")}>
               <Label className={cn(isLight ? "text-slate-600" : "text-white/70")}>Usar PIN</Label>
               <Input
                 type="password"
@@ -4958,18 +4973,18 @@ function PortalPinUnlockModal({
                   isLight ? "rounded-2xl bg-[#2563eb] hover:bg-[#1d4ed8]" : "bg-gradient-to-r from-[#5de0e6] to-[#004aad] hover:opacity-90",
                 )}
               >
-                Desbloquear com PIN
+                {isSubmitting ? "Validando PIN..." : "Desbloquear com PIN"}
               </Button>
             </div>
           ) : null}
 
-          {!isLoadingStatus && !pinStatus?.pinConfigured ? (
-            <div className={cn("rounded-2xl border p-4 text-sm", isLight ? "border-slate-200 bg-white/92 text-slate-600" : "border-amber-500/20 bg-amber-500/10 text-amber-100")}>
+          {hasMissingPin ? (
+            <div className={cn("rounded-2xl border p-4 text-sm", isLight ? "border-slate-200 bg-[#fcfbf8] text-slate-600" : "border-amber-500/20 bg-amber-500/10 text-amber-100")}>
               {getTripPinSetupMessage(pinStatus)}
             </div>
           ) : null}
 
-          {error ? (
+          {hasErrorView ? (
             <div className={cn("rounded-2xl border p-4 text-sm", isLight ? "border-red-200 bg-red-50 text-red-700" : "border-red-500/20 bg-red-500/10 text-red-300")}>
               {error}
             </div>
@@ -8840,37 +8855,29 @@ export default function TripPage() {
   if (adminRouteActive && !sensitiveAccessGranted) {
     return (
       <main className="min-h-screen bg-[#f4f1ea] text-slate-900 flex items-center justify-center px-4">
-        <div className="max-w-md rounded-3xl border border-slate-200 bg-white/92 p-8 text-center shadow-[0_24px_60px_rgba(148,163,184,0.16)]">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#eef4ff]">
-            <Lock className="h-6 w-6 text-[#5de0e6]" />
-          </div>
-          <h1 className="text-xl font-semibold text-slate-950">Desbloqueie para editar esta viagem</h1>
-          <p className="mt-3 text-sm text-slate-500">
-            Use o PIN ja criado no portal para abrir o modo administrador deste link.
-          </p>
-          <PortalPinUnlockModal
-            open
-            onClose={handleCloseSensitiveAccessModal}
-            tripId={tripData.id}
-            tripSlug={routeSlug}
-            adminToken={tripAdminToken}
-            publicToken={tripPublicToken}
-            accessMode="admin"
-            title="Desbloqueie para editar esta viagem"
-            configuredDescription="Use o PIN ja criado no portal para liberar o modo administrador desta viagem."
-            onSuccess={() => {
-              setSensitiveAccessGranted(true)
-              setIsAdmin(true)
-              setCanWrite(true)
-              setAdminLinkMutationMode(true)
-              const pendingAction = pendingSensitiveActionRef.current
-              pendingSensitiveActionRef.current = null
-              setToast({ message: "Acesso liberado para esta viagem.", type: "success" })
-              pendingAction?.()
-            }}
-            onLogin={handleRequireAuthenticatedAdmin}
-          />
-        </div>
+        <PortalPinUnlockModal
+          open
+          onClose={handleCloseSensitiveAccessModal}
+          tripId={tripData.id}
+          tripSlug={routeSlug}
+          adminToken={tripAdminToken}
+          publicToken={tripPublicToken}
+          accessMode="admin"
+          title="Desbloqueie para editar esta viagem"
+          configuredDescription="Use o PIN ja criado no portal para liberar o modo administrador desta viagem."
+          tone="light"
+          onSuccess={() => {
+            setSensitiveAccessGranted(true)
+            setIsAdmin(true)
+            setCanWrite(true)
+            setAdminLinkMutationMode(true)
+            const pendingAction = pendingSensitiveActionRef.current
+            pendingSensitiveActionRef.current = null
+            setToast({ message: "Acesso liberado para esta viagem.", type: "success" })
+            pendingAction?.()
+          }}
+          onLogin={handleRequireAuthenticatedAdmin}
+        />
       </main>
     )
   }
