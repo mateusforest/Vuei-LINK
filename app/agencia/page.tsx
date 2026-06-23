@@ -125,7 +125,7 @@ function NewClientModal({ open, onClose, onSave }: { open: boolean; onClose: () 
           />
         </div>
         <div>
-          <label className="text-xs text-white/50 uppercase tracking-wider">Observa??es</label>
+          <label className="text-xs text-white/50 uppercase tracking-wider">Observações</label>
           <textarea
             value={formData.notes}
             onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
@@ -477,7 +477,7 @@ export default function AgencyDashboard() {
                   <p className="text-sm text-muted-foreground">
                     {pendingRequests.length > 0 
                       ? `${pendingRequests.length} solicitacoes aguardando resposta`
-                      : "Nenhuma solicita??o pendente"
+                      : "Nenhuma solicitação pendente"
                     }
                   </p>
                 </div>

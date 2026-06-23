@@ -295,7 +295,7 @@ export default function ClientsPage() {
   const handleDeleteClient = async (id: string) => {
     const linkedTrips = getActiveTripsByClient(id)
     if (linkedTrips.length > 0) {
-      window.alert("Este cliente possui viagens vinculadas e nao pode ser excluido agora.")
+      window.alert("Este cliente possui viagens vinculadas e não pode ser excluído agora.")
       return
     }
 
@@ -330,7 +330,7 @@ export default function ClientsPage() {
       {setupIncomplete && (
         <Card className="border-amber-500/20 bg-amber-500/5">
           <CardContent className="p-4 text-sm text-amber-200">
-            Sua agencia ainda nao foi persistida corretamente no Supabase. Finalize o cadastro antes de operar clientes reais.
+            Sua agência ainda não foi persistida corretamente no Supabase. Finalize o cadastro antes de operar clientes reais.
           </CardContent>
         </Card>
       )}

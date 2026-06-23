@@ -128,7 +128,7 @@ export default function TeamPage() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Equipe</h1>
-          <p className="mt-1 text-muted-foreground">{teamSeatsUsed} de {subscription.definition.maxUsers} usuarios ativos no plano</p>
+          <p className="mt-1 text-muted-foreground">{teamSeatsUsed} de {subscription.definition.maxUsers} usuários ativos no plano</p>
         </div>
         <Button
           onClick={() => setInviteModalOpen(true)}

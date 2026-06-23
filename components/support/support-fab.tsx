@@ -16,7 +16,7 @@ import type { SupportTicketCategory, SupportTicketPriority } from "@/types"
 const categories: Array<{ value: SupportTicketCategory; label: string }> = [
   { value: "vuei_help", label: "Duvida sobre o Vuei" },
   { value: "technical_issue", label: "Problema tecnico" },
-  { value: "billing", label: "Plano ou cobranca" },
+  { value: "billing", label: "Plano ou cobrança" },
   { value: "credits", label: "Creditos" },
   { value: "trip_link", label: "Viagem ou link" },
   { value: "other", label: "Outro" },
@@ -161,14 +161,14 @@ export function SupportFab({
               <Textarea
                 value={form.message}
                 onChange={(event) => setForm((prev) => ({ ...prev, message: event.target.value }))}
-                placeholder="Conte o que aconteceu e em qual tela voce estava."
+                placeholder="Conte o que aconteceu e em qual tela você estava."
                 className="min-h-36 rounded-3xl border-slate-200 bg-white text-slate-900 placeholder:text-slate-400"
               />
             </div>
 
             <div className="rounded-3xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs leading-5 text-slate-600">
-              Contexto enviado automaticamente: {portalType === "agency" ? "portal da agencia" : "portal viajante"}, rota atual,
-              usuario autenticado, timestamp e vinculo de agencia {agencyId ? "disponivel" : "nao aplicavel"}.
+              Contexto enviado automaticamente: {portalType === "agency" ? "portal da agência" : "portal viajante"}, rota atual,
+              usuário autenticado, timestamp e vínculo de agência {agencyId ? "disponível" : "não aplicável"}.
             </div>
 
             {showUrgentHint ? (
@@ -176,7 +176,7 @@ export function SupportFab({
                 <div className="flex items-start gap-3">
                   <MessageSquareWarning className="mt-0.5 h-4 w-4 flex-shrink-0" />
                   <p>
-                    Para situacoes urgentes, entre em contato tambem pelo WhatsApp: <strong>{SUPPORT_WHATSAPP}</strong>
+                    Para situações urgentes, entre em contato também pelo WhatsApp: <strong>{SUPPORT_WHATSAPP}</strong>
                   </p>
                 </div>
               </div>

@@ -323,7 +323,7 @@ export default function RoteirosIAPage() {
     const matchingDocument = documents.find((document) => document.id === itinerary.documentId)
 
     if (!matchingDocument?.filePath) {
-      setLoadError("Documento do roteiro n?o ?ncontrado.")
+      setLoadError("Documento do roteiro não encontrado.")
       return
     }
 
@@ -471,7 +471,7 @@ export default function RoteirosIAPage() {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label>Dura??o</Label>
+                    <Label>Duração</Label>
                     <div className="relative">
                       <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                       <Input value={formData.duration} readOnly className="pl-10 bg-background border-border" />
@@ -510,7 +510,7 @@ export default function RoteirosIAPage() {
                   <Textarea
                     value={formData.preferences}
                     onChange={(event) => setFormData((current) => ({ ...current, preferences: event.target.value }))}
-                    placeholder="Adicione preferencias extras para a gera??o do roteiro."
+                    placeholder="Adicione preferências extras para a geração do roteiro."
                     className="bg-background border-border min-h-[100px]"
                   />
                 </div>
@@ -599,7 +599,7 @@ export default function RoteirosIAPage() {
                         </div>
                       ) : previewDays.length === 0 ? (
                         <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4 text-sm text-muted-foreground">
-                          Este roteiro ainda n?o possui dias estruturados.
+                          Este roteiro ainda não possui dias estruturados.
                         </div>
                       ) : (
                         <div className="space-y-4 max-h-[420px] overflow-y-auto pr-2">
@@ -620,7 +620,7 @@ export default function RoteirosIAPage() {
                                   <div key={activity.id} className="rounded-lg border border-white/5 bg-white/[0.02] p-3">
                                     <div className="flex items-center gap-2">
                                       <Clock className="w-3.5 h-3.5 text-primary" />
-                                      <span className="text-xs text-primary font-medium">{activity.time || "Horario livre"}</span>
+                                      <span className="text-xs text-primary font-medium">{activity.time || "Horário livre"}</span>
                                       <span className="text-sm font-medium text-foreground">{activity.title}</span>
                                     </div>
                                     {activity.location ? (

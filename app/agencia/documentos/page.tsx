@@ -123,7 +123,7 @@ export default function DocumentsPage() {
         if (created.flightExtractionStatus === "failed") {
           setActionError(created.extractionError || "Passagem anexada, mas não foi possível iniciar a extração agora.")
         } else {
-          setActionNotice("Passagem anexada. Estamos extraindo as informa??es.")
+          setActionNotice("Passagem anexada. Estamos extraindo as informações.")
         }
       } else if (uploadData.type === "itinerary") {
         setActionNotice("Roteiro anexado com sucesso.")

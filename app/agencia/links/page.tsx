@@ -85,7 +85,7 @@ export default function LinksPage() {
       {setupIncomplete && (
         <Card className="border-amber-500/20 bg-amber-500/5">
           <CardContent className="p-4 text-sm text-amber-200">
-            Os links so ficam disponiveis depois que a agencia e as viagens forem persistidas corretamente no Supabase.
+            Os links só ficam disponíveis depois que a agência e as viagens forem persistidas corretamente no Supabase.
           </CardContent>
         </Card>
       )}
@@ -351,7 +351,7 @@ export default function LinksPage() {
                 <CardContent className="flex items-start gap-2 p-3">
                   <Lock className="mt-0.5 h-4 w-4 text-yellow-500" />
                   <p className="text-xs text-muted-foreground">
-                    Documentos privados (passaporte, RG, visto) nunca aparecem no link compartilhavel,
+                    Documentos privados (passaporte, RG, visto) nunca aparecem no link compartilhável,
                     independente desta configuracao.
                   </p>
                 </CardContent>

@@ -509,7 +509,7 @@ export default function SettingsPage() {
                     </div>
                     <div className="flex-1">
                       <p className="font-medium text-foreground">Branding da Agência</p>
-                      <p className="text-xs text-muted-foreground">Este logo aparece nos links da viagem. O avatar do usuario continua separado no perfil.</p>
+                      <p className="text-xs text-muted-foreground">Este logo aparece nos links da viagem. O avatar do usuário continua separado no perfil.</p>
                     </div>
                     <Button variant="outline" className="border-border/70 bg-white" onClick={() => setShowPhotoModal(true)}>
                       Gerenciar logo
@@ -571,7 +571,7 @@ export default function SettingsPage() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <p className="text-sm text-muted-foreground">
-                    Personalize o logo exibido nos links compartilháveis sem alterar a foto de perfil do usuario.
+                    Personalize o logo exibido nos links compartilháveis sem alterar a foto de perfil do usuário.
                   </p>
                   <div className="rounded-2xl border border-border/60 bg-[#fbfbfc] p-4">
                     <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
@@ -794,7 +794,7 @@ export default function SettingsPage() {
         <DialogContent className="agency-dialog sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Atualizar branding</DialogTitle>
-            <DialogDescription>Envie o logo da agência que sera exibido no link da viagem.</DialogDescription>
+            <DialogDescription>Envie o logo da agência que será exibido no link da viagem.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="flex justify-center">
@@ -868,7 +868,7 @@ export default function SettingsPage() {
         <DialogContent className="agency-dialog sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>Alterar plano</DialogTitle>
-            <DialogDescription>Escolha um plano para a sua opera??o sem integrar pagamento nesta etapa.</DialogDescription>
+            <DialogDescription>Escolha um plano para a sua operação sem integrar pagamento nesta etapa.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="rounded-xl border border-primary/20 bg-primary/5 p-4">
@@ -896,7 +896,7 @@ export default function SettingsPage() {
 
                       setAgencyData((prev) => ({ ...prev, plan: plan.name }))
                       setShowPlanModal(false)
-                      showToast(`Plano ${plan.name} selecionado sem cobranca real nesta etapa.`)
+                      showToast(`Plano ${plan.name} selecionado sem cobrança real nesta etapa.`)
                     }}
                   >
                     {subscription.code === plan.id ? "Plano atual" : "Selecionar plano"}
@@ -923,14 +923,14 @@ export default function SettingsPage() {
             <DialogDescription>
               {hasPaidSubscriptionActive
                 ? "Existe uma assinatura ativa nesta agência. Cancele-a antes de arquivar a conta."
-                : "A agência sera desativada e arquivada com segurança, sem excluir dados reais nem remover histórico operacional."}
+                : "A agência será desativada e arquivada com segurança, sem excluir dados reais nem remover histórico operacional."}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             {hasPaidSubscriptionActive ? (
               <>
                 <div className="rounded-xl border border-amber-300/70 bg-amber-50 p-4 text-sm text-amber-900">
-                  Se voce possui uma assinatura ativa, cancele-a antes de excluir ou arquivar a agência.
+                  Se você possui uma assinatura ativa, cancele-a antes de excluir ou arquivar a agência.
                 </div>
                 <div className="flex gap-3">
                   <Button variant="outline" className="flex-1 border-border/70 bg-white" onClick={() => setShowArchiveModal(false)}>
@@ -948,10 +948,10 @@ export default function SettingsPage() {
             ) : (
               <>
                 <div className="rounded-xl border border-red-500/20 bg-red-500/5 p-4 text-sm text-muted-foreground">
-                  Digite <span className="font-medium text-foreground">ARQUIVAR</span> para confirmar a desativa??o da agência.
+                  Digite <span className="font-medium text-foreground">ARQUIVAR</span> para confirmar a desativação da agência.
                 </div>
                 <div>
-                  <Label className="text-muted-foreground">Confirma??o</Label>
+                  <Label className="text-muted-foreground">Confirmação</Label>
                   <Input
                     value={archiveConfirmation}
                     onChange={(e) => setArchiveConfirmation(e.target.value)}

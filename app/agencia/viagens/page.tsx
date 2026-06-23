@@ -222,7 +222,7 @@ export default function TripsPage() {
       {setupIncomplete && (
         <Card className="border-amber-500/20 bg-amber-500/5">
           <CardContent className="p-4 text-sm text-amber-200">
-            Sua agencia ainda nao foi persistida corretamente no Supabase. Finalize o cadastro antes de operar viagens reais.
+            Sua agência ainda não foi persistida corretamente no Supabase. Finalize o cadastro antes de operar viagens reais.
           </CardContent>
         </Card>
       )}

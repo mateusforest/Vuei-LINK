@@ -490,7 +490,7 @@ function AgencyLayoutInner({ children }: { children: React.ReactNode }) {
         <div className="p-4 lg:p-6">
           {workspaceLoading ? (
             <div className="agency-subtle-card rounded-2xl p-6 text-sm text-muted-foreground">
-              Carregando workspace da agencia...
+              Carregando workspace da agência...
             </div>
           ) : (
             children
