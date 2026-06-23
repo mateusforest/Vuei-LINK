@@ -840,6 +840,36 @@ export interface Database {
           updated_at?: string
         }
       }
+      trip_travelers: {
+        Row: {
+          id: string
+          trip_id: string
+          name: string
+          role: string
+          is_primary: boolean
+          avatar_url: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          trip_id: string
+          name: string
+          role?: string
+          is_primary?: boolean
+          avatar_url?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          trip_id?: string
+          name?: string
+          role?: string
+          is_primary?: boolean
+          avatar_url?: string | null
+          updated_at?: string
+        }
+      }
       trips: {
         Row: {
           id: string

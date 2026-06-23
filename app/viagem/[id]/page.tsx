@@ -60,6 +60,157 @@ import { CREDIT_BALANCE_CHANGED_EVENT, dispatchCreditBalanceChanged } from "@/li
 const TRIPS_STORAGE_KEY = "vuei_trips"
 const AGENCY_STORAGE_KEY = "vuei_agency"
 
+type TravelerItem = {
+  id: string
+  name: string
+  avatar?: string
+  role: "principal" | "acompanhante"
+}
+
+type PersistedTravelerPayload = {
+  id: string
+  name: string
+  role?: string | null
+  isPrimary?: boolean | null
+  avatarUrl?: string | null
+}
+
+type TripPinApiAccessMode = "admin" | "public"
+
+type TripPinStatusPayload = {
+  pinConfigured: boolean
+  pinScope: "traveler_portal" | "agency_trip" | null
+  ownerType: "traveler" | "agency" | null
+  trip?: {
+    id: string
+    slug: string
+    title: string
+    destination: string
+    country: string | null
+    city: string | null
+    startDate: string | null
+    endDate: string | null
+    status: string
+    ownerType: "traveler" | "agency"
+    ownerUserId: string | null
+    agencyId: string | null
+    clientId: string | null
+    visibility: "private" | "public"
+    travelersCount: number
+    coverImage: string | null
+    adminLink: string | null
+    publicLink: string | null
+  }
+}
+
+function buildTripPinQuery(params: {
+  tripId?: string | null
+  tripSlug: string
+  adminToken?: string | null
+  publicToken?: string | null
+  accessMode: TripPinApiAccessMode
+}) {
+  const searchParams = new URLSearchParams()
+  if (params.tripId) {
+    searchParams.set("tripId", params.tripId)
+  }
+  searchParams.set("tripSlug", params.tripSlug)
+  searchParams.set("accessMode", params.accessMode)
+
+  if (params.adminToken) {
+    searchParams.set("adminToken", params.adminToken)
+  }
+
+  if (params.publicToken) {
+    searchParams.set("publicToken", params.publicToken)
+  }
+
+  return searchParams.toString()
+}
+
+async function loadTripPinStatus(params: {
+  tripId?: string | null
+  tripSlug: string
+  adminToken?: string | null
+  publicToken?: string | null
+  accessMode: TripPinApiAccessMode
+}) {
+  const response = await fetch(`/api/trip-pin?${buildTripPinQuery(params)}`)
+  const data = (await response.json().catch(() => null)) as (TripPinStatusPayload & { error?: string }) | null
+
+  return {
+    ok: response.ok,
+    data,
+    error: response.ok ? null : data?.error ?? "Nao foi possivel consultar o PIN desta viagem.",
+  }
+}
+
+async function verifyTripPinOnServer(params: {
+  tripId: string
+  tripSlug: string
+  adminToken?: string | null
+  publicToken?: string | null
+  accessMode: TripPinApiAccessMode
+  pin: string
+}) {
+  const response = await fetch("/api/trip-pin", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(params),
+  })
+
+  const data = (await response.json().catch(() => null)) as (TripPinStatusPayload & { verified?: boolean; error?: string }) | null
+
+  return {
+    ok: response.ok,
+    data,
+    error: response.ok ? null : data?.error ?? "Nao foi possivel validar o PIN desta viagem.",
+  }
+}
+
+function getTripPinSetupMessage(status: TripPinStatusPayload | null) {
+  if (status?.ownerType === "agency") {
+    return "PIN ainda nao configurado. Peca ao responsavel pela viagem para configurar o PIN no portal."
+  }
+
+  return "PIN ainda nao configurado. Peca ao responsavel pela viagem para configurar o PIN no portal."
+}
+
+function mapTripPinSnapshotToStoredTrip(snapshot: NonNullable<TripPinStatusPayload["trip"]>, tokens: {
+  adminToken?: string | null
+  publicToken?: string | null
+}) {
+  return {
+    id: snapshot.id,
+    slug: snapshot.slug,
+    title: snapshot.title,
+    destination: snapshot.destination,
+    country: snapshot.country,
+    city: snapshot.city,
+    startDate: snapshot.startDate,
+    endDate: snapshot.endDate,
+    status: snapshot.status,
+    ownerType: snapshot.ownerType,
+    ownerUserId: snapshot.ownerUserId,
+    agencyId: snapshot.agencyId,
+    clientId: snapshot.clientId,
+    visibility: snapshot.visibility,
+    travelersCount: snapshot.travelersCount,
+    coverImage: snapshot.coverImage,
+    adminToken: tokens.adminToken ?? null,
+    publicToken: tokens.publicToken ?? null,
+    adminLink: snapshot.adminLink ?? buildAdminTripUrl(snapshot.slug, tokens.adminToken ?? null),
+    publicLink: snapshot.publicLink ?? buildPublicTripUrl(snapshot.slug),
+    travelers: [],
+    flights: [],
+    accommodations: [],
+    itinerary: [],
+    documents: [],
+  }
+}
+
 // Permission context
 const PermissionContext = createContext<{
   isAdmin: boolean
@@ -552,13 +703,56 @@ function calculateDaysUntil(dateString?: string) {
 }
 
 function buildTravelers(count?: number) {
-  const total = Math.max(count ?? 1, 1)
+  const safeCount = typeof count === "number" ? count : 1
+  const total = Math.max(safeCount, 0)
+
+  if (total === 0) {
+    return [] as TravelerItem[]
+  }
 
   return Array.from({ length: total }, (_, index) => ({
+    id: `fallback-${index}`,
     name: index === 0 ? "Viajante Principal" : `Acompanhante ${index}`,
     avatar: "/placeholder.svg?height=40&width=40",
     role: index === 0 ? "principal" : "acompanhante",
   }))
+}
+
+function normalizeTravelerRole(role?: string | null, isPrimary?: boolean | null) {
+  if (isPrimary || role === "primary" || role === "principal") {
+    return "principal" as const
+  }
+
+  return "acompanhante" as const
+}
+
+function mapPersistedTravelerToView(traveler: PersistedTravelerPayload, index: number): TravelerItem {
+  return {
+    id: traveler.id || `traveler-${index}`,
+    name: traveler.name || (index === 0 ? "Viajante Principal" : `Acompanhante ${index}`),
+    avatar: traveler.avatarUrl || "/placeholder.svg?height=40&width=40",
+    role: normalizeTravelerRole(traveler.role, traveler.isPrimary),
+  }
+}
+
+function mapPersistedTravelersToView(travelers?: PersistedTravelerPayload[] | null) {
+  if (!Array.isArray(travelers) || travelers.length === 0) {
+    return [] as TravelerItem[]
+  }
+
+  return travelers.map((traveler, index) => mapPersistedTravelerToView(traveler, index))
+}
+
+function resolveTripTravelersCount(tripData: any) {
+  if (Array.isArray(tripData?.travelers) && tripData.travelers.length > 0) {
+    return tripData.travelers.length
+  }
+
+  if (typeof tripData?.travelersCount === "number") {
+    return Math.max(tripData.travelersCount, 0)
+  }
+
+  return 0
 }
 
 function buildQuickInfo(destination?: string, country?: string, city?: string) {
@@ -1702,7 +1896,7 @@ function TripHero({ tripData, onEditTrip }: { tripData: any; onEditTrip: () => v
   const y = useTransform(scrollYProgress, [0, 1], ["0%", "30%"])
   const opacity = useTransform(scrollYProgress, [0, 0.5], [1, 0])
   const { canWrite } = useContext(PermissionContext)
-  const travelersCount = Array.isArray(tripData?.travelers) ? tripData.travelers.length : 0
+  const travelersCount = resolveTripTravelersCount(tripData)
   const WeatherIcon = tripData?.weather?.icon || Cloud
 
   return (
@@ -4374,7 +4568,7 @@ function DocumentsSection({
               )}
             </AnimatePresence>
 
-            {!unlocked && <p className="text-xs text-white/30 text-center mt-3">Use PIN ou biometria para acessar documentos privados</p>}
+            {!unlocked && <p className="text-xs text-white/30 text-center mt-3">Use o PIN ja criado no portal para acessar documentos privados</p>}
           </motion.div>
         )}
 
@@ -4384,10 +4578,16 @@ function DocumentsSection({
         </div>
       </div>
 
-      <PinModal
+      <PortalPinUnlockModal
         open={pinModal}
         onClose={() => setPinModal(false)}
         tripId={tripId}
+        tripSlug={routeSlug}
+        adminToken={tripAdminToken}
+        publicToken={tripPublicToken}
+        accessMode={adminLinkMutationMode ? "admin" : "public"}
+        title="Desbloquear Documentos"
+        configuredDescription="Use o PIN ja criado no portal para acessar os documentos protegidos."
         onSuccess={() => {
           setUnlocked(true)
           onSensitiveAccessGranted()
@@ -4418,26 +4618,66 @@ function PinModal({
   onClose,
   onSuccess,
   tripId,
+  tripSlug,
+  adminToken,
+  publicToken,
+  accessMode,
 }: {
   open: boolean
   onClose: () => void
   onSuccess: () => void
   tripId: string
+  tripSlug: string
+  adminToken: string | null
+  publicToken: string | null
+  accessMode: TripPinApiAccessMode
 }) {
   const [pin, setPin] = useState("")
   const [confirmPin, setConfirmPin] = useState("")
   const [error, setError] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const quickAccessMethods = getTripLinkQuickAccessMethods(tripId)
+  const [isLoadingStatus, setIsLoadingStatus] = useState(false)
+  const [pinStatus, setPinStatus] = useState<TripPinStatusPayload | null>(null)
 
   useEffect(() => {
     if (!open) {
       setPin("")
-      setConfirmPin("")
       setError("")
       setIsSubmitting(false)
+      setIsLoadingStatus(false)
     }
   }, [open])
+
+  useEffect(() => {
+    if (!open) return
+
+    let active = true
+    setIsLoadingStatus(true)
+    setError("")
+
+    void loadTripPinStatus({
+      tripId,
+      tripSlug,
+      adminToken,
+      publicToken,
+      accessMode,
+    }).then((result) => {
+      if (!active) return
+      setIsLoadingStatus(false)
+
+      if (!result.ok || !result.data) {
+        setPinStatus(null)
+        setError(result.error ?? "Nao foi possivel consultar o PIN desta viagem.")
+        return
+      }
+
+      setPinStatus(result.data)
+    })
+
+    return () => {
+      active = false
+    }
+  }, [open, tripId, tripSlug, adminToken, publicToken, accessMode])
 
   const handleSubmit = async () => {
     if (pin.length !== 4) return
@@ -4554,6 +4794,272 @@ function PinModal({
           </Button>
         )}
         <p className="text-xs text-white/30 mt-4">O PIN deste link pertence apenas a este dispositivo e não é compartilhado com o portal ou com outros aparelhos.</p>
+      </div>
+    </Modal>
+  )
+}
+
+function PortalPinUnlockModal({
+  open,
+  onClose,
+  onSuccess,
+  tripId,
+  tripSlug,
+  adminToken,
+  publicToken,
+  accessMode,
+  title,
+  configuredDescription,
+  tone = "dark",
+  onLogin,
+  loginLabel = "Entrar com login",
+}: {
+  open: boolean
+  onClose: () => void
+  onSuccess: () => void
+  tripId: string
+  tripSlug: string
+  adminToken: string | null
+  publicToken: string | null
+  accessMode: TripPinApiAccessMode
+  title: string
+  configuredDescription: string
+  tone?: "dark" | "light"
+  onLogin?: (() => void) | null
+  loginLabel?: string
+}) {
+  const isLight = tone === "light"
+  const [pin, setPin] = useState("")
+  const [error, setError] = useState("")
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isLoadingStatus, setIsLoadingStatus] = useState(false)
+  const [pinStatus, setPinStatus] = useState<TripPinStatusPayload | null>(null)
+
+  useEffect(() => {
+    if (!open) {
+      setPin("")
+      setError("")
+      setIsSubmitting(false)
+      setIsLoadingStatus(false)
+    }
+  }, [open])
+
+  useEffect(() => {
+    if (!open) return
+
+    let active = true
+    setIsLoadingStatus(true)
+    setError("")
+
+    void loadTripPinStatus({
+      tripId,
+      tripSlug,
+      adminToken,
+      publicToken,
+      accessMode,
+    }).then((result) => {
+      if (!active) return
+      setIsLoadingStatus(false)
+
+      if (!result.ok || !result.data) {
+        setPinStatus(null)
+        setError(result.error ?? "Nao foi possivel consultar o PIN desta viagem.")
+        return
+      }
+
+      setPinStatus(result.data)
+    })
+
+    return () => {
+      active = false
+    }
+  }, [open, tripId, tripSlug, adminToken, publicToken, accessMode])
+
+  const handleSubmit = async () => {
+    if (pin.length !== 4) return
+
+    setIsSubmitting(true)
+    setError("")
+
+    try {
+      const result = await verifyTripPinOnServer({
+        tripId,
+        tripSlug,
+        adminToken,
+        publicToken,
+        accessMode,
+        pin,
+      })
+
+      if (!result.ok || !result.data) {
+        setError(result.error ?? "Nao foi possivel validar o PIN.")
+        return
+      }
+
+      setPinStatus(result.data)
+
+      if (!result.data.pinConfigured) {
+        setError(getTripPinSetupMessage(result.data))
+        return
+      }
+
+      if (!result.data.verified) {
+        setError("PIN invalido.")
+        return
+      }
+
+      onSuccess()
+      setPin("")
+    } catch (pinError) {
+      const message = pinError instanceof Error ? pinError.message : "Nao foi possivel validar o PIN desta viagem."
+      setError(message)
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  return (
+    <Modal tone={tone} open={open} onClose={onClose} title={title}>
+      <div className="w-full">
+        <div className={cn("mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl", isLight ? "bg-[linear-gradient(180deg,#eff6ff,#dbeafe)]" : "bg-gradient-to-br from-[#5de0e6]/20 to-[#004aad]/20")}>
+          <Lock className={cn("h-8 w-8", isLight ? "text-[#2563eb]" : "text-[#5de0e6]")} />
+        </div>
+        <p className={cn("text-center text-sm leading-6", isLight ? "text-slate-600" : "text-white/55")}>
+          {pinStatus?.pinConfigured ? configuredDescription : getTripPinSetupMessage(pinStatus)}
+        </p>
+
+        <div className="mt-6 space-y-3">
+          {isLoadingStatus ? (
+            <div className={cn("rounded-2xl border p-4 text-sm", isLight ? "border-slate-200 bg-white/92 text-slate-600" : "border-white/[0.06] bg-white/[0.02] text-white/60")}>
+              Verificando configuracao do PIN...
+            </div>
+          ) : null}
+
+          {!isLoadingStatus && pinStatus?.pinConfigured ? (
+            <div className={cn("space-y-3 rounded-2xl border p-4", isLight ? "border-slate-200 bg-white/92" : "border-white/[0.06] bg-white/[0.02]")}>
+              <Label className={cn(isLight ? "text-slate-600" : "text-white/70")}>Usar PIN</Label>
+              <Input
+                type="password"
+                inputMode="numeric"
+                maxLength={4}
+                placeholder="0000"
+                value={pin}
+                onChange={(event) => setPin(event.target.value.replace(/\D/g, "").slice(0, 4))}
+                className={cn(
+                  "h-12 text-center text-lg font-semibold tracking-[0.22em] sm:tracking-[0.28em] px-3 placeholder:tracking-normal placeholder:text-base",
+                  isLight ? "border-slate-200 bg-white text-slate-950 placeholder:text-slate-400" : "",
+                )}
+              />
+              <Button
+                onClick={() => void handleSubmit()}
+                disabled={isSubmitting || pin.length !== 4}
+                className={cn(
+                  "w-full border-0 text-white",
+                  isLight ? "rounded-2xl bg-[#2563eb] hover:bg-[#1d4ed8]" : "bg-gradient-to-r from-[#5de0e6] to-[#004aad] hover:opacity-90",
+                )}
+              >
+                Desbloquear com PIN
+              </Button>
+            </div>
+          ) : null}
+
+          {!isLoadingStatus && !pinStatus?.pinConfigured ? (
+            <div className={cn("rounded-2xl border p-4 text-sm", isLight ? "border-slate-200 bg-white/92 text-slate-600" : "border-amber-500/20 bg-amber-500/10 text-amber-100")}>
+              {getTripPinSetupMessage(pinStatus)}
+            </div>
+          ) : null}
+
+          {error ? (
+            <div className={cn("rounded-2xl border p-4 text-sm", isLight ? "border-red-200 bg-red-50 text-red-700" : "border-red-500/20 bg-red-500/10 text-red-300")}>
+              {error}
+            </div>
+          ) : null}
+        </div>
+
+        {onLogin ? (
+          <Button
+            variant="outline"
+            onClick={onLogin}
+            className={cn("mt-5 w-full", isLight ? "border-slate-200 bg-white text-slate-700 hover:bg-slate-50" : "border-white/[0.08] bg-transparent text-white/80 hover:bg-white/[0.06]")}
+          >
+            {loginLabel}
+          </Button>
+        ) : null}
+
+        <p className={cn("mt-4 text-xs text-center", isLight ? "text-slate-500" : "text-white/35")}>
+          O link nao cria PIN. O desbloqueio usa apenas o PIN ja configurado no portal responsavel pela viagem.
+        </p>
+      </div>
+    </Modal>
+  )
+}
+
+function LinkSecurityInfoModal({
+  open,
+  onClose,
+  tripId,
+  tripSlug,
+  adminToken,
+  publicToken,
+  accessMode,
+}: {
+  open: boolean
+  onClose: () => void
+  tripId: string
+  tripSlug: string
+  adminToken: string | null
+  publicToken: string | null
+  accessMode: TripPinApiAccessMode
+}) {
+  const [status, setStatus] = useState<TripPinStatusPayload | null>(null)
+  const [error, setError] = useState("")
+
+  useEffect(() => {
+    if (!open) return
+
+    let active = true
+    setError("")
+
+    void loadTripPinStatus({
+      tripId,
+      tripSlug,
+      adminToken,
+      publicToken,
+      accessMode,
+    }).then((result) => {
+      if (!active) return
+
+      if (!result.ok || !result.data) {
+        setStatus(null)
+        setError(result.error ?? "Nao foi possivel consultar o PIN desta viagem.")
+        return
+      }
+
+      setStatus(result.data)
+    })
+
+    return () => {
+      active = false
+    }
+  }, [open, tripId, tripSlug, adminToken, publicToken, accessMode])
+
+  return (
+    <Modal open={open} onClose={onClose} title="Seguranca">
+      <div className="space-y-4">
+        <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4">
+          <p className="text-sm font-medium text-white">O PIN desta viagem e definido apenas no portal responsavel.</p>
+          <p className="mt-2 text-xs text-white/40">Este link serve apenas para solicitar o PIN ja existente quando uma area protegida for aberta.</p>
+        </div>
+        <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4">
+          <p className="text-xs uppercase tracking-wider text-white/40">Status do PIN</p>
+          <p className="mt-2 text-sm text-white">{status?.pinConfigured ? "PIN configurado" : "PIN ainda nao configurado"}</p>
+          <p className="mt-2 text-xs text-white/40">{getTripPinSetupMessage(status)}</p>
+        </div>
+        {error ? (
+          <div className="rounded-2xl border border-red-500/20 bg-red-500/10 p-4 text-sm text-red-300">
+            {error}
+          </div>
+        ) : null}
       </div>
     </Modal>
   )
@@ -5330,17 +5836,26 @@ function TravelersModal({
   open,
   onClose,
   travelers,
-  onUpdateTravelers,
+  loading = false,
+  onAddTraveler,
+  onUpdateTraveler,
+  onRemoveTraveler,
+  onSetPrimaryTraveler,
 }: {
   open: boolean
   onClose: () => void
-  travelers: { name: string; avatar?: string; role: string }[]
-  onUpdateTravelers: (travelers: { name: string; avatar?: string; role: string }[]) => void
+  travelers: TravelerItem[]
+  loading?: boolean
+  onAddTraveler: (payload: { name: string; role: "principal" | "acompanhante" }) => Promise<boolean>
+  onUpdateTraveler: (travelerId: string, payload: { name: string; role: "principal" | "acompanhante" }) => Promise<boolean>
+  onRemoveTraveler: (travelerId: string) => Promise<boolean>
+  onSetPrimaryTraveler: (travelerId: string) => Promise<boolean>
 }) {
   const { canWrite } = useContext(PermissionContext)
   const { showToast } = useToast()
   const [editingIndex, setEditingIndex] = useState<number | null>(null)
-  const [form, setForm] = useState({ name: "", role: "acompanhante" })
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [form, setForm] = useState({ name: "", role: "acompanhante" as "principal" | "acompanhante" })
 
   const startEditing = (index: number) => {
     setEditingIndex(index)
@@ -5352,55 +5867,90 @@ function TravelersModal({
     setForm({ name: "", role: "acompanhante" })
   }
 
-  const handleSave = () => {
-    if (!canWrite) return
+  useEffect(() => {
+    if (!open) {
+      resetForm()
+      setIsSubmitting(false)
+    }
+  }, [open])
+
+  const handleSave = async () => {
+    if (!canWrite || loading || isSubmitting) return
     if (!form.name.trim()) return
 
-    if (editingIndex === null) {
-      onUpdateTravelers([...travelers, { name: form.name.trim(), role: form.role, avatar: "/placeholder.svg?height=40&width=40" }])
-      showToast("Viaj?nte adicionado.", "success")
-    } else {
-      onUpdateTravelers(travelers.map((traveler, index) => index === editingIndex ? { ...traveler, name: form.name.trim(), role: form.role } : traveler))
-      showToast("Viaj?nte atualizado.", "success")
-    }
+    setIsSubmitting(true)
+    try {
+      const success = editingIndex === null
+        ? await onAddTraveler({ name: form.name.trim(), role: form.role })
+        : travelers[editingIndex]
+          ? await onUpdateTraveler(travelers[editingIndex].id, { name: form.name.trim(), role: form.role })
+          : false
 
-    resetForm()
+      if (!success) return
+
+      showToast(editingIndex === null ? "Viajante adicionado." : "Viajante atualizado.", "success")
+      resetForm()
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
-  const handleRemove = (index: number) => {
-    if (!canWrite) return
-    onUpdateTravelers(travelers.filter((_, travelerIndex) => travelerIndex !== index))
-    showToast("Viaj?nte removido.", "success")
+  const handleRemove = async (index: number) => {
+    if (!canWrite || loading || isSubmitting) return
+    const traveler = travelers[index]
+    if (!traveler) return
+
+    setIsSubmitting(true)
+    try {
+      const success = await onRemoveTraveler(traveler.id)
+      if (!success) return
+    } finally {
+      setIsSubmitting(false)
+    }
+
+    showToast("Viajante removido.", "success")
     if (editingIndex === index) resetForm()
   }
 
-  const handleSetPrimary = (index: number) => {
-    if (!canWrite) return
-    onUpdateTravelers(travelers.map((traveler, travelerIndex) => ({
-      ...traveler,
-      role: travelerIndex === index ? "principal" : traveler.role === "principal" ? "acompanhante" : traveler.role
-    })))
-    showToast("Responsavel principal atualizado.", "success")
+  const handleSetPrimary = async (index: number) => {
+    if (!canWrite || loading || isSubmitting) return
+    const traveler = travelers[index]
+    if (!traveler) return
+
+    setIsSubmitting(true)
+    try {
+      const success = await onSetPrimaryTraveler(traveler.id)
+      if (!success) return
+    } finally {
+      setIsSubmitting(false)
+    }
+
+    showToast("Responsável principal atualizado.", "success")
   }
 
   return (
     <Modal open={open} onClose={onClose} title="Viajantes">
       <div className="space-y-6">
         <div className="space-y-3">
+          {travelers.length === 0 ? (
+            <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4 text-sm text-white/50">
+              Nenhum viajante detalhado foi persistido para esta viagem ainda.
+            </div>
+          ) : null}
           {travelers.map((traveler, index) => (
-            <div key={`${traveler.name}-${index}`} className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4">
+            <div key={`${traveler.id}-${index}`} className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4">
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="font-medium text-white">{traveler.name}</p>
-                  <p className="text-xs text-white/40">{traveler.role === "principal" ? "Responsavel principal" : "Viaj?nte"}</p>
+                  <p className="text-xs text-white/40">{traveler.role === "principal" ? "Responsável principal" : "Viajante"}</p>
                 </div>
                 <div className="flex gap-2">
                   {canWrite && (
                     <>
-                      <button onClick={() => startEditing(index)} className="rounded-xl bg-white/[0.05] p-2 text-white/60 transition-colors hover:bg-white/10 hover:text-white">
+                      <button disabled={loading || isSubmitting} onClick={() => startEditing(index)} className="rounded-xl bg-white/[0.05] p-2 text-white/60 transition-colors hover:bg-white/10 hover:text-white disabled:opacity-50">
                         <Pencil className="h-4 w-4" />
                       </button>
-                      <button onClick={() => handleRemove(index)} className="rounded-xl bg-red-500/10 p-2 text-red-300 transition-colors hover:bg-red-500/20">
+                      <button disabled={loading || isSubmitting} onClick={() => void handleRemove(index)} className="rounded-xl bg-red-500/10 p-2 text-red-300 transition-colors hover:bg-red-500/20 disabled:opacity-50">
                         <Trash2 className="h-4 w-4" />
                       </button>
                     </>
@@ -5408,8 +5958,8 @@ function TravelersModal({
                 </div>
               </div>
               {canWrite && traveler.role !== "principal" && (
-                <button onClick={() => handleSetPrimary(index)} className="mt-3 text-xs font-medium text-[#5de0e6]">
-                  Definir como responsavel principal
+                <button disabled={loading || isSubmitting} onClick={() => void handleSetPrimary(index)} className="mt-3 text-xs font-medium text-[#5de0e6] disabled:opacity-50">
+                  Definir como responsável principal
                 </button>
               )}
             </div>
@@ -5418,14 +5968,14 @@ function TravelersModal({
 
         {canWrite ? (
           <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4">
-            <p className="mb-4 text-sm font-medium text-white">{editingIndex === null ? "Adicionar viaj?nte" : "Editar viaj?nte"}</p>
+            <p className="mb-4 text-sm font-medium text-white">{editingIndex === null ? "Adicionar viajante" : "Editar viajante"}</p>
             <div className="space-y-3">
-              <Input value={form.name} onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))} placeholder="Nome do viaj?nte" className="border-white/10 bg-white/[0.03] text-white" />
+              <Input value={form.name} onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))} placeholder="Nome do viajante" className="border-white/10 bg-white/[0.03] text-white" />
               <div className="grid grid-cols-2 gap-2">
                 {["principal", "acompanhante"].map((role) => (
                   <button
                     key={role}
-                    onClick={() => setForm((prev) => ({ ...prev, role }))}
+                    onClick={() => setForm((prev) => ({ ...prev, role: role as "principal" | "acompanhante" }))}
                     className={cn(
                       "rounded-xl border px-3 py-2 text-sm transition-colors",
                       form.role === role ? "border-[#5de0e6]/40 bg-[#5de0e6]/10 text-[#5de0e6]" : "border-white/10 bg-white/[0.03] text-white/60"
@@ -5436,11 +5986,11 @@ function TravelersModal({
                 ))}
               </div>
               <div className="flex gap-3">
-                <Button variant="outline" className="flex-1 border-white/10" onClick={resetForm}>
+                <Button variant="outline" className="flex-1 border-white/10" onClick={resetForm} disabled={loading || isSubmitting}>
                   Limpar
                 </Button>
-                <Button className="flex-1 bg-gradient-to-r from-[#5de0e6] to-[#004aad] text-white" onClick={handleSave}>
-                  {editingIndex === null ? "Adicionar" : "Salvar"}
+                <Button className="flex-1 bg-gradient-to-r from-[#5de0e6] to-[#004aad] text-white" onClick={() => void handleSave()} disabled={loading || isSubmitting}>
+                  {loading || isSubmitting ? "Salvando..." : editingIndex === null ? "Adicionar" : "Salvar"}
                 </Button>
               </div>
             </div>
@@ -6501,9 +7051,10 @@ export default function TripPage() {
   const [tripAdminToken, setTripAdminToken] = useState<string | null>(null)
   const [tripPublicToken, setTripPublicToken] = useState<string | null>(null)
   const [tripItineraryRecords, setTripItineraryRecords] = useState<TripItineraryRecord[]>([])
+  const [tripTravelersSource, setTripTravelersSource] = useState<"fallback" | "persisted">("fallback")
+  const [travelersLoading, setTravelersLoading] = useState(false)
   const [sensitiveAccessGranted, setSensitiveAccessGranted] = useState(false)
   const [securityModalOpen, setSecurityModalOpen] = useState(false)
-  const [quickAccessGateRequired, setQuickAccessGateRequired] = useState(false)
   const [adminLinkMutationMode, setAdminLinkMutationMode] = useState(false)
   const [premiumGateModalOpen, setPremiumGateModalOpen] = useState(false)
   const [offlineModeEnabled, setOfflineModeEnabled] = useState(false)
@@ -6571,7 +7122,8 @@ export default function TripPage() {
   useEffect(() => {
     setSensitiveAccessGranted(false)
     pendingSensitiveActionRef.current = null
-    setQuickAccessGateRequired(false)
+    setTripTravelersSource("fallback")
+    setTravelersLoading(false)
   }, [tripOwnerUserId, user?.id, params?.id, params?.slug])
 
   useEffect(() => {
@@ -6702,7 +7254,7 @@ export default function TripPage() {
       const routeMode = isAdminRoute ? "admin" : isPublicRoute ? "public" : "portal"
       const isMobileViewport = typeof window !== "undefined" ? window.innerWidth < 768 : false
 
-      if (isAdminRoute && !adminToken) {
+      if (false && isAdminRoute && !adminToken) {
         setLoadError("Este link administrativo é inválido ou expirou.")
         setIsLoadingTrip(false)
         return
@@ -6783,7 +7335,6 @@ export default function TripPage() {
           setTripAdminToken(null)
           setTripPublicToken(null)
           setAdminLinkMutationMode(false)
-          setQuickAccessGateRequired(false)
           setSensitiveAccessGranted(false)
           setCanWrite(false)
           setIsAdmin(isAdminRoute)
@@ -6825,17 +7376,20 @@ export default function TripPage() {
       }
 
       try {
-        const repositoryTripPromise = adminToken
-          ? getTripByAdminToken(adminToken)
-          : publicToken
-            ? getTripByPublicToken(publicToken)
-            : getTripBySlug(routeSlug)
+        const repositoryTripPromise = isTripLinkRoute
+          ? getTripBySlug(routeSlug)
+          : adminToken
+            ? getTripByAdminToken(adminToken)
+            : publicToken
+              ? getTripByPublicToken(publicToken)
+              : getTripBySlug(routeSlug)
         const shouldAttemptOfflineTimeoutFallback = useSupabase && (isPublicRoute || isAdminRoute)
         const lookupTimeoutMs = isMobileViewport ? 2200 : 3200
         let repositoryTrip:
           | Awaited<ReturnType<typeof getTripBySlug>>
           | Awaited<ReturnType<typeof getTripByAdminToken>>
           | Awaited<ReturnType<typeof getTripByPublicToken>>
+        let fallbackTrip: ReturnType<typeof mapTripPinSnapshotToStoredTrip> | null = null
 
         let hydratedFromOfflineTimeout = false
 
@@ -6863,7 +7417,25 @@ export default function TripPage() {
           repositoryTrip = await repositoryTripPromise
         }
 
-        if (repositoryTrip.data) {
+        if (!repositoryTrip.data && useSupabase && isTripLinkRoute) {
+          const pinStatusResult = await loadTripPinStatus({
+            tripSlug: routeSlug,
+            adminToken,
+            publicToken,
+            accessMode: isAdminRoute ? "admin" : "public",
+          })
+
+          if (pinStatusResult.ok && pinStatusResult.data?.trip) {
+            fallbackTrip = mapTripPinSnapshotToStoredTrip(pinStatusResult.data.trip, {
+              adminToken,
+              publicToken,
+            })
+          }
+        }
+
+        const resolvedTrip = repositoryTrip.data ?? fallbackTrip
+
+        if (resolvedTrip) {
           if (loadRequestRef.current !== requestId) return
           if (hydratedFromOfflineTimeout) {
             if (offlineImageUrlsRef.current.length > 0) {
@@ -6874,12 +7446,12 @@ export default function TripPage() {
             setOfflinePackageStatus(null)
             setOfflineDocumentContext(null)
           }
-          const resolvedAgencyId = resolveTripAgencyId(repositoryTrip.data)
+          const resolvedAgencyId = resolveTripAgencyId(resolvedTrip)
           const preloadedAgencyBranding = await fetchTripAgencyBranding({
-            tripId: repositoryTrip.data.id,
-            tripSlug: repositoryTrip.data.slug ?? routeSlug,
-            adminToken: repositoryTrip.data.adminToken ?? adminToken ?? null,
-            publicToken: repositoryTrip.data.publicToken ?? publicToken ?? null,
+            tripId: resolvedTrip.id,
+            tripSlug: resolvedTrip.slug ?? routeSlug,
+            adminToken: resolvedTrip.adminToken ?? adminToken ?? null,
+            publicToken: resolvedTrip.publicToken ?? publicToken ?? null,
             accessMode: isAdminRoute ? "admin" : "public",
           })
           const preloadedAgencyLogo = resolveAgencyBrandLogo(
@@ -6896,16 +7468,17 @@ export default function TripPage() {
             isAgency: Boolean(resolvedAgencyId),
           })
 
-          setTripOwnerUserId(repositoryTrip.data.ownerUserId ?? null)
-          setTripAdminToken(repositoryTrip.data.adminToken ?? adminToken ?? null)
-          setTripPublicToken(repositoryTrip.data.publicToken ?? publicToken ?? null)
-          const isOwner = Boolean(user?.id && repositoryTrip.data.ownerUserId && user.id === repositoryTrip.data.ownerUserId)
+          setTripOwnerUserId(resolvedTrip.ownerUserId ?? null)
+          setTripAdminToken(resolvedTrip.adminToken ?? adminToken ?? null)
+          setTripPublicToken(resolvedTrip.publicToken ?? publicToken ?? null)
+          const isOwner = Boolean(user?.id && resolvedTrip.ownerUserId && user.id === resolvedTrip.ownerUserId)
           const isPublicLinkRequest = isPublicRoute || Boolean(publicToken)
           const adminLinkAccessMode = isAdminRoute && !isOwner
+          const adminPinGranted = !isAdminRoute || sensitiveAccessGranted
 
           logTripDocumentsDev("trip_resolved", {
             routeSlug,
-            tripId: repositoryTrip.data.id,
+            tripId: resolvedTrip.id,
             routeMode,
             isMobileViewport,
             hasAdminToken: Boolean(adminToken),
@@ -6913,53 +7486,53 @@ export default function TripPage() {
             isOwner,
           })
 
-          if (isPublicLinkRequest && repositoryTrip.data.visibility !== "public") {
+          if (isPublicLinkRequest && resolvedTrip.visibility !== "public") {
             console.error("[TRIP] erro ao carregar link", "Esta viagem não está publicada para acesso público.")
             setLoadError("Esta viagem não está disponível publicamente.")
             setIsLoadingTrip(false)
             return
           }
 
-          setQuickAccessGateRequired(false)
-          setAdminLinkMutationMode(adminLinkAccessMode)
+          setAdminLinkMutationMode(adminLinkAccessMode && adminPinGranted)
 
-          const canEditTrip = isAdminRoute && (Boolean(user) ? (isOwner || adminLinkAccessMode) : true)
-          const canWriteTrip = isAdminRoute && (isOwner || adminLinkAccessMode)
+          const canEditTrip = isAdminRoute && adminPinGranted && (Boolean(user) ? (isOwner || adminLinkAccessMode) : true)
+          const canWriteTrip = isAdminRoute && adminPinGranted && (isOwner || adminLinkAccessMode)
           setIsAdmin(canEditTrip)
           setCanWrite(canWriteTrip)
 
           setTripData(
             buildTripDataFromStoredTrip({
-              id: repositoryTrip.data.id,
-              slug: repositoryTrip.data.slug,
-              name: repositoryTrip.data.title,
-              destination: repositoryTrip.data.destination,
+              id: resolvedTrip.id,
+              slug: resolvedTrip.slug,
+              name: resolvedTrip.title,
+              destination: resolvedTrip.destination,
               agencyId: resolvedAgencyId,
-              clientId: repositoryTrip.data.clientId ?? null,
-              country: repositoryTrip.data.country ?? undefined,
-              city: repositoryTrip.data.city ?? undefined,
-              startDate: repositoryTrip.data.startDate ?? undefined,
-              endDate: repositoryTrip.data.endDate ?? undefined,
-              passengersCount: repositoryTrip.data.travelersCount,
-              status: repositoryTrip.data.status,
-              coverImage: repositoryTrip.data.coverImage ?? undefined,
-              adminLink: repositoryTrip.data.adminLink,
-              shareLink: repositoryTrip.data.publicLink,
+              clientId: resolvedTrip.clientId ?? null,
+              country: resolvedTrip.country ?? undefined,
+              city: resolvedTrip.city ?? undefined,
+              startDate: resolvedTrip.startDate ?? undefined,
+              endDate: resolvedTrip.endDate ?? undefined,
+              passengersCount: resolvedTrip.travelersCount,
+              status: resolvedTrip.status,
+              coverImage: resolvedTrip.coverImage ?? undefined,
+              adminLink: resolvedTrip.adminLink,
+              shareLink: resolvedTrip.publicLink,
               flights: [],
               hotels: [],
-              hotel: repositoryTrip.data.accommodations?.[0] ?? null,
-              itinerary: repositoryTrip.data.itinerary,
+              hotel: resolvedTrip.accommodations?.[0] ?? null,
+              itinerary: resolvedTrip.itinerary,
               documents: [],
-              travelersCount: repositoryTrip.data.travelersCount,
+              travelersCount: resolvedTrip.travelersCount,
             })
           )
           setIsLoadingTrip(false)
-          tripPerf.end({ tripId: repositoryTrip.data.id })
+          tripPerf.end({ tripId: resolvedTrip.id })
 
           void (async () => {
             const sectionsPerf = startPerfMeasure("trip.sections")
-            const adminSectionsPromise = canWriteTrip && adminLinkAccessMode
-              ? fetch(`/api/trip-admin?tripId=${encodeURIComponent(repositoryTrip.data.id)}&tripSlug=${encodeURIComponent(routeSlug)}${repositoryTrip.data.adminToken ? `&adminToken=${encodeURIComponent(repositoryTrip.data.adminToken)}` : ""}`).then(async (response) => {
+            const resolvedAdminToken = resolvedTrip.adminToken ?? adminToken ?? null
+            const adminSectionsPromise = canWriteTrip && isAdminRoute && resolvedAdminToken
+              ? fetch(`/api/trip-admin?tripId=${encodeURIComponent(resolvedTrip.id)}&tripSlug=${encodeURIComponent(routeSlug)}&adminToken=${encodeURIComponent(resolvedAdminToken)}`).then(async (response) => {
                   const data = await response.json().catch(() => null)
                   if (!response.ok) {
                     throw new Error(data?.error || "Falha ao carregar dados administrativos da viagem.")
@@ -6968,20 +7541,23 @@ export default function TripPage() {
                 })
               : null
 
-            const [documentsSettled, flightsSettled, itinerariesSettled, hotelsSettled, agencySettled] = await Promise.allSettled([
+            const [documentsSettled, flightsSettled, itinerariesSettled, hotelsSettled, agencySettled, travelersSettled] = await Promise.allSettled([
               adminSectionsPromise
                 ? adminSectionsPromise.then((data: any) => ({ source: "admin-api" as const, data: data?.documents ?? [], error: null }))
-                : (canWriteTrip ? listDocumentsByTrip(repositoryTrip.data.id) : listPublicTripDocuments(repositoryTrip.data.id)),
+                : (canWriteTrip ? listDocumentsByTrip(resolvedTrip.id) : listPublicTripDocuments(resolvedTrip.id)),
               adminSectionsPromise
                 ? adminSectionsPromise.then((data: any) => ({ source: "admin-api" as const, data: data?.flights ?? [], error: null }))
-                : (canWriteTrip ? listTripFlights(repositoryTrip.data.id) : listPublicTripFlights(repositoryTrip.data.id)),
+                : (canWriteTrip ? listTripFlights(resolvedTrip.id) : listPublicTripFlights(resolvedTrip.id)),
               adminSectionsPromise
                 ? adminSectionsPromise.then((data: any) => ({ source: "admin-api" as const, data: data?.itineraries ?? [], error: null }))
-                : listTripItineraries(repositoryTrip.data.id),
+                : listTripItineraries(resolvedTrip.id),
               adminSectionsPromise
                 ? adminSectionsPromise.then((data: any) => ({ source: "admin-api" as const, data: data?.hotels ?? [], error: null }))
-                : listTripHotels(repositoryTrip.data.id),
+                : listTripHotels(resolvedTrip.id),
               Promise.resolve(preloadedAgencyBranding),
+              adminSectionsPromise
+                ? adminSectionsPromise.then((data: any) => ({ source: "admin-api" as const, data: data?.travelers ?? [], error: null }))
+                : Promise.resolve({ source: "hidden" as const, data: [] as PersistedTravelerPayload[], error: null }),
             ])
 
             if (loadRequestRef.current !== requestId) return
@@ -7003,12 +7579,18 @@ export default function TripPage() {
                 ? hotelsSettled.value
                 : { source: "error" as const, data: [] as any[], error: hotelsSettled.reason instanceof Error ? hotelsSettled.reason.message : "Falha ao buscar hospedagens." }
             const agencyResult = agencySettled.status === "fulfilled" ? agencySettled.value : null
+            const travelersResult =
+              travelersSettled.status === "fulfilled"
+                ? travelersSettled.value
+                : { source: "error" as const, data: [] as PersistedTravelerPayload[], error: travelersSettled.reason instanceof Error ? travelersSettled.reason.message : "Falha ao buscar viajantes." }
             const resolvedDocuments = Array.isArray(documentsResult.data) ? documentsResult.data : []
+            const resolvedTravelers = Array.isArray(travelersResult.data) ? travelersResult.data : []
             const sectionErrors = [
               documentsResult.error,
               flightsResult.error,
               itinerariesResult.error,
               hotelsResult.error,
+              travelersResult.error,
               agencySettled.status === "rejected" ? agencySettled.reason instanceof Error ? agencySettled.reason.message : "Falha ao buscar branding da agência." : null,
             ].filter((value): value is string => Boolean(value))
 
@@ -7021,7 +7603,7 @@ export default function TripPage() {
 
             logTripDocumentsDev("query_result", {
               routeSlug,
-              tripId: repositoryTrip.data.id,
+              tripId: resolvedTrip.id,
               routeMode,
               isMobileViewport,
               adminMode: canWriteTrip,
@@ -7042,24 +7624,27 @@ export default function TripPage() {
               ),
               isAgency: Boolean(resolvedAgencyId),
             })
+            if (isAdminRoute) {
+              setTripTravelersSource(resolvedTravelers.length > 0 ? "persisted" : "fallback")
+            }
 
             setTripData((prev) =>
               buildTripDataFromStoredTrip({
-                id: repositoryTrip.data.id,
-                slug: repositoryTrip.data.slug,
-                name: repositoryTrip.data.title,
-                destination: repositoryTrip.data.destination,
+                id: resolvedTrip.id,
+                slug: resolvedTrip.slug,
+                name: resolvedTrip.title,
+                destination: resolvedTrip.destination,
                 agencyId: resolvedAgencyId,
-                clientId: repositoryTrip.data.clientId ?? null,
-                country: repositoryTrip.data.country ?? undefined,
-                city: repositoryTrip.data.city ?? undefined,
-                startDate: repositoryTrip.data.startDate ?? undefined,
-                endDate: repositoryTrip.data.endDate ?? undefined,
-                passengersCount: repositoryTrip.data.travelersCount,
-                status: repositoryTrip.data.status,
-                coverImage: repositoryTrip.data.coverImage ?? undefined,
-                adminLink: repositoryTrip.data.adminLink,
-                shareLink: repositoryTrip.data.publicLink,
+                clientId: resolvedTrip.clientId ?? null,
+                country: resolvedTrip.country ?? undefined,
+                city: resolvedTrip.city ?? undefined,
+                startDate: resolvedTrip.startDate ?? undefined,
+                endDate: resolvedTrip.endDate ?? undefined,
+                passengersCount: resolvedTrip.travelersCount,
+                status: resolvedTrip.status,
+                coverImage: resolvedTrip.coverImage ?? undefined,
+                adminLink: resolvedTrip.adminLink,
+                shareLink: resolvedTrip.publicLink,
                 flights: (flightsResult.data ?? []).map((flight) => mapFlightRecordToView(flight, resolvedDocuments)),
                 hotel: hotelsResult.data[0]
                   ? {
@@ -7067,21 +7652,22 @@ export default function TripPage() {
                       image: null,
                       amenities: [],
                     }
-                  : repositoryTrip.data.accommodations?.[0] ?? null,
+                  : resolvedTrip.accommodations?.[0] ?? null,
                 hotels: hotelsResult.data.map((hotel) => ({
                   ...hotel,
                   image: null,
                   amenities: [],
                 })),
-                itinerary: simpleItinerary ? mapItineraryContentToLegacyDays(simpleItinerary.content) : repositoryTrip.data.itinerary,
+                itinerary: simpleItinerary ? mapItineraryContentToLegacyDays(simpleItinerary.content) : resolvedTrip.itinerary,
                 documents: resolvedDocuments,
-                travelersCount: repositoryTrip.data.travelersCount,
+                travelers: isAdminRoute ? mapPersistedTravelersToView(resolvedTravelers) : prev?.travelers,
+                travelersCount: resolvedTrip.travelersCount,
               })
             )
 
             logTripDocumentsDev("post_filter_counts", {
               routeSlug,
-              tripId: repositoryTrip.data.id,
+              tripId: resolvedTrip.id,
               routeMode,
               isMobileViewport,
               adminMode: canWriteTrip,
@@ -7093,7 +7679,7 @@ export default function TripPage() {
               itineraries: false,
               documents: false,
             })
-            sectionsPerf.end({ tripId: repositoryTrip.data.id })
+            sectionsPerf.end({ tripId: resolvedTrip.id })
           })().catch((error) => {
             console.error("[TRIP] section load error", error)
             setSectionsLoading({
@@ -7182,7 +7768,7 @@ export default function TripPage() {
         setIsLoadingTrip(false)
       }
     })
-  }, [params?.id, params?.slug, pathname, searchParamsKey, user?.id, adminAuthLoading])
+  }, [params?.id, params?.slug, pathname, searchParamsKey, user?.id, adminAuthLoading, sensitiveAccessGranted])
 
   useEffect(() => {
     if (typeof document === "undefined") return
@@ -7309,6 +7895,49 @@ export default function TripPage() {
       ok: response.ok,
       data,
       error: response.ok ? null : data?.error || "Não foi possível concluir o upload administrativo.",
+    }
+  }
+
+  const applyPersistedTravelers = (travelers: PersistedTravelerPayload[], source: "fallback" | "persisted" = "persisted") => {
+    const nextTravelers = mapPersistedTravelersToView(travelers)
+    setTripTravelersSource(source)
+    setTripData((prev: any) => ({
+      ...prev,
+      travelers: nextTravelers.length > 0 ? nextTravelers : source === "fallback" ? buildTravelers(prev?.travelersCount) : [],
+      travelersCount: nextTravelers.length > 0 ? nextTravelers.length : source === "fallback" ? prev?.travelersCount ?? 0 : 0,
+    }))
+  }
+
+  const ensurePersistedTripTravelers = async () => {
+    if (!adminRouteActive || !canWrite || !shouldUseSupabase()) {
+      return true
+    }
+
+    if (tripTravelersSource === "persisted" || resolveTripTravelersCount(tripData) === 0) {
+      return true
+    }
+
+    if (!sensitiveAccessGranted) {
+      requireSensitiveAccess(() => { void ensurePersistedTripTravelers() })
+      return false
+    }
+
+    setTravelersLoading(true)
+    try {
+      const result = await callTripAdminApi<{ travelers?: PersistedTravelerPayload[] }>({
+        action: "ensureTravelersPersisted",
+        travelersCount: resolveTripTravelersCount(tripData),
+      })
+
+      if (result.error) {
+        showToast(resolveProtectedWriteError(result.error || "Não foi possível preparar os viajantes desta viagem."), "error")
+        return false
+      }
+
+      applyPersistedTravelers(Array.isArray(result.data?.travelers) ? result.data.travelers : [], "persisted")
+      return true
+    } finally {
+      setTravelersLoading(false)
     }
   }
 
@@ -8035,11 +8664,140 @@ export default function TripPage() {
     showToast(storageWarning ? `Arquivo excluído. Aviso do storage: ${storageWarning}` : "Arquivo excluído com sucesso.", storageWarning ? "info" : "success")
   }
 
-  const handleUpdateTravelers = (travelers: { name: string; avatar?: string; role: string }[]) => {
-    if (blockOfflineMutation()) return
-    requireSensitiveAccess(() => {
-      setTripData(prev => ({ ...prev, travelers }))
-    })
+  const handleOpenTravelers = async () => {
+    if (adminRouteActive && canWrite) {
+      const ready = await ensurePersistedTripTravelers()
+      if (!ready) return
+    }
+
+    setTravelersOpen(true)
+  }
+
+  const handleAddTraveler = async (payload: { name: string; role: "principal" | "acompanhante" }) => {
+    if (blockOfflineMutation()) return false
+    if (!sensitiveAccessGranted) {
+      requireSensitiveAccess(() => { void handleOpenTravelers() })
+      return false
+    }
+    if (!(adminRouteActive && tripAdminToken)) {
+      showToast("Este modo de viagem ainda nÃ£o permite salvar viajantes reais.", "info")
+      return false
+    }
+
+    setTravelersLoading(true)
+    try {
+      const result = await callTripAdminApi<{ travelers?: PersistedTravelerPayload[] }>({
+        action: "createTraveler",
+        name: payload.name,
+        role: payload.role === "principal" ? "primary" : "companion",
+        travelersCount: resolveTripTravelersCount(tripData),
+      })
+
+      if (result.error) {
+        showToast(resolveProtectedWriteError(result.error || "NÃ£o foi possÃ­vel adicionar o viajante."), "error")
+        return false
+      }
+
+      applyPersistedTravelers(Array.isArray(result.data?.travelers) ? result.data.travelers : [], "persisted")
+      return true
+    } finally {
+      setTravelersLoading(false)
+    }
+  }
+
+  const handleEditTraveler = async (travelerId: string, payload: { name: string; role: "principal" | "acompanhante" }) => {
+    if (blockOfflineMutation()) return false
+    if (!sensitiveAccessGranted) {
+      requireSensitiveAccess(() => { void handleOpenTravelers() })
+      return false
+    }
+    if (!(adminRouteActive && tripAdminToken)) {
+      showToast("Este modo de viagem ainda nÃ£o permite salvar viajantes reais.", "info")
+      return false
+    }
+
+    setTravelersLoading(true)
+    try {
+      const result = await callTripAdminApi<{ travelers?: PersistedTravelerPayload[] }>({
+        action: "updateTraveler",
+        travelerId,
+        name: payload.name,
+        role: payload.role === "principal" ? "primary" : "companion",
+      })
+
+      if (result.error) {
+        showToast(resolveProtectedWriteError(result.error || "NÃ£o foi possÃ­vel atualizar o viajante."), "error")
+        return false
+      }
+
+      applyPersistedTravelers(Array.isArray(result.data?.travelers) ? result.data.travelers : [], "persisted")
+      return true
+    } finally {
+      setTravelersLoading(false)
+    }
+  }
+
+  const handleRemoveTraveler = async (travelerId: string) => {
+    if (blockOfflineMutation()) return false
+    if (!sensitiveAccessGranted) {
+      requireSensitiveAccess(() => { void handleOpenTravelers() })
+      return false
+    }
+    if (!(adminRouteActive && tripAdminToken)) {
+      showToast("Este modo de viagem ainda nÃ£o permite salvar viajantes reais.", "info")
+      return false
+    }
+
+    const confirmed = window.confirm("Excluir este viajante?")
+    if (!confirmed) return false
+
+    setTravelersLoading(true)
+    try {
+      const result = await callTripAdminApi<{ travelers?: PersistedTravelerPayload[] }>({
+        action: "deleteTraveler",
+        travelerId,
+      })
+
+      if (result.error) {
+        showToast(resolveProtectedWriteError(result.error || "NÃ£o foi possÃ­vel remover o viajante."), "error")
+        return false
+      }
+
+      applyPersistedTravelers(Array.isArray(result.data?.travelers) ? result.data.travelers : [], "persisted")
+      return true
+    } finally {
+      setTravelersLoading(false)
+    }
+  }
+
+  const handleSetPrimaryTraveler = async (travelerId: string) => {
+    if (blockOfflineMutation()) return false
+    if (!sensitiveAccessGranted) {
+      requireSensitiveAccess(() => { void handleOpenTravelers() })
+      return false
+    }
+    if (!(adminRouteActive && tripAdminToken)) {
+      showToast("Este modo de viagem ainda nÃ£o permite salvar viajantes reais.", "info")
+      return false
+    }
+
+    setTravelersLoading(true)
+    try {
+      const result = await callTripAdminApi<{ travelers?: PersistedTravelerPayload[] }>({
+        action: "setPrimaryTraveler",
+        travelerId,
+      })
+
+      if (result.error) {
+        showToast(resolveProtectedWriteError(result.error || "NÃ£o foi possÃ­vel definir o viajante principal."), "error")
+        return false
+      }
+
+      applyPersistedTravelers(Array.isArray(result.data?.travelers) ? result.data.travelers : [], "persisted")
+      return true
+    } finally {
+      setTravelersLoading(false)
+    }
   }
 
   const handleSaveTripSettings = (data: { privacy: string; permissions: string; status: string; preferences: string }) => {
@@ -8079,7 +8837,7 @@ export default function TripPage() {
     )
   }
 
-  if (adminRouteActive && !user && quickAccessGateRequired && !sensitiveAccessGranted) {
+  if (adminRouteActive && !sensitiveAccessGranted) {
     return (
       <main className="min-h-screen bg-[#f4f1ea] text-slate-900 flex items-center justify-center px-4">
         <div className="max-w-md rounded-3xl border border-slate-200 bg-white/92 p-8 text-center shadow-[0_24px_60px_rgba(148,163,184,0.16)]">
@@ -8088,24 +8846,29 @@ export default function TripPage() {
           </div>
           <h1 className="text-xl font-semibold text-slate-950">Desbloqueie para editar esta viagem</h1>
           <p className="mt-3 text-sm text-slate-500">
-            Use PIN ou biometria configurados neste dispositivo para abrir o modo administrador sem login tradicional.
+            Use o PIN ja criado no portal para abrir o modo administrador deste link.
           </p>
-          <SensitiveAccessModal
+          <PortalPinUnlockModal
             open
             onClose={handleCloseSensitiveAccessModal}
             tripId={tripData.id}
+            tripSlug={routeSlug}
+            adminToken={tripAdminToken}
+            publicToken={tripPublicToken}
+            accessMode="admin"
+            title="Desbloqueie para editar esta viagem"
+            configuredDescription="Use o PIN ja criado no portal para liberar o modo administrador desta viagem."
             onSuccess={() => {
               setSensitiveAccessGranted(true)
-              setQuickAccessGateRequired(false)
               setIsAdmin(true)
-              setCanWrite(false)
+              setCanWrite(true)
+              setAdminLinkMutationMode(true)
               const pendingAction = pendingSensitiveActionRef.current
               pendingSensitiveActionRef.current = null
-              setToast({ message: "Acesso rápido liberado para esta viagem.", type: "success" })
+              setToast({ message: "Acesso liberado para esta viagem.", type: "success" })
               pendingAction?.()
             }}
             onLogin={handleRequireAuthenticatedAdmin}
-            onConfigureQuickAccess={handleConfigureQuickAccess}
           />
         </div>
       </main>
@@ -8232,10 +8995,17 @@ export default function TripPage() {
             </BottomSheet>
 
             <ShareModal open={shareOpen} onClose={() => setShareOpen(false)} tripData={tripData} />
-            <TravelerPublicSensitiveAccessModal
+            <PortalPinUnlockModal
               open={securityModalOpen}
               onClose={handleCloseSensitiveAccessModal}
               tripId={tripData.id}
+              tripSlug={routeSlug}
+              adminToken={tripAdminToken}
+              publicToken={tripPublicToken}
+              accessMode="public"
+              title="Desbloquear areas protegidas"
+              configuredDescription="Use o PIN ja criado no portal para abrir documentos, passagens, hospedagens e outras areas protegidas."
+              tone="light"
               onSuccess={() => {
                 setSensitiveAccessGranted(true)
                 setSecurityModalOpen(false)
@@ -8253,7 +9023,7 @@ export default function TripPage() {
               showCredits={!isAgencyTrip}
               onOpenTravelers={() => {
                 setMenuOpen(false)
-                setTravelersOpen(true)
+                void handleOpenTravelers()
               }}
               onOpenSettings={() => {
                 setMenuOpen(false)
@@ -8270,9 +9040,18 @@ export default function TripPage() {
               }}
             />
             <EditTripModal open={editTripOpen} onClose={() => setEditTripOpen(false)} tripData={tripData} onSave={handleUpdateTrip} />
-            <TravelersModal open={travelersOpen} onClose={() => setTravelersOpen(false)} travelers={tripData.travelers} onUpdateTravelers={handleUpdateTravelers} />
+            <TravelersModal
+              open={travelersOpen}
+              onClose={() => setTravelersOpen(false)}
+              travelers={Array.isArray(tripData.travelers) ? tripData.travelers : []}
+              loading={travelersLoading}
+              onAddTraveler={handleAddTraveler}
+              onUpdateTraveler={handleEditTraveler}
+              onRemoveTraveler={handleRemoveTraveler}
+              onSetPrimaryTraveler={handleSetPrimaryTraveler}
+            />
             <TripSettingsModal open={tripSettingsOpen} onClose={() => setTripSettingsOpen(false)} tripData={tripData} onSave={handleSaveTripSettings} />
-            <TripSecurityModal open={securitySettingsOpen} onClose={() => setSecuritySettingsOpen(false)} tripId={tripData.id} tripTitle={tripData.destination} onSecurityUpdated={() => setToast({ message: "Segurança do dispositivo atualizada.", type: "success" })} />
+            <LinkSecurityInfoModal open={securitySettingsOpen} onClose={() => setSecuritySettingsOpen(false)} tripId={tripData.id} tripSlug={routeSlug} adminToken={tripAdminToken} publicToken={tripPublicToken} accessMode="public" />
             {!isAgencyTrip ? <TravelerPublicCreditsModal open={creditsOpen} onClose={() => setCreditsOpen(false)} credits={travelerCredits} /> : null}
             <Modal open={premiumGateModalOpen} onClose={() => setPremiumGateModalOpen(false)} title="Disponível no Premium">
               <div className="space-y-5">
@@ -8420,10 +9199,16 @@ export default function TripPage() {
             </BottomSheet>
 
             <ShareModal open={shareOpen} onClose={() => setShareOpen(false)} tripData={tripData} />
-            <SensitiveAccessModal
+            <PortalPinUnlockModal
               open={securityModalOpen}
               onClose={handleCloseSensitiveAccessModal}
               tripId={tripData.id}
+              tripSlug={routeSlug}
+              adminToken={tripAdminToken}
+              publicToken={tripPublicToken}
+              accessMode="admin"
+              title="Desbloqueie para editar esta viagem"
+              configuredDescription="Use o PIN ja criado no portal para liberar as acoes administrativas desta viagem."
               onSuccess={() => {
                 setSensitiveAccessGranted(true)
                 setSecurityModalOpen(false)
@@ -8433,7 +9218,6 @@ export default function TripPage() {
                 pendingAction?.()
               }}
               onLogin={handleRequireAuthenticatedAdmin}
-              onConfigureQuickAccess={handleConfigureQuickAccess}
             />
             <MenuModal
               open={menuOpen}
@@ -8454,7 +9238,7 @@ export default function TripPage() {
               }}
               onOpenTravelers={() => {
                 setMenuOpen(false)
-                setTravelersOpen(true)
+                void handleOpenTravelers()
               }}
               onOpenSettings={() => {
                 setMenuOpen(false)
@@ -8471,9 +9255,18 @@ export default function TripPage() {
               }}
             />
             <EditTripModal open={editTripOpen} onClose={() => setEditTripOpen(false)} tripData={tripData} onSave={handleUpdateTrip} />
-            <TravelersModal open={travelersOpen} onClose={() => setTravelersOpen(false)} travelers={tripData.travelers} onUpdateTravelers={handleUpdateTravelers} />
+            <TravelersModal
+              open={travelersOpen}
+              onClose={() => setTravelersOpen(false)}
+              travelers={Array.isArray(tripData.travelers) ? tripData.travelers : []}
+              loading={travelersLoading}
+              onAddTraveler={handleAddTraveler}
+              onUpdateTraveler={handleEditTraveler}
+              onRemoveTraveler={handleRemoveTraveler}
+              onSetPrimaryTraveler={handleSetPrimaryTraveler}
+            />
             <TripSettingsModal open={tripSettingsOpen} onClose={() => setTripSettingsOpen(false)} tripData={tripData} onSave={handleSaveTripSettings} />
-            <TripSecurityModal open={securitySettingsOpen} onClose={() => setSecuritySettingsOpen(false)} tripId={tripData.id} tripTitle={tripData.destination} onSecurityUpdated={() => setToast({ message: "Segurança do dispositivo atualizada.", type: "success" })} />
+            <LinkSecurityInfoModal open={securitySettingsOpen} onClose={() => setSecuritySettingsOpen(false)} tripId={tripData.id} tripSlug={routeSlug} adminToken={tripAdminToken} publicToken={tripPublicToken} accessMode="admin" />
             {!isAgencyTrip ? <LinkCreditsSummaryModal open={creditsOpen} onClose={() => setCreditsOpen(false)} credits={travelerCredits} /> : null}
             <Modal open={premiumGateModalOpen} onClose={() => setPremiumGateModalOpen(false)} title="Disponível no Premium">
               <div className="space-y-5">
@@ -8555,20 +9348,25 @@ export default function TripPage() {
           <TripFooter agencyBranding={agencyBranding} />
 
           <ShareModal open={shareOpen} onClose={() => setShareOpen(false)} tripData={tripData} />
-          <SensitiveAccessModal
+          <PortalPinUnlockModal
             open={securityModalOpen}
             onClose={handleCloseSensitiveAccessModal}
             tripId={tripData.id}
+            tripSlug={routeSlug}
+            adminToken={tripAdminToken}
+            publicToken={tripPublicToken}
+            accessMode={adminRouteActive ? "admin" : "public"}
+            title="Desbloquear areas protegidas"
+            configuredDescription={adminRouteActive ? "Use o PIN ja criado no portal para liberar as acoes administrativas desta viagem." : "Use o PIN ja criado no portal para liberar as areas protegidas desta viagem."}
             onSuccess={() => {
               setSensitiveAccessGranted(true)
               setSecurityModalOpen(false)
               const pendingAction = pendingSensitiveActionRef.current
               pendingSensitiveActionRef.current = null
-              setToast({ message: "Acesso rápido liberado para ações sensíveis.", type: "success" })
+              setToast({ message: "Acesso liberado para areas protegidas.", type: "success" })
               pendingAction?.()
             }}
             onLogin={handleRequireAuthenticatedAdmin}
-            onConfigureQuickAccess={handleConfigureQuickAccess}
           />
           <MenuModal
             open={menuOpen}
@@ -8576,7 +9374,7 @@ export default function TripPage() {
             showCredits={!isAgencyTrip}
             onOpenTravelers={() => {
               setMenuOpen(false)
-              setTravelersOpen(true)
+              void handleOpenTravelers()
             }}
             onOpenSettings={() => {
               setMenuOpen(false)
@@ -8593,9 +9391,18 @@ export default function TripPage() {
             }}
           />
           <EditTripModal open={editTripOpen} onClose={() => setEditTripOpen(false)} tripData={tripData} onSave={handleUpdateTrip} />
-          <TravelersModal open={travelersOpen} onClose={() => setTravelersOpen(false)} travelers={tripData.travelers} onUpdateTravelers={handleUpdateTravelers} />
+          <TravelersModal
+            open={travelersOpen}
+            onClose={() => setTravelersOpen(false)}
+            travelers={Array.isArray(tripData.travelers) ? tripData.travelers : []}
+            loading={travelersLoading}
+            onAddTraveler={handleAddTraveler}
+            onUpdateTraveler={handleEditTraveler}
+            onRemoveTraveler={handleRemoveTraveler}
+            onSetPrimaryTraveler={handleSetPrimaryTraveler}
+          />
           <TripSettingsModal open={tripSettingsOpen} onClose={() => setTripSettingsOpen(false)} tripData={tripData} onSave={handleSaveTripSettings} />
-          <TripSecurityModal open={securitySettingsOpen} onClose={() => setSecuritySettingsOpen(false)} tripId={tripData.id} tripTitle={tripData.destination} onSecurityUpdated={() => setToast({ message: "Segurança do dispositivo atualizada.", type: "success" })} />
+          <LinkSecurityInfoModal open={securitySettingsOpen} onClose={() => setSecuritySettingsOpen(false)} tripId={tripData.id} tripSlug={routeSlug} adminToken={tripAdminToken} publicToken={tripPublicToken} accessMode={adminRouteActive ? "admin" : "public"} />
           {!isAgencyTrip ? <LinkCreditsSummaryModal open={creditsOpen} onClose={() => setCreditsOpen(false)} credits={travelerCredits} /> : null}
           <Modal open={premiumGateModalOpen} onClose={() => setPremiumGateModalOpen(false)} title="Disponível no Premium">
             <div className="space-y-5">

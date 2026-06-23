@@ -32,6 +32,17 @@ interface RepositoryTripResult {
   config?: ReturnType<typeof createSupabaseBrowserClientPlaceholder>
 }
 
+function parseTripPinSettings(value: unknown) {
+  if (!value || typeof value !== "object") return null
+  const settings = value as Record<string, unknown>
+  return {
+    enabled: settings.enabled === true,
+    pinHash: typeof settings.pinHash === "string" ? settings.pinHash : null,
+    pinSalt: typeof settings.pinSalt === "string" ? settings.pinSalt : null,
+    pinIterations: typeof settings.pinIterations === "number" ? settings.pinIterations : null,
+  }
+}
+
 function stripSensitiveTripTokens<T extends Trip | null>(trip: T): T {
   if (!trip) return trip
   return {
@@ -89,7 +100,6 @@ async function listExistingTripSlugs(
 function mapTripRowToTrip(row: Database["public"]["Tables"]["trips"]["Row"]): Trip {
   const permissions = (row.permissions as Record<string, unknown>) ?? {}
   const creditsSummary = (row.credits_summary as Record<string, unknown>) ?? {}
-
   return {
     id: row.id,
     title: row.title,
@@ -128,6 +138,7 @@ function mapTripRowToTrip(row: Database["public"]["Tables"]["trips"]["Row"]): Tr
       publicCanViewFlights: typeof permissions.publicCanViewFlights === "boolean" ? permissions.publicCanViewFlights : false,
       publicCanViewPublicDocuments: typeof permissions.publicCanViewPublicDocuments === "boolean" ? permissions.publicCanViewPublicDocuments : true,
       publicCanUseConcierge: typeof permissions.publicCanUseConcierge === "boolean" ? permissions.publicCanUseConcierge : false,
+      tripPin: parseTripPinSettings(permissions.tripPin),
     },
     creditsSummary: {
       balance: typeof creditsSummary.balance === "number" ? creditsSummary.balance : null,
@@ -573,7 +584,7 @@ export async function createTrip(payload: CreateTripPayload) {
         const trip = buildTrip(payload, currentTrips, candidateSlug)
         const adminToken = trip.adminToken || generateSecureToken()
         const publicToken = trip.publicToken || generateSecureToken()
-        const adminLink = buildAdminTripUrl(trip.slug)
+        const adminLink = buildAdminTripUrl(trip.slug, adminToken)
         const publicLink = buildPublicTripUrl(trip.slug)
         const parsedDestination = parseDestinationParts(trip.destination)
         const insertPayload: Database["public"]["Tables"]["trips"]["Insert"] = {
@@ -674,6 +685,35 @@ export async function updateTrip(id: string, payload: Partial<Trip>) {
 
   if (shouldUseSupabase() && supabase) {
     try {
+      let mergedPermissions = payload.permissions as Record<string, unknown> | undefined
+
+      if (payload.permissions !== undefined) {
+        const { data: currentPermissionsRow, error: currentPermissionsError } = await supabase
+          .from("trips")
+          .select("permissions")
+          .eq("id", id)
+          .maybeSingle()
+
+        if (currentPermissionsError) {
+          return {
+            source: "supabase" as const,
+            config: createSupabaseBrowserClientPlaceholder(),
+            data: null,
+            error: currentPermissionsError.message,
+          }
+        }
+
+        const currentPermissions =
+          currentPermissionsRow?.permissions && typeof currentPermissionsRow.permissions === "object"
+            ? (currentPermissionsRow.permissions as Record<string, unknown>)
+            : {}
+
+        mergedPermissions = {
+          ...currentPermissions,
+          ...(payload.permissions as Record<string, unknown>),
+        }
+      }
+
       const updatePayload: Database["public"]["Tables"]["trips"]["Update"] = {
         title: payload.title,
         slug: payload.slug,
@@ -695,7 +735,7 @@ export async function updateTrip(id: string, payload: Partial<Trip>) {
         cover_image: payload.coverImage,
         visibility: payload.visibility,
         travelers_count: payload.travelersCount,
-        permissions: payload.permissions,
+        permissions: mergedPermissions,
         credits_summary: payload.creditsSummary ?? undefined,
         offline_enabled: payload.offlineEnabled,
       }

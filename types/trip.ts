@@ -1,3 +1,5 @@
+import type { ProfileQuickAccessSettings } from "./profile"
+
 export type TripStatus = "draft" | "upcoming" | "ongoing" | "completed" | "cancelled"
 
 export type TripOwnerType = "traveler" | "agency"
@@ -7,7 +9,7 @@ export type TripVisibility = "private" | "public"
 export interface TripTraveler {
   id: string
   name: string
-  role: "primary" | "adult" | "child" | "guest"
+  role: "primary" | "companion" | "adult" | "child" | "guest"
   email: string | null
   phone: string | null
   avatarUrl: string | null
@@ -75,6 +77,7 @@ export interface TripPermissions {
   publicCanViewFlights: boolean
   publicCanViewPublicDocuments: boolean
   publicCanUseConcierge: boolean
+  tripPin?: ProfileQuickAccessSettings | null
 }
 
 export type TripPermissionSettings = TripPermissions

@@ -22,6 +22,7 @@ import {
   Copy,
   ExternalLink,
   Trash2,
+  Lock,
   X,
   Check,
 } from "lucide-react"
@@ -36,7 +37,11 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { useAgency, type AgencyTrip } from "@/contexts/agency-context"
+import { buildQuickAccessPinSettings } from "@/lib/auth/quick-access"
+import { getTripById, updateTrip as updateTripRepository } from "@/lib/repositories/trips-repository"
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -173,10 +178,17 @@ function LinksModal({ open, onClose, trip }: { open: boolean; onClose: () => voi
 
 export default function TripsPage() {
   const router = useRouter()
-  const { trips, deleteTrip, getDocumentsByTrip, conciergeRequests, setupIncomplete, workspaceError, activeTripsCount, subscription, canCreateMoreTrips, showPlanLimitDialog } = useAgency()
+  const { trips, deleteTrip, getDocumentsByTrip, conciergeRequests, setupIncomplete, workspaceError, activeTripsCount, subscription, canCreateMoreTrips, showPlanLimitDialog, refreshAgencyWorkspace } = useAgency()
   const [searchQuery, setSearchQuery] = useState("")
   const [filter, setFilter] = useState<"all" | "upcoming" | "ongoing" | "completed">("all")
   const [linksTrip, setLinksTrip] = useState<AgencyTrip | null>(null)
+  const [pinTrip, setPinTrip] = useState<AgencyTrip | null>(null)
+  const [pinForm, setPinForm] = useState({ pin: "", confirmPin: "" })
+  const [pinError, setPinError] = useState("")
+  const [pinSuccess, setPinSuccess] = useState("")
+  const [pinSaving, setPinSaving] = useState(false)
+  const [pinConfigured, setPinConfigured] = useState(false)
+  const [pinLoading, setPinLoading] = useState(false)
 
   const filteredTrips = trips.filter((trip) => {
     const matchesSearch =
@@ -215,6 +227,93 @@ export default function TripsPage() {
     }
 
     router.push("/agencia/viagens/criar")
+  }
+
+  const handleClosePinModal = () => {
+    setPinTrip(null)
+    setPinForm({ pin: "", confirmPin: "" })
+    setPinError("")
+    setPinSuccess("")
+    setPinSaving(false)
+    setPinConfigured(false)
+    setPinLoading(false)
+  }
+
+  const loadTripPinState = async (tripId: string) => {
+    setPinLoading(true)
+    setPinError("")
+    setPinSuccess("")
+
+    try {
+      const tripResult = await getTripById(tripId)
+      const configured = Boolean(
+        tripResult.data?.permissions?.tripPin?.enabled &&
+        tripResult.data?.permissions?.tripPin?.pinHash &&
+        tripResult.data?.permissions?.tripPin?.pinSalt,
+      )
+      setPinConfigured(configured)
+    } catch (error) {
+      setPinConfigured(false)
+      setPinError(error instanceof Error ? error.message : "Nao foi possivel consultar o PIN da viagem.")
+    } finally {
+      setPinLoading(false)
+    }
+  }
+
+  const handleOpenPinModal = async (trip: AgencyTrip) => {
+    setPinTrip(trip)
+    setPinForm({ pin: "", confirmPin: "" })
+    setPinError("")
+    setPinSuccess("")
+    setPinConfigured(false)
+    await loadTripPinState(trip.id)
+  }
+
+  const handleSaveTripPin = async () => {
+    if (!pinTrip) return
+
+    if (pinForm.pin.length !== 4 || pinForm.confirmPin.length !== 4) {
+      setPinError("Informe um PIN de 4 digitos.")
+      return
+    }
+
+    if (pinForm.pin !== pinForm.confirmPin) {
+      setPinError("Os PINs nao conferem.")
+      return
+    }
+
+    setPinSaving(true)
+    setPinError("")
+    setPinSuccess("")
+
+    try {
+      const tripPin = await buildQuickAccessPinSettings(pinForm.pin)
+      const currentTripResult = await getTripById(pinTrip.id)
+      const currentPermissions = currentTripResult.data?.permissions
+      const result = await updateTripRepository(pinTrip.id, {
+        permissions: {
+          publicCanViewItinerary: currentPermissions?.publicCanViewItinerary ?? true,
+          publicCanViewAccommodation: currentPermissions?.publicCanViewAccommodation ?? true,
+          publicCanViewFlights: currentPermissions?.publicCanViewFlights ?? false,
+          publicCanViewPublicDocuments: currentPermissions?.publicCanViewPublicDocuments ?? true,
+          publicCanUseConcierge: currentPermissions?.publicCanUseConcierge ?? false,
+          tripPin,
+        },
+      })
+
+      if (!result.data) {
+        throw new Error(result.error ?? "Nao foi possivel salvar o PIN da viagem.")
+      }
+
+      await refreshAgencyWorkspace()
+      setPinConfigured(true)
+      setPinForm({ pin: "", confirmPin: "" })
+      setPinSuccess("PIN salvo com sucesso.")
+    } catch (error) {
+      setPinError(error instanceof Error ? error.message : "Nao foi possivel salvar o PIN da viagem.")
+    } finally {
+      setPinSaving(false)
+    }
   }
 
   return (
@@ -438,6 +537,10 @@ export default function TripsPage() {
                               <Copy className="mr-2 h-4 w-4" />
                               Copiar link
                             </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => void handleOpenPinModal(trip)}>
+                              <Lock className="mr-2 h-4 w-4" />
+                              PIN
+                            </DropdownMenuItem>
                             <DropdownMenuSeparator className="bg-border/70" />
                             <DropdownMenuItem 
                               onClick={() => handleDelete(trip.id)}
@@ -460,6 +563,60 @@ export default function TripsPage() {
 
       {/* Links Modal */}
       <LinksModal open={!!linksTrip} onClose={() => setLinksTrip(null)} trip={linksTrip} />
+      <Modal open={!!pinTrip} onClose={handleClosePinModal} title="PIN da viagem">
+        <div className="space-y-4">
+          {pinLoading ? (
+            <div className="rounded-xl border border-border/60 bg-[#fbfbfc] p-4 text-sm text-muted-foreground">
+              Carregando configuracao do PIN...
+            </div>
+          ) : null}
+          {!pinLoading && pinConfigured ? (
+            <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-4 text-sm text-emerald-700">
+              PIN configurado para esta viagem. Voce pode alterar abaixo.
+            </div>
+          ) : null}
+          <div className="rounded-xl border border-border/60 bg-[#fbfbfc] p-4 text-sm text-muted-foreground">
+            Este PIN sera usado para desbloquear areas protegidas do link da viagem.
+          </div>
+          <div className="rounded-xl border border-border/60 bg-[#fbfbfc] p-4 text-sm text-muted-foreground">
+            Utilize os 4 primeiros numeros do CPF do viajante ou os 4 ultimos numeros do telefone.
+          </div>
+          <div className="space-y-2">
+            <Label>PIN</Label>
+            <Input
+              type="password"
+              inputMode="numeric"
+              maxLength={4}
+              placeholder="0000"
+              value={pinForm.pin}
+              onChange={(event) => setPinForm((prev) => ({ ...prev, pin: event.target.value.replace(/\D/g, "").slice(0, 4) }))}
+              className="text-center text-2xl tracking-[0.5em]"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Confirmar PIN</Label>
+            <Input
+              type="password"
+              inputMode="numeric"
+              maxLength={4}
+              placeholder="0000"
+              value={pinForm.confirmPin}
+              onChange={(event) => setPinForm((prev) => ({ ...prev, confirmPin: event.target.value.replace(/\D/g, "").slice(0, 4) }))}
+              className="text-center text-2xl tracking-[0.5em]"
+            />
+          </div>
+          {pinError ? <p className="text-sm text-red-400">{pinError}</p> : null}
+          {pinSuccess ? <p className="text-sm text-emerald-600">{pinSuccess}</p> : null}
+          <div className="flex gap-3">
+            <Button variant="outline" className="flex-1" onClick={handleClosePinModal} disabled={pinSaving}>
+              Cancelar
+            </Button>
+            <Button className="flex-1" onClick={() => void handleSaveTripPin()} disabled={pinSaving || pinLoading}>
+              {pinSaving ? "Salvando..." : "Salvar PIN"}
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   )
 }

@@ -68,7 +68,11 @@ interface QuickAccessPinVerificationOptions {
   profileSettings?: ProfileSettings | null
 }
 
-function getWindowCrypto() {
+function getRuntimeCrypto() {
+  if (typeof globalThis !== "undefined" && globalThis.crypto) {
+    return globalThis.crypto
+  }
+
   if (typeof window === "undefined") return null
   return window.crypto ?? null
 }
@@ -179,7 +183,7 @@ function base64ToBytes(value: string) {
 }
 
 function createRandomBase64(size = 16) {
-  const resolvedCrypto = getWindowCrypto()
+  const resolvedCrypto = getRuntimeCrypto()
   if (!resolvedCrypto) {
     throw new Error("Criptografia do navegador indisponivel neste dispositivo.")
   }
@@ -190,7 +194,7 @@ function createRandomBase64(size = 16) {
 }
 
 async function hashPin(pin: string, salt: string, iterations = PIN_HASH_ITERATIONS) {
-  const resolvedCrypto = getWindowCrypto()
+  const resolvedCrypto = getRuntimeCrypto()
   if (!resolvedCrypto?.subtle) {
     throw new Error("Hash de PIN indisponivel neste navegador.")
   }
@@ -206,7 +210,7 @@ async function hashPin(pin: string, salt: string, iterations = PIN_HASH_ITERATIO
 }
 
 async function derivePinProtectionKey(pin: string, salt: string, iterations = PIN_HASH_ITERATIONS) {
-  const resolvedCrypto = getWindowCrypto()
+  const resolvedCrypto = getRuntimeCrypto()
   if (!resolvedCrypto?.subtle) {
     throw new Error("Protecao de PIN indisponivel neste navegador.")
   }
@@ -241,7 +245,7 @@ async function createTripLinkPinVerifier(scopeKey: string, pin: string): Promise
     throw new Error("O PIN precisa ter 4 digitos.")
   }
 
-  const resolvedCrypto = getWindowCrypto()
+  const resolvedCrypto = getRuntimeCrypto()
   if (!resolvedCrypto?.subtle) {
     throw new Error("Protecao de PIN indisponivel neste navegador.")
   }
@@ -414,17 +418,24 @@ export async function verifyQuickAccessPin(ownerUserId: string, pin: string, opt
   const profilePin = getProfilePinSettings(options?.profileSettings)
 
   if (profilePin?.pinHash && profilePin.pinSalt) {
-    const hashedPin = await hashPin(pin, profilePin.pinSalt, profilePin.pinIterations ?? PIN_HASH_ITERATIONS)
-    return hashedPin === profilePin.pinHash
+    return verifyStoredQuickAccessPin(profilePin, pin)
   }
 
   const legacyPin = getLegacyQuickAccessPin(ownerUserId)
   if (legacyPin?.pinHash && legacyPin.pinSalt) {
-    const hashedPin = await hashPin(pin, legacyPin.pinSalt, legacyPin.pinIterations ?? PIN_HASH_ITERATIONS)
-    return hashedPin === legacyPin.pinHash
+    return verifyStoredQuickAccessPin(legacyPin, pin)
   }
 
   throw new Error("PIN nao configurado para esta conta neste dispositivo ou perfil.")
+}
+
+export async function verifyStoredQuickAccessPin(settings: ProfileQuickAccessSettings | null | undefined, pin: string) {
+  if (!settings?.enabled || !settings.pinHash || !settings.pinSalt) {
+    throw new Error("PIN nao configurado.")
+  }
+
+  const hashedPin = await hashPin(pin, settings.pinSalt, settings.pinIterations ?? PIN_HASH_ITERATIONS)
+  return hashedPin === settings.pinHash
 }
 
 export async function registerQuickAccessBiometric(ownerUserId: string, displayName: string) {

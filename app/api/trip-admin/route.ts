@@ -2,6 +2,14 @@ import { NextRequest, NextResponse } from "next/server"
 import { createSupabaseAdminClient, hasSupabaseAdminEnv, isMissingSupabaseAdminEnvError } from "@/lib/supabase/admin"
 import { resolveTripLinkAccess } from "@/lib/security/trip-link-access"
 import { resolveDocumentMimeType } from "@/lib/files/file-validation"
+import {
+  createTripTravelerWithClient,
+  deleteTripTravelerWithClient,
+  ensureTripTravelersPersistedWithClient,
+  listTripTravelersByTripWithClient,
+  setPrimaryTripTravelerWithClient,
+  updateTripTravelerWithClient,
+} from "@/lib/repositories/trip-travelers-repository"
 import type { Database } from "@/lib/supabase/types"
 
 export const runtime = "nodejs"
@@ -14,6 +22,7 @@ type DocumentRow = Database["public"]["Tables"]["documents"]["Row"]
 type FlightRow = Database["public"]["Tables"]["trip_flights"]["Row"]
 type HotelRow = Database["public"]["Tables"]["trip_hotels"]["Row"]
 type ItineraryRow = Database["public"]["Tables"]["trip_itineraries"]["Row"]
+type TripTravelerRow = Database["public"]["Tables"]["trip_travelers"]["Row"]
 
 function asBoolean(value: FormDataEntryValue | string | null | undefined) {
   return value === "true" || value === "1" || value === true
@@ -99,6 +108,20 @@ function mapItineraryRow(row: ItineraryRow) {
   }
 }
 
+function mapTripTravelerRow(row: TripTravelerRow) {
+  const isPrimary = row.is_primary === true || row.role === "primary"
+  return {
+    id: row.id,
+    tripId: row.trip_id,
+    name: row.name,
+    role: isPrimary ? "primary" : "companion",
+    isPrimary,
+    avatarUrl: row.avatar_url,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  }
+}
+
 async function resolveTripAdminAccess(params: {
   tripId?: string | null
   tripSlug?: string | null
@@ -175,18 +198,20 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: error ?? "Acesso administrativo inv?lido." }, { status: 403 })
     }
 
-    const [documentsResult, flightsResult, hotelsResult, itinerariesResult] = await Promise.all([
+    const [documentsResult, flightsResult, hotelsResult, itinerariesResult, travelersResult] = await Promise.all([
       supabase.from("documents").select("*").eq("trip_id", trip.id).order("created_at", { ascending: false }),
       supabase.from("trip_flights").select("*").eq("trip_id", trip.id).order("departure_at", { ascending: true, nullsFirst: false }).order("created_at", { ascending: true }),
       supabase.from("trip_hotels").select("*").eq("trip_id", trip.id).order("created_at", { ascending: true }),
       supabase.from("trip_itineraries").select("*").eq("trip_id", trip.id).order("created_at", { ascending: false }),
+      supabase.from("trip_travelers").select("*").eq("trip_id", trip.id).order("is_primary", { ascending: false }).order("created_at", { ascending: true }),
     ])
 
     const firstError =
       documentsResult.error?.message ||
       flightsResult.error?.message ||
       hotelsResult.error?.message ||
-      itinerariesResult.error?.message
+      itinerariesResult.error?.message ||
+      travelersResult.error?.message
 
     if (firstError) {
       return NextResponse.json({ error: firstError }, { status: 400 })
@@ -197,6 +222,7 @@ export async function GET(request: NextRequest) {
       flights: (flightsResult.data ?? []).map((row) => mapFlightRow(row as FlightRow)),
       hotels: (hotelsResult.data ?? []).map((row) => mapHotelRow(row as HotelRow)),
       itineraries: (itinerariesResult.data ?? []).map((row) => mapItineraryRow(row as ItineraryRow)),
+      travelers: (travelersResult.data ?? []).map((row) => mapTripTravelerRow(row as TripTravelerRow)),
     })
   } catch (error) {
     if (isMissingSupabaseAdminEnvError(error)) {
@@ -393,6 +419,114 @@ export async function POST(request: NextRequest) {
     const { supabase, trip, error } = await resolveTripAdminAccess({ tripId, tripSlug, adminToken })
     if (error || !trip) {
       return NextResponse.json({ error: error ?? "Acesso administrativo inv?lido." }, { status: 403 })
+    }
+
+    if (action === "ensureTravelersPersisted") {
+      const fallbackCount = typeof body?.travelersCount === "number"
+        ? body.travelersCount
+        : typeof body?.fallbackCount === "number"
+          ? body.fallbackCount
+          : trip.travelers_count
+
+      const result = await ensureTripTravelersPersistedWithClient(supabase, {
+        tripId: trip.id,
+        travelersCount: fallbackCount,
+      })
+
+      if (result.error) {
+        return NextResponse.json({ error: result.error }, { status: 400 })
+      }
+
+      return NextResponse.json({ travelers: result.data })
+    }
+
+    if (action === "createTraveler") {
+      const name = typeof body?.name === "string" ? body.name.trim() : ""
+      if (!name) {
+        return NextResponse.json({ error: "Informe o nome do viajante." }, { status: 400 })
+      }
+
+      const fallbackCount = typeof body?.travelersCount === "number" ? body.travelersCount : trip.travelers_count
+      const bootstrapResult = await ensureTripTravelersPersistedWithClient(supabase, {
+        tripId: trip.id,
+        travelersCount: fallbackCount,
+      })
+
+      if (bootstrapResult.error) {
+        return NextResponse.json({ error: bootstrapResult.error }, { status: 400 })
+      }
+
+      const travelerResult = await createTripTravelerWithClient(supabase, trip.id, {
+        name,
+        role: body?.role === "primary" ? "primary" : "companion",
+        isPrimary: body?.role === "primary",
+      })
+
+      if (travelerResult.error || !travelerResult.data) {
+        return NextResponse.json({ error: travelerResult.error ?? "N?o foi poss?vel criar o viajante." }, { status: 400 })
+      }
+
+      const nextTravelers = await listTripTravelersByTripWithClient(supabase, trip.id)
+      if (nextTravelers.error) {
+        return NextResponse.json({ error: nextTravelers.error }, { status: 400 })
+      }
+
+      return NextResponse.json({ traveler: travelerResult.data, travelers: nextTravelers.data })
+    }
+
+    if (action === "updateTraveler") {
+      const travelerId = typeof body?.travelerId === "string" ? body.travelerId : ""
+      const name = typeof body?.name === "string" ? body.name.trim() : ""
+      if (!name) {
+        return NextResponse.json({ error: "Informe o nome do viajante." }, { status: 400 })
+      }
+      const travelerResult = await updateTripTravelerWithClient(supabase, travelerId, trip.id, {
+        name,
+        role: body?.role === "primary" ? "primary" : "companion",
+        isPrimary: body?.role === "primary",
+      })
+
+      if (travelerResult.error || !travelerResult.data) {
+        return NextResponse.json({ error: travelerResult.error ?? "N?o foi poss?vel atualizar o viajante." }, { status: 400 })
+      }
+
+      const nextTravelers = await listTripTravelersByTripWithClient(supabase, trip.id)
+      if (nextTravelers.error) {
+        return NextResponse.json({ error: nextTravelers.error }, { status: 400 })
+      }
+
+      return NextResponse.json({ traveler: travelerResult.data, travelers: nextTravelers.data })
+    }
+
+    if (action === "deleteTraveler") {
+      const travelerId = typeof body?.travelerId === "string" ? body.travelerId : ""
+      const travelerResult = await deleteTripTravelerWithClient(supabase, travelerId, trip.id)
+      if (travelerResult.error) {
+        return NextResponse.json({ error: travelerResult.error }, { status: 400 })
+      }
+
+      const nextTravelers = await listTripTravelersByTripWithClient(supabase, trip.id)
+      if (nextTravelers.error) {
+        return NextResponse.json({ error: nextTravelers.error }, { status: 400 })
+      }
+
+      return NextResponse.json({ success: true, travelers: nextTravelers.data })
+    }
+
+    if (action === "setPrimaryTraveler") {
+      const travelerId = typeof body?.travelerId === "string" ? body.travelerId : ""
+      const travelerResult = await setPrimaryTripTravelerWithClient(supabase, travelerId, trip.id)
+
+      if (travelerResult.error || !travelerResult.data) {
+        return NextResponse.json({ error: travelerResult.error ?? "N?o foi poss?vel definir o viajante principal." }, { status: 400 })
+      }
+
+      const nextTravelers = await listTripTravelersByTripWithClient(supabase, trip.id)
+      if (nextTravelers.error) {
+        return NextResponse.json({ error: nextTravelers.error }, { status: 400 })
+      }
+
+      return NextResponse.json({ traveler: travelerResult.data, travelers: nextTravelers.data })
     }
 
     if (action === "saveHotel") {
