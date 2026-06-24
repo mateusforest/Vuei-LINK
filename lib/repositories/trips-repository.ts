@@ -8,6 +8,7 @@ import { buildUniqueTripSlug, extractTripsStoragePayload, mapStoredTripToTrip, s
 import { buildAdminTripUrl, buildPublicTripUrl, generateSecureToken } from "@/lib/security/link-tokens"
 import type { Database } from "@/lib/supabase/types"
 import { resolveTripHeroImage } from "@/lib/trip-destination"
+import { ensureTripTravelersPersistedWithClient } from "@/lib/repositories/trip-travelers-repository"
 import { getTravelerBillingStatus } from "@/lib/repositories/traveler-billing-repository"
 import { AGENCY_PLAN_LIMIT_ERROR } from "@/lib/billing/agency-plans"
 import { countActiveAgencyTripsForClient, getAgencyBillingStatusForClient } from "@/lib/billing/agency-billing"
@@ -273,6 +274,10 @@ function buildTrip(payload: CreateTripPayload, existingTrips: Trip[], slugOverri
   const baseSlug = slugifyTripBase(payload.title, payload.destination)
   const slug = slugOverride ?? buildUniqueTripSlug(baseSlug, existingTrips.map((trip) => trip.slug))
   const destinationParts = parseDestinationParts(payload.destination)
+  const travelersCount =
+    typeof payload.travelersCount === "number" && Number.isFinite(payload.travelersCount) && payload.travelersCount >= 1
+      ? payload.travelersCount
+      : 1
 
   return mapStoredTripToTrip({
     id: `trip-${Date.now()}`,
@@ -290,6 +295,7 @@ function buildTrip(payload: CreateTripPayload, existingTrips: Trip[], slugOverri
     slug,
     status: payload.status ?? "draft",
     coverImage: payload.coverImage ?? undefined,
+    travelersCount,
     adminToken: payload.adminToken ?? null,
     publicToken: payload.publicToken ?? null,
     visibility: payload.visibility ?? "public",
@@ -618,6 +624,15 @@ export async function createTrip(payload: CreateTripPayload) {
         const { data, error } = await supabase.from("trips").insert(insertPayload).select("*").single()
 
         if (!error && data) {
+          const travelersResult = await ensureTripTravelersPersistedWithClient(supabase, {
+            tripId: data.id,
+            travelersCount: trip.travelersCount,
+          })
+
+          if (travelersResult.error) {
+            console.error("[TRIP] travelers placeholder error", travelersResult.error)
+          }
+
           console.log("[TRIP] insert data", data)
           console.log("[TRIP] viagem criada", data.id)
           return {
