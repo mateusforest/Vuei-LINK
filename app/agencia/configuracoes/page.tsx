@@ -116,6 +116,8 @@ export default function SettingsPage() {
     newPassword: "",
     confirmPassword: "",
   })
+  const [passwordSaving, setPasswordSaving] = useState(false)
+  const [passwordError, setPasswordError] = useState("")
 
   useEffect(() => {
     if (typeof window === "undefined") return
@@ -372,14 +374,72 @@ export default function SettingsPage() {
     setTimeout(() => setSaved(false), 1500)
   }
 
-  const handleSavePassword = () => {
-    if (!passwordForm.currentPassword || !passwordForm.newPassword || passwordForm.newPassword !== passwordForm.confirmPassword) {
+  const handleSavePassword = async () => {
+    const currentPassword = passwordForm.currentPassword.trim()
+    const newPassword = passwordForm.newPassword.trim()
+    const confirmPassword = passwordForm.confirmPassword.trim()
+
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      setPasswordError("Preencha todos os campos para continuar.")
       return
     }
 
-    setShowPasswordModal(false)
-    setPasswordForm({ currentPassword: "", newPassword: "", confirmPassword: "" })
-    showToast("Senha atualizada com sucesso.")
+    if (newPassword.length < 6) {
+      setPasswordError("A nova senha deve ter pelo menos 6 caracteres.")
+      return
+    }
+
+    if (newPassword !== confirmPassword) {
+      setPasswordError("A confirmação da nova senha precisa ser igual.")
+      return
+    }
+
+    if (currentPassword === newPassword) {
+      setPasswordError("A nova senha precisa ser diferente da senha atual.")
+      return
+    }
+
+    if (!user?.email) {
+      setPasswordError("Não foi possível validar o usuário autenticado.")
+      return
+    }
+
+    const client = createSupabaseBrowserClient()
+    if (!client) {
+      setPasswordError("Cliente Supabase indisponível neste ambiente.")
+      return
+    }
+
+    setPasswordSaving(true)
+    setPasswordError("")
+
+    try {
+      const { error: signInError } = await client.auth.signInWithPassword({
+        email: user.email,
+        password: currentPassword,
+      })
+
+      if (signInError) {
+        setPasswordError("A senha atual está incorreta.")
+        return
+      }
+
+      const { error: updatePasswordError } = await client.auth.updateUser({
+        password: newPassword,
+      })
+
+      if (updatePasswordError) {
+        setPasswordError(updatePasswordError.message)
+        return
+      }
+
+      setShowPasswordModal(false)
+      setPasswordForm({ currentPassword: "", newPassword: "", confirmPassword: "" })
+      setPasswordError("")
+      showToast("Senha atualizada com sucesso.")
+    } finally {
+      setPasswordSaving(false)
+    }
   }
 
   const handleSignOut = async () => {
@@ -829,7 +889,17 @@ export default function SettingsPage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={showPasswordModal} onOpenChange={setShowPasswordModal}>
+      <Dialog
+        open={showPasswordModal}
+        onOpenChange={(open) => {
+          setShowPasswordModal(open)
+          if (!open) {
+            setPasswordError("")
+            setPasswordSaving(false)
+            setPasswordForm({ currentPassword: "", newPassword: "", confirmPassword: "" })
+          }
+        }}
+      >
         <DialogContent className="agency-dialog sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Alterar senha</DialogTitle>
@@ -838,26 +908,27 @@ export default function SettingsPage() {
           <div className="space-y-4">
             <div>
               <Label className="text-muted-foreground">Senha atual</Label>
-              <Input type="password" value={passwordForm.currentPassword} onChange={(e) => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })} className="mt-1.5 border-border/70 bg-white" />
+              <Input type="password" value={passwordForm.currentPassword} onChange={(e) => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })} className="mt-1.5 border-border/70 bg-white" disabled={passwordSaving} />
             </div>
             <div>
               <Label className="text-muted-foreground">Nova senha</Label>
-              <Input type="password" value={passwordForm.newPassword} onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })} className="mt-1.5 border-border/70 bg-white" />
+              <Input type="password" value={passwordForm.newPassword} onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })} className="mt-1.5 border-border/70 bg-white" disabled={passwordSaving} />
             </div>
             <div>
               <Label className="text-muted-foreground">Confirmar nova senha</Label>
-              <Input type="password" value={passwordForm.confirmPassword} onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })} className="mt-1.5 border-border/70 bg-white" />
+              <Input type="password" value={passwordForm.confirmPassword} onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })} className="mt-1.5 border-border/70 bg-white" disabled={passwordSaving} />
             </div>
+            {passwordError ? <p className="text-sm text-red-500">{passwordError}</p> : null}
             <div className="flex gap-3">
-              <Button variant="outline" className="flex-1 border-border/70 bg-white" onClick={() => setShowPasswordModal(false)}>
+              <Button variant="outline" className="flex-1 border-border/70 bg-white" onClick={() => setShowPasswordModal(false)} disabled={passwordSaving}>
                 Cancelar
               </Button>
               <Button
                 className="flex-1 bg-gradient-to-r from-primary to-accent text-white"
-                onClick={handleSavePassword}
-                disabled={!passwordForm.currentPassword || !passwordForm.newPassword || passwordForm.newPassword !== passwordForm.confirmPassword}
+                onClick={() => void handleSavePassword()}
+                disabled={passwordSaving || !passwordForm.currentPassword || !passwordForm.newPassword || passwordForm.newPassword !== passwordForm.confirmPassword}
               >
-                Salvar senha
+                {passwordSaving ? "Salvando..." : "Salvar senha"}
               </Button>
             </div>
           </div>
