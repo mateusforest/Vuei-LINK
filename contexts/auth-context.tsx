@@ -8,6 +8,7 @@ import { shouldUseSupabase } from "@/lib/data-source"
 import { ensureProfile } from "@/lib/auth/ensure-profile"
 import { withTimeout } from "@/lib/async/with-timeout"
 import { devLog, startPerfMeasure } from "@/lib/dev/perf"
+import { buildAbsoluteAppUrl } from "@/lib/app-url"
 
 interface SignInPayload {
   email: string
@@ -33,6 +34,8 @@ interface AuthContextType {
   signUp: (payload: SignUpPayload) => Promise<{ error: string | null; user: User | null; profile: Profile | null; session: Session | null }>
   signOut: () => Promise<void>
   refreshProfile: () => Promise<void>
+  requestPasswordReset: (email: string) => Promise<{ error: string | null }>
+  updatePassword: (password: string) => Promise<{ error: string | null }>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -370,8 +373,60 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  const requestPasswordReset = async (email: string) => {
+    if (!supabaseEnabled || !supabase) {
+      return { error: "Supabase nao esta configurado neste ambiente." }
+    }
+
+    try {
+      const { error } = await withTimeout(
+        supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: buildAbsoluteAppUrl("/auth/callback?next=/reset-password"),
+        }),
+        BOOTSTRAP_TIMEOUT_MS,
+        "Auth password reset timeout.",
+      )
+
+      if (error) {
+        console.error("[AUTH ERROR]", error.message)
+        return { error: error.message }
+      }
+
+      return { error: null }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Erro inesperado ao solicitar recuperacao de senha."
+      console.error("[AUTH ERROR]", message)
+      return { error: message }
+    }
+  }
+
+  const updatePassword = async (password: string) => {
+    if (!supabaseEnabled || !supabase) {
+      return { error: "Supabase nao esta configurado neste ambiente." }
+    }
+
+    try {
+      const { error } = await withTimeout(
+        supabase.auth.updateUser({ password }),
+        BOOTSTRAP_TIMEOUT_MS,
+        "Auth update password timeout.",
+      )
+
+      if (error) {
+        console.error("[AUTH ERROR]", error.message)
+        return { error: error.message }
+      }
+
+      return { error: null }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Erro inesperado ao atualizar a senha."
+      console.error("[AUTH ERROR]", message)
+      return { error: message }
+    }
+  }
+
   return (
-    <AuthContext.Provider value={{ session, user, profile, loading, initialized, signIn, signUp, signOut, refreshProfile }}>
+    <AuthContext.Provider value={{ session, user, profile, loading, initialized, signIn, signUp, signOut, refreshProfile, requestPasswordReset, updatePassword }}>
       {children}
     </AuthContext.Provider>
   )
