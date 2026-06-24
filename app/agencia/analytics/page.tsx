@@ -78,7 +78,7 @@ export default function AnalyticsPage() {
       change: "+45%",
       trend: "up" as const,
       icon: Link2,
-      period: "Visualizacoes",
+      period: "Visualizações",
     },
   ]
 
@@ -104,7 +104,7 @@ export default function AnalyticsPage() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Analytics</h1>
-          <p className="mt-1 text-muted-foreground">Visao geral do desempenho</p>
+          <p className="mt-1 text-muted-foreground">Visão geral do desempenho</p>
         </div>
         <div className="flex gap-2">
           {["7D", "30D", "90D", "12M"].map((period) => (
@@ -167,7 +167,7 @@ export default function AnalyticsPage() {
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-base font-semibold">
               <BarChart3 className="h-4 w-4 text-primary" />
-              Viagens por Mes
+              Viagens por mês
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -236,8 +236,8 @@ export default function AnalyticsPage() {
       {/* Secondary Stats */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {[
-          { label: "Tempo medio resposta", value: "2.5 min", icon: MessageSquare },
-          { label: "Satisfacao concierge", value: "94%", icon: Users },
+          { label: "Tempo médio de resposta", value: "2.5 min", icon: MessageSquare },
+          { label: "Satisfação do concierge", value: "94%", icon: Users },
           { label: "Roteiros gerados", value: safeHistory.filter(h => h.action.includes("Roteiro")).length.toString(), icon: Sparkles },
           { label: "Docs enviados", value: safeDocuments.length.toString(), icon: Calendar },
         ].map((item, index) => (

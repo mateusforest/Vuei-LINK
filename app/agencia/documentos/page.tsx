@@ -261,7 +261,7 @@ export default function DocumentsPage() {
           {[
             { value: "all", label: "Todos" },
             { value: "private", label: "Privados" },
-            { value: "shared", label: "Compartilhaveis" },
+            { value: "shared", label: "Compartilháveis" },
           ].map((item) => (
             <Button
               key={item.value}

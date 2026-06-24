@@ -58,7 +58,7 @@ export default function AgencyCreditsPage() {
 
     if (diffDays === 0) return "Hoje"
     if (diffDays === 1) return "Ontem"
-    if (diffDays < 7) return `Ha ${diffDays} dias`
+    if (diffDays < 7) return `Há ${diffDays} dias`
     return date.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })
   }
 
@@ -69,7 +69,7 @@ export default function AgencyCreditsPage() {
     const sourceContext = typeof metadata?.source_context === "string" ? metadata.source_context.trim() : ""
     const mode = typeof metadata?.mode === "string" ? metadata.mode.trim() : ""
 
-    let featureLabel = item.action?.trim() || "Consumo de creditos"
+    let featureLabel = item.action?.trim() || "Consumo de créditos"
 
     if (item.source === "ai_concierge" || sourceContext.includes("link_") || sourceContext.includes("portal_")) {
       featureLabel = "Concierge IA"
@@ -79,7 +79,7 @@ export default function AgencyCreditsPage() {
       featureLabel = "Leitura de passagem"
     } else {
       featureLabel = featureLabel
-        .replace(/^Geracao/i, "Geracao")
+        .replace(/^Geracao/i, "Geração")
         .replace(/^Consumo do concierge ia/i, "Concierge IA")
         .replace(/^Consumo da leitura de passagem/i, "Leitura de passagem")
     }
@@ -175,11 +175,11 @@ export default function AgencyCreditsPage() {
 
       <motion.div {...fadeInUp}>
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="font-semibold">Historico de consumo</h2>
+          <h2 className="font-semibold">Histórico de consumo</h2>
         </div>
         <Card className="divide-y divide-border/50 border-border/50 bg-card/50 vuei-glass">
           {credits.history.length === 0 ? (
-            <div className="p-4 text-sm text-muted-foreground">Nenhum consumo de creditos registrado ainda.</div>
+            <div className="p-4 text-sm text-muted-foreground">Nenhum consumo de créditos registrado ainda.</div>
           ) : (
             credits.history.slice(0, 8).map((item, index) => (
               <div key={`${item.action}-${index}`} className="flex items-center gap-4 p-4">

@@ -92,7 +92,7 @@ export default function TeamPage() {
       if (result.error === AGENCY_TEAM_LIMIT_ERROR) {
         return
       }
-      window.alert(result.error || "NÃ£o foi possÃ­vel vincular o membro Ã  agÃªncia.")
+      window.alert(result.error || "Não foi possível vincular o membro à agência.")
       return
     }
 
@@ -105,14 +105,14 @@ export default function TeamPage() {
   const handleResendInvite = async (id: string) => {
     const result = await updateTeamMember(id, { status: "active" })
     if (!result.success) {
-      window.alert(result.error || "NÃ£o foi possÃ­vel atualizar o membro.")
+      window.alert(result.error || "Não foi possível atualizar o membro.")
     }
   }
 
   const handleCancelInvite = async (id: string) => {
     const result = await removeTeamMember(id)
     if (!result.success) {
-      window.alert(result.error || "NÃ£o foi possÃ­vel desativar o membro.")
+      window.alert(result.error || "Não foi possível desativar o membro.")
     }
   }
 
@@ -121,7 +121,7 @@ export default function TeamPage() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Equipe</h1>
-          <p className="mt-1 text-muted-foreground">{teamSeatsUsed} de {subscription.definition.maxUsers} usuÃ¡rios ativos no plano</p>
+          <p className="mt-1 text-muted-foreground">{teamSeatsUsed} de {subscription.definition.maxUsers} usuários ativos no plano</p>
         </div>
         <Button
           onClick={() => setInviteModalOpen(true)}
@@ -263,7 +263,7 @@ export default function TeamPage() {
       <Card className="border-border/60 bg-white/80 shadow-sm backdrop-blur-sm">
         <CardContent className="p-4">
           <p className="text-sm text-muted-foreground">
-            Adicione um membro ja cadastrado no Vuei a sua equipe.
+            Adicione um membro já cadastrado no Vuei à sua equipe.
           </p>
         </CardContent>
       </Card>
@@ -296,7 +296,7 @@ export default function TeamPage() {
             </div>
             <div className="rounded-2xl border border-border/60 bg-white p-4">
               <p className="text-sm text-muted-foreground">
-                Informe o e-mail de um usuario ja cadastrado no Vuei.
+                Informe o e-mail de um usuário já cadastrado no Vuei.
               </p>
             </div>
             <div className="flex gap-3">

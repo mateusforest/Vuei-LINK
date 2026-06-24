@@ -100,8 +100,8 @@ export default function LinksPage() {
 
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-foreground">Links Compartilhaveis</h1>
-        <p className="mt-1 text-muted-foreground">Gerencie os links de acesso as viagens</p>
+        <h1 className="text-2xl font-bold text-foreground">Links Compartilháveis</h1>
+        <p className="mt-1 text-muted-foreground">Gerencie os links de acesso às viagens</p>
       </div>
 
       {/* Info Card */}
@@ -113,7 +113,7 @@ export default function LinksPage() {
           <div>
             <p className="text-sm font-medium text-foreground">Privacidade de Documentos</p>
             <p className="text-xs text-muted-foreground">
-              Documentos marcados como privados (passaporte, RG, etc.) nunca aparecem nos links compartilhaveis, apenas no link admin.
+              Documentos marcados como privados (passaporte, RG, etc.) nunca aparecem nos links compartilháveis, apenas no link admin.
             </p>
           </div>
         </CardContent>
@@ -238,7 +238,7 @@ export default function LinksPage() {
                         <div className="flex items-center gap-2 flex-1 min-w-0">
                           <Users className="h-4 w-4 text-primary flex-shrink-0" />
                           <div className="min-w-0">
-                            <p className="text-xs font-medium text-foreground">Link Compartilhavel</p>
+                            <p className="text-xs font-medium text-foreground">Link Compartilhável</p>
                             <code className="text-[10px] text-muted-foreground truncate block">{trip.shareLink}</code>
                           </div>
                         </div>
@@ -327,7 +327,7 @@ export default function LinksPage() {
                 <div className="flex items-center justify-between rounded-lg border border-white/5 p-3">
                   <div>
                     <p className="text-sm font-medium text-foreground">Exibir documentos</p>
-                    <p className="text-xs text-muted-foreground">Mostrar docs compartilhaveis</p>
+                    <p className="text-xs text-muted-foreground">Mostrar docs compartilháveis</p>
                   </div>
                   <Switch 
                     checked={getSettings(selectedLink.id).allowDocs} 
@@ -352,7 +352,7 @@ export default function LinksPage() {
                   <Lock className="mt-0.5 h-4 w-4 text-yellow-500" />
                   <p className="text-xs text-muted-foreground">
                     Documentos privados (passaporte, RG, visto) nunca aparecem no link compartilhável,
-                    independente desta configuracao.
+                    independente desta configuração.
                   </p>
                 </CardContent>
               </Card>

@@ -145,8 +145,8 @@ function LinksModal({ open, onClose, trip }: { open: boolean; onClose: () => voi
               <Share2 className="w-4 h-4 text-accent" />
             </div>
             <div>
-              <p className="text-sm font-medium text-foreground">Link Compartilhavel</p>
-              <p className="text-xs text-muted-foreground">Para o cliente/familia</p>
+              <p className="text-sm font-medium text-foreground">Link Compartilhável</p>
+              <p className="text-xs text-muted-foreground">Para o cliente/família</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -254,7 +254,7 @@ export default function TripsPage() {
       setPinConfigured(configured)
     } catch (error) {
       setPinConfigured(false)
-      setPinError(error instanceof Error ? error.message : "Nao foi possivel consultar o PIN da viagem.")
+      setPinError(error instanceof Error ? error.message : "Não foi possível consultar o PIN da viagem.")
     } finally {
       setPinLoading(false)
     }
@@ -273,12 +273,12 @@ export default function TripsPage() {
     if (!pinTrip) return
 
     if (pinForm.pin.length !== 4 || pinForm.confirmPin.length !== 4) {
-      setPinError("Informe um PIN de 4 digitos.")
+      setPinError("Informe um PIN de 4 dígitos.")
       return
     }
 
     if (pinForm.pin !== pinForm.confirmPin) {
-      setPinError("Os PINs nao conferem.")
+      setPinError("Os PINs não conferem.")
       return
     }
 
@@ -302,7 +302,7 @@ export default function TripsPage() {
       })
 
       if (!result.data) {
-        throw new Error(result.error ?? "Nao foi possivel salvar o PIN da viagem.")
+        throw new Error(result.error ?? "Não foi possível salvar o PIN da viagem.")
       }
 
       await refreshAgencyWorkspace()
@@ -310,7 +310,7 @@ export default function TripsPage() {
       setPinForm({ pin: "", confirmPin: "" })
       setPinSuccess("PIN salvo com sucesso.")
     } catch (error) {
-      setPinError(error instanceof Error ? error.message : "Nao foi possivel salvar o PIN da viagem.")
+      setPinError(error instanceof Error ? error.message : "Não foi possível salvar o PIN da viagem.")
     } finally {
       setPinSaving(false)
     }
@@ -361,7 +361,7 @@ export default function TripsPage() {
         <div className="flex gap-2">
           {[
             { value: "all", label: "Todas" },
-            { value: "upcoming", label: "Proximas" },
+            { value: "upcoming", label: "Próximas" },
             { value: "ongoing", label: "Em andamento" },
             { value: "completed", label: "Finalizadas" },
           ].map((item) => (
@@ -567,19 +567,19 @@ export default function TripsPage() {
         <div className="space-y-4">
           {pinLoading ? (
             <div className="rounded-xl border border-border/60 bg-[#fbfbfc] p-4 text-sm text-muted-foreground">
-              Carregando configuracao do PIN...
+              Carregando configuração do PIN...
             </div>
           ) : null}
           {!pinLoading && pinConfigured ? (
             <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-4 text-sm text-emerald-700">
-              PIN configurado para esta viagem. Voce pode alterar abaixo.
+              PIN configurado para esta viagem. Você pode alterar abaixo.
             </div>
           ) : null}
           <div className="rounded-xl border border-border/60 bg-[#fbfbfc] p-4 text-sm text-muted-foreground">
-            Este PIN sera usado para desbloquear areas protegidas do link da viagem.
+            Este PIN será usado para desbloquear áreas protegidas do link da viagem.
           </div>
           <div className="rounded-xl border border-border/60 bg-[#fbfbfc] p-4 text-sm text-muted-foreground">
-            Utilize os 4 primeiros numeros do CPF do viajante ou os 4 ultimos numeros do telefone.
+            Utilize os 4 primeiros números do CPF do viajante ou os 4 últimos números do telefone.
           </div>
           <div className="space-y-2">
             <Label>PIN</Label>

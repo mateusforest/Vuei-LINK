@@ -318,8 +318,8 @@ function CreateTripPageContent() {
                       <Link2 className="h-5 w-5 text-accent" />
                     </div>
                     <div className="text-left">
-                      <p className="font-medium text-foreground">Link Compartilhavel</p>
-                      <p className="text-sm text-muted-foreground">Para cliente/familia</p>
+                      <p className="font-medium text-foreground">Link Compartilhável</p>
+                      <p className="text-sm text-muted-foreground">Para cliente/família</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">

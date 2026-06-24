@@ -29,7 +29,7 @@ export async function resolveAgencyBillingActor(
   }
 
   if (!user) {
-    return { data: null, error: "Entre para gerenciar o billing da agencia.", status: 401 }
+    return { data: null, error: "Entre para gerenciar o billing da agência.", status: 401 }
   }
 
   const profileResult = await adminClient
@@ -60,7 +60,7 @@ export async function resolveAgencyBillingActor(
   }
 
   if (!agencyId) {
-    return { data: null, error: "Nenhuma agencia vinculada foi encontrada para este usuario.", status: 404 }
+    return { data: null, error: "Nenhuma agência vinculada foi encontrada para este usuário.", status: 404 }
   }
 
   const [agencyResult, subscriptionResult, membershipResult] = await Promise.all([
@@ -95,7 +95,7 @@ export async function resolveAgencyBillingActor(
 
   const agency = agencyResult.data as { id: string; name: string; owner_user_id: string | null } | null
   if (!agency) {
-    return { data: null, error: "Agencia nao encontrada.", status: 404 }
+    return { data: null, error: "Agência não encontrada.", status: 404 }
   }
 
   const membership = membershipResult.data as { role?: string | null; status?: string | null } | null
