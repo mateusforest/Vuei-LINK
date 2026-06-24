@@ -210,21 +210,17 @@ function PortalLayoutInner({ children }: { children: React.ReactNode }) {
       {/* Mobile Header */}
       {isMobile && (
         <header className="fixed left-0 right-0 top-0 z-40 border-b border-border/60 vuei-glass">
-          <div className="flex items-center justify-between px-4 pb-3 pt-[calc(env(safe-area-inset-top)+12px)]">
-            <Link href="/portal">
-              <Image
-                src="/vuei-logo.png"
-                alt="Vuei"
-                width={80}
-                height={28}
-                className="object-contain"
-              />
-            </Link>
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-2 rounded-full border border-border/60 bg-white/80 px-3 py-1.5">
-                <Coins size={14} className="text-primary" />
-                <span className="text-xs font-medium">{credits.balance}</span>
-              </div>
+          <div className="px-4 pb-3 pt-[calc(env(safe-area-inset-top)+12px)]">
+            <div className="flex items-center justify-between">
+              <Link href="/portal">
+                <Image
+                  src="/vuei-logo.png"
+                  alt="Vuei"
+                  width={80}
+                  height={28}
+                  className="object-contain"
+                />
+              </Link>
               <Link
                 href="/portal/configuracoes"
                 aria-label="Abrir configuracoes"
@@ -237,6 +233,22 @@ function PortalLayoutInner({ children }: { children: React.ReactNode }) {
                 )}
               </Link>
             </div>
+            <div className="mt-3 flex items-center gap-2">
+              <Link
+                href="/portal/creditos"
+                className="flex min-w-0 flex-1 items-center gap-2 rounded-full border border-border/60 bg-white/85 px-3 py-2 text-slate-900 transition-colors hover:bg-white"
+              >
+                <Coins size={14} className="text-primary" />
+                <span className="truncate text-xs font-medium">{credits.balance} créditos</span>
+              </Link>
+              <Link
+                href="/portal/offline"
+                className="flex items-center gap-2 rounded-full border border-border/60 bg-white/85 px-3 py-2 text-xs font-medium text-slate-700 transition-colors hover:bg-white"
+              >
+                <WifiOff size={14} className="text-primary" />
+                <span>Offline</span>
+              </Link>
+            </div>
           </div>
         </header>
       )}
@@ -246,7 +258,7 @@ function PortalLayoutInner({ children }: { children: React.ReactNode }) {
         className={cn(
           "min-h-screen transition-all duration-300",
           isMobile
-            ? "px-4 pt-[calc(env(safe-area-inset-top)+84px)] pb-[calc(env(safe-area-inset-bottom)+96px)]"
+            ? "px-4 pt-[calc(env(safe-area-inset-top)+132px)] pb-[calc(env(safe-area-inset-bottom)+104px)]"
             : sidebarCollapsed
               ? "ml-20 p-8"
               : "ml-60 p-8"
