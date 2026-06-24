@@ -14,6 +14,7 @@ import {
   Share2, 
   WifiOff, 
   Settings,
+  LifeBuoy,
   Plus,
   ChevronLeft,
   ChevronRight,
@@ -38,6 +39,7 @@ const navItems = [
 const secondaryNavItems = [
   { href: "/portal/compartilhar", icon: Share2, label: "Compartilhar" },
   { href: "/portal/offline", icon: WifiOff, label: "Offline" },
+  { href: "/portal/suporte", icon: LifeBuoy, label: "Suporte" },
   { href: "/portal/configuracoes", icon: Settings, label: "Configurações" },
 ]
 
@@ -279,6 +281,13 @@ function PortalLayoutInner({ children }: { children: React.ReactNode }) {
               >
                 <WifiOff size={14} className="text-primary" />
                 <span>Offline</span>
+              </Link>
+              <Link
+                href="/portal/suporte"
+                className="flex items-center gap-2 rounded-full border border-border/60 bg-white/85 px-3 py-2 text-xs font-medium text-slate-700 transition-colors hover:bg-white"
+              >
+                <LifeBuoy size={14} className="text-primary" />
+                <span>Suporte</span>
               </Link>
             </div>
           </div>

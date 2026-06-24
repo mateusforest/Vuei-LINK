@@ -88,6 +88,10 @@ async function getAuthenticatedProfile() {
   }
 }
 
+function isAgencyRole(role: SupportProfile["role"]) {
+  return role === "agency_owner" || role === "agency_member"
+}
+
 function isValidCategory(value: unknown): value is SupportTicketCategory {
   return ["vuei_help", "technical_issue", "billing", "credits", "trip_link", "other"].includes(String(value))
 }
@@ -106,14 +110,24 @@ export async function GET() {
     return NextResponse.json({ error: auth.error }, { status: auth.status })
   }
 
-  if (auth.profile.role !== "master") {
-    return NextResponse.json({ error: "Apenas o portal master pode listar chamados." }, { status: 403 })
-  }
-
-  const ticketsResult = await auth.supabase
+  let ticketsQuery = auth.supabase
     .from("support_tickets")
     .select("*")
     .order("created_at", { ascending: false })
+
+  if (auth.profile.role === "master") {
+    // master ve todos os chamados
+  } else if (isAgencyRole(auth.profile.role)) {
+    if (!auth.profile.agency_id) {
+      return NextResponse.json({ error: "Sua conta de agência não está vinculada a uma agência ativa." }, { status: 403 })
+    }
+
+    ticketsQuery = ticketsQuery.eq("agency_id", auth.profile.agency_id)
+  } else {
+    ticketsQuery = ticketsQuery.eq("user_id", auth.profile.id)
+  }
+
+  const ticketsResult = await ticketsQuery
 
   if (ticketsResult.error) {
     return NextResponse.json({ error: ticketsResult.error.message }, { status: 500 })

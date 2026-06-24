@@ -27,6 +27,7 @@ import {
   Menu,
   X,
   Sparkles,
+  LifeBuoy,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -48,6 +49,7 @@ const navItems = [
   { href: "/agencia/hospedagens", icon: Building2, label: "Hospedagens" },
   { href: "/agencia/roteiros-ia", icon: Map, label: "Roteiros IA" },
   { href: "/agencia/equipe", icon: UserCog, label: "Equipe" },
+  { href: "/agencia/suporte", icon: LifeBuoy, label: "Suporte" },
   { href: "/agencia/creditos", icon: Coins, label: "Créditos" },
   { href: "/agencia/analytics", icon: BarChart3, label: "Analytics" },
   { href: "/agencia/configuracoes", icon: Settings, label: "Configurações" },

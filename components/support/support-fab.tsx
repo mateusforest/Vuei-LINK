@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { usePathname } from "next/navigation"
 import { CheckCircle2, Headphones, MessageSquareWarning, Send } from "lucide-react"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -42,6 +42,19 @@ export function SupportFab({
   })
 
   const showUrgentHint = form.priority === "urgent"
+
+  useEffect(() => {
+    if (typeof window === "undefined") return
+
+    const handleOpenSupport = () => {
+      setOpen(true)
+      setError(null)
+      setSuccess(null)
+    }
+
+    window.addEventListener("vuei:support-open", handleOpenSupport as EventListener)
+    return () => window.removeEventListener("vuei:support-open", handleOpenSupport as EventListener)
+  }, [])
 
   const resetForm = () => {
     setForm({
