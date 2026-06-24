@@ -330,7 +330,7 @@ export default function MasterSupportPage() {
         </Card>
 
         <Card className="border-border/60 bg-card/80 p-4">
-          <p className="text-sm font-semibold text-foreground">Resumo rapido</p>
+          <p className="text-sm font-semibold text-foreground">Resumo rápido</p>
           <div className="mt-4 space-y-3 text-sm text-muted-foreground">
             <div className="flex items-center justify-between rounded-2xl border border-border/60 bg-background/70 px-4 py-3">
               <span>Chamados abertos</span>
@@ -354,147 +354,166 @@ export default function MasterSupportPage() {
       </div>
 
       <Dialog open={Boolean(selectedTicketId)} onOpenChange={(open) => !open && setSelectedTicketId(null)}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto border-border/60 bg-white sm:max-w-4xl">
-          <DialogHeader>
-            <DialogTitle>{detail?.ticket.title ?? "Chamado"}</DialogTitle>
-            <DialogDescription>
-              {detail?.ticket ? `${getSupportCategoryLabel(detail.ticket.category as any)} • ${getSupportStatusLabel(detail.ticket.status as any)}` : "Carregando detalhes..."}
-            </DialogDescription>
-          </DialogHeader>
-
-          {detail?.ticket ? (
-            <div className="space-y-5">
-              <div className="grid gap-3 rounded-2xl border border-border/60 bg-slate-50 p-4 text-sm text-slate-700 sm:grid-cols-2">
-                <div>
-                  <p className="text-xs uppercase tracking-wide text-slate-500">Usuário</p>
-                  <p className="mt-1 font-medium">{String(detail.ticket.context?.name ?? "Usuário")}</p>
-                  <p className="text-xs text-slate-500">{String(detail.ticket.context?.email ?? "Sem email")}</p>
-                </div>
-                <div>
-                  <p className="text-xs uppercase tracking-wide text-slate-500">Origem</p>
-                  <p className="mt-1 font-medium">{getSupportPortalLabel((detail.ticket.context?.portalType as any) ?? "traveler")}</p>
-                  <p className="text-xs text-slate-500">{String(detail.ticket.context?.currentRoute ?? "Rota não informada")}</p>
-                </div>
-                <div>
-                  <p className="text-xs uppercase tracking-wide text-slate-500">Agência</p>
-                  <p className="mt-1 font-medium">{String(detail.ticket.context?.agencyName ?? detail.ticket.agencyId ?? "Não vinculada")}</p>
-                </div>
-                <div className="text-xs text-slate-500">
-                  Criado em {new Date(detail.ticket.createdAt).toLocaleString("pt-BR")}
-                </div>
-                <div className="flex items-center gap-2">
-                  <TicketPriorityBadge priority={detail.ticket.priority as any} />
-                  <TicketStatusBadge status={detail.ticket.status as any} />
-                </div>
-                <div>
-                  <p className="text-xs uppercase tracking-wide text-slate-500">Mensagem inicial</p>
-                  <p className="mt-1 text-sm text-slate-700">{detail.ticket.message}</p>
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                <p className="text-sm font-semibold text-slate-900">Histórico</p>
-                <div className="max-h-80 space-y-3 overflow-y-auto rounded-2xl border border-border/60 bg-slate-50 p-4">
-                  {detail.messages.map((message) => (
-                    <div key={message.id} className="rounded-2xl border border-white bg-white p-3 shadow-sm">
-                      <div className="mb-1 flex items-center justify-between text-xs text-slate-500">
-                        <span>{getSupportSenderRoleLabel(message.senderRole as any)}</span>
-                        <span>{new Date(message.createdAt).toLocaleString("pt-BR")}</span>
-                      </div>
-                      <p className="text-sm text-slate-800">{message.body}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="grid gap-3 md:grid-cols-3">
-                <Button variant="outline" onClick={() => void handleStatusUpdate("open")} disabled={statusUpdating !== null}>
-                  Reabrir
-                </Button>
-                <Button variant="outline" onClick={() => void handleStatusUpdate("in_progress")} disabled={statusUpdating !== null}>
-                  Em andamento
-                </Button>
-                <Button className="bg-emerald-600 text-white hover:bg-emerald-700" onClick={() => void handleStatusUpdate("resolved")} disabled={statusUpdating !== null}>
-                  <CheckCircle2 className="mr-2 h-4 w-4" />
-                  Resolver
-                </Button>
-              </div>
-
-              <div className="space-y-3 rounded-2xl border border-border/60 bg-slate-50 p-4">
-                <div className="flex items-center gap-2">
-                  <Gift className="h-4 w-4 text-primary" />
-                  <p className="text-sm font-semibold text-slate-900">Bonificar conta</p>
-                </div>
-                <div className="grid gap-3 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <label className="text-xs font-medium uppercase tracking-wide text-slate-500">Conta alvo</label>
-                    <select
-                      value={bonusTarget}
-                      onChange={(event) => setBonusTarget(event.target.value)}
-                      className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900"
-                    >
-                      {ticketTargets.length === 0 ? <option value="">Sem conta disponível</option> : null}
-                      {ticketTargets.map((target) => (
-                        <option key={target.value} value={target.value}>
-                          {target.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-xs font-medium uppercase tracking-wide text-slate-500">Tipo de bonificação</label>
-                    <select
-                      value={bonusType}
-                      onChange={(event) => setBonusType(event.target.value as SupportBonusType)}
-                      className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900"
-                    >
-                      <option value="credits">Créditos extras</option>
-                      {selectedTargetType === "agency" ? <option value="client_extra">Cliente extra</option> : null}
-                      <option value="trip_extra">Viagem extra</option>
-                    </select>
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-xs font-medium uppercase tracking-wide text-slate-500">Quantidade</label>
-                    <Input value={bonusQuantity} onChange={(event) => setBonusQuantity(event.target.value)} placeholder="1" />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-xs font-medium uppercase tracking-wide text-slate-500">Viagem relacionada</label>
-                    <Input value={bonusTripTitle} onChange={(event) => setBonusTripTitle(event.target.value)} placeholder="Opcional" />
-                  </div>
-                  <div className="space-y-2 md:col-span-2">
-                    <label className="text-xs font-medium uppercase tracking-wide text-slate-500">Cliente relacionado</label>
-                    <Input value={bonusClientName} onChange={(event) => setBonusClientName(event.target.value)} placeholder="Opcional" />
-                  </div>
-                  <div className="space-y-2 md:col-span-2">
-                    <label className="text-xs font-medium uppercase tracking-wide text-slate-500">Motivo</label>
-                    <Textarea value={bonusReason} onChange={(event) => setBonusReason(event.target.value)} placeholder="Explique a compensação aplicada." className="min-h-28" />
-                  </div>
-                </div>
-
-                {bonusError ? <p className="text-sm text-red-600">{bonusError}</p> : null}
-                {bonusSuccess ? <p className="text-sm text-emerald-700">{bonusSuccess}</p> : null}
-
-                <div className="flex justify-end">
-                  <Button className="bg-gradient-to-r from-primary to-accent text-white" disabled={bonusSubmitting || ticketTargets.length === 0} onClick={() => void handleBonusSubmit()}>
-                    {bonusSubmitting ? "Aplicando..." : "Aplicar bonificação"}
-                  </Button>
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                <p className="text-sm font-semibold text-slate-900">Responder</p>
-                <Textarea value={reply} onChange={(event) => setReply(event.target.value)} placeholder="Escreva a resposta do suporte..." className="min-h-32" />
-                <div className="flex justify-end">
-                  <Button className="gap-2 bg-gradient-to-r from-primary to-accent text-white" onClick={() => void handleReply()} disabled={replying || !reply.trim()}>
-                    <MessageCircleReply className="h-4 w-4" />
-                    {replying ? "Enviando..." : "Enviar resposta"}
-                  </Button>
-                </div>
-              </div>
+        <DialogContent className="max-h-[92vh] overflow-hidden rounded-[28px] border border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(248,250,252,0.96)_100%)] p-0 shadow-[0_32px_90px_rgba(15,23,42,0.18)] sm:max-w-4xl">
+          <div className="max-h-[92vh] overflow-y-auto">
+            <div className="border-b border-slate-200/80 bg-white/90 px-6 pb-5 pt-6 backdrop-blur">
+              <DialogHeader>
+                <DialogTitle className="pr-8 text-left text-xl font-semibold tracking-tight text-slate-950">{detail?.ticket.title ?? "Chamado"}</DialogTitle>
+                <DialogDescription className="mt-2 text-left text-sm text-slate-600">
+                  {detail?.ticket ? `${getSupportCategoryLabel(detail.ticket.category as any)} • ${getSupportStatusLabel(detail.ticket.status as any)}` : "Carregando detalhes..."}
+                </DialogDescription>
+              </DialogHeader>
             </div>
-          ) : (
-            <p className="text-sm text-muted-foreground">Carregando detalhes do chamado...</p>
-          )}
+
+            {detail?.ticket ? (
+              <div className="space-y-6 px-6 pb-6 pt-5">
+                <div className="grid gap-3 rounded-[24px] border border-slate-200/80 bg-white p-5 text-sm text-slate-700 shadow-[0_18px_48px_rgba(15,23,42,0.06)] sm:grid-cols-2">
+                  <div>
+                    <p className="text-xs uppercase tracking-wide text-slate-500">Usuário</p>
+                    <p className="mt-1 font-medium">{String(detail.ticket.context?.name ?? "Usuário")}</p>
+                    <p className="text-xs text-slate-500">{String(detail.ticket.context?.email ?? "Sem email")}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs uppercase tracking-wide text-slate-500">Origem</p>
+                    <p className="mt-1 font-medium">{getSupportPortalLabel((detail.ticket.context?.portalType as any) ?? "traveler")}</p>
+                    <p className="text-xs text-slate-500">{String(detail.ticket.context?.currentRoute ?? "Rota não informada")}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs uppercase tracking-wide text-slate-500">Agência</p>
+                    <p className="mt-1 font-medium">{String(detail.ticket.context?.agencyName ?? detail.ticket.agencyId ?? "Não vinculada")}</p>
+                  </div>
+                  <div className="text-xs text-slate-500">
+                    Criado em {new Date(detail.ticket.createdAt).toLocaleString("pt-BR")}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <TicketPriorityBadge priority={detail.ticket.priority as any} />
+                    <TicketStatusBadge status={detail.ticket.status as any} />
+                  </div>
+                  <div>
+                    <p className="text-xs uppercase tracking-wide text-slate-500">Mensagem inicial</p>
+                    <p className="mt-1 text-sm leading-6 text-slate-800">{detail.ticket.message}</p>
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <p className="text-sm font-semibold text-slate-900">Histórico</p>
+                  <div className="max-h-[45vh] space-y-3 overflow-y-auto rounded-[24px] border border-slate-200/80 bg-[linear-gradient(180deg,#f8fafc_0%,#fdfefe_100%)] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.6)]">
+                    {detail.messages.map((message) => {
+                      const isMasterMessage = message.senderRole === "master"
+                      const isSystem = message.senderRole === "system"
+
+                      return (
+                        <div
+                          key={message.id}
+                          className={cn(
+                            "rounded-[22px] px-4 py-3 shadow-sm",
+                            isSystem && "mx-auto max-w-[92%] border border-amber-200/80 bg-amber-50/95 text-amber-950",
+                            isMasterMessage && "ml-auto max-w-[88%] border border-sky-200/70 bg-[linear-gradient(180deg,rgba(224,242,254,0.98)_0%,rgba(219,234,254,0.96)_100%)] text-slate-900 shadow-[0_12px_28px_rgba(14,116,144,0.10)]",
+                            !isMasterMessage && !isSystem && "mr-auto max-w-[88%] border border-slate-200/80 bg-white text-slate-900 shadow-[0_14px_32px_rgba(15,23,42,0.07)]"
+                          )}
+                        >
+                          <div className="mb-1.5 flex items-center justify-between gap-3 text-xs">
+                            <span className="font-semibold text-slate-700">{getSupportSenderRoleLabel(message.senderRole as any)}</span>
+                            <span className="text-slate-500">{new Date(message.createdAt).toLocaleString("pt-BR")}</span>
+                          </div>
+                          <p className="text-sm leading-6 text-slate-800">{message.body}</p>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+
+                <div className="grid gap-3 md:grid-cols-3">
+                  <Button variant="outline" className="rounded-xl border-slate-200 bg-white text-slate-700" onClick={() => void handleStatusUpdate("open")} disabled={statusUpdating !== null}>
+                    Reabrir
+                  </Button>
+                  <Button variant="outline" className="rounded-xl border-slate-200 bg-white text-slate-700" onClick={() => void handleStatusUpdate("in_progress")} disabled={statusUpdating !== null}>
+                    Em andamento
+                  </Button>
+                  <Button className="rounded-xl bg-emerald-600 text-white shadow-[0_18px_34px_rgba(5,150,105,0.18)] hover:bg-emerald-700" onClick={() => void handleStatusUpdate("resolved")} disabled={statusUpdating !== null}>
+                    <CheckCircle2 className="mr-2 h-4 w-4" />
+                    Resolver
+                  </Button>
+                </div>
+
+                <div className="space-y-3 rounded-[24px] border border-slate-200/80 bg-white p-5 shadow-[0_18px_48px_rgba(15,23,42,0.06)]">
+                  <div className="flex items-center gap-2">
+                    <Gift className="h-4 w-4 text-primary" />
+                    <p className="text-sm font-semibold text-slate-900">Bonificar conta</p>
+                  </div>
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <div className="space-y-2">
+                      <label className="text-xs font-medium uppercase tracking-wide text-slate-500">Conta alvo</label>
+                      <select
+                        value={bonusTarget}
+                        onChange={(event) => setBonusTarget(event.target.value)}
+                        className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900"
+                      >
+                        {ticketTargets.length === 0 ? <option value="">Sem conta disponível</option> : null}
+                        {ticketTargets.map((target) => (
+                          <option key={target.value} value={target.value}>
+                            {target.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-medium uppercase tracking-wide text-slate-500">Tipo de bonificação</label>
+                      <select
+                        value={bonusType}
+                        onChange={(event) => setBonusType(event.target.value as SupportBonusType)}
+                        className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900"
+                      >
+                        <option value="credits">Créditos extras</option>
+                        {selectedTargetType === "agency" ? <option value="client_extra">Cliente extra</option> : null}
+                        <option value="trip_extra">Viagem extra</option>
+                      </select>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-medium uppercase tracking-wide text-slate-500">Quantidade</label>
+                      <Input value={bonusQuantity} onChange={(event) => setBonusQuantity(event.target.value)} placeholder="1" />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-medium uppercase tracking-wide text-slate-500">Viagem relacionada</label>
+                      <Input value={bonusTripTitle} onChange={(event) => setBonusTripTitle(event.target.value)} placeholder="Opcional" />
+                    </div>
+                    <div className="space-y-2 md:col-span-2">
+                      <label className="text-xs font-medium uppercase tracking-wide text-slate-500">Cliente relacionado</label>
+                      <Input value={bonusClientName} onChange={(event) => setBonusClientName(event.target.value)} placeholder="Opcional" />
+                    </div>
+                    <div className="space-y-2 md:col-span-2">
+                      <label className="text-xs font-medium uppercase tracking-wide text-slate-500">Motivo</label>
+                      <Textarea value={bonusReason} onChange={(event) => setBonusReason(event.target.value)} placeholder="Explique a compensação aplicada." className="min-h-28 rounded-2xl border-slate-200 bg-slate-50/80 text-slate-900 placeholder:text-slate-400 focus-visible:ring-primary/30" />
+                    </div>
+                  </div>
+
+                  {bonusError ? <p className="text-sm text-red-600">{bonusError}</p> : null}
+                  {bonusSuccess ? <p className="text-sm text-emerald-700">{bonusSuccess}</p> : null}
+
+                  <div className="flex justify-end">
+                    <Button className="rounded-xl bg-gradient-to-r from-primary to-accent text-white shadow-[0_18px_34px_rgba(11,86,216,0.20)]" disabled={bonusSubmitting || ticketTargets.length === 0} onClick={() => void handleBonusSubmit()}>
+                      {bonusSubmitting ? "Aplicando..." : "Aplicar bonificação"}
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="space-y-3 rounded-[24px] border border-slate-200/80 bg-white p-5 shadow-[0_18px_48px_rgba(15,23,42,0.06)]">
+                  <p className="text-sm font-semibold text-slate-900">Responder</p>
+                  <Textarea value={reply} onChange={(event) => setReply(event.target.value)} placeholder="Escreva a resposta do suporte..." className="min-h-32 rounded-2xl border-slate-200 bg-slate-50/80 text-slate-900 placeholder:text-slate-400 focus-visible:ring-primary/30" />
+                  <div className="flex justify-end">
+                    <Button className="gap-2 rounded-xl bg-gradient-to-r from-primary to-accent text-white shadow-[0_18px_34px_rgba(11,86,216,0.20)]" onClick={() => void handleReply()} disabled={replying || !reply.trim()}>
+                      <MessageCircleReply className="h-4 w-4" />
+                      {replying ? "Enviando..." : "Enviar resposta"}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="px-6 pb-6 pt-5">
+                <p className="text-sm text-slate-600">Carregando detalhes do chamado...</p>
+              </div>
+            )}
+          </div>
         </DialogContent>
       </Dialog>
     </div>

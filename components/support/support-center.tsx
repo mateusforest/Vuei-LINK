@@ -230,76 +230,88 @@ export function SupportCenter(props: SupportCenterProps) {
       </Card>
 
       <Dialog open={Boolean(selectedTicketId)} onOpenChange={(open) => !open && setSelectedTicketId(null)}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto border-border/60 bg-white sm:max-w-3xl">
-          <DialogHeader>
-            <DialogTitle>{detail?.ticket.title ?? "Chamado"}</DialogTitle>
-            <DialogDescription>
-              {detail?.ticket ? `${getSupportCategoryLabel(detail.ticket.category)} • ${getStatusLabel(detail.ticket.status)}` : "Carregando detalhes..."}
-            </DialogDescription>
-          </DialogHeader>
-
-          {detail?.ticket ? (
-            <div className="space-y-5">
-              <div className="rounded-2xl border border-border/60 bg-[#fbfbfc] p-4">
-                <div className="flex flex-wrap items-center gap-2">
-                  <Badge className={cn("border-0", getStatusBadgeClass(detail.ticket.status))}>{getStatusLabel(detail.ticket.status)}</Badge>
-                  <span className="text-xs text-muted-foreground">Criado em {formatDate(detail.ticket.createdAt)}</span>
-                  <span className="text-xs text-muted-foreground">Atualizado em {formatDate(detail.ticket.updatedAt)}</span>
-                </div>
-                <p className="mt-3 text-sm text-foreground">{detail.ticket.message}</p>
-              </div>
-
-              <div className="space-y-3">
-                <p className="text-sm font-semibold text-foreground">Mensagens</p>
-                <div className="max-h-[45vh] space-y-3 overflow-y-auto rounded-2xl border border-border/60 bg-[#fbfbfc] p-4">
-                  {detail.messages.map((message) => {
-                    const isViewerMessage = message.senderRole === props.portalType
-                    const isSystem = message.senderRole === "system"
-
-                    return (
-                      <div
-                        key={message.id}
-                        className={cn(
-                          "rounded-2xl p-3",
-                          isSystem && "border border-amber-200 bg-amber-50",
-                          isViewerMessage && "ml-auto max-w-[85%] bg-primary/10 text-foreground",
-                          !isViewerMessage && !isSystem && "mr-auto max-w-[85%] border border-border/60 bg-white text-foreground"
-                        )}
-                      >
-                        <div className="mb-1 flex items-center justify-between gap-3 text-xs text-muted-foreground">
-                          <span>{getViewerSenderLabel(message.senderRole, props.portalType)}</span>
-                          <span>{formatDate(message.createdAt)}</span>
-                        </div>
-                        <p className="text-sm">{message.body}</p>
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                <p className="text-sm font-semibold text-foreground">Responder</p>
-                <Textarea
-                  value={reply}
-                  onChange={(event) => setReply(event.target.value)}
-                  placeholder="Escreva sua mensagem para o suporte..."
-                  className="min-h-28 border-border/70 bg-white"
-                />
-                <div className="flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <Clock3 className="h-3.5 w-3.5" />
-                    As respostas ficam registradas neste histórico.
-                  </div>
-                  <Button className="gap-2 bg-gradient-to-r from-primary to-accent text-white" onClick={() => void handleReply()} disabled={replying || !reply.trim()}>
-                    <Send className="h-4 w-4" />
-                    {replying ? "Enviando..." : "Enviar resposta"}
-                  </Button>
-                </div>
-              </div>
+        <DialogContent className="max-h-[92vh] overflow-hidden rounded-[28px] border border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(248,250,252,0.96)_100%)] p-0 shadow-[0_32px_90px_rgba(15,23,42,0.18)] sm:max-w-3xl">
+          <div className="max-h-[92vh] overflow-y-auto">
+            <div className="border-b border-slate-200/80 bg-white/90 px-6 pb-5 pt-6 backdrop-blur">
+              <DialogHeader>
+                <DialogTitle className="pr-8 text-left text-xl font-semibold tracking-tight text-slate-950">
+                  {detail?.ticket.title ?? "Chamado"}
+                </DialogTitle>
+                <DialogDescription className="mt-2 text-left text-sm text-slate-600">
+                  {detail?.ticket ? `${getSupportCategoryLabel(detail.ticket.category)} • ${getStatusLabel(detail.ticket.status)}` : "Carregando detalhes..."}
+                </DialogDescription>
+              </DialogHeader>
             </div>
-          ) : (
-            <p className="text-sm text-muted-foreground">Carregando detalhes do chamado...</p>
-          )}
+
+            {detail?.ticket ? (
+              <div className="space-y-6 px-6 pb-6 pt-5">
+                <div className="rounded-[24px] border border-slate-200/80 bg-white px-5 py-4 shadow-[0_18px_48px_rgba(15,23,42,0.06)]">
+                  <div className="flex flex-wrap items-center gap-2.5">
+                    <Badge className={cn("border-0 shadow-sm", getStatusBadgeClass(detail.ticket.status))}>{getStatusLabel(detail.ticket.status)}</Badge>
+                    <span className="text-xs font-medium text-slate-500">Criado em {formatDate(detail.ticket.createdAt)}</span>
+                    <span className="text-xs font-medium text-slate-500">Atualizado em {formatDate(detail.ticket.updatedAt)}</span>
+                  </div>
+                  <p className="mt-4 text-sm leading-6 text-slate-800">{detail.ticket.message}</p>
+                </div>
+
+                <div className="space-y-3">
+                  <p className="text-sm font-semibold text-slate-900">Mensagens</p>
+                  <div className="max-h-[45vh] space-y-3 overflow-y-auto rounded-[24px] border border-slate-200/80 bg-[linear-gradient(180deg,#f8fafc_0%,#fdfefe_100%)] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.6)]">
+                    {detail.messages.map((message) => {
+                      const isViewerMessage = message.senderRole === props.portalType
+                      const isSystem = message.senderRole === "system"
+
+                      return (
+                        <div
+                          key={message.id}
+                          className={cn(
+                            "rounded-[22px] px-4 py-3 shadow-sm",
+                            isSystem && "mx-auto max-w-[92%] border border-amber-200/80 bg-amber-50/95 text-amber-950",
+                            isViewerMessage && "ml-auto max-w-[88%] border border-sky-200/70 bg-[linear-gradient(180deg,rgba(224,242,254,0.98)_0%,rgba(219,234,254,0.96)_100%)] text-slate-900 shadow-[0_12px_28px_rgba(14,116,144,0.10)]",
+                            !isViewerMessage && !isSystem && "mr-auto max-w-[88%] border border-slate-200/80 bg-white text-slate-900 shadow-[0_14px_32px_rgba(15,23,42,0.07)]"
+                          )}
+                        >
+                          <div className="mb-1.5 flex items-center justify-between gap-3 text-xs">
+                            <span className="font-semibold text-slate-700">{getViewerSenderLabel(message.senderRole, props.portalType)}</span>
+                            <span className="text-slate-500">{formatDate(message.createdAt)}</span>
+                          </div>
+                          <p className="text-sm leading-6 text-slate-800">{message.body}</p>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+
+                <div className="space-y-3 rounded-[24px] border border-slate-200/80 bg-white px-5 py-4 shadow-[0_18px_48px_rgba(15,23,42,0.06)]">
+                  <p className="text-sm font-semibold text-slate-900">Responder</p>
+                  <Textarea
+                    value={reply}
+                    onChange={(event) => setReply(event.target.value)}
+                    placeholder="Escreva sua mensagem para o suporte..."
+                    className="min-h-28 resize-none rounded-2xl border-slate-200 bg-slate-50/80 text-slate-900 placeholder:text-slate-400 focus-visible:ring-primary/30"
+                  />
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex items-center gap-2 text-xs text-slate-500">
+                      <Clock3 className="h-3.5 w-3.5" />
+                      As respostas ficam registradas neste histórico.
+                    </div>
+                    <Button
+                      className="gap-2 rounded-xl bg-gradient-to-r from-primary to-accent px-5 text-white shadow-[0_18px_34px_rgba(11,86,216,0.20)] hover:opacity-95 disabled:opacity-60"
+                      onClick={() => void handleReply()}
+                      disabled={replying || !reply.trim()}
+                    >
+                      <Send className="h-4 w-4" />
+                      {replying ? "Enviando..." : "Enviar resposta"}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="px-6 pb-6 pt-5">
+                <p className="text-sm text-slate-600">Carregando detalhes do chamado...</p>
+              </div>
+            )}
+          </div>
         </DialogContent>
       </Dialog>
     </div>
