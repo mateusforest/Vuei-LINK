@@ -17,13 +17,14 @@ export default function ResetPasswordPage() {
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isFinishingSuccessFlow, setIsFinishingSuccessFlow] = useState(false)
 
   const canSubmit = useMemo(() => password.length >= 6 && password === confirmPassword, [confirmPassword, password])
 
   useEffect(() => {
-    if (!initialized || loading || session) return
+    if (!initialized || loading || session || isFinishingSuccessFlow) return
     setError("Este link de recuperação é inválido ou expirou. Solicite um novo email para continuar.")
-  }, [initialized, loading, session])
+  }, [initialized, isFinishingSuccessFlow, loading, session])
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault()
@@ -60,6 +61,7 @@ export default function ResetPasswordPage() {
       }
 
       setSuccess("Senha atualizada com sucesso. Você será redirecionado para o login.")
+      setIsFinishingSuccessFlow(true)
       await signOut()
       window.setTimeout(() => {
         router.replace("/login")
