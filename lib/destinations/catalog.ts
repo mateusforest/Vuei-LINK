@@ -956,7 +956,7 @@ export function resolveDestinationOption(input?: string | null, selectedId?: str
   )
   if (exact) return exact
 
-  return searchDestinationOptions(normalizedInput, 1)[0] ?? null
+  return null
 }
 
 export function resolveDestinationInput(input: string, selectedId?: string | null): ResolvedDestinationInput {
