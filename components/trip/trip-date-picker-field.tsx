@@ -5,6 +5,7 @@ import { ptBR } from "date-fns/locale"
 import { Calendar } from "@/components/ui/calendar"
 import { Label } from "@/components/ui/label"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { useIsMobile } from "@/components/ui/use-mobile"
 import { cn } from "@/lib/utils"
 import { formatDateForDisplay, formatDateFromDate, parseTripDateToDate } from "@/lib/trip-date"
 
@@ -23,6 +24,7 @@ type TripDatePickerFieldProps = {
 }
 
 export function TripDatePickerField(props: TripDatePickerFieldProps) {
+  const isMobile = useIsMobile()
   const selectedDate = parseTripDateToDate(props.value)
   const minDate = parseTripDateToDate(props.minValue)
 
@@ -52,7 +54,9 @@ export function TripDatePickerField(props: TripDatePickerFieldProps) {
           side="bottom"
           sideOffset={8}
           className={cn(
-            "z-[70] w-[min(22rem,calc(100vw-2rem))] rounded-2xl border border-border/60 bg-card/95 p-0 shadow-2xl backdrop-blur",
+            isMobile
+              ? "fixed inset-x-4 bottom-[calc(env(safe-area-inset-bottom)+88px)] top-auto z-[120] w-auto max-h-[min(68vh,34rem)] overflow-y-auto rounded-[24px] border border-border/60 bg-card/98 p-0 shadow-2xl backdrop-blur"
+              : "z-[70] w-[min(22rem,calc(100vw-2rem))] rounded-2xl border border-border/60 bg-card/95 p-0 shadow-2xl backdrop-blur",
             props.popoverClassName
           )}
         >
@@ -62,7 +66,7 @@ export function TripDatePickerField(props: TripDatePickerFieldProps) {
             selected={selectedDate}
             defaultMonth={selectedDate ?? minDate ?? new Date()}
             disabled={minDate ? { before: minDate } : undefined}
-            className="w-full"
+            className={cn("w-full", isMobile && "p-4")}
             onSelect={(date) => {
               const nextValue = formatDateFromDate(date)
               if (!nextValue) return
