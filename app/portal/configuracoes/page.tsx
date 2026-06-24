@@ -691,30 +691,30 @@ export default function ConfiguracoesPage() {
         },
         {
           icon: Lock,
-          label: "PIN de seguranca",
+          label: "PIN de segurança",
           description: settings.pinEnabled ? "PIN da conta configurado" : "Defina um PIN de 4 dígitos",
           action: () => setShowPinModal(true),
         },
         {
           icon: Shield,
-          label: "Sessoes ativas",
+          label: "Sessões ativas",
           description: "2 dispositivos conectados",
           action: () =>
             openInfoModal(
-              "Sessoes ativas",
+              "Sessões ativas",
               "Em breve você poderá visualizar e encerrar dispositivos conectados à sua conta."
             ),
         },
       ],
     },
     {
-      title: "Preferencias",
+      title: "Preferências",
       items: [
         { icon: Bell, label: "Notificações", description: "Alertas e lembretes", switchKey: "notifications" as const },
         {
           icon: Globe,
           label: "Idioma",
-          description: "Portugues (Brasil)",
+          description: "Português (Brasil)",
           action: () =>
             openInfoModal(
               "Idioma",
@@ -729,7 +729,7 @@ export default function ConfiguracoesPage() {
         {
           icon: HelpCircle,
           label: "Central de ajuda",
-          description: "Duvidas frequentes",
+          description: "Dúvidas frequentes",
           action: () =>
             openInfoModal(
               "Central de ajuda",
@@ -739,13 +739,13 @@ export default function ConfiguracoesPage() {
         {
           icon: FileText,
           label: "Termos de uso",
-          description: "Regras e condicoes do Vuei",
+          description: "Regras e condições do Vuei",
           action: () => router.push("/termos"),
         },
         {
           icon: FileText,
-          label: "Politica de privacidade",
-          description: "Como seus dados sao tratados",
+          label: "Política de privacidade",
+          description: "Como seus dados são tratados",
           action: () => router.push("/privacidade"),
         },
       ],
@@ -852,7 +852,7 @@ export default function ConfiguracoesPage() {
             <div className="space-y-2">
               <h2 className="text-base font-semibold">Acesso rápido</h2>
               <p className="text-sm text-muted-foreground">
-                O PIN fica salvo com seguranca na sua conta e funciona em outros dispositivos depois do login. A biometria continua sendo configurada separadamente em cada dispositivo.
+                O PIN fica salvo com segurança na sua conta e funciona em outros dispositivos depois do login. A biometria continua sendo configurada separadamente em cada dispositivo.
               </p>
               <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
                 <Badge variant="secondary" className="border-border/50 bg-background/50">

@@ -344,7 +344,7 @@ export default function CriarViagemPage() {
               />
               
               <div className="flex flex-wrap gap-2">
-                {["Ferias de verao", "Viagem de trabalho", "Aventura europeia"].map((suggestion) => (
+                {["Férias de verão", "Viagem de trabalho", "Aventura europeia"].map((suggestion) => (
                   <Button
                     key={suggestion}
                     variant="outline"
@@ -626,7 +626,7 @@ export default function CriarViagemPage() {
                 <div className="flex items-start gap-3 mb-3">
                   <Share2 size={20} className="text-primary" />
                   <div className="flex-1">
-                    <h3 className="font-semibold">Link Compartilhavel</h3>
+                    <h3 className="font-semibold">Link compartilhável</h3>
                     <p className="text-xs text-muted-foreground">Compartilhe com familia e amigos</p>
                   </div>
                   <Badge className="bg-primary/20 text-primary border-0 text-xs">

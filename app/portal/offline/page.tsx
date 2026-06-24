@@ -119,7 +119,7 @@ function mapStoredPackageItems(pkg: OfflineStoredTripPackage): OfflineTripPackag
     { id: "flight", name: "Passagens extraídas", type: "flight", sizeLabel: formatSizeLabel(payload.flights), saved: Array.isArray(payload.flights) && payload.flights.length > 0 },
     { id: "hotel", name: "Hospedagem", type: "hotel", sizeLabel: formatSizeLabel(payload.hotels), saved: Array.isArray(payload.hotels) && payload.hotels.length > 0 },
     { id: "itinerary", name: "Roteiro", type: "itinerary", sizeLabel: formatSizeLabel(payload.itineraries), saved: Array.isArray(payload.itineraries) && payload.itineraries.length > 0 },
-    { id: "quick_info", name: "Informacoes rapidas", type: "quick_info", sizeLabel: formatSizeLabel(payload.quickInfo), saved: Boolean(payload.quickInfo) },
+    { id: "quick_info", name: "Informações rápidas", type: "quick_info", sizeLabel: formatSizeLabel(payload.quickInfo), saved: Boolean(payload.quickInfo) },
     { id: "document", name: "Documentos offline", type: "document", sizeLabel: formatSizeLabel(savedDocumentIds), saved: savedDocumentIds.length > 0 },
   ]
 }

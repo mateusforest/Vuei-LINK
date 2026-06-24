@@ -149,7 +149,7 @@ export default function CreditosPage() {
       <motion.div variants={fadeInUp} className="flex items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold">Créditos</h1>
-          <p className="text-sm text-muted-foreground">Gerencie seus creditos Vuei</p>
+          <p className="text-sm text-muted-foreground">Gerencie seus créditos Vuei</p>
         </div>
         <Badge className="bg-gradient-to-r from-amber-500/20 to-amber-600/20 text-amber-400 border-amber-500/30">
           <Crown size={14} className="mr-1" />
@@ -186,17 +186,17 @@ export default function CreditosPage() {
                 </div>
                 <div className="flex items-baseline gap-3">
                   <span className="text-5xl md:text-6xl font-bold vuei-gradient-text">{effectiveBalance}</span>
-                  <span className="text-muted-foreground">creditos</span>
+                  <span className="text-muted-foreground">créditos</span>
                 </div>
                 <div className="space-y-1 text-sm">
                   <div className="flex items-center gap-2 text-green-400">
                     <Gift size={14} />
                     <span>
-                      {planCreditsAvailable} de {monthlyPlanCredits} creditos do plano disponíveis neste ciclo
+                      {planCreditsAvailable} de {monthlyPlanCredits} créditos do plano disponíveis neste ciclo
                     </span>
                   </div>
                   <div className="text-muted-foreground">
-                    {purchasedCreditsAvailable} creditos comprados acumulados
+                    {purchasedCreditsAvailable} créditos comprados acumulados
                   </div>
                 </div>
               </div>
@@ -205,13 +205,13 @@ export default function CreditosPage() {
                 <div className="flex items-center gap-2 md:justify-end">
                   <TrendingUp size={14} className="text-muted-foreground" />
                   <span className="text-sm text-muted-foreground">
-                    {planCreditsUsed} de {monthlyPlanCredits} creditos mensais utilizados
+                    {planCreditsUsed} de {monthlyPlanCredits} créditos mensais utilizados
                   </span>
                 </div>
                 <Progress value={usagePercentage} className="h-2 w-full md:w-48" />
                 <p className="text-xs text-muted-foreground">
                   {billingStatus?.currentPeriodEnd
-                    ? `Ciclo atual ate ${new Date(billingStatus.currentPeriodEnd).toLocaleDateString("pt-BR")}`
+                    ? `Ciclo atual até ${new Date(billingStatus.currentPeriodEnd).toLocaleDateString("pt-BR")}`
                     : isRealMode
                       ? "Saldo sincronizado com o Supabase"
                       : "Ciclo do plano ainda sem renovação automática nesta fase."}
@@ -226,8 +226,8 @@ export default function CreditosPage() {
         <div className="grid grid-cols-3 gap-3">
           {[
             { label: "Concierge", value: conciergeUsage.toString(), icon: MessageCircle, desc: "usos" },
-            { label: "Documentos", value: documentsUsage.toString(), icon: FileText, desc: "transacoes" },
-            { label: "Offline", value: offlineUsage.toString(), icon: WifiOff, desc: "transacoes" },
+            { label: "Documentos", value: documentsUsage.toString(), icon: FileText, desc: "transações" },
+            { label: "Offline", value: offlineUsage.toString(), icon: WifiOff, desc: "transações" },
           ].map((stat) => (
             <Card key={stat.label} className="p-4 bg-card/50 border-border/50 vuei-glass text-center">
               <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary/10 to-secondary/10 flex items-center justify-center mx-auto mb-2">
@@ -268,7 +268,7 @@ export default function CreditosPage() {
                 <div className="flex items-center gap-2">
                   <Coins size={20} className="text-primary" />
                   <span className="text-2xl font-bold">{pkg.credits}</span>
-                  <span className="text-muted-foreground">creditos</span>
+                  <span className="text-muted-foreground">créditos</span>
                 </div>
 
                 <div>
@@ -305,7 +305,7 @@ export default function CreditosPage() {
               <div>
                 <h3 className="font-semibold mb-1">Planos e benefícios</h3>
                 <p className="text-sm text-muted-foreground">
-                  Compare Free e Premium, veja os creditos inclusos e gerencie sua assinatura traveler.
+                  Compare Free e Premium, veja os créditos inclusos e gerencie sua assinatura do viajante.
                 </p>
               </div>
             </div>

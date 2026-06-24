@@ -257,7 +257,7 @@ function PortalLayoutInner({ children }: { children: React.ReactNode }) {
               </Link>
               <Link
                 href="/portal/configuracoes"
-                aria-label="Abrir configuracoes"
+                aria-label="Abrir configurações"
                 className="relative flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-[#37beff] to-[#0b56d8] ring-1 ring-border/50 transition-transform duration-200 active:scale-95"
               >
                 {profile?.avatarUrl ? (

@@ -141,7 +141,7 @@ async function loadTripPinStatus(params: {
   return {
     ok: response.ok,
     data,
-    error: response.ok ? null : data?.error ?? "Nao foi possivel consultar o PIN desta viagem.",
+    error: response.ok ? null : data?.error ?? "Não foi possível consultar o PIN desta viagem.",
   }
 }
 
@@ -166,7 +166,7 @@ async function verifyTripPinOnServer(params: {
   return {
     ok: response.ok,
     data,
-    error: response.ok ? null : data?.error ?? "Nao foi possivel validar o PIN desta viagem.",
+    error: response.ok ? null : data?.error ?? "Não foi possível validar o PIN desta viagem.",
   }
 }
 
@@ -1938,7 +1938,7 @@ function TripHero({ tripData, onEditTrip }: { tripData: any; onEditTrip: () => v
             <div className="flex items-center gap-3 px-4 py-3 rounded-2xl bg-white/5 backdrop-blur-md border border-white/10">
               <Calendar className="w-5 h-5 text-[#5de0e6]" />
               <div>
-                <p className="text-xs text-white/50">Periodo</p>
+                <p className="text-xs text-white/50">Período</p>
                 <p className="text-sm text-white font-medium">{tripData.dates.start} - {tripData.dates.end}</p>
               </div>
             </div>
@@ -3933,8 +3933,8 @@ function ItinerarySection({
         {simpleRecord?.status === "completed" && itinerary.length > 0 ? (
           <>
             <div className="mb-4 rounded-2xl border border-[#5de0e6]/20 bg-[#5de0e6]/10 p-4 text-sm text-white/80">
-              Roteiro simples criado com IA e salvo para edicao no modo admin.
-              {realPlannedDays ? ` Periodo real: ${realPlannedDays} dia(s).` : ""}
+              Roteiro simples criado com IA e salvo para edição no modo admin.
+              {realPlannedDays ? ` Período real: ${realPlannedDays} dia(s).` : ""}
             </div>
             <div className="flex gap-2 mb-6 overflow-x-auto pb-2 scrollbar-hide">
               {itinerary.map((day: any) => (
@@ -4195,7 +4195,7 @@ function EditItineraryItemModal({ open, onClose, item, onSave, onDelete }: { ope
           </select>
         </div>
         <div>
-          <label className="text-xs text-white/50 uppercase tracking-wider">Periodo</label>
+          <label className="text-xs text-white/50 uppercase tracking-wider">Período</label>
           <select
             value={formData.period || "flexible"}
             onChange={(e) => setFormData({ ...formData, period: e.target.value })}
@@ -4286,7 +4286,7 @@ function AddItineraryItemModal({ open, onClose, day, onSave }: { open: boolean; 
         </div>
 
         <div>
-          <label className="text-xs text-white/50 uppercase tracking-wider">Periodo</label>
+          <label className="text-xs text-white/50 uppercase tracking-wider">Período</label>
           <select
             value={formData.period}
             onChange={(e) => setFormData({ ...formData, period: e.target.value })}
@@ -4489,7 +4489,7 @@ function DocumentsSection({
                 ) : null}
               </div>
               <p className="text-sm text-white font-medium mt-2 break-words">{doc.name}</p>
-              <p className="text-xs text-white/40 mt-1">Compartilhavel</p>
+              <p className="text-xs text-white/40 mt-1">Compartilhável</p>
             </motion.div>
           ))}
         </div>
@@ -4667,7 +4667,7 @@ function PinModal({
 
       if (!result.ok || !result.data) {
         setPinStatus(null)
-        setError(result.error ?? "Nao foi possivel consultar o PIN desta viagem.")
+        setError(result.error ?? "Não foi possível consultar o PIN desta viagem.")
         return
       }
 
@@ -4865,7 +4865,7 @@ function PortalPinUnlockModal({
 
       if (!result.ok || !result.data) {
         setPinStatus(null)
-        setError(result.error ?? "Nao foi possivel consultar o PIN desta viagem.")
+        setError(result.error ?? "Não foi possível consultar o PIN desta viagem.")
         return
       }
 
@@ -4894,7 +4894,7 @@ function PortalPinUnlockModal({
       })
 
       if (!result.ok || !result.data) {
-        setError(result.error ?? "Nao foi possivel validar o PIN.")
+        setError(result.error ?? "Não foi possível validar o PIN.")
         return
       }
 
@@ -4913,7 +4913,7 @@ function PortalPinUnlockModal({
       onSuccess()
       setPin("")
     } catch (pinError) {
-      const message = pinError instanceof Error ? pinError.message : "Nao foi possivel validar o PIN desta viagem."
+      const message = pinError instanceof Error ? pinError.message : "Não foi possível validar o PIN desta viagem."
       setError(message)
     } finally {
       setIsSubmitting(false)
@@ -5046,7 +5046,7 @@ function LinkSecurityInfoModal({
 
       if (!result.ok || !result.data) {
         setStatus(null)
-        setError(result.error ?? "Nao foi possivel consultar o PIN desta viagem.")
+        setError(result.error ?? "Não foi possível consultar o PIN desta viagem.")
         return
       }
 
@@ -5734,7 +5734,7 @@ function ShareModal({ open, onClose, tripData }: { open: boolean; onClose: () =>
         <div className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.06]">
           <div className="flex items-center gap-2 mb-3">
             <Globe className="w-4 h-4 text-white/60" />
-            <span className="text-sm font-medium text-white">Link Compartilhavel</span>
+            <span className="text-sm font-medium text-white">Link Compartilhável</span>
           </div>
           <p className="text-xs text-white/40 mb-3">Sem documentos privados</p>
           <div className="flex items-center gap-2 p-3 rounded-xl bg-white/[0.03]">
@@ -6033,7 +6033,7 @@ function TripSettingsModal({
 }) {
   const { canWrite } = useContext(PermissionContext)
   const [form, setForm] = useState({
-    preferences: "Roteiro premium com foco em experiencias culturais e gastronomia.",
+    preferences: "Roteiro premium com foco em experiências culturais e gastronomia.",
     privacy: "privado",
     permissions: "edicao_restrita",
     status: tripData.status ?? "upcoming",
@@ -6049,7 +6049,7 @@ function TripSettingsModal({
     <Modal open={open} onClose={onClose} title="Configurações">
       <div className="space-y-4">
         <div>
-          <Label className="text-white/60">Preferencias da viagem</Label>
+          <Label className="text-white/60">Preferências da viagem</Label>
           <textarea
             value={form.preferences}
             onChange={(e) => canWrite && setForm((prev) => ({ ...prev, preferences: e.target.value }))}
@@ -6077,7 +6077,7 @@ function TripSettingsModal({
             </div>
           </div>
           <div>
-            <Label className="text-white/60">Permissoes</Label>
+            <Label className="text-white/60">Permissões</Label>
             <div className="mt-2 grid gap-2">
               {["edicao_restrita", "colaborativa"].map((permission) => (
                 <button
@@ -6089,7 +6089,7 @@ function TripSettingsModal({
                     form.permissions === permission ? "border-[#5de0e6]/40 bg-[#5de0e6]/10 text-[#5de0e6]" : "border-white/10 bg-white/[0.03] text-white/60"
                   )}
                 >
-                  {permission === "edicao_restrita" ? "Somente equipe principal" : "Edicao colaborativa"}
+                  {permission === "edicao_restrita" ? "Somente equipe principal" : "Edição colaborativa"}
                 </button>
               ))}
             </div>
@@ -6115,7 +6115,7 @@ function TripSettingsModal({
         </div>
         {canWrite ? (
           <Button className="w-full bg-gradient-to-r from-[#5de0e6] to-[#004aad] text-white" onClick={() => onSave(form)}>
-            Salvar configuracoes
+            Salvar configurações
           </Button>
         ) : (
           <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4 text-sm text-white/50">
@@ -6548,7 +6548,7 @@ function TravelerPublicCreditsModal({
             <div className="h-full rounded-full bg-gradient-to-r from-[#5de0e6] to-[#004aad]" style={{ width: `${usagePercentage}%` }} />
           </div>
           <p className="mt-3 text-xs text-slate-500">
-            {planCreditsUsed} de {monthlyCredits} creditos mensais utilizados neste ciclo
+            {planCreditsUsed} de {monthlyCredits} créditos mensais utilizados neste ciclo
           </p>
         </div>
 
@@ -6619,7 +6619,7 @@ function LinkCreditsSummaryModal({
             <div className="h-full rounded-full bg-gradient-to-r from-[#5de0e6] to-[#004aad]" style={{ width: `${usagePercentage}%` }} />
           </div>
           <p className="mt-3 text-xs text-slate-500">
-            {planCreditsUsed} de {monthlyCredits} creditos mensais utilizados neste ciclo
+            {planCreditsUsed} de {monthlyCredits} créditos mensais utilizados neste ciclo
           </p>
         </div>
 
@@ -8695,7 +8695,7 @@ export default function TripPage() {
       return false
     }
     if (!(adminRouteActive && tripAdminToken)) {
-      showToast("Este modo de viagem ainda nÃ£o permite salvar viajantes reais.", "info")
+      showToast("Este modo de viagem ainda não permite salvar viajantes reais.", "info")
       return false
     }
 
@@ -8709,7 +8709,7 @@ export default function TripPage() {
       })
 
       if (result.error) {
-        showToast(resolveProtectedWriteError(result.error || "NÃ£o foi possÃ­vel adicionar o viajante."), "error")
+        showToast(resolveProtectedWriteError(result.error || "Não foi possível adicionar o viajante."), "error")
         return false
       }
 
@@ -8727,7 +8727,7 @@ export default function TripPage() {
       return false
     }
     if (!(adminRouteActive && tripAdminToken)) {
-      showToast("Este modo de viagem ainda nÃ£o permite salvar viajantes reais.", "info")
+      showToast("Este modo de viagem ainda não permite salvar viajantes reais.", "info")
       return false
     }
 
@@ -8741,7 +8741,7 @@ export default function TripPage() {
       })
 
       if (result.error) {
-        showToast(resolveProtectedWriteError(result.error || "NÃ£o foi possÃ­vel atualizar o viajante."), "error")
+        showToast(resolveProtectedWriteError(result.error || "Não foi possível atualizar o viajante."), "error")
         return false
       }
 
@@ -8759,7 +8759,7 @@ export default function TripPage() {
       return false
     }
     if (!(adminRouteActive && tripAdminToken)) {
-      showToast("Este modo de viagem ainda nÃ£o permite salvar viajantes reais.", "info")
+      showToast("Este modo de viagem ainda não permite salvar viajantes reais.", "info")
       return false
     }
 
@@ -8774,7 +8774,7 @@ export default function TripPage() {
       })
 
       if (result.error) {
-        showToast(resolveProtectedWriteError(result.error || "NÃ£o foi possÃ­vel remover o viajante."), "error")
+        showToast(resolveProtectedWriteError(result.error || "Não foi possível remover o viajante."), "error")
         return false
       }
 
@@ -8792,7 +8792,7 @@ export default function TripPage() {
       return false
     }
     if (!(adminRouteActive && tripAdminToken)) {
-      showToast("Este modo de viagem ainda nÃ£o permite salvar viajantes reais.", "info")
+      showToast("Este modo de viagem ainda não permite salvar viajantes reais.", "info")
       return false
     }
 
@@ -8804,7 +8804,7 @@ export default function TripPage() {
       })
 
       if (result.error) {
-        showToast(resolveProtectedWriteError(result.error || "NÃ£o foi possÃ­vel definir o viajante principal."), "error")
+        showToast(resolveProtectedWriteError(result.error || "Não foi possível definir o viajante principal."), "error")
         return false
       }
 

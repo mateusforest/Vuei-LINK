@@ -14,8 +14,8 @@ import { SUPPORT_WHATSAPP } from "@/lib/support/labels"
 import type { SupportTicketCategory, SupportTicketPriority } from "@/types"
 
 const categories: Array<{ value: SupportTicketCategory; label: string }> = [
-  { value: "vuei_help", label: "Duvida sobre o Vuei" },
-  { value: "technical_issue", label: "Problema tecnico" },
+  { value: "vuei_help", label: "Dúvida sobre o Vuei" },
+  { value: "technical_issue", label: "Problema técnico" },
   { value: "billing", label: "Plano ou cobrança" },
   { value: "credits", label: "Créditos" },
   { value: "trip_link", label: "Viagem ou link" },
@@ -125,7 +125,7 @@ export function SupportFab({
           <DialogHeader className="border-b border-slate-200 px-6 pb-4 pt-6">
             <DialogTitle className="text-xl font-semibold text-slate-950">Falar com o suporte</DialogTitle>
             <DialogDescription className="text-sm text-slate-600">
-              Abra um chamado pelo portal. Casos urgentes tambem podem ser acompanhados pelo WhatsApp.
+              Abra um chamado pelo portal. Casos urgentes também podem ser acompanhados pelo WhatsApp.
             </DialogDescription>
           </DialogHeader>
 
@@ -136,7 +136,7 @@ export function SupportFab({
                 <Input
                   value={form.title}
                   onChange={(event) => setForm((prev) => ({ ...prev, title: event.target.value }))}
-                  placeholder="Ex: Nao consegui abrir minha viagem"
+                  placeholder="Ex: Não consegui abrir minha viagem"
                   className="h-11 rounded-2xl border-slate-200 bg-white text-slate-900 placeholder:text-slate-400"
                 />
               </div>
