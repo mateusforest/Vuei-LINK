@@ -37,6 +37,7 @@ import { shouldUseSupabase } from "@/lib/data-source"
 import type { Document, TripItineraryRecord } from "@/types"
 import { deleteTripItinerary, listTripItineraries, requestAiItineraryGeneration } from "@/lib/repositories/trip-itineraries-repository"
 import { getSignedDocumentUrl, listDocumentsByTrip } from "@/lib/repositories/documents-repository"
+import { listTripTravelersByTrip } from "@/lib/repositories/trip-travelers-repository"
 import { getAiCreditCost } from "@/lib/ai/credit-costs"
 import { getAgencyBillingStatusFromApi } from "@/lib/repositories/agency-billing-repository"
 import { dispatchCreditBalanceChanged } from "@/lib/credits/credit-events"
@@ -63,13 +64,13 @@ function formatTripDuration(startDate?: string, endDate?: string) {
 
 function formatTravelersLabel(count?: number) {
   if (!count || count <= 0) return "Não informado"
-  return `${count} ${count === 1 ? "viaj?nte" : "viaj?ntes"}`
+  return `${count} ${count === 1 ? "viajante" : "viajantes"}`
 }
 
 function formatItineraryStatus(status: TripItineraryRecord["status"]) {
   switch (status) {
     case "completed":
-      return "Conclu?do"
+      return "Concluído"
     case "generating":
       return "Gerando"
     case "failed":
@@ -95,6 +96,7 @@ function formatItineraryMode(mode: TripItineraryRecord["mode"]) {
 export default function RoteirosIAPage() {
   const { trips, credits } = useAgency()
   const isRealMode = shouldUseSupabase()
+  const [tripTravelersCountByTrip, setTripTravelersCountByTrip] = useState<Record<string, number | null>>({})
   const [selectedTripId, setSelectedTripId] = useState("")
   const [activeTab, setActiveTab] = useState("generate")
   const [isGenerating, setIsGenerating] = useState(false)
@@ -137,6 +139,27 @@ export default function RoteirosIAPage() {
     setAvailableCredits(credits.balance)
   }, [credits.balance, isRealMode])
 
+  const loadTripTravelersCount = useCallback(async (tripId: string) => {
+    if (!isRealMode || !tripId || tripTravelersCountByTrip[tripId] !== undefined) {
+      return
+    }
+
+    const result = await listTripTravelersByTrip(tripId)
+    setTripTravelersCountByTrip((current) => ({
+      ...current,
+      [tripId]: result.data.length > 0 ? result.data.length : null,
+    }))
+  }, [isRealMode, tripTravelersCountByTrip])
+
+  const getResolvedTravelersCount = useCallback((tripId: string, fallbackCount?: number) => {
+    const persistedCount = tripTravelersCountByTrip[tripId]
+    if (typeof persistedCount === "number" && persistedCount > 0) {
+      return persistedCount
+    }
+
+    return fallbackCount
+  }, [tripTravelersCountByTrip])
+
   const hydrateTripFields = useCallback((tripId: string) => {
     const trip = trips.find((entry) => entry.id === tripId)
     if (!trip) {
@@ -155,11 +178,11 @@ export default function RoteirosIAPage() {
       ...current,
       destination: trip.destination || [trip.city, trip.country].filter(Boolean).join(", "),
       duration: formatTripDuration(trip.startDate, trip.endDate),
-      travelers: formatTravelersLabel(trip.passengersCount),
+      travelers: formatTravelersLabel(getResolvedTravelersCount(trip.id, trip.passengersCount)),
       style: trip.style || "",
       preferences: current.preferences,
     }))
-  }, [trips])
+  }, [getResolvedTravelersCount, trips])
 
   const loadDocumentsForTrip = useCallback(async (tripId: string) => {
     const result = await listDocumentsByTrip(tripId)
@@ -229,6 +252,14 @@ export default function RoteirosIAPage() {
       hydrateTripFields(selectedTripId)
     }
   }, [hydrateTripFields, selectedTripId, trips])
+
+  useEffect(() => {
+    if (!selectedTripId) {
+      return
+    }
+
+    void loadTripTravelersCount(selectedTripId)
+  }, [loadTripTravelersCount, selectedTripId])
 
   useEffect(() => {
     void loadSavedItineraries()
@@ -337,7 +368,7 @@ export default function RoteirosIAPage() {
   }
 
   const handleDeleteSavedItinerary = async (itineraryId: string) => {
-    if (!confirm("Desej? remover este roteiro salvo?")) {
+    if (!confirm("Deseja remover este roteiro salvo?")) {
       return
     }
 
