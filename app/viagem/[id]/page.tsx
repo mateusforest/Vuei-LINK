@@ -6327,10 +6327,12 @@ function OfflineSection({
 }) {
   const [downloading, setDownloading] = useState(false)
   const [downloaded, setDownloaded] = useState(false)
+  const [offlinePreparationPending, setOfflinePreparationPending] = useState(false)
   const { showToast } = useToast()
 
   const handleDownload = async () => {
     setDownloading(true)
+    setOfflinePreparationPending(false)
     try {
       const offlineResult = await saveTripOfflinePackage(
         {
@@ -6350,15 +6352,13 @@ function OfflineSection({
         includeAdminRoute: isAdmin,
       })
 
-      setDownloaded(true)
-      const routePreparationIncomplete =
-        routePreparation.preparedPaths.length === 0 ||
-        !routePreparation.registrationActive ||
-        !routePreparation.controllerReady
+      const routePreparationIncomplete = !routePreparation.navigationReady
+      setDownloaded(!routePreparationIncomplete)
+      setOfflinePreparationPending(routePreparationIncomplete)
 
       showToast(
         routePreparationIncomplete
-          ? "Offline preparado. Feche e abra novamente o link uma vez online para concluir a instalação offline."
+          ? "Os dados da viagem foram salvos, mas o modo offline ainda precisa concluir a preparação do link. Mantenha a internet ativa, feche e abra este link uma vez antes de viajar."
           : offlineResult.message,
         routePreparationIncomplete || offlineResult.persisted.failures.length > 0 ? "info" : "success",
       )
@@ -6386,20 +6386,53 @@ function OfflineSection({
         <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="p-6 rounded-2xl bg-gradient-to-br from-white/[0.03] to-transparent border border-white/[0.06]">
           <div className="flex flex-col sm:flex-row items-center gap-6">
             <div className="flex-1 text-center sm:text-left">
-              <h3 className="text-lg font-medium text-white mb-2">{downloaded ? "Viagem salva offline!" : "Salvar viagem offline"}</h3>
-              <p className="text-sm text-white/40 mb-4">{downloaded ? getOfflineWarningMessage() : "Salve o último resumo, passagens extraídas, hospedagem, documentos já abertos, roteiro e informações rápidas para consultar sem internet."}</p>
+              <h3 className="text-lg font-medium text-white mb-2">
+                {downloaded
+                  ? "Viagem salva offline!"
+                  : offlinePreparationPending
+                    ? "Preparação offline em andamento"
+                    : "Salvar viagem offline"}
+              </h3>
+              <p className="text-sm text-white/40 mb-4">
+                {downloaded
+                  ? getOfflineWarningMessage()
+                  : offlinePreparationPending
+                    ? "Os dados da viagem já foram salvos neste dispositivo, mas o link ainda precisa concluir a preparação offline com internet ativa."
+                    : "Salve o último resumo, passagens extraídas, hospedagem, documentos já abertos, roteiro e informações rápidas para consultar sem internet."}
+              </p>
               
               <div className="flex flex-wrap gap-2 justify-center sm:justify-start">
                 {["Roteiro", "Vouchers", "Documentos", "Contatos"].map((item) => (
-                  <span key={item} className={cn("px-3 py-1 text-xs rounded-full", downloaded ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30" : "bg-white/[0.05] text-white/40")}>
-                    {downloaded && <Check className="w-3 h-3 inline mr-1" />}
+                  <span
+                    key={item}
+                    className={cn(
+                      "px-3 py-1 text-xs rounded-full",
+                      downloaded
+                        ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30"
+                        : offlinePreparationPending
+                          ? "bg-amber-500/10 text-amber-300 border border-amber-500/30"
+                          : "bg-white/[0.05] text-white/40",
+                    )}
+                  >
+                    {downloaded ? <Check className="w-3 h-3 inline mr-1" /> : null}
                     {item}
                   </span>
                 ))}
               </div>
             </div>
 
-            <Button onClick={() => void handleDownload()} disabled={downloading || downloaded} className={cn("px-6 py-6 rounded-xl transition-all duration-300", downloaded ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30" : "bg-gradient-to-r from-[#5de0e6] to-[#004aad] hover:opacity-90 text-white border-0")}>
+            <Button
+              onClick={() => void handleDownload()}
+              disabled={downloading || downloaded}
+              className={cn(
+                "px-6 py-6 rounded-xl transition-all duration-300",
+                downloaded
+                  ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                  : offlinePreparationPending
+                    ? "bg-amber-500/15 text-amber-200 border border-amber-500/30 hover:bg-amber-500/20"
+                    : "bg-gradient-to-r from-[#5de0e6] to-[#004aad] hover:opacity-90 text-white border-0",
+              )}
+            >
               {downloading ? (
                 <div className="flex items-center gap-2">
                   <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
@@ -6409,6 +6442,11 @@ function OfflineSection({
                 <div className="flex items-center gap-2">
                   <Check className="w-5 h-5" />
                   <span>Salvo</span>
+                </div>
+              ) : offlinePreparationPending ? (
+                <div className="flex items-center gap-2">
+                  <Clock className="w-5 h-5" />
+                  <span>Concluir preparo</span>
                 </div>
               ) : (
                 <div className="flex items-center gap-2">

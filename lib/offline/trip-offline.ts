@@ -8,7 +8,7 @@ import type { OfflinePackagePersistenceResult, OfflineTripPackage, OfflineTripPa
 const OFFLINE_STORAGE_KEY = "vuei_offline_trips"
 const OFFLINE_WARNING = getIndexedDbOfflineWarningMessage()
 const OFFLINE_SHELL_CACHE_PREFIX = "vuei-shell"
-const OFFLINE_SHELL_CACHE_VERSION = "20260614b"
+const OFFLINE_SHELL_CACHE_VERSION = "20260624a"
 const OFFLINE_SHELL_CACHE_NAME = `${OFFLINE_SHELL_CACHE_PREFIX}-${OFFLINE_SHELL_CACHE_VERSION}`
 
 function isValidTripRouteHtml(path: string, response: Response, html: string) {
@@ -163,13 +163,16 @@ export async function prepareTripRoutesForOffline(input: {
 }) {
   const preparedPaths: string[] = []
   const skippedPaths: string[] = []
+  const verifiedPaths: string[] = []
 
   if (typeof window === "undefined" || typeof caches === "undefined" || !("serviceWorker" in navigator)) {
     return {
       preparedPaths,
+      verifiedPaths,
       skippedPaths: [input.currentPathname],
       controllerReady: false,
       registrationActive: false,
+      navigationReady: false,
     }
   }
 
@@ -217,17 +220,30 @@ export async function prepareTripRoutesForOffline(input: {
 
       await cache.put(path, response.clone())
       preparedPaths.push(path)
+      const cachedRoute = await cache.match(path)
+      if (cachedRoute) {
+        verifiedPaths.push(path)
+      } else {
+        skippedPaths.push(path)
+      }
     } catch (error) {
       console.error("[OFFLINE] route prepare error", path, error)
       skippedPaths.push(path)
     }
   }
 
+  const navigationReady =
+    verifiedPaths.length > 0 &&
+    registrationActive &&
+    controllerReady
+
   return {
     preparedPaths,
+    verifiedPaths,
     skippedPaths,
     controllerReady,
     registrationActive,
+    navigationReady,
   }
 }
 

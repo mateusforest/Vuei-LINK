@@ -1,5 +1,5 @@
 const SHELL_CACHE_PREFIX = "vuei-shell"
-const SHELL_CACHE_VERSION = "20260618a"
+const SHELL_CACHE_VERSION = "20260624a"
 const CACHE_NAME = `${SHELL_CACHE_PREFIX}-${SHELL_CACHE_VERSION}`
 const SHELL_FALLBACK_URL = "/"
 const NAVIGATION_NETWORK_TIMEOUT_MS = 2500
@@ -75,9 +75,6 @@ self.addEventListener("fetch", (event) => {
   if (request.method !== "GET") return
   if (url.origin !== self.location.origin) return
   if (url.pathname.startsWith("/api/")) return
-  if (url.searchParams.has("adminToken")) return
-  if (url.searchParams.has("token")) return
-  if (url.searchParams.has("publicToken")) return
 
   if (request.mode === "navigate") {
     const isTripRoute =
@@ -123,6 +120,10 @@ self.addEventListener("fetch", (event) => {
     )
     return
   }
+
+  if (url.searchParams.has("adminToken")) return
+  if (url.searchParams.has("token")) return
+  if (url.searchParams.has("publicToken")) return
 
   const isStaticAsset =
     url.pathname.startsWith("/_next/") ||
