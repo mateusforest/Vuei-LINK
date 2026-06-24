@@ -107,7 +107,7 @@ function SettingsToast({ message }: { message: string }) {
 export default function ConfiguracoesPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { signOut, profile: authProfile, refreshProfile } = useAuth()
+  const { signOut, user, profile: authProfile, refreshProfile } = useAuth()
   const { subscription } = useTrips()
   const [profile, setProfile] = useState(defaultProfile)
   const [settings, setSettings] = useState(defaultSettings)
@@ -118,6 +118,7 @@ export default function ConfiguracoesPage() {
   const [isSavingSettings, setIsSavingSettings] = useState(false)
   const [showPhotoModal, setShowPhotoModal] = useState(false)
   const [showProfileModal, setShowProfileModal] = useState(false)
+  const [showPasswordModal, setShowPasswordModal] = useState(false)
   const [showBiometricModal, setShowBiometricModal] = useState(false)
   const [showPinModal, setShowPinModal] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
@@ -129,6 +130,13 @@ export default function ConfiguracoesPage() {
   const [profileForm, setProfileForm] = useState(defaultProfile)
   const [photoPreview, setPhotoPreview] = useState("")
   const [photoFile, setPhotoFile] = useState<File | null>(null)
+  const [passwordForm, setPasswordForm] = useState({
+    currentPassword: "",
+    newPassword: "",
+    confirmPassword: "",
+  })
+  const [passwordError, setPasswordError] = useState("")
+  const [isSavingPassword, setIsSavingPassword] = useState(false)
   const [pinForm, setPinForm] = useState({ pin: "", confirmPin: "" })
   const biometricSupported = isBiometricQuickAccessSupported()
   const [deviceQuickAccess, setDeviceQuickAccess] = useState({ configured: false, pinEnabled: false, biometricEnabled: false })
@@ -363,6 +371,74 @@ export default function ConfiguracoesPage() {
     }
   }
 
+  const handleSavePassword = async () => {
+    const currentPassword = passwordForm.currentPassword.trim()
+    const newPassword = passwordForm.newPassword.trim()
+    const confirmPassword = passwordForm.confirmPassword.trim()
+
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      setPasswordError("Preencha todos os campos para continuar.")
+      return
+    }
+
+    if (newPassword.length < 6) {
+      setPasswordError("A nova senha deve ter pelo menos 6 caracteres.")
+      return
+    }
+
+    if (newPassword !== confirmPassword) {
+      setPasswordError("A confirmação da nova senha precisa ser igual.")
+      return
+    }
+
+    if (currentPassword === newPassword) {
+      setPasswordError("A nova senha precisa ser diferente da senha atual.")
+      return
+    }
+
+    if (!user?.email) {
+      setPasswordError("Não foi possível validar o usuário autenticado.")
+      return
+    }
+
+    const client = createSupabaseBrowserClient()
+    if (!client) {
+      setPasswordError("Cliente Supabase indisponível neste ambiente.")
+      return
+    }
+
+    setIsSavingPassword(true)
+    setPasswordError("")
+
+    try {
+      const { error: signInError } = await client.auth.signInWithPassword({
+        email: user.email,
+        password: currentPassword,
+      })
+
+      if (signInError) {
+        setPasswordError("A senha atual está incorreta.")
+        return
+      }
+
+      const { error: updatePasswordError } = await client.auth.updateUser({
+        password: newPassword,
+      })
+
+      if (updatePasswordError) {
+        setPasswordError(updatePasswordError.message)
+        return
+      }
+
+      setShowPasswordModal(false)
+      setPasswordForm({ currentPassword: "", newPassword: "", confirmPassword: "" })
+      setPasswordError("")
+      showToast("Senha atualizada com sucesso.")
+    } finally {
+      setIsSavingPassword(false)
+    }
+  }
+
   const handleSavePin = async () => {
     if (pinForm.pin.length !== 4 || pinForm.pin !== pinForm.confirmPin) return
 
@@ -588,6 +664,12 @@ export default function ConfiguracoesPage() {
           label: "Editar perfil",
           description: "Nome, email e telefone",
           action: () => setShowProfileModal(true),
+        },
+        {
+          icon: Lock,
+          label: "Senha da conta",
+          description: "Altere a senha usada para acessar sua conta Vuei",
+          action: () => setShowPasswordModal(true),
         },
         {
           icon: Crown,
@@ -927,6 +1009,69 @@ export default function ConfiguracoesPage() {
               </Button>
               <Button className="flex-1 bg-gradient-to-r from-primary to-secondary text-primary-foreground" onClick={handleSaveProfile} disabled={isSavingProfile}>
                 {isSavingProfile ? "Salvando..." : "Salvar perfil"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={showPasswordModal}
+        onOpenChange={(open) => {
+          setShowPasswordModal(open)
+          if (!open) {
+            setPasswordError("")
+            setIsSavingPassword(false)
+            setPasswordForm({ currentPassword: "", newPassword: "", confirmPassword: "" })
+          }
+        }}
+      >
+        <DialogContent className="portal-dialog max-w-md border-border/50">
+          <DialogHeader>
+            <DialogTitle>Alterar senha</DialogTitle>
+            <DialogDescription>
+              A senha é usada para acessar sua conta Vuei. O PIN é usado apenas para proteger ações sensíveis no link da viagem.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label>Senha atual</Label>
+              <Input
+                type="password"
+                value={passwordForm.currentPassword}
+                onChange={(e) => setPasswordForm((prev) => ({ ...prev, currentPassword: e.target.value }))}
+                disabled={isSavingPassword}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Nova senha</Label>
+              <Input
+                type="password"
+                value={passwordForm.newPassword}
+                onChange={(e) => setPasswordForm((prev) => ({ ...prev, newPassword: e.target.value }))}
+                disabled={isSavingPassword}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Confirmar nova senha</Label>
+              <Input
+                type="password"
+                value={passwordForm.confirmPassword}
+                onChange={(e) => setPasswordForm((prev) => ({ ...prev, confirmPassword: e.target.value }))}
+                disabled={isSavingPassword}
+              />
+            </div>
+            {passwordError ? <p className="text-sm text-red-500">{passwordError}</p> : null}
+            <div className="flex gap-3">
+              <Button variant="outline" className="flex-1" onClick={() => setShowPasswordModal(false)} disabled={isSavingPassword}>
+                Cancelar
+              </Button>
+              <Button
+                className="flex-1 bg-gradient-to-r from-primary to-secondary text-primary-foreground"
+                onClick={() => void handleSavePassword()}
+                disabled={isSavingPassword || !passwordForm.currentPassword || !passwordForm.newPassword || passwordForm.newPassword !== passwordForm.confirmPassword}
+              >
+                {isSavingPassword ? "Salvando..." : "Salvar senha"}
               </Button>
             </div>
           </div>
