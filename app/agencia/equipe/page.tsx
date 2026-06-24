@@ -37,12 +37,6 @@ import { Label } from "@/components/ui/label"
 import { useAgency } from "@/contexts/agency-context"
 import { AGENCY_TEAM_LIMIT_ERROR } from "@/lib/billing/agency-plans"
 
-const roles = [
-  { value: "admin", label: "Administrador", desc: "Acesso total ao sistema" },
-  { value: "viewer", label: "Gerente", desc: "Acompanha equipe e clientes" },
-  { value: "agent", label: "Agente", desc: "Atende clientes e cria viagens" },
-]
-
 export default function TeamPage() {
   const { teamMembers, addTeamMember, updateTeamMember, removeTeamMember, workspaceError, teamSeatsUsed, subscription } = useAgency()
   const [searchQuery, setSearchQuery] = useState("")
@@ -91,14 +85,14 @@ export default function TeamPage() {
       name: inviteName,
       email: inviteEmail,
       role: inviteRole as "admin" | "agent" | "viewer",
-      status: "active"
+      status: "active",
     })
 
     if (!result.success) {
       if (result.error === AGENCY_TEAM_LIMIT_ERROR) {
         return
       }
-      window.alert(result.error || "Não foi possível vincular o membro à agência.")
+      window.alert(result.error || "NÃ£o foi possÃ­vel vincular o membro Ã  agÃªncia.")
       return
     }
 
@@ -111,31 +105,30 @@ export default function TeamPage() {
   const handleResendInvite = async (id: string) => {
     const result = await updateTeamMember(id, { status: "active" })
     if (!result.success) {
-      window.alert(result.error || "Não foi possível atualizar o membro.")
+      window.alert(result.error || "NÃ£o foi possÃ­vel atualizar o membro.")
     }
   }
 
   const handleCancelInvite = async (id: string) => {
     const result = await removeTeamMember(id)
     if (!result.success) {
-      window.alert(result.error || "Não foi possível desativar o membro.")
+      window.alert(result.error || "NÃ£o foi possÃ­vel desativar o membro.")
     }
   }
 
   return (
     <div className="space-y-6 pb-20 lg:pb-0">
-      {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Equipe</h1>
-          <p className="mt-1 text-muted-foreground">{teamSeatsUsed} de {subscription.definition.maxUsers} usuários ativos no plano</p>
+          <p className="mt-1 text-muted-foreground">{teamSeatsUsed} de {subscription.definition.maxUsers} usuÃ¡rios ativos no plano</p>
         </div>
         <Button
           onClick={() => setInviteModalOpen(true)}
           className="gap-2 bg-gradient-to-r from-primary to-accent text-white hover:opacity-90"
         >
           <Plus className="h-4 w-4" />
-          Convidar
+          Adicionar membro
         </Button>
       </div>
 
@@ -145,7 +138,6 @@ export default function TeamPage() {
         </Card>
       ) : null}
 
-      {/* Search */}
       <div className="relative max-w-md">
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <input
@@ -157,7 +149,6 @@ export default function TeamPage() {
         />
       </div>
 
-      {/* Team Grid */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {filteredMembers.map((member, index) => {
           const RoleIcon = getRoleIcon(member.role)
@@ -176,7 +167,7 @@ export default function TeamPage() {
                         <Avatar className="h-12 w-12 border-2 border-white/10">
                           <AvatarImage src={member.avatar || "/placeholder.svg"} />
                           <AvatarFallback className="bg-primary/20 text-primary">
-                            {member.name.split(" ").map(n => n[0]).join("").slice(0, 2)}
+                            {member.name.split(" ").map((n) => n[0]).join("").slice(0, 2)}
                           </AvatarFallback>
                         </Avatar>
                         <span
@@ -196,7 +187,7 @@ export default function TeamPage() {
                           <MoreHorizontal className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="border-white/10 bg-card">
+                      <DropdownMenuContent align="end" className="border-white/10 bg-card">
                         <DropdownMenuItem disabled={member.role === "owner"} onClick={() => void updateTeamMember(member.id, { role: "admin" })}>
                           <Edit2 className="mr-2 h-4 w-4" />
                           Tornar admin
@@ -243,18 +234,18 @@ export default function TeamPage() {
 
                   {member.status === "pending" && (
                     <div className="mt-3 flex gap-2">
-                      <Button 
-                        size="sm" 
-                        variant="outline" 
+                      <Button
+                        size="sm"
+                        variant="outline"
                         className="flex-1 gap-1 border-white/10 text-xs"
                         onClick={() => handleResendInvite(member.id)}
                       >
                         <Send className="h-3 w-3" />
                         Reenviar
                       </Button>
-                      <Button 
-                        size="sm" 
-                        variant="outline" 
+                      <Button
+                        size="sm"
+                        variant="outline"
                         className="border-white/10 text-xs text-red-400"
                         onClick={() => handleCancelInvite(member.id)}
                       >
@@ -269,35 +260,18 @@ export default function TeamPage() {
         })}
       </div>
 
-      {/* Roles Info */}
-      <Card className="border-white/5 bg-card/50">
+      <Card className="border-border/60 bg-white/80 shadow-sm backdrop-blur-sm">
         <CardContent className="p-4">
-          <h3 className="mb-4 text-sm font-medium text-muted-foreground">Funcoes e Permissoes</h3>
-          <div className="grid gap-4 sm:grid-cols-3">
-            {roles.map((role) => {
-              const RoleIcon = getRoleIcon(role.value)
-              return (
-                <div
-                  key={role.value}
-                  className="rounded-lg border border-white/5 bg-white/[0.02] p-4"
-                >
-                  <div className="flex items-center gap-2">
-                    <RoleIcon className="h-4 w-4 text-primary" />
-                    <span className="font-medium text-foreground">{role.label}</span>
-                  </div>
-                  <p className="mt-1 text-xs text-muted-foreground">{role.desc}</p>
-                </div>
-              )
-            })}
-          </div>
+          <p className="text-sm text-muted-foreground">
+            Adicione um membro ja cadastrado no Vuei a sua equipe.
+          </p>
         </CardContent>
       </Card>
 
-      {/* Invite Modal */}
       <Dialog open={inviteModalOpen} onOpenChange={setInviteModalOpen}>
-        <DialogContent className="border-white/10 bg-card sm:max-w-md">
+        <DialogContent className="border-border/60 bg-[#fcfcfd] shadow-2xl sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Convidar Membro</DialogTitle>
+            <DialogTitle>Adicionar Membro</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div>
@@ -307,7 +281,7 @@ export default function TeamPage() {
                 value={inviteName}
                 onChange={(e) => setInviteName(e.target.value)}
                 placeholder="Nome completo"
-                className="mt-1.5 border-white/10 bg-white/5"
+                className="mt-1.5 border-border/60 bg-white"
               />
             </div>
             <div>
@@ -317,52 +291,29 @@ export default function TeamPage() {
                 value={inviteEmail}
                 onChange={(e) => setInviteEmail(e.target.value)}
                 placeholder="email@empresa.com"
-                className="mt-1.5 border-white/10 bg-white/5"
+                className="mt-1.5 border-border/60 bg-white"
               />
             </div>
-            <div>
-              <Label className="text-muted-foreground">Funcao</Label>
-              <div className="mt-2 space-y-2">
-                {roles.map((role) => {
-                  const RoleIcon = getRoleIcon(role.value)
-                  return (
-                    <div
-                      key={role.value}
-                      onClick={() => setInviteRole(role.value)}
-                      className={`cursor-pointer rounded-lg border p-3 transition-all ${
-                        inviteRole === role.value
-                          ? "border-primary bg-primary/10"
-                          : "border-white/10 hover:border-white/20"
-                      }`}
-                    >
-                      <div className="flex items-center gap-2">
-                        <RoleIcon className="h-4 w-4 text-primary" />
-                        <span className="font-medium text-foreground">{role.label}</span>
-                      </div>
-                      <p className="mt-0.5 text-xs text-muted-foreground">{role.desc}</p>
-                    </div>
-                  )
-                })}
-              </div>
+            <div className="rounded-2xl border border-border/60 bg-white p-4">
+              <p className="text-sm text-muted-foreground">
+                Informe o e-mail de um usuario ja cadastrado no Vuei.
+              </p>
             </div>
-            <p className="text-xs text-muted-foreground">
-              O convite de novo usuário ainda depende do fluxo de convite. Por enquanto, só é possível vincular e-mails que já existem em perfis.
-            </p>
             <div className="flex gap-3">
               <Button
                 variant="outline"
                 onClick={() => setInviteModalOpen(false)}
-                className="flex-1 border-white/10"
+                className="flex-1 border-border/60 bg-white hover:bg-slate-50"
               >
                 Cancelar
               </Button>
-              <Button 
+              <Button
                 className="flex-1 gap-2 bg-gradient-to-r from-primary to-accent text-white"
                 onClick={handleInvite}
                 disabled={!inviteEmail || !inviteName}
               >
                 <Mail className="h-4 w-4" />
-                Enviar Convite
+                Adicionar Membro
               </Button>
             </div>
           </div>
