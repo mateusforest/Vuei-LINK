@@ -166,9 +166,13 @@ export function SupportFab({
               />
             </div>
 
-            <div className="rounded-3xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs leading-5 text-slate-600">
+            <div className="hidden rounded-3xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs leading-5 text-slate-600">
               Contexto enviado automaticamente: {portalType === "agency" ? "portal da agência" : "portal viajante"}, rota atual,
               usuário autenticado, timestamp e vínculo de agência {agencyId ? "disponível" : "não aplicável"}.
+            </div>
+
+            <div className="rounded-3xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs leading-5 text-slate-600">
+              Algumas informações da tela serão enviadas automaticamente para facilitar o suporte.
             </div>
 
             {showUrgentHint ? (

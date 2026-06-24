@@ -210,7 +210,7 @@ function PortalLayoutInner({ children }: { children: React.ReactNode }) {
       {/* Mobile Header */}
       {isMobile && (
         <header className="fixed left-0 right-0 top-0 z-40 border-b border-border/60 vuei-glass">
-          <div className="flex items-center justify-between px-4 py-3">
+          <div className="flex items-center justify-between px-4 pb-3 pt-[calc(env(safe-area-inset-top)+12px)]">
             <Link href="/portal">
               <Image
                 src="/vuei-logo.png"
@@ -245,7 +245,11 @@ function PortalLayoutInner({ children }: { children: React.ReactNode }) {
       <main
         className={cn(
           "min-h-screen transition-all duration-300",
-          isMobile ? "pt-16 pb-24 px-4" : sidebarCollapsed ? "ml-20 p-8" : "ml-60 p-8"
+          isMobile
+            ? "px-4 pt-[calc(env(safe-area-inset-top)+84px)] pb-[calc(env(safe-area-inset-bottom)+96px)]"
+            : sidebarCollapsed
+              ? "ml-20 p-8"
+              : "ml-60 p-8"
         )}
       >
         {children}
@@ -254,7 +258,7 @@ function PortalLayoutInner({ children }: { children: React.ReactNode }) {
       {/* Mobile Bottom Navigation */}
       {isMobile && (
         <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-border/60 vuei-glass">
-          <div className="flex items-center justify-around py-2 px-2">
+          <div className="flex items-center justify-around px-2 pb-[calc(env(safe-area-inset-bottom)+8px)] pt-2">
             {navItems.slice(0, 4).map((item) => {
               const isActive = pathname === item.href || (item.href !== "/portal" && pathname.startsWith(item.href))
               return (

@@ -549,33 +549,47 @@ export default function DocumentosPage() {
       </Dialog>
 
       <Dialog open={showUploadModal} onOpenChange={setShowUploadModal}>
-        <DialogContent className="portal-dialog border-border/50">
+        <DialogContent className="portal-dialog max-h-[min(90vh,760px)] overflow-y-auto border-border/50 p-0 sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>Adicionar documento</DialogTitle>
-            <DialogDescription>Selecione um arquivo real para esta viagem. Sem preenchimento automatico falso.</DialogDescription>
+            <DialogTitle className="px-6 pt-6 text-slate-950">Adicionar documento</DialogTitle>
+            <DialogDescription className="px-6 text-slate-600">Selecione um arquivo real para esta viagem. Sem preenchimento automatico falso.</DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4 py-4">
+          <div className="space-y-4 px-6 py-5">
             <div className="space-y-2">
-              <Label>Nome do documento</Label>
-              <Input value={uploadForm.name} onChange={(event) => setUploadForm((prev) => ({ ...prev, name: event.target.value }))} placeholder="Ex: Voucher do hotel" />
+              <Label className="text-sm font-medium text-slate-800">Nome do documento</Label>
+              <Input
+                value={uploadForm.name}
+                onChange={(event) => setUploadForm((prev) => ({ ...prev, name: event.target.value }))}
+                placeholder="Ex: Voucher do hotel"
+                className="h-11 rounded-2xl border-slate-200 bg-white text-slate-900 placeholder:text-slate-400"
+              />
             </div>
 
             <div className="space-y-2">
-              <Label>Arquivo</Label>
-              <Input type="file" accept=".pdf,.png,.jpg,.jpeg" onChange={(event) => setSelectedFile(event.target.files?.[0] ?? null)} />
+              <Label className="text-sm font-medium text-slate-800">Arquivo</Label>
+              <Input
+                type="file"
+                accept=".pdf,.png,.jpg,.jpeg"
+                onChange={(event) => setSelectedFile(event.target.files?.[0] ?? null)}
+                className="h-11 rounded-2xl border-slate-200 bg-white text-slate-900 file:mr-3 file:rounded-xl file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:text-sm file:font-medium file:text-slate-700"
+              />
               {selectedFile && <p className="text-xs text-muted-foreground">{selectedFile.name} • {formatFileSize(selectedFile.size)}</p>}
             </div>
 
             <div className="space-y-2">
-              <Label>Tipo</Label>
+              <Label className="text-sm font-medium text-slate-800">Tipo</Label>
               <div className="grid grid-cols-2 gap-2">
                 {documentTypeLabels.map((item) => (
                   <Button
                     key={item.label}
                     type="button"
                     variant={uploadForm.type === item.value ? "default" : "outline"}
-                    className="justify-start rounded-xl"
+                    className={
+                      uploadForm.type === item.value
+                        ? "justify-start rounded-xl bg-gradient-to-r from-primary to-secondary text-primary-foreground shadow-none"
+                        : "justify-start rounded-xl border-slate-200 bg-white text-slate-700 hover:border-primary/30 hover:bg-sky-50 hover:text-slate-900"
+                    }
                     onClick={() => setUploadForm((prev) => ({ ...prev, type: item.value }))}
                   >
                     {item.label}
@@ -584,19 +598,30 @@ export default function DocumentosPage() {
               </div>
             </div>
 
-            <div className="flex items-center justify-between p-3 rounded-xl bg-muted/20 border border-border/50">
+            <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 p-3">
               <div className="flex items-center gap-2">
                 <Lock size={16} className="text-primary" />
-                <span className="text-sm font-medium">Documento privado</span>
+                <span className="text-sm font-medium text-slate-800">Documento privado</span>
               </div>
-              <Button type="button" variant="ghost" size="sm" className="text-xs" onClick={() => setUploadForm((prev) => ({ ...prev, isPrivate: !prev.isPrivate }))}>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="rounded-xl text-xs text-slate-700 hover:bg-white hover:text-slate-900"
+                onClick={() => setUploadForm((prev) => ({ ...prev, isPrivate: !prev.isPrivate }))}
+              >
                 {uploadForm.isPrivate ? "Ativado" : "Compartilhável"}
               </Button>
             </div>
           </div>
 
-          <div className="flex gap-3">
-            <Button variant="outline" className="flex-1 rounded-xl" onClick={resetUploadState} disabled={isSaving}>
+          <div className="flex gap-3 px-6 pb-[calc(env(safe-area-inset-bottom)+24px)] pt-1">
+            <Button
+              variant="outline"
+              className="flex-1 rounded-xl border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900"
+              onClick={resetUploadState}
+              disabled={isSaving}
+            >
               Cancelar
             </Button>
             <Button className="flex-1 rounded-xl bg-gradient-to-r from-primary to-secondary text-primary-foreground" onClick={() => void handleUpload()} disabled={isSaving}>
