@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { usePathname } from "next/navigation"
 import Link from "next/link"
 import Image from "next/image"
@@ -59,6 +59,8 @@ function PortalLayoutInner({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const isMobile = useIsMobile()
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const [mobileHeaderOffset, setMobileHeaderOffset] = useState(132)
+  const mobileHeaderRef = useRef<HTMLElement | null>(null)
   const { credits } = useTrips()
   const { profile } = useAuth()
   const firstName = profile?.name?.trim().split(" ")[0] ?? ""
@@ -70,6 +72,36 @@ function PortalLayoutInner({ children }: { children: React.ReactNode }) {
         .map((part) => part[0]?.toUpperCase() ?? "")
         .join("")
     : "VP"
+
+  useEffect(() => {
+    if (!isMobile) return
+
+    const updateMobileHeaderOffset = () => {
+      const nextHeight = mobileHeaderRef.current?.offsetHeight ?? 132
+      setMobileHeaderOffset(nextHeight)
+    }
+
+    updateMobileHeaderOffset()
+
+    const headerElement = mobileHeaderRef.current
+    const resizeObserver =
+      typeof ResizeObserver !== "undefined" && headerElement
+        ? new ResizeObserver(() => updateMobileHeaderOffset())
+        : null
+
+    if (resizeObserver && headerElement) {
+      resizeObserver.observe(headerElement)
+    }
+
+    window.addEventListener("resize", updateMobileHeaderOffset)
+    window.addEventListener("orientationchange", updateMobileHeaderOffset)
+
+    return () => {
+      resizeObserver?.disconnect()
+      window.removeEventListener("resize", updateMobileHeaderOffset)
+      window.removeEventListener("orientationchange", updateMobileHeaderOffset)
+    }
+  }, [isMobile])
 
   return (
     <div className="portal-shell min-h-screen bg-background text-foreground">
@@ -209,7 +241,7 @@ function PortalLayoutInner({ children }: { children: React.ReactNode }) {
 
       {/* Mobile Header */}
       {isMobile && (
-        <header className="fixed left-0 right-0 top-0 z-40 border-b border-border/60 vuei-glass">
+        <header ref={mobileHeaderRef} className="fixed left-0 right-0 top-0 z-40 border-b border-border/60 vuei-glass">
           <div className="px-4 pb-3 pt-[calc(env(safe-area-inset-top)+12px)]">
             <div className="flex items-center justify-between">
               <Link href="/portal">
@@ -258,11 +290,12 @@ function PortalLayoutInner({ children }: { children: React.ReactNode }) {
         className={cn(
           "min-h-screen transition-all duration-300",
           isMobile
-            ? "px-4 pt-[calc(env(safe-area-inset-top)+132px)] pb-[calc(env(safe-area-inset-bottom)+104px)]"
+            ? "px-4 pb-[calc(env(safe-area-inset-bottom)+104px)]"
             : sidebarCollapsed
               ? "ml-20 p-8"
               : "ml-60 p-8"
         )}
+        style={isMobile ? { paddingTop: `calc(${mobileHeaderOffset}px + 16px)` } : undefined}
       >
         {children}
       </main>
