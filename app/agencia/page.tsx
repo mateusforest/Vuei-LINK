@@ -162,7 +162,7 @@ export default function AgencyDashboard() {
     { label: "Viagens Ativas", value: activeTripsCount.toString(), icon: Plane, trend: `${upcomingTrips.length} proximas`, color: "from-primary to-accent" },
     { label: "Clientes Ativos", value: activeClients.length.toString(), icon: Users, trend: "Todos ativos", color: "from-accent to-primary" },
     { label: "Concierge Ativos", value: pendingRequests.length.toString(), icon: MessageSquare, trend: "Aguardando", color: "from-primary/80 to-accent/80" },
-    { label: "Cr?ditos IA", value: credits.balance.toString(), icon: Sparkles, trend: subscription.definition.name, color: "from-accent/80 to-primary/80" },
+    { label: "Créditos IA", value: credits.balance.toString(), icon: Sparkles, trend: subscription.definition.name, color: "from-accent/80 to-primary/80" },
   ]
 
   const handleNewClient = async (data: Omit<Client, "id" | "createdAt">) => {
