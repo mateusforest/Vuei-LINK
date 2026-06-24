@@ -26,7 +26,10 @@ import { Badge } from "@/components/ui/badge"
 import { useAgency, type AgencyTrip } from "@/contexts/agency-context"
 import { calculateTripDays, isValidTripDate } from "@/lib/trip-date"
 import {
+  getDestinationOptionById,
+  normalizeDestinationText,
   resolveDestinationInput,
+  resolveDestinationOption,
   searchDestinationOptions,
   type DestinationOption,
 } from "@/lib/destinations/catalog"
@@ -48,6 +51,15 @@ const travelStyles = [
   { id: "lua-de-mel", label: "Romantica", desc: "Lua de mel, aniversarios" },
   { id: "familia", label: "Família", desc: "Atividades para todas as idades" },
 ]
+
+function resolveCanonicalDestinationIdForVisibleText(value: string) {
+  const matchedOption = resolveDestinationOption(value, null)
+  if (!matchedOption) return null
+
+  return normalizeDestinationText(matchedOption.label) === normalizeDestinationText(value)
+    ? matchedOption.id
+    : null
+}
 
 function CreateTripPageContent() {
   const router = useRouter()
@@ -109,7 +121,16 @@ function CreateTripPageContent() {
       setSubmitError("")
       createTripRequestRef.current = true
       setIsCreating(true)
-      const resolvedDestination = resolveDestinationInput(formData.destination, selectedDestinationId)
+      const visibleDestination = formData.destination.trim()
+      const selectedOption = getDestinationOptionById(selectedDestinationId)
+      const selectedMatchesVisibleDestination = Boolean(
+        selectedOption &&
+        normalizeDestinationText(selectedOption.label) === normalizeDestinationText(visibleDestination)
+      )
+      const resolvedDestination = resolveDestinationInput(
+        visibleDestination,
+        selectedMatchesVisibleDestination ? selectedDestinationId : null
+      )
       try {
         const newTrip = await addTrip({
           clientId: formData.clientId || `temp-${Date.now()}`,
@@ -215,6 +236,12 @@ function CreateTripPageContent() {
   const handleDestinationSelect = (option: DestinationOption) => {
     setFormData((current) => ({ ...current, destination: option.label }))
     setSelectedDestinationId(option.id)
+    setDestinationMenuOpen(false)
+  }
+
+  const handleDestinationBadgeSelect = (value: string) => {
+    setFormData((current) => ({ ...current, destination: value }))
+    setSelectedDestinationId(resolveCanonicalDestinationIdForVisibleText(value))
     setDestinationMenuOpen(false)
   }
 
@@ -542,7 +569,7 @@ function CreateTripPageContent() {
                       className={`cursor-pointer border-white/10 hover:border-primary/50 hover:bg-primary/10 ${
                         formData.destination === dest ? "border-primary bg-primary/10 text-primary" : ""
                       }`}
-                      onClick={() => setFormData({ ...formData, destination: dest })}
+                      onClick={() => handleDestinationBadgeSelect(dest)}
                     >
                       {dest}
                     </Badge>
