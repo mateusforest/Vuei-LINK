@@ -26,6 +26,18 @@ const fadeInUp = {
   transition: { duration: 0.45 },
 }
 
+function formatPlanCount(value: number, singular: string, plural: string) {
+  return `${value} ${value === 1 ? singular : plural}`
+}
+
+function getPlanClientsLabel(maxClients: number | null) {
+  if (maxClients === null) {
+    return "Clientes ilimitados"
+  }
+
+  return formatPlanCount(maxClients, "cliente", "clientes")
+}
+
 export default function AgencyPlansPage() {
   const { subscription, activeTripsCount, teamSeatsUsed } = useAgency()
   const searchParams = useSearchParams()
@@ -182,6 +194,14 @@ export default function AgencyPlansPage() {
                   ? ["5 usuários", "100 viagens ativas", "600 créditos/mês"]
                   : ["15 usuários", "220 viagens ativas", "1.500 créditos/mês", "Atendimento prioritário"]
 
+          const planHighlights = [
+            formatPlanCount(plan.maxUsers, "usuário", "usuários"),
+            getPlanClientsLabel(plan.maxClients),
+            formatPlanCount(plan.maxActiveTrips, "viagem ativa", "viagens ativas"),
+            `${plan.monthlyCredits.toLocaleString("pt-BR")} créditos/mês`,
+            ...(plan.code === "business" ? ["Atendimento prioritário"] : []),
+          ]
+
           return (
             <Card
               key={plan.code}
@@ -213,23 +233,27 @@ export default function AgencyPlansPage() {
                 ) : null}
               </div>
 
-              <div className="mt-4 grid grid-cols-3 gap-2.5 text-center">
+              <div className="mt-4 grid grid-cols-2 gap-2.5 text-center">
                 <div className="flex min-h-[5.5rem] min-w-0 flex-col items-center justify-center rounded-2xl border border-border/60 bg-[#fbfbfc] px-2 py-3">
                   <p className="text-base font-semibold leading-none">{plan.maxUsers}</p>
                   <p className="mt-1 text-[11px] leading-snug text-muted-foreground">usuários</p>
+                </div>
+                <div className="flex min-h-[5.5rem] min-w-0 flex-col items-center justify-center rounded-2xl border border-border/60 bg-[#fbfbfc] px-2 py-3">
+                  <p className="text-base font-semibold leading-none">{plan.maxClients === null ? "Ilimitados" : plan.maxClients}</p>
+                  <p className="mt-1 text-[11px] leading-snug text-muted-foreground">clientes</p>
                 </div>
                 <div className="flex min-h-[5.5rem] min-w-0 flex-col items-center justify-center rounded-2xl border border-border/60 bg-[#fbfbfc] px-2 py-3">
                   <p className="text-base font-semibold leading-none">{plan.maxActiveTrips}</p>
                   <p className="mt-1 text-[11px] leading-snug text-muted-foreground">viagens ativas</p>
                 </div>
                 <div className="flex min-h-[5.5rem] min-w-0 flex-col items-center justify-center rounded-2xl border border-border/60 bg-[#fbfbfc] px-2 py-3">
-                  <p className="text-base font-semibold leading-none">{plan.monthlyCredits}</p>
+                  <p className="text-base font-semibold leading-none">{plan.monthlyCredits.toLocaleString("pt-BR")}</p>
                   <p className="mt-1 whitespace-nowrap text-[11px] leading-snug text-muted-foreground">créditos/mês</p>
                 </div>
               </div>
 
-              <div className="mt-5 min-h-[7rem] space-y-2.5">
-                {highlights.map((feature) => (
+              <div className="mt-5 min-h-[8.5rem] space-y-2.5"> 
+                {planHighlights.map((feature) => (
                   <div key={feature} className="flex items-start gap-3 text-sm">
                     <Check size={16} className="mt-0.5 shrink-0 text-emerald-500" />
                     <span>{feature}</span>
