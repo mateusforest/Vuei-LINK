@@ -74,10 +74,10 @@ export function Header() {
           className="hidden md:block"
         >
           <Link
-            href="/signup"
+            href="/criar-viagem"
             className="group relative inline-flex items-center overflow-hidden rounded-full bg-gradient-to-r from-[#32b8ff] to-[#0b56d8] px-6 py-2.5 text-sm font-medium text-white shadow-[0_12px_30px_rgba(11,86,216,0.22)]"
           >
-            <span className="relative z-10">Criar minha viagem</span>
+            <span className="relative z-10">Criar viagem</span>
             <div className="absolute inset-0 bg-gradient-to-r from-[#0b56d8] to-[#32b8ff] opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
           </Link>
         </motion.div>
@@ -114,11 +114,11 @@ export function Header() {
                 </Link>
               ))}
               <Link
-                href="/signup"
+                href="/criar-viagem"
                 onClick={() => setIsMobileMenuOpen(false)}
                 className="block w-full rounded-full bg-gradient-to-r from-[#32b8ff] to-[#0b56d8] px-6 py-3 text-center text-sm font-medium text-white"
               >
-                Criar minha viagem
+                Criar viagem
               </Link>
             </div>
           </motion.div>

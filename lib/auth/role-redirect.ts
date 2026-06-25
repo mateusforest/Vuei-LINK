@@ -6,7 +6,7 @@ export function getRedirectByRole(role?: UserRole | null) {
   switch (role) {
     case "agency_owner":
     case "agency_member":
-      return "/agency"
+      return "/agencia"
     case "master":
       return "/master"
     case "traveler":

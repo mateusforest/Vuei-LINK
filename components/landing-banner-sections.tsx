@@ -80,8 +80,8 @@ export function LandingBannerSections() {
           eager
           sizes="(max-width: 767px) calc(100vw - 32px), (max-width: 1280px) calc(100vw - 48px), 1880px"
           className="scroll-mt-32"
-          ctaHref="/signup"
-          ctaLabel="Criar minha viagem"
+          ctaHref="/criar-viagem"
+          ctaLabel="Criar viagem"
           ctaClassName="left-[6.8%] top-[44.6%] h-[7.4%] w-[39.2%] rounded-[1.05rem] md:left-[8.9%] md:top-[64.1%] md:h-[10.2%] md:w-[18.4%] md:min-w-[10rem] md:rounded-[1.1rem]"
         />
 
@@ -124,7 +124,7 @@ export function LandingBannerSections() {
           width={1983}
           height={793}
           sizes="(max-width: 767px) calc(100vw - 32px), (max-width: 1280px) calc(100vw - 48px), 1880px"
-          ctaHref="/signup"
+          ctaHref="/criar-viagem"
           ctaLabel="Criar viagem"
           ctaClassName="left-[26.5%] top-[40.6%] h-[6.8%] w-[49.7%] rounded-[1rem] md:left-[40.5%] md:top-[46.2%] md:h-[24.4%] md:w-[19.3%] md:min-w-[10rem] md:rounded-[1.2rem]"
         />

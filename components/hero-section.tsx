@@ -37,7 +37,7 @@ export function HeroSection() {
 
             <div className="flex flex-col gap-3 pt-2 sm:flex-row sm:items-center sm:gap-4 sm:pt-4">
               <a
-                href="/signup"
+                href="/criar-viagem"
                 className="inline-flex items-center justify-center gap-2 rounded-[1.15rem] bg-gradient-to-r from-[#37beff] to-[#0b56d8] px-7 py-4 text-base font-medium text-white shadow-[0_18px_40px_rgba(11,86,216,0.18)] transition-transform duration-300 hover:-translate-y-0.5"
               >
                 Criar viagem
