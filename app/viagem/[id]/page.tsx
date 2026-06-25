@@ -2520,22 +2520,21 @@ function FlightCard({
   onOpenDocument: () => void
   onDelete: () => void
 }) {
-  const { isAdmin, canWrite } = useContext(PermissionContext)
+  const { canWrite } = useContext(PermissionContext)
   const statusCopy = getFlightStatusCopy(flight)
-  const metaHighlights = [
-    { label: "Data", value: flight.date },
-    { label: "Voo", value: flight.flightNumber },
-    { label: "Duração", value: flight.duration },
-    { label: "Terminal", value: flight.terminal },
-    { label: "Portão", value: flight.gate },
-    { label: "Assento", value: flight.seat },
-  ].filter((item) => Boolean(item.value))
-  const extraMetaItems = Array.isArray(flight.metaItems)
-    ? flight.metaItems.filter((item: { label: string; value: string }) =>
-        item?.value &&
-        !["Data", "Voo", "Duração", "Terminal", "Portão", "Assento"].includes(item.label)
-      )
-    : []
+  const dataSourceLabel =
+    flight.extractionStatus === "completed"
+      ? "Dados extraídos por IA"
+      : flight.extractionStatus === "manual"
+        ? "Dados manuais"
+        : statusCopy.eyebrow
+  const compactMeta = [
+    { label: "Terminal", value: flight.terminal || "--" },
+    { label: "Portão", value: flight.gate || "--" },
+    { label: "Assento", value: flight.seat || "--" },
+  ]
+  const routeSchedule = [flight.origin.time, flight.destination.time].filter(Boolean).join(" - ")
+  const showStatusNote = !["completed", "manual"].includes(flight.extractionStatus ?? "")
 
   return (
     <motion.div
@@ -2550,123 +2549,103 @@ function FlightCard({
       >
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-px bg-gradient-to-r from-transparent via-[#5de0e6]/30 to-transparent" />
 
-        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div className="flex items-start gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#5de0e6]/20 to-[#004aad]/20 flex items-center justify-center">
-              <Plane className="w-5 h-5 text-[#5de0e6]" />
+        <div className="mb-5 flex items-start justify-between gap-3">
+          <div className="flex min-w-0 items-start gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#5de0e6]/20 to-[#004aad]/20">
+              <Plane className="h-5 w-5 text-[#5de0e6]" />
             </div>
             <div className="min-w-0">
-              <p className="text-sm text-white/50">{statusCopy.eyebrow}</p>
-              <p className="font-medium text-white">{flight.airline}</p>
-              <p className="mt-1 text-xs text-white/40">{flight.date}</p>
+              <p className="truncate text-lg font-semibold text-white">{flight.airline}</p>
+              <div className="mt-1 flex flex-wrap items-center gap-2">
+                <span className="rounded-full border border-[#5de0e6]/18 bg-[#5de0e6]/10 px-2.5 py-1 text-[11px] font-medium text-[#7cecf0]">
+                  {dataSourceLabel}
+                </span>
+                {showStatusNote ? (
+                  <span
+                    className={cn(
+                      "text-[11px]",
+                      statusCopy.tone === "pending" && "text-amber-200",
+                      statusCopy.tone === "error" && "text-red-200"
+                    )}
+                  >
+                    {statusCopy.detail}
+                  </span>
+                ) : null}
+              </div>
             </div>
           </div>
-          <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+          <div className="shrink-0 text-right">
+            <p className="text-xs font-medium text-white/55">{flight.date || "Data não informada"}</p>
             {flight.flightNumber ? (
-              <span className="rounded-full border border-[#5de0e6]/20 bg-[#5de0e6]/10 px-3 py-1 text-xs font-medium text-[#5de0e6]">
+              <span className="mt-1 block text-xl font-semibold leading-none text-[#5de0e6]">
                 {flight.flightNumber}
               </span>
             ) : null}
-            <span
-              className={cn(
-                "rounded-full px-3 py-1 text-[11px] font-medium",
-                statusCopy.tone === "success" && "bg-emerald-500/15 text-emerald-300",
-                statusCopy.tone === "pending" && "bg-amber-500/15 text-amber-200",
-                statusCopy.tone === "error" && "bg-red-500/15 text-red-200"
-              )}
-            >
-              {statusCopy.label}
-            </span>
           </div>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] md:items-center">
-          <div className="min-w-0 rounded-2xl border border-white/[0.06] bg-white/[0.03] p-4 text-left md:text-center">
-            {flight.origin.time ? <p className="text-2xl font-bold text-white">{flight.origin.time}</p> : null}
-            <p className="text-lg font-semibold text-[#5de0e6]">{flight.origin.code}</p>
-            <p className="truncate text-xs text-white/40">{flight.origin.city}</p>
+        <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 rounded-[28px] border border-white/[0.06] bg-white/[0.03] p-4 sm:gap-4">
+          <div className="min-w-0 text-left md:text-center">
+            {flight.origin.time ? <p className="text-[2rem] font-semibold leading-none text-white">{flight.origin.time}</p> : null}
+            <p className="mt-2 text-2xl font-semibold leading-none text-[#2a7fff]">{flight.origin.code}</p>
+            <p className="mt-2 text-sm leading-snug text-white/55">{flight.origin.city}</p>
           </div>
 
-          <div className="flex flex-col items-center justify-center px-2">
-            {flight.duration ? <p className="mb-2 text-[10px] text-white/30">{flight.duration}</p> : null}
-            <div className="flex w-full min-w-[140px] items-center gap-1">
-              <div className="h-px flex-1 bg-gradient-to-r from-transparent via-[#5de0e6]/50 to-[#5de0e6]" />
-              <Plane className="w-4 h-4 text-[#5de0e6] rotate-90" />
-              <div className="h-px flex-1 bg-gradient-to-r from-[#5de0e6] via-[#5de0e6]/50 to-transparent" />
+          <div className="flex min-w-[136px] flex-col items-center justify-center gap-2 px-1 text-center">
+            {flight.duration ? <p className="text-sm font-medium text-white/65">{flight.duration}</p> : null}
+            <div className="flex w-full items-center gap-2">
+              <div className="h-px flex-1 bg-gradient-to-r from-transparent via-[#5de0e6]/70 to-[#5de0e6]" />
+              <Plane className="h-4 w-4 rotate-90 text-[#5de0e6]" />
+              <div className="h-px flex-1 bg-gradient-to-r from-[#5de0e6] via-[#5de0e6]/70 to-transparent" />
             </div>
-            {flight.scheduleLabel ? <p className="mt-2 text-[10px] text-white/30 text-center">{flight.scheduleLabel}</p> : null}
+            {(routeSchedule || flight.scheduleLabel) ? (
+              <p className="text-xs text-white/45">{routeSchedule || flight.scheduleLabel}</p>
+            ) : null}
           </div>
 
-          <div className="min-w-0 rounded-2xl border border-white/[0.06] bg-white/[0.03] p-4 text-left md:text-center">
-            {flight.destination.time ? <p className="text-2xl font-bold text-white">{flight.destination.time}</p> : null}
-            <p className="text-lg font-semibold text-[#5de0e6]">{flight.destination.code}</p>
-            <p className="truncate text-xs text-white/40">{flight.destination.city}</p>
-          </div>
-        </div>
-
-        <div className="mt-4 grid gap-3 border-t border-white/[0.06] pt-4 sm:grid-cols-2 xl:grid-cols-4">
-          {metaHighlights.map((item) => (
-            <div key={item.label} className="rounded-xl border border-white/[0.06] bg-white/[0.025] px-3 py-2.5">
-              <p className="text-[10px] uppercase tracking-wider text-white/40">{item.label}</p>
-              <p className="mt-1 text-sm font-medium text-white">{item.value}</p>
-            </div>
-          ))}
-          {extraMetaItems.slice(0, 2).map((item: { label: string; value: string }) => (
-            <div key={item.label} className="rounded-xl border border-white/[0.06] bg-white/[0.025] px-3 py-2.5">
-              <p className="text-[10px] uppercase tracking-wider text-white/40">{item.label}</p>
-              <p className="mt-1 text-sm font-medium text-white">{item.value}</p>
-            </div>
-          ))}
-        </div>
-
-        <div className="mt-4 rounded-xl border border-white/[0.06] bg-white/[0.02] px-3 py-2.5">
-          <div className="flex items-start gap-2">
-            <div
-              className={cn(
-                "mt-1 h-2 w-2 shrink-0 rounded-full",
-                statusCopy.tone === "success" && "bg-emerald-500",
-                statusCopy.tone === "pending" && "bg-amber-400",
-                statusCopy.tone === "error" && "bg-red-400",
-              )}
-            />
-            <span
-              className={cn(
-                "text-xs leading-relaxed",
-                statusCopy.tone === "success" && "text-emerald-300",
-                statusCopy.tone === "pending" && "text-amber-200",
-                statusCopy.tone === "error" && "text-red-200",
-              )}
-            >
-              {statusCopy.detail}
-            </span>
+          <div className="min-w-0 text-right md:text-center">
+            {flight.destination.time ? <p className="text-[2rem] font-semibold leading-none text-white">{flight.destination.time}</p> : null}
+            <p className="mt-2 text-2xl font-semibold leading-none text-[#2a7fff]">{flight.destination.code}</p>
+            <p className="mt-2 text-sm leading-snug text-white/55">{flight.destination.city}</p>
           </div>
         </div>
 
-        <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-white/[0.06] pt-4">
-          <Button size="sm" variant="ghost" onClick={onOpenDetails} className="h-9 text-white/70 hover:bg-white/10">
+        <div className="mt-4 overflow-hidden rounded-2xl border border-white/[0.08] bg-white/[0.025]">
+          <div className="grid grid-cols-3 divide-x divide-white/[0.08]">
+            {compactMeta.map((item) => (
+              <div key={item.label} className="px-3 py-3 text-center">
+                <p className="text-xs text-white/45">{item.label}</p>
+                <p className="mt-1 text-lg font-semibold text-white">{item.value}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-white/[0.06] pt-4">
+          <Button size="sm" variant="ghost" onClick={onOpenDetails} className="h-9 px-0 text-white/72 hover:bg-transparent hover:text-white">
             <Eye className="mr-2 h-4 w-4" />
             Detalhes
           </Button>
           {flight.document ? (
-            <Button size="sm" variant="ghost" onClick={onOpenDocument} className="h-9 text-white/70 hover:bg-white/10">
+            <Button size="sm" variant="ghost" onClick={onOpenDocument} className="h-9 px-0 text-[#4b84ff] hover:bg-transparent hover:text-[#78a4ff]">
               <ExternalLink className="mr-2 h-4 w-4" />
               Abrir passagem
             </Button>
           ) : null}
           {canWrite ? (
-            <Button size="sm" variant="ghost" onClick={onEdit} className="h-9 text-white/70 hover:bg-white/10">
+            <Button size="sm" variant="ghost" onClick={onEdit} className="h-9 px-0 text-white/72 hover:bg-transparent hover:text-white">
               <Edit3 className="mr-2 h-4 w-4" />
               Editar
             </Button>
           ) : null}
           {canWrite ? (
-            <Button size="sm" variant="ghost" onClick={() => void onDelete()} className="h-9 text-red-300 hover:bg-red-500/10">
+            <Button size="sm" variant="ghost" onClick={() => void onDelete()} className="h-9 px-0 text-red-300 hover:bg-transparent hover:text-red-200">
               <Trash2 className="mr-2 h-4 w-4" />
               Excluir
             </Button>
           ) : null}
           {flight.qrCodePayload ? (
-            <Button size="sm" variant="ghost" onClick={onViewQR} className="h-9 text-[#5de0e6] hover:bg-[#5de0e6]/10">
+            <Button size="sm" variant="ghost" onClick={onViewQR} className="h-9 px-0 text-[#5de0e6] hover:bg-transparent hover:text-[#82eef2]">
               <QrCode className="mr-2 h-4 w-4" />
               QR Code
             </Button>
