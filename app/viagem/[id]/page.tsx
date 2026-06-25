@@ -2520,9 +2520,22 @@ function FlightCard({
   onOpenDocument: () => void
   onDelete: () => void
 }) {
-  const [expanded, setExpanded] = useState(false)
   const { isAdmin, canWrite } = useContext(PermissionContext)
   const statusCopy = getFlightStatusCopy(flight)
+  const metaHighlights = [
+    { label: "Data", value: flight.date },
+    { label: "Voo", value: flight.flightNumber },
+    { label: "Duração", value: flight.duration },
+    { label: "Terminal", value: flight.terminal },
+    { label: "Portão", value: flight.gate },
+    { label: "Assento", value: flight.seat },
+  ].filter((item) => Boolean(item.value))
+  const extraMetaItems = Array.isArray(flight.metaItems)
+    ? flight.metaItems.filter((item: { label: string; value: string }) =>
+        item?.value &&
+        !["Data", "Voo", "Duração", "Terminal", "Portão", "Assento"].includes(item.label)
+      )
+    : []
 
   return (
     <motion.div
@@ -2532,130 +2545,132 @@ function FlightCard({
       transition={{ delay: index * 0.1 }}
       className="group"
     >
-      <div 
-        onClick={() => setExpanded(!expanded)}
-        className="relative p-5 rounded-2xl bg-white/[0.02] backdrop-blur-xl border border-white/[0.06] hover:border-[#5de0e6]/20 transition-all duration-300 cursor-pointer overflow-hidden"
+      <div
+        className="relative overflow-hidden rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4 backdrop-blur-xl transition-all duration-300 hover:border-[#5de0e6]/20 sm:p-5"
       >
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-px bg-gradient-to-r from-transparent via-[#5de0e6]/30 to-transparent" />
-        
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-3">
+
+        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="flex items-start gap-3">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#5de0e6]/20 to-[#004aad]/20 flex items-center justify-center">
               <Plane className="w-5 h-5 text-[#5de0e6]" />
             </div>
-            <div>
+            <div className="min-w-0">
               <p className="text-sm text-white/50">{statusCopy.eyebrow}</p>
-              <p className="text-white font-medium">{flight.airline}</p>
+              <p className="font-medium text-white">{flight.airline}</p>
+              <p className="mt-1 text-xs text-white/40">{flight.date}</p>
             </div>
           </div>
-          <div className="text-right">
-            <p className="text-xs text-white/40">{flight.date}</p>
-            <p className="text-sm text-[#5de0e6] font-medium">{flight.flightNumber}</p>
+          <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+            {flight.flightNumber ? (
+              <span className="rounded-full border border-[#5de0e6]/20 bg-[#5de0e6]/10 px-3 py-1 text-xs font-medium text-[#5de0e6]">
+                {flight.flightNumber}
+              </span>
+            ) : null}
+            <span
+              className={cn(
+                "rounded-full px-3 py-1 text-[11px] font-medium",
+                statusCopy.tone === "success" && "bg-emerald-500/15 text-emerald-300",
+                statusCopy.tone === "pending" && "bg-amber-500/15 text-amber-200",
+                statusCopy.tone === "error" && "bg-red-500/15 text-red-200"
+              )}
+            >
+              {statusCopy.label}
+            </span>
           </div>
         </div>
 
-        <div className="flex items-center gap-4">
-          <div className="flex-1 text-center">
+        <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] md:items-center">
+          <div className="min-w-0 rounded-2xl border border-white/[0.06] bg-white/[0.03] p-4 text-left md:text-center">
             {flight.origin.time ? <p className="text-2xl font-bold text-white">{flight.origin.time}</p> : null}
             <p className="text-lg font-semibold text-[#5de0e6]">{flight.origin.code}</p>
-            <p className="text-xs text-white/40">{flight.origin.city}</p>
+            <p className="truncate text-xs text-white/40">{flight.origin.city}</p>
           </div>
-          
-          <div className="flex-1 flex flex-col items-center">
-            {flight.duration ? <p className="text-[10px] text-white/30 mb-2">{flight.duration}</p> : null}
-            <div className="w-full flex items-center gap-1">
+
+          <div className="flex flex-col items-center justify-center px-2">
+            {flight.duration ? <p className="mb-2 text-[10px] text-white/30">{flight.duration}</p> : null}
+            <div className="flex w-full min-w-[140px] items-center gap-1">
               <div className="h-px flex-1 bg-gradient-to-r from-transparent via-[#5de0e6]/50 to-[#5de0e6]" />
               <Plane className="w-4 h-4 text-[#5de0e6] rotate-90" />
               <div className="h-px flex-1 bg-gradient-to-r from-[#5de0e6] via-[#5de0e6]/50 to-transparent" />
             </div>
-            {flight.scheduleLabel ? <p className="text-[10px] text-white/30 mt-2">{flight.scheduleLabel}</p> : null}
+            {flight.scheduleLabel ? <p className="mt-2 text-[10px] text-white/30 text-center">{flight.scheduleLabel}</p> : null}
           </div>
-          
-          <div className="flex-1 text-center">
+
+          <div className="min-w-0 rounded-2xl border border-white/[0.06] bg-white/[0.03] p-4 text-left md:text-center">
             {flight.destination.time ? <p className="text-2xl font-bold text-white">{flight.destination.time}</p> : null}
             <p className="text-lg font-semibold text-[#5de0e6]">{flight.destination.code}</p>
-            <p className="text-xs text-white/40">{flight.destination.city}</p>
+            <p className="truncate text-xs text-white/40">{flight.destination.city}</p>
           </div>
         </div>
 
-        <AnimatePresence>
-          {expanded && (
-            <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: "auto", opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              transition={{ duration: 0.3 }}
-              className="overflow-hidden"
-            >
-              {flight.metaItems?.length ? (
-                <div className="mt-4 pt-4 border-t border-white/[0.06] grid grid-cols-1 gap-4 sm:grid-cols-3">
-                  {flight.metaItems.map((item: { label: string; value: string }) => (
-                    <div key={item.label}>
-                      <p className="text-[10px] text-white/40 uppercase tracking-wider">{item.label}</p>
-                      <p className="text-sm text-white font-medium">{item.value}</p>
-                    </div>
-                  ))}
-                </div>
-              ) : null}
-              
-              <div className="mt-4 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div
-                    className={cn(
-                      "w-2 h-2 rounded-full",
-                      statusCopy.tone === "success" && "bg-emerald-500",
-                      statusCopy.tone === "pending" && "bg-amber-400",
-                      statusCopy.tone === "error" && "bg-red-400",
-                    )}
-                  />
-                  <span
-                    className={cn(
-                      "text-xs",
-                      statusCopy.tone === "success" && "text-emerald-400",
-                      statusCopy.tone === "pending" && "text-amber-300",
-                      statusCopy.tone === "error" && "text-red-300",
-                    )}
-                  >
-                    {statusCopy.detail}
-                  </span>
-                </div>
-                <div className="flex gap-2">
-                  <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); onOpenDetails() }} className="text-white/60 hover:bg-white/10">
-                    <Eye className="w-4 h-4 mr-2" />
-                    Detalhes
-                  </Button>
-                  {flight.document && (
-                    <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); onOpenDocument() }} className="text-white/60 hover:bg-white/10">
-                      <ExternalLink className="w-4 h-4 mr-2" />
-                      Original
-                    </Button>
-                  )}
-                  {canWrite && (
-                    <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); onEdit() }} className="text-white/60 hover:bg-white/10">
-                      <Edit3 className="w-4 h-4 mr-2" />
-                      Editar
-                    </Button>
-                  )}
-                  {canWrite && (
-                    <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); void onDelete() }} className="text-red-300 hover:bg-red-500/10">
-                      <Trash2 className="w-4 h-4 mr-2" />
-                      Excluir
-                    </Button>
-                  )}
-                  {flight.qrCodePayload ? (
-                    <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); onViewQR() }} className="text-[#5de0e6] hover:bg-[#5de0e6]/10">
-                      <QrCode className="w-4 h-4 mr-2" />
-                      Ver QR Code
-                    </Button>
-                  ) : null}
-                </div>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+        <div className="mt-4 grid gap-3 border-t border-white/[0.06] pt-4 sm:grid-cols-2 xl:grid-cols-4">
+          {metaHighlights.map((item) => (
+            <div key={item.label} className="rounded-xl border border-white/[0.06] bg-white/[0.025] px-3 py-2.5">
+              <p className="text-[10px] uppercase tracking-wider text-white/40">{item.label}</p>
+              <p className="mt-1 text-sm font-medium text-white">{item.value}</p>
+            </div>
+          ))}
+          {extraMetaItems.slice(0, 2).map((item: { label: string; value: string }) => (
+            <div key={item.label} className="rounded-xl border border-white/[0.06] bg-white/[0.025] px-3 py-2.5">
+              <p className="text-[10px] uppercase tracking-wider text-white/40">{item.label}</p>
+              <p className="mt-1 text-sm font-medium text-white">{item.value}</p>
+            </div>
+          ))}
+        </div>
 
-        <div className="flex justify-center mt-3">
-          <ChevronDown className={cn("w-4 h-4 text-white/30 transition-transform duration-300", expanded && "rotate-180")} />
+        <div className="mt-4 rounded-xl border border-white/[0.06] bg-white/[0.02] px-3 py-2.5">
+          <div className="flex items-start gap-2">
+            <div
+              className={cn(
+                "mt-1 h-2 w-2 shrink-0 rounded-full",
+                statusCopy.tone === "success" && "bg-emerald-500",
+                statusCopy.tone === "pending" && "bg-amber-400",
+                statusCopy.tone === "error" && "bg-red-400",
+              )}
+            />
+            <span
+              className={cn(
+                "text-xs leading-relaxed",
+                statusCopy.tone === "success" && "text-emerald-300",
+                statusCopy.tone === "pending" && "text-amber-200",
+                statusCopy.tone === "error" && "text-red-200",
+              )}
+            >
+              {statusCopy.detail}
+            </span>
+          </div>
+        </div>
+
+        <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-white/[0.06] pt-4">
+          <Button size="sm" variant="ghost" onClick={onOpenDetails} className="h-9 text-white/70 hover:bg-white/10">
+            <Eye className="mr-2 h-4 w-4" />
+            Detalhes
+          </Button>
+          {flight.document ? (
+            <Button size="sm" variant="ghost" onClick={onOpenDocument} className="h-9 text-white/70 hover:bg-white/10">
+              <ExternalLink className="mr-2 h-4 w-4" />
+              Abrir passagem
+            </Button>
+          ) : null}
+          {canWrite ? (
+            <Button size="sm" variant="ghost" onClick={onEdit} className="h-9 text-white/70 hover:bg-white/10">
+              <Edit3 className="mr-2 h-4 w-4" />
+              Editar
+            </Button>
+          ) : null}
+          {canWrite ? (
+            <Button size="sm" variant="ghost" onClick={() => void onDelete()} className="h-9 text-red-300 hover:bg-red-500/10">
+              <Trash2 className="mr-2 h-4 w-4" />
+              Excluir
+            </Button>
+          ) : null}
+          {flight.qrCodePayload ? (
+            <Button size="sm" variant="ghost" onClick={onViewQR} className="h-9 text-[#5de0e6] hover:bg-[#5de0e6]/10">
+              <QrCode className="mr-2 h-4 w-4" />
+              QR Code
+            </Button>
+          ) : null}
         </div>
       </div>
     </motion.div>
@@ -2890,7 +2905,7 @@ function FlightDetailsModal({
         {flight.document && (
           <Button variant="outline" className="w-full border-white/10 text-white/80" onClick={() => void onOpenDocument(flight.document)}>
             <ExternalLink className="mr-2 h-4 w-4" />
-            Ver passagem original
+            Abrir passagem
           </Button>
         )}
       </div>
@@ -3037,7 +3052,7 @@ function FlightsSection({
               <div className="mt-4 flex flex-wrap gap-2">
                 <Button size="sm" variant="outline" className="border-white/10 text-white/70" onClick={() => void handleOpenTicketDocument(document)}>
                   <ExternalLink className="mr-2 h-4 w-4" />
-                  Ver passagem original
+                  Abrir passagem
                 </Button>
                 {canWrite ? (
                   <Button size="sm" variant="ghost" className="text-red-300 hover:bg-red-500/10" onClick={() => void onDeleteDocument(document.id)}>
