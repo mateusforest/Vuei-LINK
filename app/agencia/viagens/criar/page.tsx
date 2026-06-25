@@ -110,12 +110,27 @@ function CreateTripPageContent() {
     [formData.destination]
   )
 
+  const selectedClient = useMemo(
+    () => clients.find((client) => client.id === formData.clientId) ?? null,
+    [clients, formData.clientId]
+  )
+
   const handleNext = async () => {
     if (isCreating || createTripRequestRef.current) {
       return
     }
 
+    if (currentStep === 1 && !selectedClient) {
+      setSubmitError(
+        clients.length === 0
+          ? "Cadastre um cliente antes de criar uma viagem."
+          : "Selecione um cliente cadastrado para continuar."
+      )
+      return
+    }
+
     if (currentStep < steps.length) {
+      setSubmitError("")
       setCurrentStep(currentStep + 1)
     } else {
       setSubmitError("")
@@ -133,8 +148,8 @@ function CreateTripPageContent() {
       )
       try {
         const newTrip = await addTrip({
-          clientId: formData.clientId || `temp-${Date.now()}`,
-          clientName: formData.clientName,
+          clientId: selectedClient!.id,
+          clientName: selectedClient!.name,
           name: `Viagem para ${resolvedDestination.label}`,
           destination: resolvedDestination.label,
           country: resolvedDestination.country ?? "",
@@ -177,7 +192,7 @@ function CreateTripPageContent() {
 
   const canProceed = () => {
     switch (currentStep) {
-      case 1: return formData.clientName.length > 0
+      case 1: return Boolean(selectedClient)
       case 2: return formData.destination.length > 0
       case 3:
         return Boolean(
@@ -463,56 +478,67 @@ function CreateTripPageContent() {
                 exit={{ opacity: 0, x: -20 }}
                 className="space-y-4"
               >
-                <h2 className="text-lg font-semibold text-foreground">Dados do Cliente</h2>
-                
-                {clients.length > 0 && !formData.clientId && (
-                  <div>
-                    <Label className="text-muted-foreground">Selecionar cliente existente</Label>
-                    <select
-                      value={formData.clientId}
-                      onChange={(e) => {
-                        const client = clients.find(c => c.id === e.target.value)
-                        if (client) {
-                          setFormData({
-                            ...formData,
-                            clientId: client.id,
-                            clientName: client.name,
-                            clientEmail: client.email
-                          })
-                        }
-                      }}
-                      className="mt-1.5 w-full appearance-none rounded-xl border border-border/70 bg-white px-4 py-2.5 text-foreground focus:border-primary/50 focus:outline-none"
-                      style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='rgba(255,255,255,0.4)'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center', backgroundSize: '16px' }}
-                    >
-                      <option value="">Novo cliente</option>
-                      {clients.map(c => (
-                        <option key={c.id} value={c.id}>{c.name}</option>
-                      ))}
-                    </select>
+                <div className="space-y-1">
+                  <h2 className="text-lg font-semibold text-foreground">Cliente da viagem</h2>
+                  <p className="text-sm text-muted-foreground">
+                    Selecione um cliente já cadastrado para vincular esta viagem.
+                  </p>
+                </div>
+
+                {clients.length === 0 ? (
+                  <div className="rounded-2xl border border-border/60 bg-[#fbfbfc] p-5">
+                    <p className="font-medium text-foreground">Nenhum cliente cadastrado ainda.</p>
+                    <p className="mt-2 text-sm text-muted-foreground">
+                      Cadastre um cliente antes de criar uma viagem.
+                    </p>
+                    <Link href="/agencia/clientes" className="mt-4 inline-flex">
+                      <Button type="button" className="bg-gradient-to-r from-primary to-accent text-white">
+                        Cadastrar cliente
+                      </Button>
+                    </Link>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div>
+                      <Label className="text-muted-foreground">Buscar ou selecionar cliente</Label>
+                      <select
+                        value={formData.clientId}
+                        onChange={(e) => {
+                          const client = clients.find((item) => item.id === e.target.value)
+                          setSubmitError("")
+                          setFormData((current) => ({
+                            ...current,
+                            clientId: client?.id ?? "",
+                            clientName: client?.name ?? "",
+                            clientEmail: client?.email ?? "",
+                          }))
+                        }}
+                        className="mt-1.5 w-full appearance-none rounded-xl border border-border/70 bg-white px-4 py-2.5 text-foreground focus:border-primary/50 focus:outline-none"
+                        style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='rgba(255,255,255,0.4)'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center', backgroundSize: '16px' }}
+                      >
+                        <option value="">Buscar ou selecionar cliente</option>
+                        {clients.map((client) => (
+                          <option key={client.id} value={client.id}>
+                            {client.name}{client.email ? ` • ${client.email}` : ""}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {selectedClient ? (
+                      <div className="rounded-2xl border border-primary/15 bg-primary/5 p-4">
+                        <p className="font-medium text-foreground">{selectedClient.name}</p>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          {selectedClient.email || "Email não informado"}
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="rounded-2xl border border-dashed border-border/70 bg-white px-4 py-3 text-sm text-muted-foreground">
+                        Selecione um cliente cadastrado para continuar.
+                      </div>
+                    )}
                   </div>
                 )}
-
-                <div className="space-y-4">
-                  <div>
-                    <Label className="text-muted-foreground">Nome completo</Label>
-                    <Input
-                      value={formData.clientName}
-                      onChange={(e) => setFormData({ ...formData, clientName: e.target.value })}
-                      placeholder="Ex: Maria Silva"
-                      className="mt-1.5 border-border/70 bg-white"
-                    />
-                  </div>
-                  <div>
-                    <Label className="text-muted-foreground">Email</Label>
-                    <Input
-                      type="email"
-                      value={formData.clientEmail}
-                      onChange={(e) => setFormData({ ...formData, clientEmail: e.target.value })}
-                      placeholder="Ex: maria@email.com"
-                      className="mt-1.5 border-border/70 bg-white"
-                    />
-                  </div>
-                </div>
               </motion.div>
             )}
 
@@ -730,7 +756,7 @@ function CreateTripPageContent() {
             </Button>
             <Button
               onClick={handleNext}
-              disabled={!canProceed() || isCreating}
+              disabled={((currentStep === 1 && clients.length === 0) || (currentStep !== 1 && !canProceed()) || isCreating)}
               className="gap-2 bg-gradient-to-r from-primary to-accent text-white hover:opacity-90 disabled:opacity-50"
             >
               {currentStep === steps.length ? (isCreating ? "Criando sua viagem..." : "Criar viagem") : "Próximo"}
