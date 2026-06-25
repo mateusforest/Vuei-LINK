@@ -25,6 +25,7 @@ import {
   Lock,
   X,
   Check,
+  Building2,
 } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -530,7 +531,13 @@ export default function TripsPage() {
                             <DropdownMenuItem asChild>
                               <Link href="/agencia/documentos">
                                 <FileText className="mr-2 h-4 w-4" />
-                                Upload docs
+                                Documentos
+                              </Link>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem asChild>
+                              <Link href="/agencia/hospedagens">
+                                <Building2 className="mr-2 h-4 w-4" />
+                                Hospedagens
                               </Link>
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => copyLink(trip.shareLink)}>
