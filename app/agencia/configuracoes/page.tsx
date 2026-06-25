@@ -39,13 +39,13 @@ import { useRouter } from "next/navigation"
 import { updateAgency as updateAgencyRepository } from "@/lib/repositories/agencies-repository"
 import { shouldUseSupabase } from "@/lib/data-source"
 import { createSupabaseBrowserClient } from "@/lib/supabase/client"
-import { AGENCY_PLAN_DEFINITIONS, mapCommercialPlanToLegacyAgencyPlan } from "@/lib/billing/agency-plans"
+import { AGENCY_PLAN_DEFINITIONS } from "@/lib/billing/agency-plans"
 import { createAgencyCustomerPortal, getAgencyBillingStatusFromApi } from "@/lib/repositories/agency-billing-repository"
 import type { AgencyBillingApiStatus, AgencyCommercialPlanCode } from "@/types"
 
 const settingsSections = [
   { id: "agency", label: "Dados da Agência", icon: Building2 },
-  { id: "branding", label: "Branding", icon: Palette },
+  { id: "branding", label: "Logo Link", icon: Palette },
   { id: "security", label: "Segurança", icon: Shield },
   { id: "notifications", label: "Notificações", icon: Bell },
   { id: "plan", label: "Assinatura", icon: CreditCard },
@@ -243,7 +243,6 @@ export default function SettingsPage() {
       const updateResult = await updateAgencyRepository(agency.id, {
         name: agencyData.name,
         logo: nextLogo || null,
-        plan: mapCommercialPlanToLegacyAgencyPlan(subscription.code),
         settings: {
           ...(agency.settings ?? {
             email: null,
@@ -568,8 +567,8 @@ export default function SettingsPage() {
                       </Button>
                     </div>
                     <div className="flex-1">
-                      <p className="font-medium text-foreground">Branding da Agência</p>
-                      <p className="text-xs text-muted-foreground">Este logo aparece nos links da viagem. O avatar do usuário continua separado no perfil.</p>
+                      <p className="font-medium text-foreground">Foto de Perfil</p>
+                      <p className="text-xs text-muted-foreground">Esta foto identifica a agência dentro do portal. O logo exibido nos links da viagem é configurado na seção Logo Link.</p>
                     </div>
                     <Button variant="outline" className="border-border/70 bg-white" onClick={() => setShowPhotoModal(true)}>
                       Gerenciar logo
@@ -627,7 +626,7 @@ export default function SettingsPage() {
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
               <Card className="border-border/60 bg-white/88">
                 <CardHeader>
-                  <CardTitle className="text-base">Branding do Link</CardTitle>
+                  <CardTitle className="text-base">Logo do Link</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <p className="text-sm text-muted-foreground">
