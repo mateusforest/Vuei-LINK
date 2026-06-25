@@ -43,6 +43,10 @@ type TripHotelRow = Database["public"]["Tables"]["trip_hotels"]["Row"]
 type TripHotelInsert = Database["public"]["Tables"]["trip_hotels"]["Insert"]
 type TripHotelUpdate = Database["public"]["Tables"]["trip_hotels"]["Update"]
 
+function hasOwnField<T extends object, K extends PropertyKey>(value: T, key: K): value is T & Record<K, unknown> {
+  return Object.prototype.hasOwnProperty.call(value, key)
+}
+
 function mapRow(row: TripHotelRow): TripHotelRecord {
   return {
     id: row.id,
@@ -127,17 +131,39 @@ export async function updateTripHotel(id: string, payload: TripHotelUpdatePayloa
     return { source: "local" as const, data: null, error: clientError }
   }
 
+  const updatePayload: TripHotelUpdate = {}
+
+  if (typeof payload.name === "string") {
+    updatePayload.name = payload.name
+  }
+
+  if (hasOwnField(payload, "address")) {
+    updatePayload.address = payload.address ?? null
+  }
+
+  if (hasOwnField(payload, "checkIn")) {
+    updatePayload.check_in = payload.checkIn ?? null
+  }
+
+  if (hasOwnField(payload, "checkOut")) {
+    updatePayload.check_out = payload.checkOut ?? null
+  }
+
+  if (hasOwnField(payload, "confirmationCode")) {
+    updatePayload.confirmation_code = payload.confirmationCode ?? null
+  }
+
+  if (hasOwnField(payload, "notes")) {
+    updatePayload.notes = payload.notes ?? null
+  }
+
+  if (hasOwnField(payload, "documentId")) {
+    updatePayload.document_id = payload.documentId ?? null
+  }
+
   const { data, error } = await client
     .from("trip_hotels")
-    .update({
-      name: payload.name,
-      address: payload.address ?? null,
-      check_in: payload.checkIn ?? null,
-      check_out: payload.checkOut ?? null,
-      confirmation_code: payload.confirmationCode ?? null,
-      notes: payload.notes ?? null,
-      document_id: payload.documentId ?? undefined,
-    } satisfies TripHotelUpdate)
+    .update(updatePayload)
     .eq("id", id)
     .select("*")
     .single()
