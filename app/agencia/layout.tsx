@@ -26,13 +26,22 @@ import {
   Plus,
   Menu,
   X,
-  Sparkles,
   LifeBuoy,
+  User,
+  CreditCard,
+  LogOut,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { AgencyProvider, useAgency } from "@/contexts/agency-context"
 import { RouteGuard } from "@/components/auth/route-guard"
@@ -40,20 +49,17 @@ import { useAuth } from "@/contexts/auth-context"
 import { SupportFab } from "@/components/support/support-fab"
 
 const navItems = [
-  { href: "/agencia", icon: LayoutDashboard, label: "Dashboard" },
+  { href: "/agencia", icon: LayoutDashboard, label: "Início" },
   { href: "/agencia/clientes", icon: Users, label: "Clientes" },
   { href: "/agencia/viagens", icon: Plane, label: "Viagens" },
-  { href: "/agencia/links", icon: Link2, label: "Links" },
-  { href: "/agencia/concierge", icon: MessageSquare, label: "Concierge" },
-  { href: "/agencia/documentos", icon: FileText, label: "Documentos" },
-  { href: "/agencia/hospedagens", icon: Building2, label: "Hospedagens" },
-  { href: "/agencia/roteiros-ia", icon: Map, label: "Roteiros IA" },
-  { href: "/agencia/equipe", icon: UserCog, label: "Equipe" },
   { href: "/agencia/suporte", icon: LifeBuoy, label: "Suporte" },
   { href: "/agencia/creditos", icon: Coins, label: "Créditos" },
-  { href: "/agencia/analytics", icon: BarChart3, label: "Analytics" },
   { href: "/agencia/configuracoes", icon: Settings, label: "Configurações" },
 ]
+
+const primaryNavItems = navItems.filter((item) =>
+  ["/agencia", "/agencia/clientes", "/agencia/viagens", "/agencia/suporte"].includes(item.href)
+)
 
 export default function AgencyLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -71,7 +77,7 @@ function AgencyLayoutInner({ children }: { children: React.ReactNode }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [notificationsOpen, setNotificationsOpen] = useState(false)
-  const { profile } = useAuth()
+  const { profile, signOut } = useAuth()
   const { credits, conciergeRequests, agency, workspaceLoading, subscription, limitDialog, clearLimitDialog, canCreateMoreTrips, showPlanLimitDialog } = useAgency()
   const [agencyNotifications, setAgencyNotifications] = useState<Array<{
     id: string
@@ -101,6 +107,20 @@ function AgencyLayoutInner({ children }: { children: React.ReactNode }) {
   const clearAgencyNotifications = () => {
     setAgencyNotifications([])
   }
+
+  const handleSignOut = async () => {
+    void signOut()
+    router.replace("/login")
+  }
+
+  const accountMenuItems = [
+    { label: "Minha conta", href: "/agencia/configuracoes", icon: User },
+    { label: "Minha agência", href: "/agencia/configuracoes", icon: Building2 },
+    { label: "Equipe", href: "/agencia/equipe", icon: UserCog },
+    { label: "Créditos IA", href: "/agencia/creditos", icon: Coins },
+    { label: "Assinatura", href: "/agencia/planos", icon: CreditCard },
+    { label: "Configurações", href: "/agencia/configuracoes", icon: Settings },
+  ]
 
   const handleOpenCreateTrip = () => {
     if (!canCreateMoreTrips) {
@@ -251,7 +271,7 @@ function AgencyLayoutInner({ children }: { children: React.ReactNode }) {
 
           {/* Navigation */}
           <nav className="flex-1 space-y-1 overflow-y-auto p-3">
-            {navItems.map((item) => {
+            {primaryNavItems.map((item) => {
               const isActive = pathname === item.href || (item.href !== "/agencia" && pathname.startsWith(item.href))
               return (
                 <Link key={item.href} href={item.href}>
@@ -306,7 +326,7 @@ function AgencyLayoutInner({ children }: { children: React.ReactNode }) {
 
           {/* Credits Card */}
           <AnimatePresence>
-            {!sidebarCollapsed && (
+            {false && (
               <motion.div
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: "auto" }}
@@ -361,10 +381,29 @@ function AgencyLayoutInner({ children }: { children: React.ReactNode }) {
               </Button>
               {notificationsOpen ? renderNotificationsMenu() : null}
             </div>
-            <Avatar className="h-8 w-8 border border-border/60">
-              <AvatarImage src={headerImageUrl} />
-              <AvatarFallback className="bg-primary/20 text-xs text-primary">{initials}</AvatarFallback>
-            </Avatar>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full">
+                  <Avatar className="h-8 w-8 border border-border/60">
+                    <AvatarImage src={headerImageUrl} />
+                    <AvatarFallback className="bg-primary/20 text-xs text-primary">{initials}</AvatarFallback>
+                  </Avatar>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56 agency-dropdown">
+                {accountMenuItems.map((item) => (
+                  <DropdownMenuItem key={item.label} className="gap-2" onClick={() => router.push(item.href)}>
+                    <item.icon className="h-4 w-4" />
+                    {item.label}
+                  </DropdownMenuItem>
+                ))}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem className="gap-2 text-red-500 focus:text-red-500" onClick={() => void handleSignOut()}>
+                  <LogOut className="h-4 w-4" />
+                  Sair
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
       </header>
@@ -402,7 +441,7 @@ function AgencyLayoutInner({ children }: { children: React.ReactNode }) {
                 </Button>
               </div>
               <nav className="space-y-1 p-3">
-                {navItems.map((item) => {
+                {primaryNavItems.map((item) => {
                   const isActive = pathname === item.href || (item.href !== "/agencia" && pathname.startsWith(item.href))
                   return (
                     <Link key={item.href} href={item.href} onClick={() => setMobileMenuOpen(false)}>
@@ -465,10 +504,29 @@ function AgencyLayoutInner({ children }: { children: React.ReactNode }) {
                 <div className="text-sm font-medium text-foreground">{displayName}</div>
                 <div className="text-xs text-muted-foreground">{displayPlan}</div>
               </div>
-              <Avatar className="h-10 w-10 border-2 border-primary/20">
-                <AvatarImage src={headerImageUrl} />
-                <AvatarFallback className="bg-primary/20 text-primary">{initials}</AvatarFallback>
-              </Avatar>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" className="h-11 rounded-full px-2 hover:bg-primary/5">
+                    <Avatar className="h-10 w-10 border-2 border-primary/20">
+                      <AvatarImage src={headerImageUrl} />
+                      <AvatarFallback className="bg-primary/20 text-primary">{initials}</AvatarFallback>
+                    </Avatar>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56 agency-dropdown">
+                  {accountMenuItems.map((item) => (
+                    <DropdownMenuItem key={item.label} className="gap-2" onClick={() => router.push(item.href)}>
+                      <item.icon className="h-4 w-4" />
+                      {item.label}
+                    </DropdownMenuItem>
+                  ))}
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem className="gap-2 text-red-500 focus:text-red-500" onClick={() => void handleSignOut()}>
+                    <LogOut className="h-4 w-4" />
+                    Sair
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </div>
         </div>
@@ -503,7 +561,7 @@ function AgencyLayoutInner({ children }: { children: React.ReactNode }) {
       {/* Mobile Bottom Navigation */}
       <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-border/60 bg-white/92 backdrop-blur-xl lg:hidden">
         <div className="flex items-center justify-around py-2">
-          {[navItems[0], navItems[1], navItems[2], navItems[4], navItems[11]].map((item) => {
+          {primaryNavItems.map((item) => {
             const isActive = pathname === item.href || (item.href !== "/agencia" && pathname.startsWith(item.href))
             return (
               <Link key={item.href} href={item.href}>
