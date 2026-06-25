@@ -28,14 +28,9 @@ type TripLinkSnapshot = {
   endDate: string | null
   status: TripRow["status"]
   ownerType: TripRow["owner_type"]
-  ownerUserId: string | null
-  agencyId: string | null
-  clientId: string | null
   visibility: TripRow["visibility"]
   travelersCount: number
   coverImage: string | null
-  adminLink: string | null
-  publicLink: string | null
 }
 
 function getMissingAdminConfigResponse() {
@@ -73,14 +68,9 @@ function mapTripSnapshot(trip: TripRow): TripLinkSnapshot {
     endDate: trip.end_date,
     status: trip.status,
     ownerType: trip.owner_type,
-    ownerUserId: trip.owner_user_id,
-    agencyId: trip.agency_id,
-    clientId: trip.client_id,
     visibility: trip.visibility,
     travelersCount: trip.travelers_count,
     coverImage: trip.cover_image,
-    adminLink: trip.admin_link,
-    publicLink: trip.public_link,
   }
 }
 
@@ -96,13 +86,23 @@ async function findTripForPin(
 ) {
   let query = supabase.from("trips").select("*")
 
-  if (params.tripId) {
+  if (params.accessMode === "admin") {
+    if (!params.adminToken) {
+      return { trip: null as TripRow | null, error: "Acesso administrativo invalido para esta viagem." }
+    }
+
+    if (params.tripId) {
+      query = query.eq("id", params.tripId)
+    } else if (params.tripSlug) {
+      query = query.eq("slug", params.tripSlug)
+    } else {
+      query = query.eq("admin_token", params.adminToken)
+    }
+  } else if (params.tripId) {
     query = query.eq("id", params.tripId)
   } else if (params.tripSlug) {
     query = query.eq("slug", params.tripSlug)
-  } else if (params.accessMode === "admin" && params.adminToken) {
-    query = query.eq("admin_token", params.adminToken)
-  } else if (params.accessMode === "public" && params.publicToken) {
+  } else if (params.publicToken) {
     query = query.eq("public_token", params.publicToken)
   } else {
     return { trip: null as TripRow | null, error: "Link da viagem invalido." }
@@ -127,6 +127,10 @@ async function findTripForPin(
   }
 
   if (params.accessMode === "admin") {
+    if (trip.admin_token !== params.adminToken) {
+      return { trip: null as TripRow | null, error: "Acesso administrativo invalido para esta viagem." }
+    }
+
     return { trip, error: null as string | null }
   }
 
