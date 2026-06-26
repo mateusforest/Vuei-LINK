@@ -104,6 +104,16 @@ type TripPinStatusPayload = {
   }
 }
 
+const TRIP_PIN_STATUS_TIMEOUT_MS = 4000
+
+function getTripPinOfflineMessage(accessMode: TripPinApiAccessMode) {
+  if (accessMode === "admin") {
+    return "Voce esta offline. A viagem pode ser consultada, mas o modo de edicao precisa de internet para validar o PIN."
+  }
+
+  return "Voce esta offline. A viagem pode ser consultada, mas as areas protegidas precisam de internet para validar o PIN."
+}
+
 function buildTripPinQuery(params: {
   tripId?: string | null
   tripSlug: string
@@ -136,13 +146,45 @@ async function loadTripPinStatus(params: {
   publicToken?: string | null
   accessMode: TripPinApiAccessMode
 }) {
-  const response = await fetch(`/api/trip-pin?${buildTripPinQuery(params)}`)
-  const data = (await response.json().catch(() => null)) as (TripPinStatusPayload & { error?: string }) | null
+  if (typeof navigator !== "undefined" && navigator.onLine === false) {
+    return {
+      ok: false,
+      data: null,
+      error: getTripPinOfflineMessage(params.accessMode),
+      isOffline: true,
+    }
+  }
 
-  return {
-    ok: response.ok,
-    data,
-    error: response.ok ? null : data?.error ?? "Não foi possível consultar o PIN desta viagem.",
+  const controller = typeof AbortController !== "undefined" ? new AbortController() : null
+  const timeoutId =
+    typeof window !== "undefined" && controller
+      ? window.setTimeout(() => controller.abort(), TRIP_PIN_STATUS_TIMEOUT_MS)
+      : null
+
+  try {
+    const response = await fetch(`/api/trip-pin?${buildTripPinQuery(params)}`, controller ? { signal: controller.signal } : undefined)
+    const data = (await response.json().catch(() => null)) as (TripPinStatusPayload & { error?: string }) | null
+
+    return {
+      ok: response.ok,
+      data,
+      error: response.ok ? null : data?.error ?? "Nao foi possivel consultar o PIN desta viagem.",
+      isOffline: false,
+    }
+  } catch (error) {
+    const offline = typeof navigator !== "undefined" && navigator.onLine === false
+    const aborted = error instanceof DOMException && error.name === "AbortError"
+
+    return {
+      ok: false,
+      data: null,
+      error: offline || aborted ? getTripPinOfflineMessage(params.accessMode) : error instanceof Error ? error.message : "Nao foi possivel consultar o PIN desta viagem.",
+      isOffline: offline || aborted,
+    }
+  } finally {
+    if (timeoutId !== null) {
+      window.clearTimeout(timeoutId)
+    }
   }
 }
 
@@ -4917,6 +4959,7 @@ function PortalPinUnlockModal({
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isLoadingStatus, setIsLoadingStatus] = useState(false)
   const [pinStatus, setPinStatus] = useState<TripPinStatusPayload | null>(null)
+  const [statusUnavailableReason, setStatusUnavailableReason] = useState<"offline" | null>(null)
 
   useEffect(() => {
     if (!open) {
@@ -4925,6 +4968,7 @@ function PortalPinUnlockModal({
       setIsSubmitting(false)
       setIsLoadingStatus(false)
       setPinStatus(null)
+      setStatusUnavailableReason(null)
     }
   }, [open])
 
@@ -4935,26 +4979,30 @@ function PortalPinUnlockModal({
     setIsLoadingStatus(true)
     setError("")
     setPinStatus(null)
+    setStatusUnavailableReason(null)
 
-    void loadTripPinStatus({
-      tripId,
-      tripSlug,
-      adminToken,
-      publicToken,
-      accessMode,
-    }).then((result) => {
+    void (async () => {
+      const result = await loadTripPinStatus({
+        tripId,
+        tripSlug,
+        adminToken,
+        publicToken,
+        accessMode,
+      })
+
       if (!active) return
       setIsLoadingStatus(false)
 
       if (!result.ok || !result.data) {
         setPinStatus(null)
-        setError(result.error ?? "Não foi possível consultar o PIN desta viagem.")
+        setStatusUnavailableReason(result.isOffline ? "offline" : null)
+        setError(result.error ?? "Nao foi possivel consultar o PIN desta viagem.")
         return
       }
 
+      setStatusUnavailableReason(null)
       setPinStatus(result.data)
-    })
-
+    })()
     return () => {
       active = false
     }
@@ -5004,11 +5052,14 @@ function PortalPinUnlockModal({
   }
 
   const isLoadingView = isLoadingStatus
+  const isOfflineUnavailable = !isLoadingView && statusUnavailableReason === "offline"
   const hasErrorView = !isLoadingView && Boolean(error)
   const hasConfiguredPin = !isLoadingView && pinStatus?.pinConfigured === true
-  const hasMissingPin = !isLoadingView && !hasErrorView && pinStatus?.pinConfigured === false
+  const hasMissingPin = !isLoadingView && !hasErrorView && !isOfflineUnavailable && pinStatus?.pinConfigured === false
   const helperText = isLoadingView
     ? "Estamos verificando a configuracao do PIN desta viagem."
+    : isOfflineUnavailable
+      ? getTripPinOfflineMessage(accessMode)
     : hasConfiguredPin
       ? configuredDescription
       : getTripPinSetupMessage(pinStatus)
@@ -5072,9 +5123,19 @@ function PortalPinUnlockModal({
               {error}
             </div>
           ) : null}
+
+          {isOfflineUnavailable ? (
+            <Button
+              variant="outline"
+              onClick={onClose}
+              className={cn("w-full", isLight ? "border-slate-200 bg-white text-slate-700 hover:bg-slate-50" : "border-white/[0.08] bg-transparent text-white/80 hover:bg-white/[0.06]")}
+            >
+              Entendi
+            </Button>
+          ) : null}
         </div>
 
-        {onLogin ? (
+        {onLogin && !isOfflineUnavailable ? (
           <Button
             variant="outline"
             onClick={onLogin}
