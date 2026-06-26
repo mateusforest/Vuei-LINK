@@ -312,12 +312,14 @@ function Modal({
   children,
   title,
   tone,
+  showCloseButton = true,
 }: {
   open: boolean
   onClose: () => void
   children: React.ReactNode
   title?: string
   tone?: "dark" | "light"
+  showCloseButton?: boolean
 }) {
   const resolvedTone = resolveTripShellTone(tone)
 
@@ -355,14 +357,17 @@ function Modal({
             {title && (
               <div
                 className={cn(
-                  "sticky top-0 z-10 flex items-center justify-between p-5 backdrop-blur-xl",
+                  "sticky top-0 z-10 flex items-center p-5 backdrop-blur-xl",
+                  showCloseButton ? "justify-between" : "justify-center",
                   resolvedTone === "light" ? "border-b border-slate-200 bg-[rgba(255,255,255,0.92)]" : "border-b border-white/[0.06] bg-[#0a0a0a]/95",
                 )}
               >
                 <h3 className={cn("text-lg font-semibold", resolvedTone === "light" ? "text-slate-950" : "text-white")}>{title}</h3>
-                <button onClick={onClose} className={cn("rounded-xl p-2 transition-colors", resolvedTone === "light" ? "hover:bg-slate-100" : "hover:bg-white/10")}>
-                  <X className={cn("w-5 h-5", resolvedTone === "light" ? "text-slate-500" : "text-white/60")} />
-                </button>
+                {showCloseButton ? (
+                  <button onClick={onClose} className={cn("rounded-xl p-2 transition-colors", resolvedTone === "light" ? "hover:bg-slate-100" : "hover:bg-white/10")}>
+                    <X className={cn("w-5 h-5", resolvedTone === "light" ? "text-slate-500" : "text-white/60")} />
+                  </button>
+                ) : null}
               </div>
             )}
             <div className={cn("p-5 pb-[calc(env(safe-area-inset-bottom)+20px)]", resolvedTone === "light" ? "trip-link-light-shell" : "")}>{children}</div>
@@ -5066,7 +5071,7 @@ function PortalPinUnlockModal({
       : getTripPinSetupMessage(pinStatus)
 
   return (
-    <Modal tone={tone} open={open} onClose={onClose} title={title}>
+    <Modal tone={tone} open={open} onClose={onClose} title={title} showCloseButton={false}>
       <div className="w-full">
         <div className={cn("mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl", isLight ? "bg-[linear-gradient(180deg,#eff6ff,#dbeafe)]" : "bg-gradient-to-br from-[#5de0e6]/20 to-[#004aad]/20")}>
           <Lock className={cn("h-8 w-8", isLight ? "text-[#2563eb]" : "text-[#5de0e6]")} />
