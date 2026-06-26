@@ -4995,7 +4995,7 @@ function PortalPinUnlockModal({
 
       if (!result.ok || !result.data) {
         setPinStatus(null)
-        setStatusUnavailableReason(result.isOffline ? "offline" : null)
+        setStatusUnavailableReason(result.isOffline && accessMode === "admin" ? "offline" : null)
         setError(result.error ?? "Nao foi possivel consultar o PIN desta viagem.")
         return
       }
@@ -5052,7 +5052,7 @@ function PortalPinUnlockModal({
   }
 
   const isLoadingView = isLoadingStatus
-  const isOfflineUnavailable = !isLoadingView && statusUnavailableReason === "offline"
+  const isOfflineUnavailable = accessMode === "admin" && !isLoadingView && statusUnavailableReason === "offline"
   const hasErrorView = !isLoadingView && Boolean(error)
   const hasConfiguredPin = !isLoadingView && pinStatus?.pinConfigured === true
   const hasMissingPin = !isLoadingView && !hasErrorView && !isOfflineUnavailable && pinStatus?.pinConfigured === false
@@ -7251,6 +7251,7 @@ export default function TripPage() {
   const [travelersLoading, setTravelersLoading] = useState(false)
   const [sensitiveAccessGranted, setSensitiveAccessGranted] = useState(false)
   const [securityModalOpen, setSecurityModalOpen] = useState(false)
+  const [adminUnlockDismissed, setAdminUnlockDismissed] = useState(false)
   const [adminLinkMutationMode, setAdminLinkMutationMode] = useState(false)
   const [premiumGateModalOpen, setPremiumGateModalOpen] = useState(false)
   const [offlineModeEnabled, setOfflineModeEnabled] = useState(false)
@@ -7276,6 +7277,12 @@ export default function TripPage() {
   }
 
   const handleCloseSensitiveAccessModal = () => {
+    setSecurityModalOpen(false)
+    pendingSensitiveActionRef.current = null
+  }
+
+  const handleDismissAdminUnlockModal = () => {
+    setAdminUnlockDismissed(true)
     setSecurityModalOpen(false)
     pendingSensitiveActionRef.current = null
   }
@@ -7317,6 +7324,7 @@ export default function TripPage() {
 
   useEffect(() => {
     setSensitiveAccessGranted(false)
+    setAdminUnlockDismissed(false)
     pendingSensitiveActionRef.current = null
     setTripTravelersSource("fallback")
     setTravelersLoading(false)
@@ -9033,12 +9041,12 @@ export default function TripPage() {
     )
   }
 
-  if (adminRouteActive && !sensitiveAccessGranted) {
+  if (adminRouteActive && !sensitiveAccessGranted && !adminUnlockDismissed) {
     return (
       <main className="min-h-screen bg-[#f4f1ea] text-slate-900 flex items-center justify-center px-4">
         <PortalPinUnlockModal
           open
-          onClose={handleCloseSensitiveAccessModal}
+          onClose={handleDismissAdminUnlockModal}
           tripId={tripData.id}
           tripSlug={routeSlug}
           adminToken={tripAdminToken}
