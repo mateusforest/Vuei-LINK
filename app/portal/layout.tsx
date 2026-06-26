@@ -35,7 +35,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 
 const navItems = [
-  { href: "/portal", icon: Home, label: "InÃ­cio" },
+  { href: "/portal", icon: Home, label: "Início" },
   { href: "/portal/viagem", icon: Plane, label: "Viagem" },
   { href: "/portal/suporte", icon: LifeBuoy, label: "Suporte" },
 ]
@@ -75,8 +75,8 @@ function PortalLayoutInner({ children }: { children: React.ReactNode }) {
 
   const accountMenuItems = [
     { label: "Minha conta", href: "/portal/configuracoes", icon: User },
-    { label: "CrÃ©ditos", href: "/portal/creditos", icon: Coins },
-    { label: "ConfiguraÃ§Ãµes", href: "/portal/configuracoes", icon: Settings },
+    { label: "Créditos", href: "/portal/creditos", icon: Coins },
+    { label: "Configurações", href: "/portal/configuracoes", icon: Settings },
     { label: "Offline", href: "/portal/offline", icon: WifiOff },
     { label: "Compartilhar", href: "/portal/compartilhar", icon: Share2 },
   ]
@@ -284,7 +284,7 @@ function PortalLayoutInner({ children }: { children: React.ReactNode }) {
                 className="flex min-w-0 flex-1 items-center gap-2 rounded-full border border-border/60 bg-white/85 px-3 py-2 text-slate-900 transition-colors hover:bg-white"
               >
                 <Coins size={14} className="text-primary" />
-                <span className="truncate text-xs font-medium">{credits.balance} crÃ©ditos</span>
+                <span className="truncate text-xs font-medium">{credits.balance} créditos</span>
               </Link>
               <Link
                 href="/portal/offline"
