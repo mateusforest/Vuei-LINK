@@ -7598,7 +7598,8 @@ export default function TripPage() {
             : publicToken
               ? getTripByPublicToken(publicToken)
               : getTripBySlug(routeSlug)
-        const shouldAttemptOfflineTimeoutFallback = useSupabase && (isPublicRoute || isAdminRoute)
+        const isBrowserOffline = typeof navigator !== "undefined" && navigator.onLine === false
+        const shouldAttemptOfflineTimeoutFallback = useSupabase && (isPublicRoute || isAdminRoute) && isBrowserOffline
         const lookupTimeoutMs = isMobileViewport ? 2200 : 3200
         let repositoryTrip:
           | Awaited<ReturnType<typeof getTripBySlug>>
