@@ -39,6 +39,7 @@ import { Label } from "@/components/ui/label"
 import { useAgency, type AgencyDocument } from "@/contexts/agency-context"
 import { getSignedDocumentUrl, updateDocumentMetadata } from "@/lib/repositories/documents-repository"
 import { validateDocumentFile } from "@/lib/files/file-validation"
+import { DOCUMENT_UPLOAD_TYPE_OPTIONS } from "@/lib/constants/document-upload-types"
 
 const documentTypes = [
   { value: "all", label: "Todos" },
@@ -482,14 +483,11 @@ export default function DocumentsPage() {
                 className="mt-1.5 h-10 w-full rounded-xl border border-white/10 bg-[#0a0a0a] px-3 text-sm text-foreground appearance-none"
                 style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='rgba(255,255,255,0.4)'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center', backgroundSize: '16px' }}
               >
-                <option value="voucher" className="bg-[#0a0a0a]">Voucher</option>
-                <option value="ticket" className="bg-[#0a0a0a]">Passagem</option>
-                <option value="admission_ticket" className="bg-[#0a0a0a]">Ingresso</option>
-                <option value="itinerary" className="bg-[#0a0a0a]">Roteiro</option>
-                <option value="passport" className="bg-[#0a0a0a]">Passaporte</option>
-                <option value="visa" className="bg-[#0a0a0a]">Visto</option>
-                <option value="insurance" className="bg-[#0a0a0a]">Seguro</option>
-                <option value="other" className="bg-[#0a0a0a]">Outro</option>
+                {DOCUMENT_UPLOAD_TYPE_OPTIONS.map((type) => (
+                  <option key={type.value} value={type.value} className="bg-[#0a0a0a]">
+                    {type.label}
+                  </option>
+                ))}
               </select>
             </div>
 

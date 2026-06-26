@@ -55,6 +55,7 @@ import {
   getQuickAccessMethods,
   verifyQuickAccessPin,
 } from "@/lib/auth/quick-access"
+import { DOCUMENT_UPLOAD_TYPE_OPTIONS } from "@/lib/constants/document-upload-types"
 import type { Document, DocumentVisibility } from "@/types"
 
 const fadeInUp = {
@@ -62,15 +63,6 @@ const fadeInUp = {
   animate: { opacity: 1, y: 0 },
   transition: { duration: 0.5 },
 }
-
-const documentTypeLabels = [
-  { label: "Passaporte", value: "passport" },
-  { label: "RG", value: "other" },
-  { label: "Visto", value: "visa" },
-  { label: "Voucher", value: "voucher" },
-  { label: "Seguro", value: "insurance" },
-  { label: "Outro", value: "other" },
-]
 
 function getDocumentIcon(type: string) {
   return type === "voucher" ? ImageIcon : FileText
@@ -580,9 +572,9 @@ export default function DocumentosPage() {
             <div className="space-y-2">
               <Label className="text-sm font-medium text-slate-800">Tipo</Label>
               <div className="grid grid-cols-2 gap-2">
-                {documentTypeLabels.map((item) => (
+                {DOCUMENT_UPLOAD_TYPE_OPTIONS.map((item) => (
                   <Button
-                    key={item.label}
+                    key={item.value}
                     type="button"
                     variant={uploadForm.type === item.value ? "default" : "outline"}
                     className={

@@ -95,7 +95,7 @@ export interface AgencyDocument {
   agencyId?: string
   ownerUserId?: string
   name: string
-  type: "voucher" | "ticket" | "admission_ticket" | "passport" | "visa" | "insurance" | "itinerary" | "other"
+  type: "voucher" | "ticket" | "hotel" | "personal_document" | "admission_ticket" | "passport" | "visa" | "insurance" | "itinerary" | "other"
   isPrivate: boolean
   fileUrl?: string
   filePath?: string
@@ -335,6 +335,8 @@ function mapDocumentRecordToAgencyDocument(document: {
     type:
       document.type === "voucher" ||
       document.type === "ticket" ||
+      document.type === "hotel" ||
+      document.type === "personal_document" ||
       document.type === "admission_ticket" ||
       document.type === "passport" ||
       document.type === "visa" ||

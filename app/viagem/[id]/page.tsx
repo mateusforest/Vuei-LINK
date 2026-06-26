@@ -7,6 +7,7 @@ import { motion, AnimatePresence, useScroll, useTransform } from "framer-motion"
 import { extractAgencyStorageState } from "@/lib/mappers/agency-mappers"
 import { extractTripsStoragePayload } from "@/lib/mappers/trip-mappers"
 import { shouldUseSupabase } from "@/lib/data-source"
+import { DOCUMENT_UPLOAD_TYPE_OPTIONS } from "@/lib/constants/document-upload-types"
 import { getTripByAdminToken, getTripByPublicToken, getTripBySlug } from "@/lib/repositories/trips-repository"
 import { createDocumentMetadata, deleteDocument, deleteDocumentFile, getSignedDocumentUrl, listDocumentsByTrip, listPublicTripDocuments, uploadDocumentFile } from "@/lib/repositories/documents-repository"
 import { deleteTripFlight, listPublicTripFlights, listTripFlights, requestTripFlightExtraction, upsertTripFlight } from "@/lib/repositories/trip-flights-repository"
@@ -5370,12 +5371,11 @@ function AddDocumentModal({ open, onClose, onSave, tripId, ownerUserId, agencyId
             className="w-full mt-1 px-4 py-3 rounded-xl bg-[#0a0a0a] border border-white/[0.08] text-white focus:outline-none focus:border-[#5de0e6]/50 appearance-none"
             style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='rgba(255,255,255,0.4)'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center', backgroundSize: '16px' }}
           >
-            <option value="voucher" className="bg-[#0a0a0a] text-white">Voucher</option>
-            <option value="ticket" className="bg-[#0a0a0a] text-white">Ingresso</option>
-            <option value="insurance" className="bg-[#0a0a0a] text-white">Seguro</option>
-            <option value="passport" className="bg-[#0a0a0a] text-white">Passaporte</option>
-            <option value="visa" className="bg-[#0a0a0a] text-white">Visto</option>
-            <option value="other" className="bg-[#0a0a0a] text-white">Outro</option>
+            {DOCUMENT_UPLOAD_TYPE_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value} className="bg-[#0a0a0a] text-white">
+                {option.label}
+              </option>
+            ))}
           </select>
         </div>
 

@@ -2,6 +2,8 @@ export type DocumentVisibility = "private" | "public_trip" | "agency_only"
 export type DocumentType =
   | "voucher"
   | "ticket"
+  | "hotel"
+  | "personal_document"
   | "admission_ticket"
   | "passport"
   | "visa"
