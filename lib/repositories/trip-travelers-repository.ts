@@ -55,6 +55,10 @@ function buildTravelerPlaceholder(index: number): TripTravelerInsert {
   }
 }
 
+function sanitizeTravelerId(travelerId: string) {
+  return typeof travelerId === "string" ? travelerId.trim() : ""
+}
+
 export async function listTripTravelersByTripWithClient(client: TripTravelersClient, tripId: string) {
   const { data, error } = await client
     .from("trip_travelers")
@@ -108,9 +112,21 @@ export async function createTripTravelerWithClient(
   tripId: string,
   payload: TripTravelerPayload,
 ) {
+  const nextPayload = buildTripTravelerInsertPayload(tripId, payload)
+  if (nextPayload.is_primary) {
+    const resetPrimaryResult = await client
+      .from("trip_travelers")
+      .update({ is_primary: false, role: "companion" })
+      .eq("trip_id", tripId)
+
+    if (resetPrimaryResult.error) {
+      return { data: null as TripTraveler | null, error: resetPrimaryResult.error.message }
+    }
+  }
+
   const { data, error } = await client
     .from("trip_travelers")
-    .insert(buildTripTravelerInsertPayload(tripId, payload))
+    .insert(nextPayload)
     .select("*")
     .single()
 
@@ -127,7 +143,24 @@ export async function updateTripTravelerWithClient(
   tripId: string | null,
   payload: TripTravelerPayload,
 ) {
+  const safeTravelerId = sanitizeTravelerId(travelerId)
+  if (!safeTravelerId) {
+    return { data: null as TripTraveler | null, error: "Identificador do viajante invalido." }
+  }
+
   const nextRole = payload.isPrimary || payload.role === "primary" ? "primary" : "companion"
+  if (nextRole === "primary" && tripId) {
+    const resetPrimaryResult = await client
+      .from("trip_travelers")
+      .update({ is_primary: false, role: "companion" })
+      .eq("trip_id", tripId)
+      .neq("id", safeTravelerId)
+
+    if (resetPrimaryResult.error) {
+      return { data: null as TripTraveler | null, error: resetPrimaryResult.error.message }
+    }
+  }
+
   let query = client
     .from("trip_travelers")
     .update({
@@ -136,7 +169,7 @@ export async function updateTripTravelerWithClient(
       is_primary: nextRole === "primary",
       avatar_url: payload.avatarUrl ?? null,
     })
-    .eq("id", travelerId)
+    .eq("id", safeTravelerId)
 
   if (tripId) {
     query = query.eq("trip_id", tripId)
@@ -152,7 +185,12 @@ export async function updateTripTravelerWithClient(
 }
 
 export async function deleteTripTravelerWithClient(client: TripTravelersClient, travelerId: string, tripId?: string | null) {
-  let query = client.from("trip_travelers").delete().eq("id", travelerId)
+  const safeTravelerId = sanitizeTravelerId(travelerId)
+  if (!safeTravelerId) {
+    return { error: "Identificador do viajante invalido." }
+  }
+
+  let query = client.from("trip_travelers").delete().eq("id", safeTravelerId)
   if (tripId) {
     query = query.eq("trip_id", tripId)
   }
@@ -165,13 +203,33 @@ export async function setPrimaryTripTravelerWithClient(
   travelerId: string,
   tripId?: string | null,
 ) {
+  const safeTravelerId = sanitizeTravelerId(travelerId)
+  if (!safeTravelerId) {
+    return { data: null as TripTraveler | null, error: "Identificador do viajante invalido." }
+  }
+
+  if (tripId) {
+    const resetPrimaryResult = await client
+      .from("trip_travelers")
+      .update({
+        is_primary: false,
+        role: "companion",
+      })
+      .eq("trip_id", tripId)
+      .neq("id", safeTravelerId)
+
+    if (resetPrimaryResult.error) {
+      return { data: null as TripTraveler | null, error: resetPrimaryResult.error.message }
+    }
+  }
+
   let query = client
     .from("trip_travelers")
     .update({
       is_primary: true,
       role: "primary",
     })
-    .eq("id", travelerId)
+    .eq("id", safeTravelerId)
 
   if (tripId) {
     query = query.eq("trip_id", tripId)

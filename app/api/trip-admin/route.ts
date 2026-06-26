@@ -24,6 +24,10 @@ type HotelRow = Database["public"]["Tables"]["trip_hotels"]["Row"]
 type ItineraryRow = Database["public"]["Tables"]["trip_itineraries"]["Row"]
 type TripTravelerRow = Database["public"]["Tables"]["trip_travelers"]["Row"]
 
+function readNonEmptyString(value: unknown) {
+  return typeof value === "string" && value.trim().length > 0 ? value.trim() : null
+}
+
 function asBoolean(value: FormDataEntryValue | string | null | undefined) {
   return value === "true" || value === "1" || value === true
 }
@@ -475,8 +479,11 @@ export async function POST(request: NextRequest) {
     }
 
     if (action === "updateTraveler") {
-      const travelerId = typeof body?.travelerId === "string" ? body.travelerId : ""
+      const travelerId = readNonEmptyString(body?.travelerId)
       const name = typeof body?.name === "string" ? body.name.trim() : ""
+      if (!travelerId) {
+        return NextResponse.json({ error: "Identificador do viajante invalido." }, { status: 400 })
+      }
       if (!name) {
         return NextResponse.json({ error: "Informe o nome do viajante." }, { status: 400 })
       }
@@ -499,7 +506,10 @@ export async function POST(request: NextRequest) {
     }
 
     if (action === "deleteTraveler") {
-      const travelerId = typeof body?.travelerId === "string" ? body.travelerId : ""
+      const travelerId = readNonEmptyString(body?.travelerId)
+      if (!travelerId) {
+        return NextResponse.json({ error: "Identificador do viajante invalido." }, { status: 400 })
+      }
       const travelerResult = await deleteTripTravelerWithClient(supabase, travelerId, trip.id)
       if (travelerResult.error) {
         return NextResponse.json({ error: travelerResult.error }, { status: 400 })
@@ -514,7 +524,10 @@ export async function POST(request: NextRequest) {
     }
 
     if (action === "setPrimaryTraveler") {
-      const travelerId = typeof body?.travelerId === "string" ? body.travelerId : ""
+      const travelerId = readNonEmptyString(body?.travelerId)
+      if (!travelerId) {
+        return NextResponse.json({ error: "Identificador do viajante invalido." }, { status: 400 })
+      }
       const travelerResult = await setPrimaryTripTravelerWithClient(supabase, travelerId, trip.id)
 
       if (travelerResult.error || !travelerResult.data) {

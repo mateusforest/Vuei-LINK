@@ -821,6 +821,7 @@ function normalizeQuickInfo(quickInfo?: any) {
 function normalizeTravelers(travelers?: any, fallbackCount?: number) {
   if (Array.isArray(travelers) && travelers.length > 0) {
     return travelers.map((traveler, index) => ({
+      id: typeof traveler?.id === "string" && traveler.id.trim() ? traveler.id : `fallback-${index}`,
       name: traveler?.name || (index === 0 ? "Viajante Principal" : `Acompanhante ${index}`),
       avatar: traveler?.avatar || "/placeholder.svg?height=40&width=40",
       role: traveler?.role || (index === 0 ? "principal" : "acompanhante"),
@@ -3394,7 +3395,7 @@ function AddFlightModal({ open, onClose, onSave, tripId, ownerUserId, agencyId, 
         </label>
 
         <div className="rounded-xl border border-white/[0.08] bg-white/[0.03] p-4">
-          <p className="mt-2 text-xs leading-5 text-white/45">Para melhor leitura, envie um cartÃ£o de embarque individual ou uma imagem limpa da passagem, sem cortes e com todos os dados visÃ­veis.</p>
+          <p className="mt-2 text-xs leading-5 text-white/45">Para melhor leitura, envie um cartão de embarque individual ou uma imagem limpa da passagem, sem cortes e com todos os dados visíveis.</p>
           <p className="mt-1 text-xs leading-5 text-white/45">Para ida e volta, envie cada trecho separadamente.</p>
           <p className="text-sm text-white/70">A passagem será salva imediatamente. Algumas informações podem aparecer em instantes.</p>
         </div>
@@ -7251,7 +7252,6 @@ export default function TripPage() {
   const [travelersLoading, setTravelersLoading] = useState(false)
   const [sensitiveAccessGranted, setSensitiveAccessGranted] = useState(false)
   const [securityModalOpen, setSecurityModalOpen] = useState(false)
-  const [adminUnlockDismissed, setAdminUnlockDismissed] = useState(false)
   const [adminLinkMutationMode, setAdminLinkMutationMode] = useState(false)
   const [premiumGateModalOpen, setPremiumGateModalOpen] = useState(false)
   const [offlineModeEnabled, setOfflineModeEnabled] = useState(false)
@@ -7282,9 +7282,16 @@ export default function TripPage() {
   }
 
   const handleDismissAdminUnlockModal = () => {
-    setAdminUnlockDismissed(true)
     setSecurityModalOpen(false)
     pendingSensitiveActionRef.current = null
+    setSensitiveAccessGranted(false)
+    setCanWrite(false)
+    setIsAdmin(false)
+    setAdminLinkMutationMode(false)
+    const publicPath = tripPublicToken
+      ? `/v/${routeSlug}?publicToken=${encodeURIComponent(tripPublicToken)}`
+      : `/v/${routeSlug}`
+    router.replace(publicPath)
   }
 
   useEffect(() => {
@@ -7324,7 +7331,6 @@ export default function TripPage() {
 
   useEffect(() => {
     setSensitiveAccessGranted(false)
-    setAdminUnlockDismissed(false)
     pendingSensitiveActionRef.current = null
     setTripTravelersSource("fallback")
     setTravelersLoading(false)
@@ -8920,6 +8926,11 @@ export default function TripPage() {
       return false
     }
 
+    if (!travelerId?.trim()) {
+      showToast("Nao foi possivel identificar este viajante para edicao.", "error")
+      return false
+    }
+
     setTravelersLoading(true)
     try {
       const result = await callTripAdminApi<{ travelers?: PersistedTravelerPayload[] }>({
@@ -8949,6 +8960,11 @@ export default function TripPage() {
     }
     if (!(adminRouteActive && tripAdminToken)) {
       showToast("Este modo de viagem ainda não permite salvar viajantes reais.", "info")
+      return false
+    }
+
+    if (!travelerId?.trim()) {
+      showToast("Nao foi possivel identificar este viajante para exclusao.", "error")
       return false
     }
 
@@ -8982,6 +8998,11 @@ export default function TripPage() {
     }
     if (!(adminRouteActive && tripAdminToken)) {
       showToast("Este modo de viagem ainda não permite salvar viajantes reais.", "info")
+      return false
+    }
+
+    if (!travelerId?.trim()) {
+      showToast("Nao foi possivel identificar este viajante principal.", "error")
       return false
     }
 
@@ -9041,7 +9062,7 @@ export default function TripPage() {
     )
   }
 
-  if (adminRouteActive && !sensitiveAccessGranted && !adminUnlockDismissed) {
+  if (adminRouteActive && !sensitiveAccessGranted) {
     return (
       <main className="min-h-screen bg-[#f4f1ea] text-slate-900 flex items-center justify-center px-4">
         <PortalPinUnlockModal
