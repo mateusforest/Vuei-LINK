@@ -2651,15 +2651,15 @@ function FlightCard({
             </div>
           </div>
 
-          <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-white/[0.06] pt-4">
+          <div className="mt-4 grid grid-cols-1 gap-2 border-t border-white/[0.06] pt-4 sm:flex sm:flex-wrap sm:items-center sm:gap-3">
             {flight.document ? (
-              <Button size="sm" variant="outline" onClick={onOpenDocument} className="border-white/10 text-white/80 hover:bg-white/10 hover:text-white">
+              <Button size="sm" variant="outline" onClick={onOpenDocument} className="justify-start whitespace-normal border-white/10 px-3 text-left text-white/80 hover:bg-white/10 hover:text-white sm:justify-center sm:whitespace-nowrap sm:px-3 sm:text-center">
                 <ExternalLink className="mr-2 h-4 w-4" />
                 Abrir passagem
               </Button>
             ) : null}
             {canWrite ? (
-              <Button size="sm" variant="ghost" onClick={() => void onDelete()} className="text-red-300 hover:bg-red-500/10 hover:text-red-200">
+              <Button size="sm" variant="ghost" onClick={() => void onDelete()} className="justify-start whitespace-normal px-3 text-left text-red-300 hover:bg-red-500/10 hover:text-red-200 sm:justify-center sm:whitespace-nowrap sm:px-3 sm:text-center">
                 <Trash2 className="mr-2 h-4 w-4" />
                 Excluir
               </Button>
@@ -2755,31 +2755,31 @@ function FlightCard({
           </div>
         </div>
 
-        <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-white/[0.06] pt-4">
-          <Button size="sm" variant="ghost" onClick={onOpenDetails} className="h-9 px-0 text-white/72 hover:bg-transparent hover:text-white">
+        <div className="mt-4 grid grid-cols-2 gap-2 border-t border-white/[0.06] pt-4 sm:flex sm:flex-wrap sm:items-center sm:gap-x-3 sm:gap-y-2">
+          <Button size="sm" variant="ghost" onClick={onOpenDetails} className="h-9 justify-start whitespace-normal px-3 text-left text-white/72 hover:bg-white/5 hover:text-white sm:px-0 sm:text-center sm:hover:bg-transparent">
             <Eye className="mr-2 h-4 w-4" />
             Detalhes
           </Button>
           {flight.document ? (
-            <Button size="sm" variant="ghost" onClick={onOpenDocument} className="h-9 px-0 text-[#4b84ff] hover:bg-transparent hover:text-[#78a4ff]">
+            <Button size="sm" variant="ghost" onClick={onOpenDocument} className="h-9 justify-start whitespace-normal px-3 text-left text-[#4b84ff] hover:bg-white/5 hover:text-[#78a4ff] sm:px-0 sm:text-center sm:hover:bg-transparent">
               <ExternalLink className="mr-2 h-4 w-4" />
               Abrir passagem
             </Button>
           ) : null}
           {canWrite ? (
-            <Button size="sm" variant="ghost" onClick={onEdit} className="h-9 px-0 text-white/72 hover:bg-transparent hover:text-white">
+            <Button size="sm" variant="ghost" onClick={onEdit} className="h-9 justify-start whitespace-normal px-3 text-left text-white/72 hover:bg-white/5 hover:text-white sm:px-0 sm:text-center sm:hover:bg-transparent">
               <Edit3 className="mr-2 h-4 w-4" />
               Editar
             </Button>
           ) : null}
           {canWrite ? (
-            <Button size="sm" variant="ghost" onClick={() => void onDelete()} className="h-9 px-0 text-red-300 hover:bg-transparent hover:text-red-200">
+            <Button size="sm" variant="ghost" onClick={() => void onDelete()} className="h-9 justify-start whitespace-normal px-3 text-left text-red-300 hover:bg-red-500/10 hover:text-red-200 sm:px-0 sm:text-center sm:hover:bg-transparent">
               <Trash2 className="mr-2 h-4 w-4" />
               Excluir
             </Button>
           ) : null}
           {flight.qrCodePayload ? (
-            <Button size="sm" variant="ghost" onClick={onViewQR} className="h-9 px-0 text-[#5de0e6] hover:bg-transparent hover:text-[#82eef2]">
+            <Button size="sm" variant="ghost" onClick={onViewQR} className="h-9 justify-start whitespace-normal px-3 text-left text-[#5de0e6] hover:bg-white/5 hover:text-[#82eef2] sm:px-0 sm:text-center sm:hover:bg-transparent">
               <QrCode className="mr-2 h-4 w-4" />
               QR Code
             </Button>
@@ -3163,13 +3163,13 @@ function FlightsSection({
               <p className="text-sm font-medium text-white">{document.name}</p>
               <p className="mt-2 text-xs text-white/40">Passagem anexada. Estamos extraindo as informações.</p>
               <p className="mt-1 text-xs text-white/30">{document.mimeType || "Não informado"}</p>
-              <div className="mt-4 flex flex-wrap gap-2">
-                <Button size="sm" variant="outline" className="border-white/10 text-white/70" onClick={() => void handleOpenTicketDocument(document)}>
+              <div className="mt-4 grid grid-cols-1 gap-2 sm:flex sm:flex-wrap">
+                <Button size="sm" variant="outline" className="justify-start whitespace-normal border-white/10 px-3 text-left text-white/70 sm:justify-center sm:whitespace-nowrap sm:text-center" onClick={() => void handleOpenTicketDocument(document)}>
                   <ExternalLink className="mr-2 h-4 w-4" />
                   Abrir passagem
                 </Button>
                 {canWrite ? (
-                  <Button size="sm" variant="ghost" className="text-red-300 hover:bg-red-500/10" onClick={() => void onDeleteDocument(document.id)}>
+                  <Button size="sm" variant="ghost" className="justify-start whitespace-normal px-3 text-left text-red-300 hover:bg-red-500/10 sm:justify-center sm:whitespace-nowrap sm:text-center" onClick={() => void onDeleteDocument(document.id)}>
                     <Trash2 className="mr-2 h-4 w-4" />
                     Excluir
                   </Button>
