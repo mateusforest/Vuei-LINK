@@ -418,7 +418,7 @@ export default function DocumentsPage() {
       <Dialog open={uploadModalOpen} onOpenChange={setUploadModalOpen}>
         <DialogContent className="agency-dialog sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Upload de Documento</DialogTitle>
+            <DialogTitle className="text-slate-950">Upload de Documento</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div
@@ -449,19 +449,19 @@ export default function DocumentsPage() {
               {uploading ? (
                 <div className="flex flex-col items-center gap-3">
                   <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-200 border-t-primary" />
-                  <p className="text-sm text-muted-foreground">Enviando...</p>
+                  <p className="text-sm text-slate-600">Enviando...</p>
                 </div>
               ) : uploadData.name ? (
                 <div className="flex flex-col items-center gap-2">
                   <div className="rounded-xl bg-primary/10 p-3">
                     <FileText className="h-8 w-8 text-primary" />
                   </div>
-                  <p className="text-sm font-medium text-foreground">{uploadData.name}</p>
+                  <p className="text-sm font-medium text-slate-950">{uploadData.name}</p>
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={(e) => { e.stopPropagation(); setUploadData({ ...uploadData, name: "" }); setSelectedFile(null) }}
-                    className="text-xs text-muted-foreground hover:bg-slate-100"
+                    className="text-xs text-slate-600 hover:bg-sky-50 hover:text-slate-900"
                   >
                     <X className="w-3 h-3 mr-1" />
                     Remover
@@ -469,29 +469,29 @@ export default function DocumentsPage() {
                 </div>
               ) : (
                 <>
-                  <Upload className="mx-auto h-10 w-10 text-muted-foreground" />
-                  <p className="mt-2 text-sm text-foreground">Arraste arquivos ou clique para selecionar</p>
-                  <p className="mt-1 text-xs text-muted-foreground">PDF, JPG, PNG ate 10MB</p>
+                  <Upload className="mx-auto h-10 w-10 text-slate-400" />
+                  <p className="mt-2 text-sm text-slate-900">Arraste arquivos ou clique para selecionar</p>
+                  <p className="mt-1 text-xs text-slate-500">PDF, JPG, PNG ate 10MB</p>
                 </>
               )}
             </div>
 
             <div>
-              <Label className="text-muted-foreground">Tipo de documento</Label>
+              <Label className="text-slate-700">Tipo de documento</Label>
               <select
                 value={uploadData.type}
                 onChange={(e) => setUploadData({ ...uploadData, type: e.target.value as AgencyDocument["type"] })}
-                className="mt-1.5 h-10 w-full appearance-none rounded-xl border border-border/70 bg-white px-3 text-sm text-foreground"
+                className="mt-1.5 h-10 w-full appearance-none rounded-xl border border-border/70 bg-white px-3 text-sm text-slate-950 focus:border-primary/40 focus:outline-none focus:ring-1 focus:ring-primary/40"
                 style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='rgba(71,85,105,0.9)'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center', backgroundSize: '16px' }}
               >
                 {DOCUMENT_UPLOAD_TYPE_OPTIONS.map((type) => (
-                  <option key={type.value} value={type.value}>
+                  <option key={type.value} value={type.value} className="bg-white text-slate-950">
                     {type.label}
                   </option>
                 ))}
               </select>
               {uploadData.type === "ticket" ? (
-                <div className="mt-2 space-y-1 text-xs leading-5 text-muted-foreground">
+                <div className="mt-2 space-y-1 text-xs leading-5 text-slate-600">
                   <p>Para melhor leitura, envie um cart&#227;o de embarque individual ou uma imagem limpa da passagem, sem cortes e com todos os dados vis&#237;veis.</p>
                   <div className="hidden">
                   <p>Para melhor leitura, envie um cartão de embarque individual ou uma imagem limpa da passagem, sem cortes e com todos os dados visíveis.</p>
@@ -506,31 +506,31 @@ export default function DocumentsPage() {
             </div>
 
             <div>
-              <Label className="text-muted-foreground">Cliente</Label>
+              <Label className="text-slate-700">Cliente</Label>
               <select
                 value={uploadData.clientId}
                 onChange={(e) => setUploadData({ ...uploadData, clientId: e.target.value })}
-                className="mt-1.5 h-10 w-full appearance-none rounded-xl border border-border/70 bg-white px-3 text-sm text-foreground"
+                className="mt-1.5 h-10 w-full appearance-none rounded-xl border border-border/70 bg-white px-3 text-sm text-slate-950 focus:border-primary/40 focus:outline-none focus:ring-1 focus:ring-primary/40"
                 style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='rgba(71,85,105,0.9)'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center', backgroundSize: '16px' }}
               >
-                <option value="">Selecionar cliente</option>
+                <option value="" className="bg-white text-slate-500">Selecionar cliente</option>
                 {activeClients.map(c => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
+                  <option key={c.id} value={c.id} className="bg-white text-slate-950">{c.name}</option>
                 ))}
               </select>
             </div>
 
             <div>
-              <Label className="text-muted-foreground">Viagem</Label>
+              <Label className="text-slate-700">Viagem</Label>
               <select
                 value={uploadData.tripId}
                 onChange={(e) => setUploadData({ ...uploadData, tripId: e.target.value })}
-                className="mt-1.5 h-10 w-full appearance-none rounded-xl border border-border/70 bg-white px-3 text-sm text-foreground"
+                className="mt-1.5 h-10 w-full appearance-none rounded-xl border border-border/70 bg-white px-3 text-sm text-slate-950 focus:border-primary/40 focus:outline-none focus:ring-1 focus:ring-primary/40"
                 style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='rgba(71,85,105,0.9)'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center', backgroundSize: '16px' }}
               >
-                <option value="">Selecionar viagem</option>
+                <option value="" className="bg-white text-slate-500">Selecionar viagem</option>
                 {trips.map(t => (
-                  <option key={t.id} value={t.id}>{t.name} - {t.clientName}</option>
+                  <option key={t.id} value={t.id} className="bg-white text-slate-950">{t.name} - {t.clientName}</option>
                 ))}
               </select>
             </div>
@@ -540,11 +540,11 @@ export default function DocumentsPage() {
                 type="checkbox"
                 checked={uploadData.isPrivate}
                 onChange={(e) => setUploadData({ ...uploadData, isPrivate: e.target.checked })}
-                className="h-4 w-4 rounded border-slate-300 bg-white text-primary focus:ring-primary/50"
+                className="h-4 w-4 rounded border-slate-300 bg-white text-primary focus:ring-primary/50 focus:ring-offset-0"
               />
               <div className="flex items-center gap-2">
                 <Lock className="h-4 w-4 text-yellow-500" />
-                <span className="text-sm text-foreground">Documento privado</span>
+                <span className="text-sm text-slate-900">Documento privado</span>
               </div>
             </label>
 
@@ -552,7 +552,7 @@ export default function DocumentsPage() {
               <Button
                 variant="outline"
                 onClick={() => setUploadModalOpen(false)}
-                className="flex-1 border-border/70 bg-white"
+                className="flex-1 border-border/70 bg-white text-slate-900 hover:bg-sky-50"
               >
                 Cancelar
               </Button>
