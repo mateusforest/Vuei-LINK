@@ -921,6 +921,30 @@ function hasMeaningfulFlightExtraction(flight?: TripFlightRecord | null) {
   )
 }
 
+function hasMinimumFlightCardData(flight?: {
+  airline?: string | null
+  flightNumber?: string | null
+  originAirport?: string | null
+  destinationAirport?: string | null
+  departureAt?: string | null
+  arrivalAt?: string | null
+} | null) {
+  if (!flight) return false
+
+  const originAirport = sanitizeFlightTextSafe(flight.originAirport)
+  const destinationAirport = sanitizeFlightTextSafe(flight.destinationAirport)
+  const airline = sanitizeFlightTextSafe(flight.airline)
+  const flightNumber = sanitizeFlightTextSafe(flight.flightNumber)
+  const departureAt = sanitizeFlightTextSafe(flight.departureAt)
+  const arrivalAt = sanitizeFlightTextSafe(flight.arrivalAt)
+
+  return Boolean(originAirport && destinationAirport && (departureAt || arrivalAt || flightNumber || airline))
+}
+
+function getPreferredStructuredFlight(flights: any[]) {
+  return flights.find((flight) => flight?.hasStructuredCardData) ?? null
+}
+
 function mapFlightRecordToView(flight: TripFlightRecord, documents?: any[]) {
   const airline = sanitizeFlightTextSafe(flight.airline) || getFlightExtractedValue(flight, "airline")
   const flightNumber = sanitizeFlightTextSafe(flight.flightNumber) || getFlightExtractedValue(flight, "flight_number")
@@ -943,6 +967,14 @@ function mapFlightRecordToView(flight: TripFlightRecord, documents?: any[]) {
   const linkedDocument = Array.isArray(documents) ? documents.find((document: any) => document.id === flight.documentId) ?? null : null
   const hasUsefulData = hasMeaningfulFlightExtraction(flight)
   const extractionStatus = flight.extractionStatus === "failed" && hasUsefulData ? "completed" : flight.extractionStatus
+  const hasStructuredCardData = hasMinimumFlightCardData({
+    airline,
+    flightNumber,
+    originAirport,
+    destinationAirport,
+    departureAt,
+    arrivalAt,
+  })
   const metaItems = [
     terminal ? { label: "Terminal", value: terminal } : null,
     gate ? { label: "Portão", value: gate } : null,
@@ -955,6 +987,7 @@ function mapFlightRecordToView(flight: TripFlightRecord, documents?: any[]) {
     flightNumber: flightNumber || "Voo não identificado",
     bookingReference,
     extractionStatus,
+    hasStructuredCardData,
     extractedData: flight.extractedData ?? {},
     passengerName,
     baggageInfo,
@@ -1009,6 +1042,16 @@ function getFlightStatusCopy(flight: any) {
   }
 
   if (flight.extractionStatus === "failed") {
+    return {
+      eyebrow: "Passagem anexada",
+      detail: "Nao foi possivel extrair os dados desta passagem. Envie um cartao de embarque individual ou uma imagem limpa, sem cortes e com todos os dados visiveis.",
+      tone: "error" as const,
+    }
+    return {
+      eyebrow: "Passagem anexada",
+      detail: "NÃ£o foi possÃ­vel extrair os dados desta passagem. Envie um cartÃ£o de embarque individual ou uma imagem limpa, sem cortes e com todos os dados visÃ­veis.",
+      tone: "error" as const,
+    }
     return {
       eyebrow: "Passagem anexada",
       detail: "Não conseguimos ler esta passagem automaticamente. Você ainda pode abrir o documento original.",
@@ -2103,7 +2146,7 @@ function buildTravelerCardSummaries(tripData: any) {
   const hotels = Array.isArray(tripData?.hotels) ? tripData.hotels : tripData?.hotel ? [tripData.hotel] : []
   const documents = Array.isArray(tripData?.documents) ? tripData.documents : []
   const itinerary = Array.isArray(tripData?.itinerary) ? tripData.itinerary : []
-  const flight = flights[0]
+  const flight = getPreferredStructuredFlight(flights)
   const rawHotel = hotels[0]
   const hotelNights =
     rawHotel?.checkIn && rawHotel?.checkOut
@@ -2174,7 +2217,7 @@ function buildTravelerCardSummariesClean(tripData: any) {
   )
   const documents = Array.isArray(tripData?.documents) ? tripData.documents : []
   const itinerary = Array.isArray(tripData?.itinerary) ? tripData.itinerary : []
-  const flight = flights[0]
+  const flight = getPreferredStructuredFlight(flights)
   const hotel = hotels[0] ?? null
   const hotelDetail = hotel
     ? [hotel.checkIn || "Check-in a definir", hotel.nights > 0 ? `${hotel.nights} noite${hotel.nights > 1 ? "s" : ""}` : hotel.checkOut || null]
@@ -2536,6 +2579,48 @@ function FlightCard({
   ]
   const routeSchedule = [flight.origin.time, flight.destination.time].filter(Boolean).join(" - ")
   const showStatusNote = !["completed", "manual"].includes(flight.extractionStatus ?? "")
+  const shouldRenderStructuredCard = flight.hasStructuredCardData !== false
+
+  if (!shouldRenderStructuredCard) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true }}
+        transition={{ delay: index * 0.1 }}
+        className="group"
+      >
+        <div className="relative overflow-hidden rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4 backdrop-blur-xl transition-all duration-300 hover:border-[#5de0e6]/20 sm:p-5">
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-px bg-gradient-to-r from-transparent via-[#5de0e6]/30 to-transparent" />
+          <div className="flex items-start gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#5de0e6]/20 to-[#004aad]/20">
+              <Plane className="h-5 w-5 text-[#5de0e6]" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-base font-semibold text-white">Passagem anexada</p>
+              <p className="mt-2 text-sm leading-6 text-white/70">{statusCopy.detail}</p>
+              {flight.document ? <p className="mt-2 text-xs text-white/45">VocÃª ainda pode abrir o arquivo anexado.</p> : null}
+            </div>
+          </div>
+
+          <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-white/[0.06] pt-4">
+            {flight.document ? (
+              <Button size="sm" variant="outline" onClick={onOpenDocument} className="border-white/10 text-white/80 hover:bg-white/10 hover:text-white">
+                <ExternalLink className="mr-2 h-4 w-4" />
+                Abrir passagem
+              </Button>
+            ) : null}
+            {canWrite ? (
+              <Button size="sm" variant="ghost" onClick={() => void onDelete()} className="text-red-300 hover:bg-red-500/10 hover:text-red-200">
+                <Trash2 className="mr-2 h-4 w-4" />
+                Excluir
+              </Button>
+            ) : null}
+          </div>
+        </div>
+      </motion.div>
+    )
+  }
 
   return (
     <motion.div
@@ -2938,6 +3023,7 @@ function FlightsSection({
   const { isAdmin, canWrite } = useContext(PermissionContext)
   const { showToast } = useToast()
   const flights = Array.isArray(tripData.flights) ? tripData.flights : []
+  const structuredFlightsCount = flights.filter((flight: any) => flight?.hasStructuredCardData !== false).length
   const ticketDocuments = Array.isArray(tripData.documents) ? tripData.documents.filter((document: any) => document.type === "ticket" && !flights.some((flight: any) => flight.document?.id === document.id)) : []
 
   const handleSaveFlight = async (data: any) => {
@@ -2985,7 +3071,7 @@ function FlightsSection({
             </div>
             <div>
               <h2 className="text-xl font-semibold text-white">Passagens</h2>
-              <p className="text-sm text-white/40">{flights.length > 0 ? `${flights.length} voo(s) salvo(s)` : `${ticketDocuments.length} passagem(ns) anexada(s)`}</p>
+              <p className="text-sm text-white/40">{structuredFlightsCount > 0 ? `${structuredFlightsCount} voo(s) salvo(s)` : `${flights.length + ticketDocuments.length} passagem(ns) anexada(s)`}</p>
             </div>
           </div>
           {canWrite && (
@@ -3266,6 +3352,8 @@ function AddFlightModal({ open, onClose, onSave, tripId, ownerUserId, agencyId, 
         </label>
 
         <div className="rounded-xl border border-white/[0.08] bg-white/[0.03] p-4">
+          <p className="mt-2 text-xs leading-5 text-white/45">Para melhor leitura, envie um cartÃ£o de embarque individual ou uma imagem limpa da passagem, sem cortes e com todos os dados visÃ­veis.</p>
+          <p className="mt-1 text-xs leading-5 text-white/45">Para ida e volta, envie cada trecho separadamente.</p>
           <p className="text-sm text-white/70">A passagem será salva imediatamente. Algumas informações podem aparecer em instantes.</p>
         </div>
 

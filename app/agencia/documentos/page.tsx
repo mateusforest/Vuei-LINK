@@ -123,6 +123,7 @@ export default function DocumentsPage() {
       if (uploadData.type === "ticket") {
         if (created.flightExtractionStatus === "failed") {
           setActionError(created.extractionError || "Passagem anexada, mas não foi possível iniciar a extração agora.")
+          setActionError("NÃ£o foi possÃ­vel extrair os dados desta passagem. Envie um cartÃ£o de embarque individual ou uma imagem limpa, sem cortes e com todos os dados visÃ­veis.")
         } else {
           setActionNotice("Passagem anexada. Estamos extraindo as informações.")
         }
@@ -489,6 +490,11 @@ export default function DocumentsPage() {
                   </option>
                 ))}
               </select>
+              {uploadData.type === "ticket" ? (
+                <p className="mt-2 text-xs leading-5 text-muted-foreground">
+                  Para melhor leitura, envie um cartÃ£o de embarque individual ou uma imagem limpa da passagem, sem cortes e com todos os dados visÃ­veis. Para ida e volta, envie cada trecho separadamente.
+                </p>
+              ) : null}
             </div>
 
             <div>
