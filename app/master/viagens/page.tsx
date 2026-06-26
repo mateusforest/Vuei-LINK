@@ -133,9 +133,9 @@ function MasterViagensPageContent() {
 
                   <div className="space-y-3">
                     <div className="flex items-center gap-2 p-3 rounded-lg bg-white/5">
-                      <span className="text-xs text-muted-foreground flex-shrink-0">Admin:</span>
-                      <code className="flex-1 text-xs truncate">{selectedTrip.adminLink}</code>
-                      <Button variant="ghost" size="sm" onClick={() => void copyLink(selectedTrip.adminLink, `${selectedTrip.id}-admin`)}>
+                      <span className="text-xs text-muted-foreground flex-shrink-0">Link da Viagem:</span>
+                      <code className="flex-1 text-xs truncate">{selectedTrip.shareLink}</code>
+                      <Button variant="ghost" size="sm" onClick={() => void copyLink(selectedTrip.shareLink, `${selectedTrip.id}-admin`)}>
                         {copiedLink === `${selectedTrip.id}-admin` ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
                       </Button>
                     </div>
@@ -149,10 +149,10 @@ function MasterViagensPageContent() {
                   </div>
 
                   <div className="flex gap-3 mt-6">
-                    <Link href={selectedTrip.adminLink.replace(/^https?:\/\/[^/]+/, "")} className="flex-1">
+                    <Link href={selectedTrip.shareLink.replace(/^https?:\/\/[^/]+/, "")} className="flex-1">
                       <Button variant="outline" className="w-full border-white/10">
                         <ExternalLink className="h-4 w-4 mr-2" />
-                        Abrir Admin
+                        Abrir link
                       </Button>
                     </Link>
                     <Link href={selectedTrip.shareLink.replace(/^https?:\/\/[^/]+/, "")} className="flex-1">

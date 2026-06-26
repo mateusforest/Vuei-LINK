@@ -229,11 +229,12 @@ export default function ViagemListPage() {
                     </span>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3 mb-4">
+                  <div className="grid grid-cols-1 gap-3 mb-4">
+                    {false && (
                     <div className="p-3 rounded-xl bg-muted/30 border border-border/50">
                       <div className="flex items-center gap-2 mb-1">
                         <Shield size={14} className="text-amber-400" />
-                        <span className="text-xs text-muted-foreground">Link Admin</span>
+                        <span className="text-xs text-muted-foreground">Link da Viagem</span>
                       </div>
                       <div className="flex items-center gap-2">
                         <code className="text-xs truncate flex-1">{trip.adminLink}</code>
@@ -242,10 +243,11 @@ export default function ViagemListPage() {
                         </Button>
                       </div>
                     </div>
+                    )}
                     <div className="p-3 rounded-xl bg-primary/5 border border-primary/20">
                       <div className="flex items-center gap-2 mb-1">
                         <Link2 size={14} className="text-primary" />
-                        <span className="text-xs text-muted-foreground">Link Público</span>
+                        <span className="text-xs text-muted-foreground">Link da Viagem</span>
                       </div>
                       <div className="flex items-center gap-2">
                         <code className="text-xs truncate flex-1">{trip.shareLink}</code>
@@ -259,18 +261,18 @@ export default function ViagemListPage() {
                   <div className="flex gap-3">
                     <Button 
                       className="flex-1 bg-gradient-to-r from-[#5de0e6] to-[#004aad] text-white border-0"
-                      onClick={() => router.push(trip.adminLink.replace(/^https?:\/\/[^/]+/, ""))}
+                      onClick={() => router.push(trip.shareLink.replace(/^https?:\/\/[^/]+/, ""))}
                     >
                       <ExternalLink size={16} className="mr-2" />
-                      Abrir Viagem
+                      Abrir link
                     </Button>
                     <Button 
                       variant="outline" 
                       className="border-border/50"
-                      onClick={() => router.push(trip.adminLink.replace(/^https?:\/\/[^/]+/, ""))}
+                      onClick={() => void copyShareLink(trip.id, trip.shareLink, `share-${trip.id}`)}
                     >
-                      <Shield size={16} className="mr-2" />
-                      Admin
+                      <Copy size={16} className="mr-2" />
+                      Copiar link
                     </Button>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>

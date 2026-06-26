@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createSupabaseAdminClient, hasSupabaseAdminEnv, isMissingSupabaseAdminEnvError } from "@/lib/supabase/admin"
+import { createSupabaseServerClient } from "@/lib/supabase/server"
 import { verifyStoredQuickAccessPin } from "@/lib/auth/quick-access"
+import { resolveAuthenticatedTripAccess } from "@/lib/security/trip-authenticated-access"
 import type { Database } from "@/lib/supabase/types"
 import type { ProfileQuickAccessSettings } from "@/types"
 
@@ -163,13 +165,39 @@ async function resolveTripFromRequest(request: NextRequest, payload?: Record<str
       ? "admin"
       : "public"
 
-  const accessResult = await findTripForPin(supabase, {
-    tripId,
-    tripSlug,
-    adminToken,
-    publicToken,
-    accessMode,
-  })
+  let accessResult: { trip: TripRow | null; error: string | null }
+
+  if (accessMode === "admin" && !adminToken) {
+    const serverClient = await createSupabaseServerClient()
+    const authResult = serverClient ? await serverClient.auth.getUser() : null
+    const sessionUser = authResult?.data.user ?? null
+
+    if (!serverClient || !sessionUser) {
+      accessResult = {
+        trip: null,
+        error: "Acesso administrativo invalido para esta viagem.",
+      }
+    } else {
+      const authenticatedAccessResult = await resolveAuthenticatedTripAccess(serverClient, sessionUser.id, {
+        tripId,
+        tripSlug,
+        requireMutationRole: true,
+      })
+
+      accessResult = {
+        trip: authenticatedAccessResult.trip,
+        error: authenticatedAccessResult.error,
+      }
+    }
+  } else {
+    accessResult = await findTripForPin(supabase, {
+      tripId,
+      tripSlug,
+      adminToken,
+      publicToken,
+      accessMode,
+    })
+  }
 
   return {
     supabase,

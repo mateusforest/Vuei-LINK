@@ -58,11 +58,11 @@ export default function CompartilharPage() {
     navigator.clipboard.writeText(text)
     if (type === 'admin') {
       setAdminCopied(true)
-      setShareFeedback("Link administrador copiado.")
+      setShareFeedback("Link da viagem copiado.")
       setTimeout(() => setAdminCopied(false), 2000)
     } else {
       setShareCopied(true)
-      setShareFeedback("Link compartilhável copiado.")
+      setShareFeedback("Link da viagem copiado.")
       setTimeout(() => setShareCopied(false), 2000)
     }
   }
@@ -153,7 +153,7 @@ export default function CompartilharPage() {
         <p className="text-sm text-muted-foreground">Compartilhe {trip.name} com familia e amigos</p>
       </motion.div>
 
-      {/* Admin Link */}
+      {false && (
       <motion.div variants={fadeInUp}>
         <Card className="p-5 bg-card/50 border-border/50 vuei-glass">
           <div className="flex items-start gap-4 mb-4">
@@ -162,7 +162,7 @@ export default function CompartilharPage() {
             </div>
             <div className="flex-1">
               <div className="flex items-center gap-2 mb-1">
-                <h3 className="font-semibold">Link Administrador</h3>
+                <h3 className="font-semibold">Link da Viagem</h3>
                 <Badge className="bg-amber-500/20 text-amber-400 border-0 text-xs">
                   Privado
                 </Badge>
@@ -191,8 +191,8 @@ export default function CompartilharPage() {
           </div>
         </Card>
       </motion.div>
+      )}
 
-      {/* Share Link */}
       <motion.div variants={fadeInUp}>
         <Card className="p-5 bg-gradient-to-br from-primary/5 to-secondary/5 border-primary/20 vuei-glass">
           <div className="flex items-start gap-4 mb-4">
@@ -201,13 +201,13 @@ export default function CompartilharPage() {
             </div>
             <div className="flex-1">
               <div className="flex items-center gap-2 mb-1">
-                <h3 className="font-semibold">Link Compartilhável</h3>
+                <h3 className="font-semibold">Link da Viagem</h3>
                 <Badge className="bg-primary/20 text-primary border-0 text-xs">
-                  Público
+                  Único
                 </Badge>
               </div>
               <p className="text-sm text-muted-foreground">
-                Compartilhe este link para que outros acompanhem sua viagem.
+                Compartilhe este único link para que outros acompanhem sua viagem.
               </p>
             </div>
           </div>

@@ -107,13 +107,14 @@ function LinksModal({ open, onClose, trip }: { open: boolean; onClose: () => voi
   return (
     <Modal open={open} onClose={onClose} title="Links da Viagem">
       <div className="space-y-4">
+        {false && (
         <div className="rounded-xl border border-border/60 bg-[#fbfbfc] p-4">
           <div className="flex items-center gap-3 mb-3">
             <div className="p-2 rounded-lg bg-primary/10">
               <Link2 className="w-4 h-4 text-primary" />
             </div>
             <div>
-              <p className="text-sm font-medium text-foreground">Link Admin</p>
+              <p className="text-sm font-medium text-foreground">Link da Viagem</p>
               <p className="text-xs text-muted-foreground">Acesso completo para editar</p>
             </div>
           </div>
@@ -139,6 +140,7 @@ function LinksModal({ open, onClose, trip }: { open: boolean; onClose: () => voi
             </Button>
           </div>
         </div>
+        )}
 
         <div className="rounded-xl border border-border/60 bg-[#fbfbfc] p-4">
           <div className="flex items-center gap-3 mb-3">
@@ -146,8 +148,8 @@ function LinksModal({ open, onClose, trip }: { open: boolean; onClose: () => voi
               <Share2 className="w-4 h-4 text-accent" />
             </div>
             <div>
-              <p className="text-sm font-medium text-foreground">Link Compartilhável</p>
-              <p className="text-xs text-muted-foreground">Para o cliente/família</p>
+              <p className="text-sm font-medium text-foreground">Link da Viagem</p>
+              <p className="text-xs text-muted-foreground">Um único link para consulta da viagem</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -494,7 +496,7 @@ export default function TripsPage() {
                             variant="ghost" 
                             size="sm" 
                             className="h-8 gap-1 px-2 text-xs text-muted-foreground hover:text-foreground"
-                            onClick={() => window.open(trip.adminLink, "_blank")}
+                            onClick={() => window.open(trip.shareLink, "_blank")}
                           >
                             <Eye className="h-3.5 w-3.5" />
                             Abrir

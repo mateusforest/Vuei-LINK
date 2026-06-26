@@ -208,14 +208,7 @@ export default function PortalHomePage() {
                 <div className="rounded-xl border border-border/50 bg-background/40 p-4">
                   <div className="mb-2 flex items-center gap-2">
                     <Link2 size={16} className="text-primary" />
-                    <p className="text-sm font-medium">Link administrador</p>
-                  </div>
-                  <p className="truncate text-xs text-muted-foreground">{activeTrip.adminLink}</p>
-                </div>
-                <div className="rounded-xl border border-border/50 bg-background/40 p-4">
-                  <div className="mb-2 flex items-center gap-2">
-                    <Share2 size={16} className="text-primary" />
-                    <p className="text-sm font-medium">Link compartilhável</p>
+                    <p className="text-sm font-medium">Link da Viagem</p>
                   </div>
                   <p className="truncate text-xs text-muted-foreground">{activeTrip.shareLink}</p>
                 </div>
@@ -224,18 +217,18 @@ export default function PortalHomePage() {
               <div className="flex flex-wrap gap-3">
                 <Button
                   className="border-0 bg-gradient-to-r from-[#5de0e6] to-[#004aad] text-white"
-                  onClick={() => router.push(activeTrip.adminLink.replace(/^https?:\/\/[^/]+/, ""))}
+                  onClick={() => router.push(activeTrip.shareLink.replace(/^https?:\/\/[^/]+/, ""))}
                 >
                   <ExternalLink size={16} className="mr-2" />
-                  Abrir viagem
+                  Abrir link
                 </Button>
                 <Button
                   variant="outline"
                   className="border-border/50"
-                  onClick={() => copyLink(activeTrip.adminLink, "admin")}
+                  onClick={() => copyLink(activeTrip.shareLink, "admin")}
                 >
                   <Copy size={16} className="mr-2" />
-                  Copiar link admin
+                  Copiar link
                 </Button>
                 <Button
                   variant="outline"
@@ -281,7 +274,7 @@ export default function PortalHomePage() {
                 <div className="flex flex-col gap-4 md:flex-row md:items-center">
                   <div
                     className="relative h-20 w-full overflow-hidden rounded-xl md:h-16 md:w-24 md:shrink-0"
-                    onClick={() => router.push(trip.adminLink.replace(/^https?:\/\/[^/]+/, ""))}
+                    onClick={() => router.push(trip.shareLink.replace(/^https?:\/\/[^/]+/, ""))}
                   >
                     <ImageWithFallback
                       src={trip.coverImage}
@@ -303,10 +296,10 @@ export default function PortalHomePage() {
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    <Button variant="outline" className="border-border/50" onClick={() => router.push(trip.adminLink.replace(/^https?:\/\/[^/]+/, ""))}>
-                      Abrir viagem
+                    <Button variant="outline" className="border-border/50" onClick={() => router.push(trip.shareLink.replace(/^https?:\/\/[^/]+/, ""))}>
+                      Abrir link
                     </Button>
-                    <Button variant="outline" className="border-border/50" onClick={() => copyLink(trip.adminLink, "admin")}>
+                    <Button variant="outline" className="border-border/50" onClick={() => copyLink(trip.shareLink, "admin")}>
                       Copiar link
                     </Button>
                     <Button variant="outline" className="border-border/50" onClick={() => shareTrip(trip.id, trip.shareLink)}>
@@ -328,7 +321,7 @@ export default function PortalHomePage() {
 
       <NoTripModal open={showNoTripModal} onClose={() => setShowNoTripModal(false)} />
       <Toast
-        message={copiedLink === "admin" ? "Link administrador copiado!" : "Link compartilhável copiado!"}
+        message="Link da viagem copiado!"
         visible={!!copiedLink}
       />
     </motion.div>

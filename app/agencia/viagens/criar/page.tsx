@@ -294,7 +294,7 @@ function CreateTripPageContent() {
               </div>
             </Card>
 
-            {/* Admin Link */}
+            {false && (
             <Card className="border-border/60 bg-white/88">
               <CardContent className="p-4">
                 <div className="flex items-center justify-between">
@@ -303,7 +303,7 @@ function CreateTripPageContent() {
                       <Link2 className="h-5 w-5 text-primary" />
                     </div>
                     <div className="text-left">
-                      <p className="font-medium text-foreground">Link Admin</p>
+                      <p className="font-medium text-foreground">Link da Viagem</p>
                       <p className="text-sm text-muted-foreground">Acesso completo</p>
                     </div>
                   </div>
@@ -323,8 +323,8 @@ function CreateTripPageContent() {
                 </div>
               </CardContent>
             </Card>
+            )}
 
-            {/* Share Link */}
             <Card className="border-border/60 bg-white/88">
               <CardContent className="p-4">
                 <div className="flex items-center justify-between">
@@ -333,8 +333,8 @@ function CreateTripPageContent() {
                       <Link2 className="h-5 w-5 text-accent" />
                     </div>
                     <div className="text-left">
-                      <p className="font-medium text-foreground">Link Compartilhável</p>
-                      <p className="text-sm text-muted-foreground">Para cliente/família</p>
+                      <p className="font-medium text-foreground">Link da Viagem</p>
+                      <p className="text-sm text-muted-foreground">Um único link para acompanhar a viagem</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
@@ -371,7 +371,7 @@ function CreateTripPageContent() {
               <Button 
                 variant="outline" 
                 className="h-auto flex-col gap-2 border-border/70 bg-white py-4 hover:bg-slate-50"
-                onClick={() => window.open(createdTrip.adminLink, "_blank")}
+                onClick={() => window.open(createdTrip.shareLink, "_blank")}
               >
                 <ExternalLink className="h-5 w-5 text-primary" />
                 <span className="text-xs">Ver Viagem</span>

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createSupabaseAdminClient, hasSupabaseAdminEnv, isMissingSupabaseAdminEnvError } from "@/lib/supabase/admin"
+import { createSupabaseServerClient } from "@/lib/supabase/server"
 import { resolveTripLinkAccess } from "@/lib/security/trip-link-access"
+import { resolveAuthenticatedTripAccess } from "@/lib/security/trip-authenticated-access"
 import { resolveDocumentMimeType } from "@/lib/files/file-validation"
 import {
   createTripTravelerWithClient,
@@ -132,12 +134,38 @@ async function resolveTripAdminAccess(params: {
   adminToken?: string | null
 }) {
   const supabase = createSupabaseAdminClient()
-  const accessResult = await resolveTripLinkAccess(supabase, {
-    tripId: params.tripId,
-    tripSlug: params.tripSlug,
-    adminToken: params.adminToken,
-    accessMode: "admin",
-  })
+  let accessResult: { trip: TripRow | null; error: string | null }
+
+  if (params.adminToken) {
+    accessResult = await resolveTripLinkAccess(supabase, {
+      tripId: params.tripId,
+      tripSlug: params.tripSlug,
+      adminToken: params.adminToken,
+      accessMode: "admin",
+    })
+  } else {
+    const serverClient = await createSupabaseServerClient()
+    const authResult = serverClient ? await serverClient.auth.getUser() : null
+    const sessionUser = authResult?.data.user ?? null
+
+    if (!serverClient || !sessionUser) {
+      accessResult = {
+        trip: null,
+        error: "Acesso administrativo invalido.",
+      }
+    } else {
+      const authenticatedAccessResult = await resolveAuthenticatedTripAccess(serverClient, sessionUser.id, {
+        tripId: params.tripId,
+        tripSlug: params.tripSlug,
+        requireMutationRole: true,
+      })
+
+      accessResult = {
+        trip: authenticatedAccessResult.trip,
+        error: authenticatedAccessResult.error,
+      }
+    }
+  }
 
   return {
     supabase,

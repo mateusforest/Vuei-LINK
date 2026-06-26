@@ -113,7 +113,7 @@ export default function LinksPage() {
           <div>
             <p className="text-sm font-medium text-foreground">Privacidade de Documentos</p>
             <p className="text-xs text-muted-foreground">
-              Documentos marcados como privados (passaporte, RG, etc.) nunca aparecem nos links compartilháveis, apenas no link admin.
+              Documentos marcados como privados (passaporte, RG, etc.) nunca aparecem no Link da Viagem compartilhado.
             </p>
           </div>
         </CardContent>
@@ -200,12 +200,12 @@ export default function LinksPage() {
 
                     {/* Links */}
                     <div className="mt-4 space-y-2">
-                      {/* Admin Link */}
+                      {false && (
                       <div className="flex items-center justify-between rounded-lg border border-white/5 bg-white/[0.02] p-3">
                         <div className="flex items-center gap-2 flex-1 min-w-0">
                           <Lock className="h-4 w-4 text-yellow-500 flex-shrink-0" />
                           <div className="min-w-0">
-                            <p className="text-xs font-medium text-foreground">Link Admin</p>
+                            <p className="text-xs font-medium text-foreground">Link da Viagem</p>
                             <code className="text-[10px] text-muted-foreground truncate block">{trip.adminLink}</code>
                           </div>
                         </div>
@@ -232,13 +232,13 @@ export default function LinksPage() {
                           </Button>
                         </div>
                       </div>
+                      )}
 
-                      {/* Share Link */}
                       <div className="flex items-center justify-between rounded-lg border border-white/5 bg-white/[0.02] p-3">
                         <div className="flex items-center gap-2 flex-1 min-w-0">
                           <Users className="h-4 w-4 text-primary flex-shrink-0" />
                           <div className="min-w-0">
-                            <p className="text-xs font-medium text-foreground">Link Compartilhável</p>
+                            <p className="text-xs font-medium text-foreground">Link da Viagem</p>
                             <code className="text-[10px] text-muted-foreground truncate block">{trip.shareLink}</code>
                           </div>
                         </div>

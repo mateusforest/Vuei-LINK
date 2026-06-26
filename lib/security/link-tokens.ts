@@ -13,7 +13,7 @@ export function generateAdminLink(slug: string) {
 }
 
 export function generatePublicLink(slug: string) {
-  return `/v/${slug}`
+  return `/viagem/${slug}`
 }
 
 export function buildAdminTripUrl(slug: string, adminToken?: string | null) {

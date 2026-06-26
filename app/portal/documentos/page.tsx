@@ -476,7 +476,7 @@ export default function DocumentosPage() {
           <div className="flex items-start gap-3">
             <AlertCircle size={18} className="text-muted-foreground shrink-0 mt-0.5" />
             <div className="text-sm text-muted-foreground">
-              <p>Documentos privados ficam visíveis apenas dentro do portal e não entram no link público.</p>
+              <p>Documentos privados ficam visíveis apenas dentro do portal e não entram no Link da Viagem compartilhado.</p>
               <p className="mt-1">Somente arquivos realmente anexados aparecem nesta area. Sem fallback de documentos falsos.</p>
             </div>
           </div>

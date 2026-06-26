@@ -221,6 +221,25 @@ function getTripPinSetupMessage(status: TripPinStatusPayload | null) {
   return "PIN ainda nao configurado. Peca ao responsavel pela viagem para configurar o PIN no portal."
 }
 
+function hasTripAuthenticatedAdminAccess(params: {
+  userId?: string | null
+  profileRole?: string | null
+  profileAgencyId?: string | null
+  ownerUserId?: string | null
+  tripAgencyId?: string | null
+}) {
+  if (!params.userId) return false
+  if (params.profileRole === "master") return true
+  if (params.ownerUserId && params.userId === params.ownerUserId) return true
+
+  return Boolean(
+    params.tripAgencyId &&
+    params.profileAgencyId &&
+    params.tripAgencyId === params.profileAgencyId &&
+    (params.profileRole === "agency_owner" || params.profileRole === "agency_member"),
+  )
+}
+
 function mapTripPinSnapshotToStoredTrip(snapshot: NonNullable<TripPinStatusPayload["trip"]>, tokens: {
   adminToken?: string | null
   publicToken?: string | null
@@ -3102,7 +3121,7 @@ function FlightsSection({
       tripSlug: routeSlug,
       adminToken: tripAdminToken,
       publicToken: tripPublicToken,
-      accessMode: adminLinkMutationMode ? "admin" : "public",
+      accessMode: canWrite ? "admin" : "public",
       disposition: "inline",
     })
 
@@ -3983,7 +4002,7 @@ function ItinerarySection({
         tripSlug: routeSlug,
         adminToken: tripAdminToken,
         publicToken: tripPublicToken,
-        accessMode: adminLinkMutationMode ? "admin" : "public",
+        accessMode: canWrite ? "admin" : "public",
         disposition: "inline",
       })
       window.open(href, "_blank", "noopener,noreferrer")
@@ -4716,7 +4735,7 @@ function DocumentsSection({
         tripSlug={routeSlug}
         adminToken={tripAdminToken}
         publicToken={tripPublicToken}
-        accessMode={adminLinkMutationMode ? "admin" : "public"}
+        accessMode={canWrite ? "admin" : "public"}
         title="Desbloquear Documentos"
         configuredDescription="Use o PIN ja criado no portal para acessar os documentos protegidos."
         onSuccess={() => {
@@ -4734,7 +4753,7 @@ function DocumentsSection({
         tripSlug={routeSlug}
         adminToken={tripAdminToken}
         publicToken={tripPublicToken}
-        accessMode={adminLinkMutationMode ? "admin" : "public"}
+        accessMode={canWrite ? "admin" : "public"}
         offlineReadOnly={offlineReadOnly}
         offlineDocumentContext={offlineDocumentContext}
       />
@@ -5864,11 +5883,11 @@ function ShareModal({ open, onClose, tripData }: { open: boolean; onClose: () =>
   return (
     <Modal open={open} onClose={onClose} title="Compartilhar Viagem">
       <div className="space-y-4">
-        {isAdmin && (
+        {false && isAdmin && (
           <div className="p-4 rounded-xl bg-gradient-to-br from-[#5de0e6]/10 to-[#004aad]/10 border border-[#5de0e6]/20">
             <div className="flex items-center gap-2 mb-3">
               <Lock className="w-4 h-4 text-[#5de0e6]" />
-              <span className="text-sm font-medium text-white">Link Administrador</span>
+              <span className="text-sm font-medium text-white">Link da Viagem</span>
             </div>
             <p className="text-xs text-white/40 mb-3">Acesso completo a todos os documentos</p>
             <div className="flex items-center gap-2 p-3 rounded-xl bg-black/30">
@@ -5883,9 +5902,9 @@ function ShareModal({ open, onClose, tripData }: { open: boolean; onClose: () =>
         <div className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.06]">
           <div className="flex items-center gap-2 mb-3">
             <Globe className="w-4 h-4 text-white/60" />
-            <span className="text-sm font-medium text-white">Link Compartilhável</span>
+            <span className="text-sm font-medium text-white">Link da Viagem</span>
           </div>
-          <p className="text-xs text-white/40 mb-3">Sem documentos privados</p>
+          <p className="text-xs text-white/40 mb-3">Um único link para acompanhar a viagem com segurança.</p>
           <div className="flex items-center gap-2 p-3 rounded-xl bg-white/[0.03]">
             <code className="flex-1 text-xs text-white/60 truncate">{tripData.shareLink}</code>
             <Button size="sm" variant="ghost" onClick={() => handleCopy("public", tripData.shareLink)} className="text-white/60">
@@ -6161,7 +6180,7 @@ function TravelersModal({
           </div>
         ) : (
           <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4 text-sm text-white/50">
-            Este link está em modo de visualização. O gerenciamento de viajantes fica disponível apenas no link administrador.
+            Este link está em modo de visualização. O gerenciamento de viajantes fica disponível apenas para responsáveis autenticados.
           </div>
         )}
       </div>
@@ -6268,7 +6287,7 @@ function TripSettingsModal({
           </Button>
         ) : (
           <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4 text-sm text-white/50">
-            Este link está em modo de visualização. As configurações da viagem ficam disponíveis apenas no link administrador.
+            Este link está em modo de visualização. As configurações da viagem ficam disponíveis apenas para responsáveis autenticados.
           </div>
         )}
       </div>
@@ -7257,6 +7276,8 @@ export default function TripPage() {
   const [travelersLoading, setTravelersLoading] = useState(false)
   const [sensitiveAccessGranted, setSensitiveAccessGranted] = useState(false)
   const [securityModalOpen, setSecurityModalOpen] = useState(false)
+  const [securityAccessMode, setSecurityAccessMode] = useState<TripPinApiAccessMode>("public")
+  const [authenticatedAdminEligible, setAuthenticatedAdminEligible] = useState(false)
   const [adminLinkMutationMode, setAdminLinkMutationMode] = useState(false)
   const [premiumGateModalOpen, setPremiumGateModalOpen] = useState(false)
   const [offlineModeEnabled, setOfflineModeEnabled] = useState(false)
@@ -7283,6 +7304,7 @@ export default function TripPage() {
 
   const handleCloseSensitiveAccessModal = () => {
     setSecurityModalOpen(false)
+    setSecurityAccessMode("public")
     pendingSensitiveActionRef.current = null
   }
 
@@ -7432,13 +7454,15 @@ export default function TripPage() {
     const publicToken = routeSearchParams.get("token") || routeSearchParams.get("publicToken")
     const isPublicRoute = pathname?.startsWith("/v/") ?? false
     const isAdminRoute = isAdminLinkMode(routeSearchParams, pathname)
+    const isCleanTripRoute = Boolean((pathname?.startsWith("/viagem/") ?? false) && !isAdminRoute)
 
-    if (isAdminRoute && authLoading) {
+    if ((isAdminRoute || isCleanTripRoute) && authLoading) {
       return
     }
 
     setIsAdmin(false)
     setCanWrite(false)
+    setAuthenticatedAdminEligible(false)
     setTripAdminToken(adminToken)
     setTripPublicToken(publicToken)
     setAdminLinkMutationMode(false)
@@ -7688,9 +7712,21 @@ export default function TripPage() {
           setTripAdminToken(resolvedTrip.adminToken ?? adminToken ?? null)
           setTripPublicToken(resolvedTrip.publicToken ?? publicToken ?? null)
           const isOwner = Boolean(user?.id && resolvedTrip.ownerUserId && user.id === resolvedTrip.ownerUserId)
-          const isPublicLinkRequest = isPublicRoute || Boolean(publicToken)
+          const authenticatedAdminAccess = hasTripAuthenticatedAdminAccess({
+            userId: user?.id ?? null,
+            profileRole: profile?.role ?? null,
+            profileAgencyId: profile?.agencyId ?? null,
+            ownerUserId: resolvedTrip.ownerUserId ?? null,
+            tripAgencyId: resolvedAgencyId,
+          })
+          const isPublicLinkRequest = isPublicRoute || (!isAdminRoute && !authenticatedAdminAccess && !publicToken)
           const adminLinkAccessMode = isAdminRoute && !isOwner
-          const adminPinGranted = !isAdminRoute || sensitiveAccessGranted
+          const adminAccessAllowed = isAdminRoute || authenticatedAdminAccess
+          const adminPinGranted = !adminAccessAllowed || sensitiveAccessGranted
+          const canEditTrip = adminAccessAllowed && adminPinGranted && (authenticatedAdminAccess || adminLinkAccessMode)
+          const canWriteTrip = adminAccessAllowed && adminPinGranted && (authenticatedAdminAccess || adminLinkAccessMode)
+
+          setAuthenticatedAdminEligible(authenticatedAdminAccess)
 
           logTripDocumentsDev("trip_resolved", {
             routeSlug,
@@ -7700,6 +7736,7 @@ export default function TripPage() {
             hasAdminToken: Boolean(adminToken),
             hasPublicToken: Boolean(publicToken),
             isOwner,
+            authenticatedAdminAccess,
           })
 
           if (isPublicLinkRequest && resolvedTrip.visibility !== "public") {
@@ -7709,10 +7746,7 @@ export default function TripPage() {
             return
           }
 
-          setAdminLinkMutationMode(adminLinkAccessMode && adminPinGranted)
-
-          const canEditTrip = isAdminRoute && adminPinGranted && (Boolean(user) ? (isOwner || adminLinkAccessMode) : true)
-          const canWriteTrip = isAdminRoute && adminPinGranted && (isOwner || adminLinkAccessMode)
+          setAdminLinkMutationMode(Boolean(isAdminRoute && adminPinGranted && (resolvedTrip.adminToken ?? adminToken ?? null)))
           setIsAdmin(canEditTrip)
           setCanWrite(canWriteTrip)
 
@@ -7747,8 +7781,15 @@ export default function TripPage() {
           void (async () => {
             const sectionsPerf = startPerfMeasure("trip.sections")
             const resolvedAdminToken = resolvedTrip.adminToken ?? adminToken ?? null
-            const adminSectionsPromise = canWriteTrip && isAdminRoute && resolvedAdminToken
-              ? fetch(`/api/trip-admin?tripId=${encodeURIComponent(resolvedTrip.id)}&tripSlug=${encodeURIComponent(routeSlug)}&adminToken=${encodeURIComponent(resolvedAdminToken)}`).then(async (response) => {
+            const adminSectionsQuery = new URLSearchParams({
+              tripId: resolvedTrip.id,
+              tripSlug: routeSlug,
+            })
+            if (resolvedAdminToken) {
+              adminSectionsQuery.set("adminToken", resolvedAdminToken)
+            }
+            const adminSectionsPromise = canWriteTrip && shouldUseSupabase()
+              ? fetch(`/api/trip-admin?${adminSectionsQuery.toString()}`).then(async (response) => {
                   const data = await response.json().catch(() => null)
                   if (!response.ok) {
                     throw new Error(data?.error || "Falha ao carregar dados administrativos da viagem.")
@@ -7984,7 +8025,7 @@ export default function TripPage() {
         setIsLoadingTrip(false)
       }
     })
-  }, [params?.id, params?.slug, pathname, searchParamsKey, user?.id, adminAuthLoading, sensitiveAccessGranted])
+  }, [params?.id, params?.slug, pathname, searchParamsKey, user?.id, profile?.role, profile?.agencyId, adminAuthLoading, sensitiveAccessGranted])
 
   useEffect(() => {
     if (typeof document === "undefined") return
@@ -8125,7 +8166,7 @@ export default function TripPage() {
   }
 
   const ensurePersistedTripTravelers = async () => {
-    if (!adminRouteActive || !canWrite || !shouldUseSupabase()) {
+    if (!canWrite || !shouldUseSupabase()) {
       return true
     }
 
@@ -8162,28 +8203,41 @@ export default function TripPage() {
     router.replace(`/login?redirect=${encodeURIComponent(target)}`)
   }
 
-  const requireSensitiveAccess = (onGranted: () => void) => {
+  const hasRequiredSensitiveAccess = (accessMode: TripPinApiAccessMode) => {
+    if (!sensitiveAccessGranted) return false
+    if (accessMode === "admin") return canWrite
+    return true
+  }
+
+  const requireSensitiveAccess = (
+    onGranted: () => void,
+    accessMode: TripPinApiAccessMode = authenticatedAdminEligible || adminRouteActive ? "admin" : "public",
+  ) => {
     if (!tripData.id) {
       showToast("Não foi possível validar a segurança desta viagem.", "error")
       return
     }
 
-    if (sensitiveAccessGranted) {
+    if (hasRequiredSensitiveAccess(accessMode)) {
       onGranted()
       return
     }
 
     pendingSensitiveActionRef.current = onGranted
+    setSecurityAccessMode(accessMode)
     setSecurityModalOpen(true)
   }
 
-  const ensureSensitiveAccess = () => {
+  const ensureSensitiveAccess = (
+    accessMode: TripPinApiAccessMode = authenticatedAdminEligible || adminRouteActive ? "admin" : "public",
+  ) => {
     if (!tripData.id) {
       showToast("Não foi possível validar a segurança desta viagem.", "error")
       return false
     }
 
-    if (!sensitiveAccessGranted) {
+    if (!hasRequiredSensitiveAccess(accessMode)) {
+      setSecurityAccessMode(accessMode)
       setSecurityModalOpen(true)
       return false
     }
@@ -8881,7 +8935,7 @@ export default function TripPage() {
   }
 
   const handleOpenTravelers = async () => {
-    if (adminRouteActive && canWrite) {
+    if (canWrite) {
       const ready = await ensurePersistedTripTravelers()
       if (!ready) return
     }
@@ -8895,7 +8949,7 @@ export default function TripPage() {
       requireSensitiveAccess(() => { void handleOpenTravelers() })
       return false
     }
-    if (!(adminRouteActive && tripAdminToken)) {
+    if (!canWrite) {
       showToast("Este modo de viagem ainda não permite salvar viajantes reais.", "info")
       return false
     }
@@ -8927,7 +8981,7 @@ export default function TripPage() {
       requireSensitiveAccess(() => { void handleOpenTravelers() })
       return false
     }
-    if (!(adminRouteActive && tripAdminToken)) {
+    if (!canWrite) {
       showToast("Este modo de viagem ainda não permite salvar viajantes reais.", "info")
       return false
     }
@@ -8964,7 +9018,7 @@ export default function TripPage() {
       requireSensitiveAccess(() => { void handleOpenTravelers() })
       return false
     }
-    if (!(adminRouteActive && tripAdminToken)) {
+    if (!canWrite) {
       showToast("Este modo de viagem ainda não permite salvar viajantes reais.", "info")
       return false
     }
@@ -9002,7 +9056,7 @@ export default function TripPage() {
       requireSensitiveAccess(() => { void handleOpenTravelers() })
       return false
     }
-    if (!(adminRouteActive && tripAdminToken)) {
+    if (!canWrite) {
       showToast("Este modo de viagem ainda não permite salvar viajantes reais.", "info")
       return false
     }
@@ -9225,12 +9279,19 @@ export default function TripPage() {
               tripSlug={routeSlug}
               adminToken={tripAdminToken}
               publicToken={tripPublicToken}
-              accessMode="public"
-              title="Desbloquear areas protegidas"
-              configuredDescription="Use o PIN ja criado no portal para abrir documentos, passagens, hospedagens e outras areas protegidas."
+              accessMode={securityAccessMode}
+              title={securityAccessMode === "admin" ? "Desbloquear para editar esta viagem" : "Desbloquear areas protegidas"}
+              configuredDescription={securityAccessMode === "admin"
+                ? "Use o PIN ja criado no portal para liberar a edicao e os dados protegidos desta viagem."
+                : "Use o PIN ja criado no portal para abrir documentos, passagens, hospedagens e outras areas protegidas."}
               tone="light"
               onSuccess={() => {
                 setSensitiveAccessGranted(true)
+                if (securityAccessMode === "admin" && (authenticatedAdminEligible || adminRouteActive)) {
+                  setIsAdmin(true)
+                  setCanWrite(true)
+                  setAdminLinkMutationMode(Boolean(adminRouteActive && tripAdminToken))
+                }
                 setSecurityModalOpen(false)
                 const pendingAction = pendingSensitiveActionRef.current
                 pendingSensitiveActionRef.current = null
@@ -9274,7 +9335,7 @@ export default function TripPage() {
               onSetPrimaryTraveler={handleSetPrimaryTraveler}
             />
             <TripSettingsModal open={tripSettingsOpen} onClose={() => setTripSettingsOpen(false)} tripData={tripData} onSave={handleSaveTripSettings} />
-            <LinkSecurityInfoModal open={securitySettingsOpen} onClose={() => setSecuritySettingsOpen(false)} tripId={tripData.id} tripSlug={routeSlug} adminToken={tripAdminToken} publicToken={tripPublicToken} accessMode="public" />
+            <LinkSecurityInfoModal open={securitySettingsOpen} onClose={() => setSecuritySettingsOpen(false)} tripId={tripData.id} tripSlug={routeSlug} adminToken={tripAdminToken} publicToken={tripPublicToken} accessMode={authenticatedAdminEligible ? "admin" : "public"} />
             {!isAgencyTrip ? <TravelerPublicCreditsModal open={creditsOpen} onClose={() => setCreditsOpen(false)} credits={travelerCredits} /> : null}
             <Modal open={premiumGateModalOpen} onClose={() => setPremiumGateModalOpen(false)} title="Disponível no Premium">
               <div className="space-y-5">
@@ -9625,7 +9686,7 @@ export default function TripPage() {
             onSetPrimaryTraveler={handleSetPrimaryTraveler}
           />
           <TripSettingsModal open={tripSettingsOpen} onClose={() => setTripSettingsOpen(false)} tripData={tripData} onSave={handleSaveTripSettings} />
-          <LinkSecurityInfoModal open={securitySettingsOpen} onClose={() => setSecuritySettingsOpen(false)} tripId={tripData.id} tripSlug={routeSlug} adminToken={tripAdminToken} publicToken={tripPublicToken} accessMode={adminRouteActive ? "admin" : "public"} />
+          <LinkSecurityInfoModal open={securitySettingsOpen} onClose={() => setSecuritySettingsOpen(false)} tripId={tripData.id} tripSlug={routeSlug} adminToken={tripAdminToken} publicToken={tripPublicToken} accessMode={canWrite || adminRouteActive || authenticatedAdminEligible ? "admin" : "public"} />
           {!isAgencyTrip ? <LinkCreditsSummaryModal open={creditsOpen} onClose={() => setCreditsOpen(false)} credits={travelerCredits} /> : null}
           <Modal open={premiumGateModalOpen} onClose={() => setPremiumGateModalOpen(false)} title="Disponível no Premium">
             <div className="space-y-5">

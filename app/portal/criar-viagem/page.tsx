@@ -597,12 +597,12 @@ export default function CriarViagemPage() {
                 </div>
               </div>
 
-              {/* Admin Link */}
+              {false && (
               <Card className="p-5 bg-card/50 border-border/50">
                 <div className="flex items-start gap-3 mb-3">
                   <Shield size={20} className="text-amber-400" />
                   <div className="flex-1">
-                    <h3 className="font-semibold">Link Administrador</h3>
+                    <h3 className="font-semibold">Link da Viagem</h3>
                     <p className="text-xs text-muted-foreground">Guarde com seguranca - acesso completo</p>
                   </div>
                   <Badge className="bg-amber-500/20 text-amber-400 border-0 text-xs">
@@ -620,17 +620,17 @@ export default function CriarViagemPage() {
                   </Button>
                 </div>
               </Card>
+              )}
 
-              {/* Share Link */}
               <Card className="p-5 bg-primary/5 border-primary/20">
                 <div className="flex items-start gap-3 mb-3">
                   <Share2 size={20} className="text-primary" />
                   <div className="flex-1">
-                    <h3 className="font-semibold">Link compartilhável</h3>
-                    <p className="text-xs text-muted-foreground">Compartilhe com familia e amigos</p>
+                    <h3 className="font-semibold">Link da Viagem</h3>
+                    <p className="text-xs text-muted-foreground">Compartilhe um único link com família e amigos</p>
                   </div>
                   <Badge className="bg-primary/20 text-primary border-0 text-xs">
-                    Publico
+                    Único
                   </Badge>
                 </div>
                 <div className="flex items-center gap-2 p-3 rounded-xl bg-background/50 border border-primary/20">
@@ -657,7 +657,7 @@ export default function CriarViagemPage() {
                 </Button>
                 <Button 
                   className="flex-1 rounded-xl bg-gradient-to-r from-[#5de0e6] to-[#004aad] text-white border-0"
-                  onClick={() => router.push(createdTrip.adminLink.replace(/^https?:\/\/[^/]+/, ""))}
+                  onClick={() => router.push(createdTrip.shareLink.replace(/^https?:\/\/[^/]+/, ""))}
                 >
                   <ExternalLink size={16} className="mr-2" />
                   Ver Viagem
@@ -692,7 +692,7 @@ export default function CriarViagemPage() {
         </div>
       )}
 
-      <Toast message={copiedLink === "admin" ? "Link admin copiado!" : "Link público copiado!"} visible={!!copiedLink} />
+      <Toast message="Link da viagem copiado!" visible={!!copiedLink} />
       <PortalActionDialog
         open={showLimitDialog}
         onOpenChange={setShowLimitDialog}
