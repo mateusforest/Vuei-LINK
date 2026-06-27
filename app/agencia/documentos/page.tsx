@@ -17,6 +17,7 @@ import {
   Shield,
   X,
   FolderOpen,
+  Pencil,
 } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -85,11 +86,15 @@ export default function DocumentsPage() {
   const [filter, setFilter] = useState("all")
   const [privacyFilter, setPrivacyFilter] = useState<"all" | "private" | "shared">("all")
   const [uploadModalOpen, setUploadModalOpen] = useState(false)
+  const [editModalOpen, setEditModalOpen] = useState(false)
   const [dragOver, setDragOver] = useState(false)
   const [uploading, setUploading] = useState(false)
+  const [savingEdit, setSavingEdit] = useState(false)
   const [actionError, setActionError] = useState("")
   const [actionNotice, setActionNotice] = useState("")
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [editingDocument, setEditingDocument] = useState<AgencyDocument | null>(null)
+  const [editingDocumentName, setEditingDocumentName] = useState("")
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const [uploadData, setUploadData] = useState({
     name: "",
@@ -116,12 +121,12 @@ export default function DocumentsPage() {
   })
 
   const handleUpload = async () => {
-    if (!uploadData.name || !selectedFile) return
+    if (!selectedFile) return
     setUploading(true)
     setActionError("")
     setActionNotice("")
     const created = await addDocument({
-      name: uploadData.name,
+      name: uploadData.name.trim() || selectedFile.name,
       type: uploadData.type,
       clientId: uploadData.clientId || undefined,
       tripId: uploadData.tripId || undefined,
@@ -191,7 +196,41 @@ export default function DocumentsPage() {
     setActionError("")
     setActionNotice("")
     setSelectedFile(file)
-    setUploadData((prev) => ({ ...prev, name: prev.name || file.name }))
+  }
+
+  const handleStartEdit = (doc: AgencyDocument) => {
+    setActionError("")
+    setActionNotice("")
+    setEditingDocument(doc)
+    setEditingDocumentName(doc.name || "")
+    setEditModalOpen(true)
+  }
+
+  const handleSaveDocumentName = async () => {
+    if (!editingDocument) return
+
+    const trimmedName = editingDocumentName.trim()
+    if (!trimmedName) {
+      setActionError("Informe um nome para o documento.")
+      return
+    }
+
+    setSavingEdit(true)
+    setActionError("")
+
+    const result = await updateDocumentMetadata(editingDocument.id, {
+      name: trimmedName,
+    })
+
+    setSavingEdit(false)
+
+    if (!result.data) {
+      setActionError(result.error || "Não foi possível atualizar o nome do documento.")
+      return
+    }
+
+    setEditModalOpen(false)
+    window.location.reload()
   }
 
   const handleOpenDocument = async (doc: AgencyDocument) => {
@@ -427,6 +466,10 @@ export default function DocumentsPage() {
                               </>
                             )}
                           </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleStartEdit(doc)}>
+                            <Pencil className="mr-2 h-4 w-4" />
+                            Editar
+                          </DropdownMenuItem>
                           <DropdownMenuSeparator className="bg-white/10" />
                           <DropdownMenuItem 
                             onClick={() => handleDelete(doc.id)}
@@ -483,16 +526,16 @@ export default function DocumentsPage() {
                   <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-200 border-t-primary" />
                   <p className="text-sm text-slate-600">Enviando...</p>
                 </div>
-              ) : uploadData.name ? (
+              ) : selectedFile ? (
                 <div className="flex flex-col items-center gap-2">
                   <div className="rounded-xl bg-primary/10 p-3">
                     <FileText className="h-8 w-8 text-primary" />
                   </div>
-                  <p className="text-sm font-medium text-slate-950">{uploadData.name}</p>
+                  <p className="text-sm font-medium text-slate-950">{selectedFile.name}</p>
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={(e) => { e.stopPropagation(); setUploadData({ ...uploadData, name: "" }); setSelectedFile(null) }}
+                    onClick={(e) => { e.stopPropagation(); setSelectedFile(null) }}
                     className="text-xs text-slate-600 hover:bg-sky-50 hover:text-slate-900"
                   >
                     <X className="w-3 h-3 mr-1" />
@@ -506,6 +549,18 @@ export default function DocumentsPage() {
                   <p className="mt-1 text-xs text-slate-500">PDF, JPG, PNG ate 10MB</p>
                 </>
               )}
+            </div>
+
+            <div>
+              <Label className="text-slate-700">Nome do documento</Label>
+              <input
+                type="text"
+                value={uploadData.name}
+                onChange={(e) => setUploadData({ ...uploadData, name: e.target.value })}
+                placeholder={selectedFile ? selectedFile.name : "Ex: Voucher do hotel"}
+                className="mt-1.5 h-10 w-full rounded-xl border border-border/70 bg-white px-3 text-sm text-slate-950 placeholder:text-slate-400 focus:border-primary/40 focus:outline-none focus:ring-1 focus:ring-primary/40"
+              />
+              <p className="mt-1 text-xs text-slate-500">Opcional. Se nao preencher, manteremos o nome atual do arquivo.</p>
             </div>
 
             <div>
@@ -590,11 +645,48 @@ export default function DocumentsPage() {
               </Button>
               <Button 
                 onClick={handleUpload}
-                disabled={!uploadData.name || !selectedFile || uploading}
+                disabled={!selectedFile || uploading}
                 className="flex-1 bg-gradient-to-r from-primary to-accent text-white disabled:opacity-50"
               >
                 <Upload className="mr-2 h-4 w-4" />
                 Enviar
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={editModalOpen} onOpenChange={setEditModalOpen}>
+        <DialogContent className="agency-dialog sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-slate-950">Editar nome do documento</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label className="text-slate-700">Nome do documento</Label>
+              <input
+                type="text"
+                value={editingDocumentName}
+                onChange={(e) => setEditingDocumentName(e.target.value)}
+                placeholder="Ex: Voucher do hotel"
+                className="mt-1.5 h-10 w-full rounded-xl border border-border/70 bg-white px-3 text-sm text-slate-950 placeholder:text-slate-400 focus:border-primary/40 focus:outline-none focus:ring-1 focus:ring-primary/40"
+              />
+            </div>
+
+            <div className="flex gap-3">
+              <Button
+                variant="outline"
+                onClick={() => setEditModalOpen(false)}
+                className="flex-1 border-border/70 bg-white text-slate-900 hover:bg-sky-50"
+              >
+                Cancelar
+              </Button>
+              <Button
+                onClick={() => void handleSaveDocumentName()}
+                disabled={savingEdit}
+                className="flex-1 bg-gradient-to-r from-primary to-accent text-white disabled:opacity-50"
+              >
+                Salvar
               </Button>
             </div>
           </div>
