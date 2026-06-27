@@ -1124,7 +1124,7 @@ function getFlightStatusCopy(flight: any) {
   if (flight.extractionStatus === "failed") {
     return {
       eyebrow: "Passagem anexada",
-      detail: "Nao foi possivel extrair os dados desta passagem. Envie um cartao de embarque individual ou uma imagem limpa, sem cortes e com todos os dados visiveis.",
+      detail: "Não foi possível extrair os dados desta passagem. Envie um cartão de embarque individual ou uma imagem limpa, sem cortes e com todos os dados visíveis.",
       tone: "error" as const,
     }
     return {

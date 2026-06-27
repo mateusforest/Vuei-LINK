@@ -1355,7 +1355,6 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
             tripId: data.tripId,
             documentId: metadataResult.data.id,
             flightId: flightResult.data.id,
-            tripSlug: getTripById(data.tripId)?.slug ?? null,
           })
 
           if (extractionResult.error) {

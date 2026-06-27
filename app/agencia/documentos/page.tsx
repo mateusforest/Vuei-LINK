@@ -120,6 +120,19 @@ export default function DocumentsPage() {
     })
     setUploading(false)
     if (created) {
+      const isTicketUpload = uploadData.type === "ticket"
+      if (isTicketUpload) {
+        if (created.flightExtractionStatus === "failed") {
+          setActionError("Não foi possível extrair os dados desta passagem. Envie um cartão de embarque individual ou uma imagem limpa, sem cortes e com todos os dados visíveis.")
+        } else {
+          setActionNotice("Passagem anexada. Estamos extraindo as informações.")
+        }
+        setUploadModalOpen(false)
+        setSelectedFile(null)
+        setUploadData({ name: "", type: "voucher", clientId: "", tripId: "", isPrivate: false })
+        return
+      }
+
       if (uploadData.type === "ticket") {
         if (created.flightExtractionStatus === "failed") {
           setActionError(created.extractionError || "Passagem anexada, mas não foi possível iniciar a extração agora.")

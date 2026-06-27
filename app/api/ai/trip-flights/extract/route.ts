@@ -394,7 +394,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Trip, document e flight sao obrigatorios para processar a passagem." }, { status: 400 })
   }
 
-  const adminAccessRequested = Boolean(adminToken || tripSlug)
+  const adminAccessRequested = Boolean(adminToken)
   if (adminAccessRequested && !hasSupabaseAdminEnv()) {
     console.error("[AI][FLIGHT_EXTRACTION] missing admin env", {
       tripId,
