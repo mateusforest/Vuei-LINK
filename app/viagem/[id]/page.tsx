@@ -7476,7 +7476,7 @@ export default function TripPage() {
     if (typeof window === "undefined") return
 
     const routeSearchParams = new URLSearchParams(searchParamsKey)
-    const adminToken = routeSearchParams.get("adminToken")
+    const adminToken = routeSearchParams.get("adminToken") ?? tripAdminToken
     const publicToken = routeSearchParams.get("token") || routeSearchParams.get("publicToken")
     const isPublicRoute = pathname?.startsWith("/v/") ?? false
     const isAdminRoute = adminRouteActive || isAdminLinkMode(routeSearchParams, pathname)
