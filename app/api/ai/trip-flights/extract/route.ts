@@ -274,10 +274,10 @@ function normalizeExtractedDateTime(value: unknown, rawText: unknown) {
 
     const isoDateTimeMatch = candidate.match(/^(\d{4}-\d{2}-\d{2})[tT ](\d{1,2}):(\d{2})(?::(\d{2}))?([zZ]|[+-]\d{2}:\d{2})?$/)
     if (isoDateTimeMatch) {
-      const [, datePart, hourPart, minutePart, secondPart, timezonePart] = isoDateTimeMatch
+      const [, datePart, hourPart, minutePart, secondPart] = isoDateTimeMatch
       const normalizedHour = hourPart.padStart(2, "0")
       const normalizedSecond = secondPart ?? "00"
-      return `${datePart}T${normalizedHour}:${minutePart}:${normalizedSecond}${timezonePart ?? ""}`
+      return `${datePart}T${normalizedHour}:${minutePart}:${normalizedSecond}`
     }
 
     const localizedDateTimeMatch = candidate.match(/^(\d{1,2})[\/.-](\d{1,2})(?:[\/.-](\d{2,4}))?(?:\s+|[tT-])(\d{1,2}):(\d{2})$/)
