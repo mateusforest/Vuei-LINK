@@ -7252,8 +7252,6 @@ export default function TripPage() {
         ? params.slug
         : initialTripData.id
   const searchParamsKey = searchParams?.toString() ?? ""
-  const adminRouteLoadActive = isAdminLinkMode(new URLSearchParams(searchParamsKey), pathname)
-  const adminAuthLoading = adminRouteLoadActive ? authLoading : false
   const [tripData, setTripData] = useState(() => normalizeTripViewData(initialTripData))
   const [isAdmin, setIsAdmin] = useState(false)
   const [canWrite, setCanWrite] = useState(false)
@@ -7454,9 +7452,8 @@ export default function TripPage() {
     const publicToken = routeSearchParams.get("token") || routeSearchParams.get("publicToken")
     const isPublicRoute = pathname?.startsWith("/v/") ?? false
     const isAdminRoute = isAdminLinkMode(routeSearchParams, pathname)
-    const isCleanTripRoute = Boolean((pathname?.startsWith("/viagem/") ?? false) && !isAdminRoute)
 
-    if ((isAdminRoute || isCleanTripRoute) && authLoading) {
+    if (isAdminRoute && authLoading) {
       return
     }
 
@@ -8025,7 +8022,7 @@ export default function TripPage() {
         setIsLoadingTrip(false)
       }
     })
-  }, [params?.id, params?.slug, pathname, searchParamsKey, user?.id, profile?.role, profile?.agencyId, adminAuthLoading, sensitiveAccessGranted])
+  }, [params?.id, params?.slug, pathname, searchParamsKey, authLoading, user?.id, profile?.role, profile?.agencyId, sensitiveAccessGranted])
 
   useEffect(() => {
     if (typeof document === "undefined") return
