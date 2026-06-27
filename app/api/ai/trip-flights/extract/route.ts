@@ -609,12 +609,14 @@ export async function POST(request: Request) {
       }
     : null
   const usefulFieldCount = countUsefulFlightFields(normalizedExtractionPayload)
-  const partial = Boolean(normalizedExtractionPayload?.is_ticket && isPartialFlightExtraction(normalizedExtractionPayload))
-  const completed = Boolean(normalizedExtractionPayload?.is_ticket && usefulFieldCount > 0)
+  const hasUsefulExtraction = usefulFieldCount > 0
+  const recognizedAsTicket = Boolean(normalizedExtractionPayload?.is_ticket || hasUsefulExtraction)
+  const partial = Boolean(recognizedAsTicket && isPartialFlightExtraction(normalizedExtractionPayload))
+  const completed = Boolean(recognizedAsTicket && hasUsefulExtraction)
   const failureReason =
     aiResult.error ||
     normalizedExtractionPayload?.failure_reason ||
-    (!normalizedExtractionPayload?.is_ticket ? "O arquivo analisado n?o parece ser uma passagem aerea." : null) ||
+    (!recognizedAsTicket ? "O arquivo analisado n?o parece ser uma passagem aerea." : null) ||
     (usefulFieldCount === 0 ? "N?o foi poss?vel identificar dados ?teis nesta passagem." : null)
 
   const metadata: JsonObject = {
@@ -639,6 +641,7 @@ export async function POST(request: Request) {
     strategy: completed ? "ai_ticket_completed" : partial ? "ai_ticket_partial_failed" : "ai_ticket_failed",
     usefulFieldCount,
     isTicket: Boolean(normalizedExtractionPayload?.is_ticket),
+    recognizedAsTicket,
     shouldChargeCredits: Boolean(shouldChargeCredits && completed),
   })
 
