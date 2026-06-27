@@ -3793,13 +3793,32 @@ function HotelSection({
 function EditHotelModal({ open, onClose, hotel, onSave }: { open: boolean; onClose: () => void; hotel: any; onSave: (data: any) => Promise<boolean> }) {
   const [formData, setFormData] = useState(hotel)
   const [saving, setSaving] = useState(false)
+  const [uploadError, setUploadError] = useState("")
 
   useEffect(() => {
     setFormData(hotel || {})
+    setUploadError("")
   }, [hotel])
 
+  const handleVoucherSelected = (file?: File | null) => {
+    if (!file) {
+      setFormData((prev: any) => ({ ...prev, voucherFile: null }))
+      setUploadError("")
+      return
+    }
+
+    const validation = validateDocumentFile(file)
+    if (!validation.valid) {
+      setUploadError(validation.error || "Arquivo invalido.")
+      return
+    }
+
+    setUploadError("")
+    setFormData((prev: any) => ({ ...prev, voucherFile: file }))
+  }
+
   const handleSave = async () => {
-    if (saving || !formData.name) return
+    if (saving || !formData.name || uploadError) return
     setSaving(true)
     try {
       const success = await onSave(formData)
@@ -3869,7 +3888,36 @@ function EditHotelModal({ open, onClose, hotel, onSave }: { open: boolean; onClo
             className="w-full mt-1 min-h-24 px-4 py-3 rounded-xl bg-white/[0.05] border border-white/[0.08] text-white focus:outline-none focus:border-[#5de0e6]/50"
           />
         </div>
-        <Button onClick={() => void handleSave()} disabled={saving || !formData.name} className="w-full mt-4 bg-gradient-to-r from-[#5de0e6] to-[#004aad] hover:opacity-90 text-white border-0 disabled:opacity-50">
+        <div>
+          <label className="text-xs text-white/50 uppercase tracking-wider">Voucher</label>
+          <label className="mt-1 flex cursor-pointer items-center justify-between gap-3 rounded-xl border border-dashed border-white/[0.12] bg-white/[0.03] px-4 py-3 text-sm text-white/70 transition-colors hover:border-[#5de0e6]/40 hover:text-white">
+            <span className="truncate">
+              {formData.voucherFile instanceof File
+                ? formData.voucherFile.name
+                : formData.documentId
+                  ? "Voucher vinculado. Selecione outro arquivo para substituir."
+                  : "Selecionar voucher (PDF, PNG, JPG, JPEG, HEIC ou HEIF)"}
+            </span>
+            <Upload className="h-4 w-4 shrink-0" />
+            <input
+              type="file"
+              accept=".pdf,.png,.jpg,.jpeg,.heic,.heif,image/heic,image/heif"
+              className="hidden"
+              onChange={(e) => handleVoucherSelected(e.target.files?.[0])}
+            />
+          </label>
+          {formData.voucherFile instanceof File ? (
+            <button
+              type="button"
+              onClick={() => handleVoucherSelected(null)}
+              className="mt-2 text-xs text-white/45 transition-colors hover:text-white/70"
+            >
+              Remover novo voucher selecionado
+            </button>
+          ) : null}
+          {uploadError ? <p className="mt-2 text-sm text-red-300">{uploadError}</p> : null}
+        </div>
+        <Button onClick={() => void handleSave()} disabled={saving || !formData.name || Boolean(uploadError)} className="w-full mt-4 bg-gradient-to-r from-[#5de0e6] to-[#004aad] hover:opacity-90 text-white border-0 disabled:opacity-50">
           {saving ? "Salvando..." : "Salvar alterações"}
         </Button>
       </div>
@@ -8677,47 +8725,126 @@ export default function TripPage() {
       return false
     }
 
+    const hotelPayload = {
+      name: data.name,
+      address: data.address,
+      checkIn: data.checkIn,
+      checkOut: data.checkOut,
+      confirmationCode: data.confirmationCode,
+      notes: data.notes,
+    }
+    const isEditingHotel = Boolean(data?.id)
+
     const result = adminLinkMutationMode
       ? await callTripAdminApi<{ hotel?: any }>({
           action: "saveHotel",
           hotelId: data?.id ?? null,
-          name: data.name,
-          address: data.address,
-          checkIn: data.checkIn,
-          checkOut: data.checkOut,
-          confirmationCode: data.confirmationCode,
-          notes: data.notes,
+          ...hotelPayload,
         })
       : data?.id
         ? await updateTripHotel(data.id, {
-            name: data.name,
-            address: data.address,
-            checkIn: data.checkIn,
-            checkOut: data.checkOut,
-            confirmationCode: data.confirmationCode,
-            notes: data.notes,
+            ...hotelPayload,
           })
         : await createTripHotel({
             tripId: tripData.id,
-            name: data.name,
-            address: data.address,
-            checkIn: data.checkIn,
-            checkOut: data.checkOut,
-            confirmationCode: data.confirmationCode,
-            notes: data.notes,
+            ...hotelPayload,
           })
 
-    const savedHotel = adminLinkMutationMode ? result.data?.hotel ?? null : result.data
+    let savedHotel = adminLinkMutationMode ? result.data?.hotel ?? null : result.data
     if (result.error || !savedHotel) {
       console.error("[HOTEL] error", result.error)
       showToast(resolveProtectedWriteError(result.error || "Não foi possível salvar a hospedagem."), "error")
       return false
     }
 
+    if (!data?.id) {
+      data.id = savedHotel.id
+    }
+
+    let linkedDocument: any = null
+    const voucherFile = data?.voucherFile instanceof File ? data.voucherFile : null
+
+    if (voucherFile) {
+      const voucherName = `Voucher - ${String(data.name || "Hospedagem").trim()}`
+      const uploadResult = adminLinkMutationMode
+        ? await callTripAdminUploadApi<{ document?: any }>("uploadDocument", voucherFile, {
+            name: voucherName,
+            type: "voucher",
+            isPrivate: "false",
+            visibility: "public_trip",
+          })
+        : await (async () => {
+            if (!tripOwnerUserId) {
+              return { ok: false, data: null, error: "Entre com login para anexar o voucher desta hospedagem." }
+            }
+
+            const resolvedMimeType = resolveDocumentMimeType(voucherFile)
+            const path = `${tripOwnerUserId}/${tripData.id}/hotel-vouchers/${Date.now()}-${voucherFile.name.replace(/\s+/g, "-")}`
+            const uploadedFile = await uploadDocumentFile(voucherFile, path)
+            if (uploadedFile.error || !uploadedFile.data) {
+              return { ok: false, data: null, error: resolveProtectedWriteError(uploadedFile.error || "NÃ£o foi possÃ­vel anexar o voucher.") }
+            }
+
+            const metadataResult = await createDocumentMetadata({
+              tripId: tripData.id,
+              clientId: null,
+              agencyId: profile?.agencyId ?? null,
+              ownerUserId: tripOwnerUserId,
+              name: voucherName,
+              type: "voucher",
+              filePath: uploadedFile.data.path,
+              fileUrl: uploadedFile.data.fileUrl,
+              mimeType: resolvedMimeType,
+              size: voucherFile.size,
+              isPrivate: false,
+              visibility: "public_trip",
+              aiExtractedData: {},
+            })
+
+            return {
+              ok: !metadataResult.error && Boolean(metadataResult.data),
+              data: metadataResult.data ? { document: metadataResult.data } : null,
+              error: metadataResult.error ? resolveProtectedWriteError(metadataResult.error) : null,
+            }
+          })()
+
+      linkedDocument = uploadResult.data?.document ?? null
+      if (!uploadResult.ok || !linkedDocument) {
+        console.error("[HOTEL] voucher upload error", uploadResult.error)
+        showToast(uploadResult.error || "NÃ£o foi possÃ­vel anexar o voucher da hospedagem.", "error")
+        return false
+      }
+
+      const hotelWithVoucherResult = adminLinkMutationMode
+        ? await callTripAdminApi<{ hotel?: any }>({
+            action: "saveHotel",
+            hotelId: savedHotel.id,
+            documentId: linkedDocument.id,
+            ...hotelPayload,
+          })
+        : await updateTripHotel(savedHotel.id, {
+            ...hotelPayload,
+            documentId: linkedDocument.id,
+          })
+
+      const hotelWithVoucher = adminLinkMutationMode ? hotelWithVoucherResult.data?.hotel ?? null : hotelWithVoucherResult.data
+      if (hotelWithVoucherResult.error || !hotelWithVoucher) {
+        console.error("[HOTEL] voucher link error", hotelWithVoucherResult.error)
+        showToast(resolveProtectedWriteError(hotelWithVoucherResult.error || "NÃ£o foi possÃ­vel vincular o voucher da hospedagem."), "error")
+        return false
+      }
+
+      savedHotel = hotelWithVoucher
+      data.voucherFile = null
+    }
+
     console.log("[HOTEL] success", savedHotel.id)
     setTripData(prev => ({
       ...prev,
-      hotels: data?.id
+      documents: linkedDocument
+        ? [linkedDocument, ...(Array.isArray(prev.documents) ? prev.documents.filter((entry: any) => entry.id !== linkedDocument.id) : [])]
+        : prev.documents,
+      hotels: isEditingHotel
         ? (Array.isArray(prev.hotels) ? prev.hotels : []).map((hotel: any) =>
             hotel.id === savedHotel.id
               ? { ...hotel, ...savedHotel, image: hotel.image ?? null, amenities: hotel.amenities || [] }
@@ -8732,7 +8859,7 @@ export default function TripPage() {
             },
           ],
       hotel:
-        data?.id
+        isEditingHotel
           ? ((Array.isArray(prev.hotels) ? prev.hotels : []).find((hotel: any) => hotel.id === savedHotel.id)
               ? { ...(Array.isArray(prev.hotels) ? prev.hotels : []).find((hotel: any) => hotel.id === savedHotel.id), ...savedHotel, image: null, amenities: [] }
               : { ...savedHotel, image: null, amenities: [] })
