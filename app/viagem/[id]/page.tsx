@@ -4966,7 +4966,7 @@ function PortalPinUnlockModal({
 }: {
   open: boolean
   onClose: () => void
-  onSuccess: () => void
+  onSuccess: (status?: (TripPinStatusPayload & { verified?: boolean; adminToken?: string | null }) | null) => void
   tripId: string
   tripSlug: string
   adminToken: string | null
@@ -5066,7 +5066,7 @@ function PortalPinUnlockModal({
         return
       }
 
-      onSuccess()
+      onSuccess(result.data)
       setPin("")
     } catch (pinError) {
       const message = pinError instanceof Error ? pinError.message : "Não foi possível validar o PIN desta viagem."
@@ -7243,8 +7243,8 @@ export default function TripPage() {
   const router = useRouter()
   const { user, profile, loading: authLoading } = useAuth()
   const [travelerPlan, setTravelerPlan] = useState(() => resolveTravelerPlan(profile))
-  const adminRouteActive = Boolean(pathname?.startsWith("/viagem/") && pathname?.endsWith("/admin"))
-  const isTripLinkRoute = Boolean((pathname?.startsWith("/viagem/") ?? false) || (pathname?.startsWith("/v/") ?? false))
+  const adminRouteActive = Boolean(pathname?.startsWith("/viagem/"))
+  const isTripLinkRoute = Boolean(adminRouteActive || (pathname?.startsWith("/v/") ?? false))
   const routeSlug =
     typeof params?.id === "string"
       ? params.id
@@ -7313,10 +7313,7 @@ export default function TripPage() {
     setCanWrite(false)
     setIsAdmin(false)
     setAdminLinkMutationMode(false)
-    const publicPath = tripPublicToken
-      ? `/v/${routeSlug}?publicToken=${encodeURIComponent(tripPublicToken)}`
-      : `/v/${routeSlug}`
-    router.replace(publicPath)
+    router.replace("/")
   }
 
   useEffect(() => {
@@ -7451,9 +7448,19 @@ export default function TripPage() {
     const adminToken = routeSearchParams.get("adminToken")
     const publicToken = routeSearchParams.get("token") || routeSearchParams.get("publicToken")
     const isPublicRoute = pathname?.startsWith("/v/") ?? false
-    const isAdminRoute = isAdminLinkMode(routeSearchParams, pathname)
+    const isAdminRoute = adminRouteActive || isAdminLinkMode(routeSearchParams, pathname)
 
-    if (isAdminRoute && authLoading) {
+    if (adminRouteActive && !sensitiveAccessGranted) {
+      setIsAdmin(false)
+      setCanWrite(false)
+      setAuthenticatedAdminEligible(false)
+      setTripAdminToken(adminToken)
+      setTripPublicToken(publicToken)
+      setAdminLinkMutationMode(false)
+      setOfflineModeEnabled(false)
+      setOfflinePackageStatus(null)
+      setOfflineDocumentContext(null)
+      setLoadError(null)
       return
     }
 
@@ -8022,7 +8029,7 @@ export default function TripPage() {
         setIsLoadingTrip(false)
       }
     })
-  }, [params?.id, params?.slug, pathname, searchParamsKey, authLoading, user?.id, profile?.role, profile?.agencyId, sensitiveAccessGranted])
+  }, [adminRouteActive, params?.id, params?.slug, pathname, searchParamsKey, authLoading, user?.id, profile?.role, profile?.agencyId, sensitiveAccessGranted])
 
   useEffect(() => {
     if (typeof document === "undefined") return
@@ -9091,6 +9098,39 @@ export default function TripPage() {
     })
   }
 
+  if (adminRouteActive && !sensitiveAccessGranted) {
+    return (
+      <main className="min-h-screen bg-[#f4f1ea] text-slate-900 flex items-center justify-center px-4">
+        <PortalPinUnlockModal
+          open
+          onClose={handleDismissAdminUnlockModal}
+          tripId={tripData.id}
+          tripSlug={routeSlug}
+          adminToken={tripAdminToken}
+          publicToken={tripPublicToken}
+          accessMode="admin"
+          title="Desbloqueie para editar esta viagem"
+          configuredDescription="Use o PIN ja criado no portal para liberar o modo administrador desta viagem."
+          tone="light"
+          onSuccess={(status) => {
+            if (status?.adminToken) {
+              setTripAdminToken(status.adminToken)
+            }
+            setSensitiveAccessGranted(true)
+            setIsAdmin(true)
+            setCanWrite(true)
+            setAdminLinkMutationMode(true)
+            const pendingAction = pendingSensitiveActionRef.current
+            pendingSensitiveActionRef.current = null
+            setToast({ message: "Acesso liberado para esta viagem.", type: "success" })
+            pendingAction?.()
+          }}
+          onLogin={handleRequireAuthenticatedAdmin}
+        />
+      </main>
+    )
+  }
+
   if (isLoadingTrip) {
     return (
       <main className={cn("min-h-screen flex items-center justify-center px-4", isTripLinkRoute ? "bg-[#f4f1ea] text-slate-900" : "bg-black text-white")}>
@@ -9115,36 +9155,6 @@ export default function TripPage() {
               : "Confira se o link está correto ou peça um novo compartilhamento."}
           </p>
         </div>
-      </main>
-    )
-  }
-
-  if (adminRouteActive && !sensitiveAccessGranted) {
-    return (
-      <main className="min-h-screen bg-[#f4f1ea] text-slate-900 flex items-center justify-center px-4">
-        <PortalPinUnlockModal
-          open
-          onClose={handleDismissAdminUnlockModal}
-          tripId={tripData.id}
-          tripSlug={routeSlug}
-          adminToken={tripAdminToken}
-          publicToken={tripPublicToken}
-          accessMode="admin"
-          title="Desbloqueie para editar esta viagem"
-          configuredDescription="Use o PIN ja criado no portal para liberar o modo administrador desta viagem."
-          tone="light"
-          onSuccess={() => {
-            setSensitiveAccessGranted(true)
-            setIsAdmin(true)
-            setCanWrite(true)
-            setAdminLinkMutationMode(true)
-            const pendingAction = pendingSensitiveActionRef.current
-            pendingSensitiveActionRef.current = null
-            setToast({ message: "Acesso liberado para esta viagem.", type: "success" })
-            pendingAction?.()
-          }}
-          onLogin={handleRequireAuthenticatedAdmin}
-        />
       </main>
     )
   }
@@ -9282,12 +9292,15 @@ export default function TripPage() {
                 ? "Use o PIN ja criado no portal para liberar a edicao e os dados protegidos desta viagem."
                 : "Use o PIN ja criado no portal para abrir documentos, passagens, hospedagens e outras areas protegidas."}
               tone="light"
-              onSuccess={() => {
+              onSuccess={(status) => {
+                if (status?.adminToken) {
+                  setTripAdminToken(status.adminToken)
+                }
                 setSensitiveAccessGranted(true)
                 if (securityAccessMode === "admin" && (authenticatedAdminEligible || adminRouteActive)) {
                   setIsAdmin(true)
                   setCanWrite(true)
-                  setAdminLinkMutationMode(Boolean(adminRouteActive && tripAdminToken))
+                  setAdminLinkMutationMode(Boolean(adminRouteActive && (status?.adminToken ?? tripAdminToken)))
                 }
                 setSecurityModalOpen(false)
                 const pendingAction = pendingSensitiveActionRef.current
@@ -9490,7 +9503,10 @@ export default function TripPage() {
               accessMode="admin"
               title="Desbloqueie para editar esta viagem"
               configuredDescription="Use o PIN ja criado no portal para liberar as acoes administrativas desta viagem."
-              onSuccess={() => {
+              onSuccess={(status) => {
+                if (status?.adminToken) {
+                  setTripAdminToken(status.adminToken)
+                }
                 setSensitiveAccessGranted(true)
                 setSecurityModalOpen(false)
                 const pendingAction = pendingSensitiveActionRef.current

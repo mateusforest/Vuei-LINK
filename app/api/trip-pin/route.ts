@@ -89,7 +89,7 @@ async function findTripForPin(
   let query = supabase.from("trips").select("*")
 
   if (params.accessMode === "admin") {
-    if (!params.adminToken) {
+    if (!params.adminToken && !params.tripId && !params.tripSlug) {
       return { trip: null as TripRow | null, error: "Acesso administrativo invalido para esta viagem." }
     }
 
@@ -129,7 +129,7 @@ async function findTripForPin(
   }
 
   if (params.accessMode === "admin") {
-    if (trip.admin_token !== params.adminToken) {
+    if (params.adminToken && trip.admin_token !== params.adminToken) {
       return { trip: null as TripRow | null, error: "Acesso administrativo invalido para esta viagem." }
     }
 
@@ -167,7 +167,7 @@ async function resolveTripFromRequest(request: NextRequest, payload?: Record<str
 
   let accessResult: { trip: TripRow | null; error: string | null }
 
-  if (accessMode === "admin" && !adminToken) {
+  if (accessMode === "admin" && !adminToken && !tripId && !tripSlug) {
     const serverClient = await createSupabaseServerClient()
     const authResult = serverClient ? await serverClient.auth.getUser() : null
     const sessionUser = authResult?.data.user ?? null
@@ -311,6 +311,7 @@ export async function POST(request: NextRequest) {
       pinScope: pinResolution.pinScope,
       ownerType: pinResolution.ownerType,
       trip: mapTripSnapshot(trip),
+      adminToken: verified ? trip.admin_token : null,
     })
   } catch (error) {
     if (isMissingSupabaseAdminEnvError(error)) {
