@@ -2418,6 +2418,7 @@ function buildTravelerCardSummariesClean(tripData: any, itineraryRecords?: TripI
 
 function TravelerPublicShell({
   tripData,
+  itineraryRecords,
   agencyBranding,
   offlineModeEnabled,
   offlinePackageStatus,
@@ -2426,6 +2427,7 @@ function TravelerPublicShell({
   onOpenPanel,
 }: {
   tripData: any
+  itineraryRecords?: TripItineraryRecord[]
   agencyBranding: { name: string | null; logoUrl: string | null; isAgency: boolean }
   offlineModeEnabled: boolean
   offlinePackageStatus: OfflineTripPackageStatus | null
@@ -2434,7 +2436,7 @@ function TravelerPublicShell({
   onOpenPanel: (panel: Exclude<TravelerPublicPanel, null> | "more" | "home") => void
 }) {
   const travelers = Array.isArray(tripData?.travelers) ? tripData.travelers : []
-  const cards = buildTravelerCardSummariesClean(tripData)
+  const cards = buildTravelerCardSummariesClean(tripData, itineraryRecords)
   const parsedDestination = parseTripDestination(tripData?.destination)
   const offlineReady = offlineModeEnabled || tripData?.offlineEnabled || Boolean(offlinePackageStatus)
   const avatarLetter = travelers[0]?.name?.charAt(0)?.toUpperCase() || parsedDestination.city.charAt(0).toUpperCase()
@@ -9249,6 +9251,7 @@ export default function TripPage() {
               <TripLinkLightThemeStyles />
             <TravelerPublicShell
               tripData={tripData}
+              itineraryRecords={tripItineraryRecords}
               agencyBranding={agencyBranding}
               offlineModeEnabled={offlineModeEnabled}
               offlinePackageStatus={offlinePackageStatus}
@@ -9463,6 +9466,7 @@ export default function TripPage() {
             <TripLinkLightThemeStyles />
             <TravelerPublicShell
               tripData={tripData}
+              itineraryRecords={tripItineraryRecords}
               agencyBranding={agencyBranding}
               offlineModeEnabled={offlineModeEnabled}
               offlinePackageStatus={offlinePackageStatus}
