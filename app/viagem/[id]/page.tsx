@@ -2167,12 +2167,15 @@ function getItinerarySummaryState(itineraryDays: any[], itineraryRecords?: TripI
 
 // Quick access cards
 function QuickAccessCards({ tripData, itineraryRecords, onNavigate }: { tripData: any; itineraryRecords?: TripItineraryRecord[]; onNavigate: (section: string) => void }) {
-  const ticketDocuments = Array.isArray(tripData.documents)
-    ? tripData.documents.filter((document: any) => document.type === "ticket")
+  const visibleDocuments = Array.isArray(tripData.documents)
+    ? tripData.documents.filter((document: any) => document.type !== "itinerary")
+    : []
+  const ticketDocuments = visibleDocuments
+    ? visibleDocuments.filter((document: any) => document.type === "ticket")
     : []
   const flightsCount = Array.isArray(tripData?.flights) ? tripData.flights.length : 0
   const itineraryCount = getItinerarySummaryState(Array.isArray(tripData?.itinerary) ? tripData.itinerary : [], itineraryRecords).count
-  const documentsCount = Array.isArray(tripData?.documents) ? tripData.documents.length : 0
+  const documentsCount = visibleDocuments.length
 
   const cards = [
     { id: "flights", icon: Plane, label: "Passagens", color: "from-[#5de0e6] to-[#5de0e6]/50", count: flightsCount || ticketDocuments.length },
@@ -2285,7 +2288,7 @@ function TripLinkLightThemeStyles() {
 function buildTravelerCardSummaries(tripData: any, itineraryRecords?: TripItineraryRecord[]) {
   const flights = Array.isArray(tripData?.flights) ? tripData.flights : []
   const hotels = Array.isArray(tripData?.hotels) ? tripData.hotels : tripData?.hotel ? [tripData.hotel] : []
-  const documents = Array.isArray(tripData?.documents) ? tripData.documents : []
+  const documents = Array.isArray(tripData?.documents) ? tripData.documents.filter((document: any) => document?.type !== "itinerary") : []
   const itinerary = Array.isArray(tripData?.itinerary) ? tripData.itinerary : []
   const flight = getPreferredStructuredFlight(flights)
   const rawHotel = hotels[0]
@@ -2358,7 +2361,7 @@ function buildTravelerCardSummariesClean(tripData: any, itineraryRecords?: TripI
   const hotels = sortHotelsForDisplay(Array.isArray(tripData?.hotels) ? tripData.hotels : tripData?.hotel ? [tripData.hotel] : []).map(
     normalizeHotelForDisplay,
   )
-  const documents = Array.isArray(tripData?.documents) ? tripData.documents : []
+  const documents = Array.isArray(tripData?.documents) ? tripData.documents.filter((document: any) => document?.type !== "itinerary") : []
   const itinerary = Array.isArray(tripData?.itinerary) ? tripData.itinerary : []
   const flight = getPreferredStructuredFlight(flights)
   const hotel = hotels[0] ?? null
@@ -4611,7 +4614,7 @@ function DocumentsSection({
   const { isAdmin, canWrite } = useContext(PermissionContext)
   const { showToast } = useToast()
 
-  const documents = Array.isArray(tripData.documents) ? tripData.documents : []
+  const documents = Array.isArray(tripData.documents) ? tripData.documents.filter((document: any) => document?.type !== "itinerary") : []
   const isPrivateDocument = (document: any) =>
     document?.private === true || document?.isPrivate === true || document?.visibility === "private"
 
