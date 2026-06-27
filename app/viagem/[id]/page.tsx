@@ -908,9 +908,76 @@ function sanitizeFlightTextSafe(value: unknown) {
   return normalized
 }
 
+function parseFlightLocalDateTimeParts(value?: string | null) {
+  const normalizedValue = sanitizeFlightTextSafe(value)
+  if (!normalizedValue) return null
+
+  const timeOnlyMatch = normalizedValue.match(/^(\d{1,2}):(\d{2})$/)
+  if (timeOnlyMatch) {
+    return {
+      year: null as number | null,
+      month: null as number | null,
+      day: null as number | null,
+      hour: Number(timeOnlyMatch[1]),
+      minute: Number(timeOnlyMatch[2]),
+      second: 0,
+      hasDate: false,
+      hasTime: true,
+    }
+  }
+
+  const dateOnlyMatch = normalizedValue.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  if (dateOnlyMatch) {
+    return {
+      year: Number(dateOnlyMatch[1]),
+      month: Number(dateOnlyMatch[2]),
+      day: Number(dateOnlyMatch[3]),
+      hour: null as number | null,
+      minute: null as number | null,
+      second: 0,
+      hasDate: true,
+      hasTime: false,
+    }
+  }
+
+  const dateTimeMatch = normalizedValue.match(/^(\d{4})-(\d{2})-(\d{2})[tT](\d{1,2}):(\d{2})(?::(\d{2}))?(?:[zZ]|[+-]\d{2}:\d{2})?$/)
+  if (dateTimeMatch) {
+    return {
+      year: Number(dateTimeMatch[1]),
+      month: Number(dateTimeMatch[2]),
+      day: Number(dateTimeMatch[3]),
+      hour: Number(dateTimeMatch[4]),
+      minute: Number(dateTimeMatch[5]),
+      second: Number(dateTimeMatch[6] ?? "0"),
+      hasDate: true,
+      hasTime: true,
+    }
+  }
+
+  return null
+}
+
 function formatFlightDateTimeSafe(dateString?: string | null) {
   const normalizedValue = sanitizeFlightTextSafe(dateString)
   if (!normalizedValue) return { date: "Data não informada", time: null as string | null, hasDate: false }
+
+  const parsedParts = parseFlightLocalDateTimeParts(normalizedValue)
+  if (parsedParts) {
+    const formatTime = (hour: number, minute: number) => `${hour.toString().padStart(2, "0")}:${minute.toString().padStart(2, "0")}`
+
+    if (parsedParts.hasDate) {
+      const literalDate = new Date(parsedParts.year!, parsedParts.month! - 1, parsedParts.day!, 12, 0, 0)
+      return {
+        date: literalDate.toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" }),
+        time: parsedParts.hasTime && parsedParts.hour !== null && parsedParts.minute !== null ? formatTime(parsedParts.hour, parsedParts.minute) : null,
+        hasDate: true,
+      }
+    }
+
+    if (parsedParts.hasTime && parsedParts.hour !== null && parsedParts.minute !== null) {
+      return { date: "Data nao informada", time: formatTime(parsedParts.hour, parsedParts.minute), hasDate: false }
+    }
+  }
 
   const date = new Date(normalizedValue)
   if (Number.isNaN(date.getTime())) {
@@ -947,6 +1014,34 @@ function calculateFlightDurationSafe(departureAt?: string | null, arrivalAt?: st
   const departureValue = sanitizeFlightTextSafe(departureAt)
   const arrivalValue = sanitizeFlightTextSafe(arrivalAt)
   if (!departureValue || !arrivalValue) return null
+
+  const departureParts = parseFlightLocalDateTimeParts(departureValue)
+  const arrivalParts = parseFlightLocalDateTimeParts(arrivalValue)
+  if (departureParts?.hasDate && departureParts.hasTime && arrivalParts?.hasDate && arrivalParts.hasTime) {
+    const departureDate = new Date(
+      departureParts.year!,
+      departureParts.month! - 1,
+      departureParts.day!,
+      departureParts.hour!,
+      departureParts.minute!,
+      departureParts.second
+    )
+    const arrivalDate = new Date(
+      arrivalParts.year!,
+      arrivalParts.month! - 1,
+      arrivalParts.day!,
+      arrivalParts.hour!,
+      arrivalParts.minute!,
+      arrivalParts.second
+    )
+    const localDiff = arrivalDate.getTime() - departureDate.getTime()
+    if (Number.isFinite(localDiff) && localDiff > 0) {
+      const totalMinutes = Math.round(localDiff / 60000)
+      const hours = Math.floor(totalMinutes / 60)
+      const minutes = totalMinutes % 60
+      return `${hours}h ${minutes.toString().padStart(2, "0")}m`
+    }
+  }
 
   const diff = new Date(arrivalValue).getTime() - new Date(departureValue).getTime()
   if (!Number.isFinite(diff) || diff <= 0) return null
@@ -2822,7 +2917,6 @@ function FlightCard({
 
         <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 rounded-[28px] border border-white/[0.06] bg-white/[0.03] p-4 sm:gap-4">
           <div className="min-w-0 text-left md:text-center">
-            {flight.origin.time ? <p className="text-[2rem] font-semibold leading-none text-white">{flight.origin.time}</p> : null}
             <p className="mt-2 text-2xl font-semibold leading-none text-[#2a7fff]">{flight.origin.code}</p>
             <p className="mt-2 text-sm leading-snug text-white/55">{flight.origin.city}</p>
           </div>
@@ -2840,7 +2934,6 @@ function FlightCard({
           </div>
 
           <div className="min-w-0 text-right md:text-center">
-            {flight.destination.time ? <p className="text-[2rem] font-semibold leading-none text-white">{flight.destination.time}</p> : null}
             <p className="mt-2 text-2xl font-semibold leading-none text-[#2a7fff]">{flight.destination.code}</p>
             <p className="mt-2 text-sm leading-snug text-white/55">{flight.destination.city}</p>
           </div>
