@@ -105,6 +105,11 @@ type TripPinStatusPayload = {
 }
 
 const TRIP_PIN_STATUS_TIMEOUT_MS = 4000
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+
+function isRealTripUuid(value?: string | null): value is string {
+  return typeof value === "string" && UUID_PATTERN.test(value.trim())
+}
 
 function getTripPinOfflineMessage(accessMode: TripPinApiAccessMode) {
   if (accessMode === "admin") {
@@ -196,6 +201,14 @@ async function verifyTripPinOnServer(params: {
   accessMode: TripPinApiAccessMode
   pin: string
 }) {
+  if (!isRealTripUuid(params.tripId)) {
+    return {
+      ok: false,
+      data: null,
+      error: "Aguarde a viagem ser carregada antes de validar o PIN.",
+    }
+  }
+
   const response = await fetch("/api/trip-pin", {
     method: "POST",
     headers: {
@@ -4979,6 +4992,7 @@ function PortalPinUnlockModal({
   loginLabel?: string
 }) {
   const isLight = tone === "light"
+  const hasResolvedTripId = isRealTripUuid(tripId)
   const [pin, setPin] = useState("")
   const [error, setError] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -4999,6 +5013,14 @@ function PortalPinUnlockModal({
 
   useEffect(() => {
     if (!open) return
+
+    if (!hasResolvedTripId) {
+      setIsLoadingStatus(true)
+      setError("")
+      setPinStatus(null)
+      setStatusUnavailableReason(null)
+      return
+    }
 
     let active = true
     setIsLoadingStatus(true)
@@ -5031,10 +5053,10 @@ function PortalPinUnlockModal({
     return () => {
       active = false
     }
-  }, [open, tripId, tripSlug, adminToken, publicToken, accessMode])
+  }, [open, hasResolvedTripId, tripId, tripSlug, adminToken, publicToken, accessMode])
 
   const handleSubmit = async () => {
-    if (pin.length !== 4) return
+    if (pin.length !== 4 || !hasResolvedTripId) return
 
     setIsSubmitting(true)
     setError("")
@@ -5082,7 +5104,9 @@ function PortalPinUnlockModal({
   const hasConfiguredPin = !isLoadingView && pinStatus?.pinConfigured === true
   const hasMissingPin = !isLoadingView && !hasErrorView && !isOfflineUnavailable && pinStatus?.pinConfigured === false
   const helperText = isLoadingView
-    ? "Estamos verificando a configuracao do PIN desta viagem."
+    ? hasResolvedTripId
+      ? "Estamos verificando a configuracao do PIN desta viagem."
+      : "Estamos localizando a viagem antes de consultar o PIN."
     : isOfflineUnavailable
       ? getTripPinOfflineMessage(accessMode)
     : hasConfiguredPin
@@ -5126,7 +5150,7 @@ function PortalPinUnlockModal({
               />
               <Button
                 onClick={() => void handleSubmit()}
-                disabled={isSubmitting || pin.length !== 4}
+                disabled={isSubmitting || pin.length !== 4 || !hasResolvedTripId}
                 className={cn(
                   "w-full border-0 text-white",
                   isLight ? "rounded-2xl bg-[#2563eb] hover:bg-[#1d4ed8]" : "bg-gradient-to-r from-[#5de0e6] to-[#004aad] hover:opacity-90",
@@ -5197,9 +5221,16 @@ function LinkSecurityInfoModal({
 }) {
   const [status, setStatus] = useState<TripPinStatusPayload | null>(null)
   const [error, setError] = useState("")
+  const hasResolvedTripId = isRealTripUuid(tripId)
 
   useEffect(() => {
     if (!open) return
+
+    if (!hasResolvedTripId) {
+      setStatus(null)
+      setError("")
+      return
+    }
 
     let active = true
     setError("")
@@ -5225,7 +5256,7 @@ function LinkSecurityInfoModal({
     return () => {
       active = false
     }
-  }, [open, tripId, tripSlug, adminToken, publicToken, accessMode])
+  }, [open, hasResolvedTripId, tripId, tripSlug, adminToken, publicToken, accessMode])
 
   return (
     <Modal open={open} onClose={onClose} title="Seguranca">
@@ -7450,20 +7481,6 @@ export default function TripPage() {
     const isPublicRoute = pathname?.startsWith("/v/") ?? false
     const isAdminRoute = adminRouteActive || isAdminLinkMode(routeSearchParams, pathname)
 
-    if (adminRouteActive && !sensitiveAccessGranted) {
-      setIsAdmin(false)
-      setCanWrite(false)
-      setAuthenticatedAdminEligible(false)
-      setTripAdminToken(adminToken)
-      setTripPublicToken(publicToken)
-      setAdminLinkMutationMode(false)
-      setOfflineModeEnabled(false)
-      setOfflinePackageStatus(null)
-      setOfflineDocumentContext(null)
-      setLoadError(null)
-      return
-    }
-
     setIsAdmin(false)
     setCanWrite(false)
     setAuthenticatedAdminEligible(false)
@@ -7633,7 +7650,6 @@ export default function TripPage() {
           | Awaited<ReturnType<typeof getTripBySlug>>
           | Awaited<ReturnType<typeof getTripByAdminToken>>
           | Awaited<ReturnType<typeof getTripByPublicToken>>
-        let fallbackTrip: ReturnType<typeof mapTripPinSnapshotToStoredTrip> | null = null
 
         let hydratedFromOfflineTimeout = false
 
@@ -7661,23 +7677,7 @@ export default function TripPage() {
           repositoryTrip = await repositoryTripPromise
         }
 
-        if (!repositoryTrip.data && useSupabase && isTripLinkRoute) {
-          const pinStatusResult = await loadTripPinStatus({
-            tripSlug: routeSlug,
-            adminToken,
-            publicToken,
-            accessMode: isAdminRoute ? "admin" : "public",
-          })
-
-          if (pinStatusResult.ok && pinStatusResult.data?.trip) {
-            fallbackTrip = mapTripPinSnapshotToStoredTrip(pinStatusResult.data.trip, {
-              adminToken,
-              publicToken,
-            })
-          }
-        }
-
-        const resolvedTrip = repositoryTrip.data ?? fallbackTrip
+        const resolvedTrip = repositoryTrip.data
 
         if (resolvedTrip) {
           if (loadRequestRef.current !== requestId) return
