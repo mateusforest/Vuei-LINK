@@ -2123,13 +2123,55 @@ function TripHero({ tripData, onEditTrip }: { tripData: any; onEditTrip: () => v
   )
 }
 
+function getItinerarySummaryState(itineraryDays: any[], itineraryRecords?: TripItineraryRecord[]) {
+  const normalizedDays = Array.isArray(itineraryDays) ? itineraryDays : []
+  const normalizedRecords = Array.isArray(itineraryRecords) ? itineraryRecords : []
+  const simpleRecord = resolveSimpleTripItinerary(normalizedRecords)
+  const plannedDays = normalizedDays.length > 0
+    ? normalizedDays.length
+    : Array.isArray(simpleRecord?.content?.days)
+      ? simpleRecord.content.days.length
+      : 0
+  const attachedRecords = normalizedRecords.filter(
+    (record) => record.mode !== "simple" && (record.status === "uploaded" || record.status === "completed")
+  )
+
+  if (plannedDays > 0) {
+    return {
+      count: plannedDays,
+      summary: `${plannedDays} dia(s) planejado(s)`,
+      detail: "Abra para ver",
+      status: "Ver",
+      statusClassName: "text-[#2563eb]",
+    }
+  }
+
+  if (attachedRecords.length > 0) {
+    return {
+      count: attachedRecords.length,
+      summary: `${attachedRecords.length} roteiro(s) anexado(s)`,
+      detail: "Abra para ver",
+      status: "Ver",
+      statusClassName: "text-[#2563eb]",
+    }
+  }
+
+  return {
+    count: 0,
+    summary: "Nenhum roteiro",
+    detail: "Monte depois",
+    status: "Vazio",
+    statusClassName: "text-slate-400",
+  }
+}
+
 // Quick access cards
-function QuickAccessCards({ tripData, onNavigate }: { tripData: any; onNavigate: (section: string) => void }) {
+function QuickAccessCards({ tripData, itineraryRecords, onNavigate }: { tripData: any; itineraryRecords?: TripItineraryRecord[]; onNavigate: (section: string) => void }) {
   const ticketDocuments = Array.isArray(tripData.documents)
     ? tripData.documents.filter((document: any) => document.type === "ticket")
     : []
   const flightsCount = Array.isArray(tripData?.flights) ? tripData.flights.length : 0
-  const itineraryCount = Array.isArray(tripData?.itinerary) ? tripData.itinerary.length : 0
+  const itineraryCount = getItinerarySummaryState(Array.isArray(tripData?.itinerary) ? tripData.itinerary : [], itineraryRecords).count
   const documentsCount = Array.isArray(tripData?.documents) ? tripData.documents.length : 0
 
   const cards = [
@@ -2240,7 +2282,7 @@ function TripLinkLightThemeStyles() {
   )
 }
 
-function buildTravelerCardSummaries(tripData: any) {
+function buildTravelerCardSummaries(tripData: any, itineraryRecords?: TripItineraryRecord[]) {
   const flights = Array.isArray(tripData?.flights) ? tripData.flights : []
   const hotels = Array.isArray(tripData?.hotels) ? tripData.hotels : tripData?.hotel ? [tripData.hotel] : []
   const documents = Array.isArray(tripData?.documents) ? tripData.documents : []
@@ -2260,6 +2302,8 @@ function buildTravelerCardSummaries(tripData: any) {
         .join(" • ")
     : "Abra para ver"
   const hotel = rawHotel ? { ...rawHotel, checkIn: hotelDetail, checkOut: "" } : rawHotel
+
+  const itineraryCard = getItinerarySummaryState(itinerary, itineraryRecords)
 
   return [
     {
@@ -2301,15 +2345,15 @@ function buildTravelerCardSummaries(tripData: any) {
       id: "itinerary" as const,
       icon: MapPin,
       title: "Roteiro",
-      summary: itinerary.length > 0 ? `${itinerary.length} dia(s) planejado(s)` : "Nenhum roteiro",
-      detail: itinerary.length > 0 ? "Abra para ver" : "Monte depois",
-      status: itinerary.length > 0 ? "Ver" : "Vazio",
-      statusClassName: itinerary.length > 0 ? "text-[#2563eb]" : "text-slate-400",
+      summary: itineraryCard.summary,
+      detail: itineraryCard.detail,
+      status: itineraryCard.status,
+      statusClassName: itineraryCard.statusClassName,
     },
   ]
 }
 
-function buildTravelerCardSummariesClean(tripData: any) {
+function buildTravelerCardSummariesClean(tripData: any, itineraryRecords?: TripItineraryRecord[]) {
   const flights = Array.isArray(tripData?.flights) ? tripData.flights : []
   const hotels = sortHotelsForDisplay(Array.isArray(tripData?.hotels) ? tripData.hotels : tripData?.hotel ? [tripData.hotel] : []).map(
     normalizeHotelForDisplay,
@@ -2323,6 +2367,8 @@ function buildTravelerCardSummariesClean(tripData: any) {
         .filter(Boolean)
         .join(" • ")
     : "Abra para ver"
+
+  const itineraryCard = getItinerarySummaryState(itinerary, itineraryRecords)
 
   return [
     {
@@ -2362,10 +2408,10 @@ function buildTravelerCardSummariesClean(tripData: any) {
       id: "itinerary" as const,
       icon: MapPin,
       title: "Roteiro",
-      summary: itinerary.length > 0 ? `${itinerary.length} dia(s) planejado(s)` : "Nenhum roteiro",
-      detail: itinerary.length > 0 ? "Abra para ver" : "Monte depois",
-      status: itinerary.length > 0 ? "Ver" : "Vazio",
-      statusClassName: itinerary.length > 0 ? "text-[#2563eb]" : "text-slate-400",
+      summary: itineraryCard.summary,
+      detail: itineraryCard.detail,
+      status: itineraryCard.status,
+      statusClassName: itineraryCard.statusClassName,
     },
   ]
 }
@@ -9638,7 +9684,7 @@ export default function TripPage() {
           <TripHeader tripData={tripData} agencyBranding={agencyBranding} onOpenShare={() => setShareOpen(true)} onOpenMenu={() => setMenuOpen(true)} />
           {offlineModeEnabled && offlinePackageStatus ? <OfflineModeBanner status={offlinePackageStatus} /> : null}
           <TripHero tripData={tripData} onEditTrip={() => setEditTripOpen(true)} />
-          <QuickAccessCards tripData={tripData} onNavigate={handleNavigate} />
+          <QuickAccessCards tripData={tripData} itineraryRecords={tripItineraryRecords} onNavigate={handleNavigate} />
           <FlightsSection loading={sectionsLoading.flights} tripData={tripData} onUpdateFlight={handleUpdateFlight} onAddFlight={handleAddFlight} onDeleteFlight={handleDeleteFlight} onDeleteDocument={handleDeleteDocument} tripId={tripData.id} ownerUserId={tripOwnerUserId} agencyId={profile?.agencyId ?? null} routeSlug={routeSlug} tripAdminToken={tripAdminToken} tripPublicToken={tripPublicToken} adminLinkMutationMode={adminLinkMutationMode} ensureSensitiveAccess={ensureSensitiveAccess} onTrackExtraction={startFlightExtractionPolling} offlineReadOnly={offlineModeEnabled} offlineDocumentContext={offlineDocumentContext} />
           <HotelSection loading={sectionsLoading.hotels} tripData={tripData} onSaveHotel={handleSaveHotel} onDeleteHotel={handleDeleteHotel} />
           <ItinerarySection
