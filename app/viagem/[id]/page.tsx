@@ -3612,11 +3612,17 @@ function HotelSection({
   loading,
   onSaveHotel,
   onDeleteHotel,
+  routeSlug,
+  tripAdminToken,
+  tripPublicToken,
 }: {
   tripData: any
   loading: boolean
   onSaveHotel: (data: any) => Promise<boolean>
   onDeleteHotel: (hotelId: string) => void
+  routeSlug: string
+  tripAdminToken: string | null
+  tripPublicToken: string | null
 }) {
   const [editing, setEditing] = useState(false)
   const [selectedHotel, setSelectedHotel] = useState<any>(null)
@@ -3671,14 +3677,14 @@ function HotelSection({
           <div className="space-y-4">
             {hotels.map((hotel: any, index: number) => {
               const linkedVoucherHref =
-                hotel.documentId && tripData?.id && tripData?.slug
+                hotel.documentId && tripData?.id && routeSlug
                   ? buildTripDocumentAccessHref({
                       tripId: tripData.id,
                       documentId: hotel.documentId,
-                      tripSlug: tripData.slug,
+                      tripSlug: routeSlug,
                       accessMode: isAdmin ? "admin" : "public",
-                      adminToken: tripData.adminToken ?? null,
-                      publicToken: tripData.publicToken ?? null,
+                      adminToken: tripAdminToken,
+                      publicToken: tripPublicToken,
                       disposition: "inline",
                     })
                   : null
@@ -9380,7 +9386,7 @@ export default function TripPage() {
               ) : null}
             </BottomSheet>
             <BottomSheet tone="light" open={travelerPanel === "hotel"} onClose={() => setTravelerPanel(null)} title="Hospedagem">
-              {travelerPanel === "hotel" ? <HotelSection loading={sectionsLoading.hotels} tripData={tripData} onSaveHotel={handleSaveHotel} onDeleteHotel={handleDeleteHotel} /> : null}
+              {travelerPanel === "hotel" ? <HotelSection loading={sectionsLoading.hotels} tripData={tripData} onSaveHotel={handleSaveHotel} onDeleteHotel={handleDeleteHotel} routeSlug={routeSlug} tripAdminToken={tripAdminToken} tripPublicToken={tripPublicToken} /> : null}
             </BottomSheet>
             <BottomSheet tone="light" open={travelerPanel === "itinerary"} onClose={() => setTravelerPanel(null)} title="Roteiro">
               {travelerPanel === "itinerary" ? (
@@ -9595,7 +9601,7 @@ export default function TripPage() {
               ) : null}
             </BottomSheet>
             <BottomSheet tone="light" open={travelerPanel === "hotel"} onClose={() => setTravelerPanel(null)} title="Hospedagem">
-              {travelerPanel === "hotel" ? <HotelSection loading={sectionsLoading.hotels} tripData={tripData} onSaveHotel={handleSaveHotel} onDeleteHotel={handleDeleteHotel} /> : null}
+              {travelerPanel === "hotel" ? <HotelSection loading={sectionsLoading.hotels} tripData={tripData} onSaveHotel={handleSaveHotel} onDeleteHotel={handleDeleteHotel} routeSlug={routeSlug} tripAdminToken={tripAdminToken} tripPublicToken={tripPublicToken} /> : null}
             </BottomSheet>
             <BottomSheet tone="light" open={travelerPanel === "itinerary"} onClose={() => setTravelerPanel(null)} title="Roteiro">
               {travelerPanel === "itinerary" ? (
@@ -9786,7 +9792,7 @@ export default function TripPage() {
           <TripHero tripData={tripData} onEditTrip={() => setEditTripOpen(true)} />
           <QuickAccessCards tripData={tripData} itineraryRecords={tripItineraryRecords} onNavigate={handleNavigate} />
           <FlightsSection loading={sectionsLoading.flights} tripData={tripData} onUpdateFlight={handleUpdateFlight} onAddFlight={handleAddFlight} onDeleteFlight={handleDeleteFlight} onDeleteDocument={handleDeleteDocument} tripId={tripData.id} ownerUserId={tripOwnerUserId} agencyId={profile?.agencyId ?? null} routeSlug={routeSlug} tripAdminToken={tripAdminToken} tripPublicToken={tripPublicToken} adminLinkMutationMode={adminLinkMutationMode} ensureSensitiveAccess={ensureSensitiveAccess} onTrackExtraction={startFlightExtractionPolling} offlineReadOnly={offlineModeEnabled} offlineDocumentContext={offlineDocumentContext} />
-          <HotelSection loading={sectionsLoading.hotels} tripData={tripData} onSaveHotel={handleSaveHotel} onDeleteHotel={handleDeleteHotel} />
+          <HotelSection loading={sectionsLoading.hotels} tripData={tripData} onSaveHotel={handleSaveHotel} onDeleteHotel={handleDeleteHotel} routeSlug={routeSlug} tripAdminToken={tripAdminToken} tripPublicToken={tripPublicToken} />
           <ItinerarySection
             loading={sectionsLoading.itineraries}
             tripData={tripData}
