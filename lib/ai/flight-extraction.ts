@@ -67,6 +67,13 @@ function normalizeString(value: unknown) {
   return typeof value === "string" && value.trim() ? value.trim() : null
 }
 
+function normalizeQrPayload(value: unknown) {
+  if (typeof value !== "string") return null
+
+  const normalized = value.replace(/\s+/g, "").trim()
+  return normalized || null
+}
+
 function normalizeNotes(value: unknown) {
   if (!Array.isArray(value)) return [] as string[]
   return value.filter((item): item is string => typeof item === "string" && item.trim().length > 0).map((item) => item.trim())
@@ -92,7 +99,7 @@ function parseStructuredData(payload: unknown): FlightExtractionStructuredData |
     gate: normalizeString(candidate.gate),
     seat: normalizeString(candidate.seat),
     baggage_info: normalizeString(candidate.baggage_info),
-    qr_code_payload: normalizeString(candidate.qr_code_payload),
+    qr_code_payload: normalizeQrPayload(candidate.qr_code_payload),
     raw_departure_text: normalizeString(candidate.raw_departure_text),
     raw_arrival_text: normalizeString(candidate.raw_arrival_text),
     confidence:
@@ -221,7 +228,7 @@ export async function requestFlightExtraction({ documentName, mimeType, signedUr
         {
           role: "system",
           content:
-            "Voce extrai dados de passagens aereas sem inventar informacoes. Responda apenas com JSON valido. Marque is_ticket=false quando a imagem nao parecer uma passagem aerea real. Preencha campos ausentes com null. So retorne departure_at e arrival_at em RFC3339 com timezone quando a data e horario estiverem claramente visiveis; caso contrario, deixe null e use raw_departure_text/raw_arrival_text quando houver texto parcial. Quando houver indicacao de portao de embarque, mesmo com variacoes como gate, boarding gate, portao, puerta ou puerta de embarque, preencha o campo gate exatamente com o valor visivel.",
+            "Voce extrai dados de passagens aereas sem inventar informacoes. Responda apenas com JSON valido. Marque is_ticket=false quando a imagem nao parecer uma passagem aerea real. Preencha campos ausentes com null. Quando data e horario estiverem visiveis, retorne departure_at e arrival_at em ISO 8601. Se houver timezone visivel, preserve-o. Se nao houver timezone visivel, retorne o horario local em formato YYYY-MM-DDTHH:MM:SS. Se apenas o horario estiver claramente visivel, retorne HH:MM e use raw_departure_text/raw_arrival_text para o texto bruto. So preencha qr_code_payload quando o conteudo do QR ou barcode estiver realmente legivel; caso contrario, deixe null. Quando houver indicacao de portao de embarque, mesmo com variacoes como gate, boarding gate, portao, puerta ou puerta de embarque, preencha o campo gate exatamente com o valor visivel.",
         },
         {
           role: "user",

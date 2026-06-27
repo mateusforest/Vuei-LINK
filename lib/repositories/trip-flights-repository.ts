@@ -1,3 +1,4 @@
+import type { Document } from "@/types"
 import type { TripFlightRecord, TripFlightUpsertPayload } from "@/types/flight"
 import { createSupabaseBrowserClient, createSupabaseBrowserClientPlaceholder } from "@/lib/supabase/client"
 import { shouldUseSupabase } from "@/lib/data-source"
@@ -70,6 +71,27 @@ function mapRow(row: TripFlightRow): TripFlightRecord {
     seat: row.seat ?? (typeof structuredResult.seat === "string" ? structuredResult.seat : null),
     extractedData,
     extractionStatus: row.extraction_status,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  }
+}
+
+function mapDocumentRow(row: Database["public"]["Tables"]["documents"]["Row"]): Document {
+  return {
+    id: row.id,
+    tripId: row.trip_id,
+    clientId: row.client_id,
+    agencyId: row.agency_id,
+    ownerUserId: row.owner_user_id,
+    name: row.name,
+    type: row.type,
+    fileUrl: row.file_url,
+    filePath: row.file_path,
+    mimeType: row.mime_type,
+    size: row.size_bytes,
+    isPrivate: row.is_private,
+    visibility: row.visibility,
+    aiExtractedData: (row.ai_extracted_data ?? {}) as Record<string, unknown>,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }
@@ -282,14 +304,25 @@ export async function requestTripFlightExtraction(payload: { tripId: string; doc
   })
 
   const data = await response.json().catch(() => null)
+  const normalizedData = data && typeof data === "object"
+    ? {
+        ...data,
+        flight: data?.flight && typeof data.flight === "object" && "flight_number" in data.flight
+          ? mapRow(data.flight as TripFlightRow)
+          : data?.flight ?? null,
+        document: data?.document && typeof data.document === "object" && "file_path" in data.document
+          ? mapDocumentRow(data.document as Database["public"]["Tables"]["documents"]["Row"])
+          : data?.document ?? null,
+      }
+    : data
 
-  if (response.ok && data?.flight) {
+  if (response.ok && normalizedData?.flight) {
     dispatchCreditBalanceChanged({ feature: "flight_extraction" })
   }
 
   return {
     source: "api" as const,
-    data,
-    error: response.ok ? null : data?.error || "Nao foi possivel processar a passagem anexada.",
+    data: normalizedData,
+    error: response.ok ? null : normalizedData?.error || "Nao foi possivel processar a passagem anexada.",
   }
 }

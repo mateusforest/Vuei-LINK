@@ -8422,7 +8422,7 @@ export default function TripPage() {
     }
 
     let attempts = 0
-    const maxAttempts = 8
+    const maxAttempts = 24
 
     const poll = async () => {
       attempts += 1

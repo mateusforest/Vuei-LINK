@@ -251,6 +251,58 @@ function sanitizeFlightText(value: unknown) {
   return normalized ? normalized : null
 }
 
+function normalizeQrCodePayload(value: unknown) {
+  if (typeof value !== "string") return null
+
+  const normalized = value.replace(/\s+/g, "").trim()
+  return normalized || null
+}
+
+function normalizeExtractedDateTime(value: unknown, rawText: unknown) {
+  const normalizedValue = sanitizeFlightText(value)
+  const candidates = [normalizedValue, sanitizeFlightText(rawText)].filter((candidate): candidate is string => Boolean(candidate))
+
+  for (const candidate of candidates) {
+    if (/^\d{1,2}:\d{2}$/.test(candidate)) {
+      return candidate.padStart(5, "0")
+    }
+
+    const isoDateOnlyMatch = candidate.match(/^(\d{4}-\d{2}-\d{2})$/)
+    if (isoDateOnlyMatch) {
+      return isoDateOnlyMatch[1]
+    }
+
+    const isoDateTimeMatch = candidate.match(/^(\d{4}-\d{2}-\d{2})[tT ](\d{1,2}):(\d{2})(?::(\d{2}))?([zZ]|[+-]\d{2}:\d{2})?$/)
+    if (isoDateTimeMatch) {
+      const [, datePart, hourPart, minutePart, secondPart, timezonePart] = isoDateTimeMatch
+      const normalizedHour = hourPart.padStart(2, "0")
+      const normalizedSecond = secondPart ?? "00"
+      return `${datePart}T${normalizedHour}:${minutePart}:${normalizedSecond}${timezonePart ?? ""}`
+    }
+
+    const localizedDateTimeMatch = candidate.match(/^(\d{1,2})[\/.-](\d{1,2})(?:[\/.-](\d{2,4}))?(?:\s+|[tT-])(\d{1,2}):(\d{2})$/)
+    if (localizedDateTimeMatch) {
+      const [, dayPart, monthPart, yearPart, hourPart, minutePart] = localizedDateTimeMatch
+      if (yearPart) {
+        const normalizedYear = yearPart.length === 2 ? `20${yearPart}` : yearPart
+        const normalizedMonth = monthPart.padStart(2, "0")
+        const normalizedDay = dayPart.padStart(2, "0")
+        const normalizedHour = hourPart.padStart(2, "0")
+        return `${normalizedYear}-${normalizedMonth}-${normalizedDay}T${normalizedHour}:${minutePart}:00`
+      }
+
+      return `${hourPart.padStart(2, "0")}:${minutePart}`
+    }
+
+    const embeddedTimeMatch = candidate.match(/\b(\d{1,2}):(\d{2})\b/)
+    if (embeddedTimeMatch) {
+      return `${embeddedTimeMatch[1].padStart(2, "0")}:${embeddedTimeMatch[2]}`
+    }
+  }
+
+  return null
+}
+
 function hasStoredUsefulFlightData(flight: TripFlightRow | null) {
   if (!flight) return false
 
@@ -548,24 +600,32 @@ export async function POST(request: Request) {
 
   const shouldChargeCredits = aiResult.calledModel
   const extractionPayload = aiResult.data
-  const usefulFieldCount = countUsefulFlightFields(extractionPayload)
-  const partial = Boolean(extractionPayload?.is_ticket && isPartialFlightExtraction(extractionPayload))
-  const completed = Boolean(extractionPayload?.is_ticket && usefulFieldCount > 0)
+  const normalizedExtractionPayload = extractionPayload
+    ? {
+        ...extractionPayload,
+        departure_at: normalizeExtractedDateTime(extractionPayload.departure_at, extractionPayload.raw_departure_text),
+        arrival_at: normalizeExtractedDateTime(extractionPayload.arrival_at, extractionPayload.raw_arrival_text),
+        qr_code_payload: normalizeQrCodePayload(extractionPayload.qr_code_payload),
+      }
+    : null
+  const usefulFieldCount = countUsefulFlightFields(normalizedExtractionPayload)
+  const partial = Boolean(normalizedExtractionPayload?.is_ticket && isPartialFlightExtraction(normalizedExtractionPayload))
+  const completed = Boolean(normalizedExtractionPayload?.is_ticket && usefulFieldCount > 0)
   const failureReason =
     aiResult.error ||
-    extractionPayload?.failure_reason ||
-    (!extractionPayload?.is_ticket ? "O arquivo analisado n?o parece ser uma passagem aerea." : null) ||
+    normalizedExtractionPayload?.failure_reason ||
+    (!normalizedExtractionPayload?.is_ticket ? "O arquivo analisado n?o parece ser uma passagem aerea." : null) ||
     (usefulFieldCount === 0 ? "N?o foi poss?vel identificar dados ?teis nesta passagem." : null)
 
   const metadata: JsonObject = {
     source: "flight_extraction",
     model: aiResult.model,
     raw_response: aiResult.rawText,
-    structured_result: extractionPayload,
+    structured_result: normalizedExtractionPayload,
     useful_field_count: usefulFieldCount,
     partial,
-    confidence: extractionPayload?.confidence ?? null,
-    notes: extractionPayload?.notes ?? [],
+    confidence: normalizedExtractionPayload?.confidence ?? null,
+    notes: normalizedExtractionPayload?.notes ?? [],
     failure_reason: failureReason,
     processed_at: new Date().toISOString(),
     mime_type: entityResult.document.mime_type,
@@ -578,24 +638,24 @@ export async function POST(request: Request) {
     flightId,
     strategy: completed ? "ai_ticket_completed" : partial ? "ai_ticket_partial_failed" : "ai_ticket_failed",
     usefulFieldCount,
-    isTicket: Boolean(extractionPayload?.is_ticket),
+    isTicket: Boolean(normalizedExtractionPayload?.is_ticket),
     shouldChargeCredits: Boolean(shouldChargeCredits && completed),
   })
 
   const flightUpdate = await updateFlightRecord(supabase, entityResult.flight.id, {
-    airline: completed ? extractionPayload?.airline ?? null : null,
-    flight_number: completed ? extractionPayload?.flight_number ?? null : null,
-    booking_reference: completed ? extractionPayload?.booking_reference ?? null : null,
-    origin_airport: completed ? extractionPayload?.origin_airport ?? null : null,
-    destination_airport: completed ? extractionPayload?.destination_airport ?? null : null,
-    departure_at: completed ? extractionPayload?.departure_at ?? null : null,
-    arrival_at: completed ? extractionPayload?.arrival_at ?? null : null,
-    passenger_name: completed ? extractionPayload?.passenger_name ?? null : null,
-    terminal: completed ? extractionPayload?.terminal ?? null : null,
-    gate: completed ? extractionPayload?.gate ?? null : null,
-    seat: completed ? extractionPayload?.seat ?? null : null,
-    baggage_info: completed ? extractionPayload?.baggage_info ?? null : null,
-    qr_code_payload: completed ? extractionPayload?.qr_code_payload ?? null : null,
+    airline: completed ? normalizedExtractionPayload?.airline ?? null : null,
+    flight_number: completed ? normalizedExtractionPayload?.flight_number ?? null : null,
+    booking_reference: completed ? normalizedExtractionPayload?.booking_reference ?? null : null,
+    origin_airport: completed ? normalizedExtractionPayload?.origin_airport ?? null : null,
+    destination_airport: completed ? normalizedExtractionPayload?.destination_airport ?? null : null,
+    departure_at: completed ? normalizedExtractionPayload?.departure_at ?? null : null,
+    arrival_at: completed ? normalizedExtractionPayload?.arrival_at ?? null : null,
+    passenger_name: completed ? normalizedExtractionPayload?.passenger_name ?? null : null,
+    terminal: completed ? normalizedExtractionPayload?.terminal ?? null : null,
+    gate: completed ? normalizedExtractionPayload?.gate ?? null : null,
+    seat: completed ? normalizedExtractionPayload?.seat ?? null : null,
+    baggage_info: completed ? normalizedExtractionPayload?.baggage_info ?? null : null,
+    qr_code_payload: completed ? normalizedExtractionPayload?.qr_code_payload ?? null : null,
     extracted_data: metadata,
     extraction_status: completed ? "completed" : "failed",
   })
