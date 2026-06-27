@@ -18,6 +18,23 @@ async function resolveTripByLinkAccess(params: {
   accessMode: AccessMode
 }) {
   const supabase = createSupabaseAdminClient()
+
+  if (params.accessMode === "admin" && !params.adminToken && (params.tripId || params.tripSlug)) {
+    let query = supabase.from("trips").select("*")
+
+    if (params.tripId) {
+      query = query.eq("id", params.tripId)
+    } else if (params.tripSlug) {
+      query = query.eq("slug", params.tripSlug)
+    }
+
+    const { data, error } = await query.maybeSingle()
+    return {
+      trip: (data as TripRow | null) ?? null,
+      error: error?.message ?? null,
+    }
+  }
+
   return resolveTripLinkRequest(supabase, {
     tripId: params.tripId,
     tripSlug: params.tripSlug,

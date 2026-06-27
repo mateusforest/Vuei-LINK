@@ -7650,6 +7650,7 @@ export default function TripPage() {
           | Awaited<ReturnType<typeof getTripBySlug>>
           | Awaited<ReturnType<typeof getTripByAdminToken>>
           | Awaited<ReturnType<typeof getTripByPublicToken>>
+        let fallbackTrip: ReturnType<typeof mapTripPinSnapshotToStoredTrip> | null = null
 
         let hydratedFromOfflineTimeout = false
 
@@ -7677,7 +7678,23 @@ export default function TripPage() {
           repositoryTrip = await repositoryTripPromise
         }
 
-        const resolvedTrip = repositoryTrip.data
+        if (!repositoryTrip.data && useSupabase && isTripLinkRoute) {
+          const pinStatusResult = await loadTripPinStatus({
+            tripSlug: routeSlug,
+            adminToken,
+            publicToken,
+            accessMode: isAdminRoute ? "admin" : "public",
+          })
+
+          if (pinStatusResult.ok && pinStatusResult.data?.trip) {
+            fallbackTrip = mapTripPinSnapshotToStoredTrip(pinStatusResult.data.trip, {
+              adminToken,
+              publicToken,
+            })
+          }
+        }
+
+        const resolvedTrip = repositoryTrip.data ?? fallbackTrip
 
         if (resolvedTrip) {
           if (loadRequestRef.current !== requestId) return
