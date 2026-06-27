@@ -122,6 +122,11 @@ function AgencyLayoutInner({ children }: { children: React.ReactNode }) {
     { label: "Configurações", href: "/agencia/configuracoes", icon: Settings },
   ]
 
+  const agencyPlanCredits = Math.max(subscription.definition.monthlyCredits, 1)
+  const agencyCreditsProgress = Math.min((credits.balance / agencyPlanCredits) * 100, 100)
+  const agencyCreditsActionHref = subscription.code === "free" ? "/agencia/planos" : "/agencia/creditos"
+  const agencyCreditsActionLabel = subscription.code === "free" ? "Fazer upgrade" : "Comprar créditos"
+
   const handleOpenCreateTrip = () => {
     if (!canCreateMoreTrips) {
       showPlanLimitDialog("trip_limit")
@@ -324,6 +329,48 @@ function AgencyLayoutInner({ children }: { children: React.ReactNode }) {
             })}
           </nav>
 
+          <div className="border-t border-border/60 p-4">
+            <div className={cn("rounded-2xl border border-border/60 bg-white/92 p-4 shadow-sm", sidebarCollapsed && "px-2 py-3")}>
+              <div className={cn("flex items-start gap-3", sidebarCollapsed && "flex-col items-center gap-2 text-center")}>
+                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-primary/18 to-accent/14 text-primary">
+                  <Coins className="h-5 w-5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  {!sidebarCollapsed && <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">Créditos IA</p>}
+                  <div className={cn("mt-1 flex items-end gap-2", sidebarCollapsed && "mt-0 flex-col items-center gap-1")}>
+                    <span className="text-2xl font-semibold leading-none text-foreground">{credits.balance}</span>
+                    {!sidebarCollapsed && <span className="text-xs text-muted-foreground">Plano {subscription.definition.name}</span>}
+                  </div>
+                </div>
+              </div>
+              <div className="mt-4">
+                <div className="h-2 overflow-hidden rounded-full bg-slate-200/80">
+                  <motion.div
+                    className="h-full rounded-full bg-gradient-to-r from-primary to-accent"
+                    initial={false}
+                    animate={{ width: `${agencyCreditsProgress}%` }}
+                    transition={{ duration: 0.4, ease: "easeOut" }}
+                  />
+                </div>
+                {!sidebarCollapsed && (
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    {credits.balance} de {agencyPlanCredits} créditos considerados no saldo atual
+                  </p>
+                )}
+              </div>
+              <Link
+                href={agencyCreditsActionHref}
+                className={cn(
+                  "mt-4 flex w-full items-center justify-center rounded-xl border border-primary/15 bg-primary/5 px-3 py-2 text-sm font-medium text-primary transition-colors hover:bg-primary/10",
+                  sidebarCollapsed && "px-2 text-xs"
+                )}
+                aria-label={agencyCreditsActionLabel}
+              >
+                {sidebarCollapsed ? <ChevronRight className="h-4 w-4" /> : agencyCreditsActionLabel}
+              </Link>
+            </div>
+          </div>
+
           {/* Credits Card */}
           <AnimatePresence>
             {false && (
@@ -460,6 +507,42 @@ function AgencyLayoutInner({ children }: { children: React.ReactNode }) {
                   )
                 })}
               </nav>
+              <div className="px-3 pb-4">
+                <div className="rounded-2xl border border-border/60 bg-white/92 p-4 shadow-sm">
+                  <div className="flex items-start gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-primary/18 to-accent/14 text-primary">
+                      <Coins className="h-5 w-5" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">Créditos IA</p>
+                      <div className="mt-1 flex items-end gap-2">
+                        <span className="text-2xl font-semibold leading-none text-foreground">{credits.balance}</span>
+                        <span className="text-xs text-muted-foreground">Plano {subscription.definition.name}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="mt-4">
+                    <div className="h-2 overflow-hidden rounded-full bg-slate-200/80">
+                      <motion.div
+                        className="h-full rounded-full bg-gradient-to-r from-primary to-accent"
+                        initial={false}
+                        animate={{ width: `${agencyCreditsProgress}%` }}
+                        transition={{ duration: 0.4, ease: "easeOut" }}
+                      />
+                    </div>
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      {credits.balance} de {agencyPlanCredits} créditos considerados no saldo atual
+                    </p>
+                  </div>
+                  <Link
+                    href={agencyCreditsActionHref}
+                    className="mt-4 flex w-full items-center justify-center rounded-xl border border-primary/15 bg-primary/5 px-3 py-2 text-sm font-medium text-primary transition-colors hover:bg-primary/10"
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    {agencyCreditsActionLabel}
+                  </Link>
+                </div>
+              </div>
             </motion.div>
           </>
         )}

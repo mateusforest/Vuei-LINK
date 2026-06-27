@@ -61,7 +61,7 @@ function PortalLayoutInner({ children }: { children: React.ReactNode }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [mobileHeaderOffset, setMobileHeaderOffset] = useState(132)
   const mobileHeaderRef = useRef<HTMLElement | null>(null)
-  const { credits } = useTrips()
+  const { credits, subscription } = useTrips()
   const { profile, signOut } = useAuth()
   const firstName = profile?.name?.trim().split(" ")[0] ?? ""
   const initials = profile?.name
@@ -80,6 +80,10 @@ function PortalLayoutInner({ children }: { children: React.ReactNode }) {
     { label: "Offline", href: "/portal/offline", icon: WifiOff },
     { label: "Compartilhar", href: "/portal/compartilhar", icon: Share2 },
   ]
+  const travelerPlanCredits = Math.max(subscription.definition.monthlyCredits, 1)
+  const travelerCreditsProgress = Math.min((credits.balance / travelerPlanCredits) * 100, 100)
+  const travelerCreditsActionHref = subscription.code === "free" ? "/portal/planos" : "/portal/creditos"
+  const travelerCreditsActionLabel = subscription.code === "free" ? "Fazer upgrade" : "Comprar créditos"
 
   const handleSignOut = async () => {
     void signOut()
@@ -189,6 +193,48 @@ function PortalLayoutInner({ children }: { children: React.ReactNode }) {
                 </CreateTripButton>
               </div>
             </nav>
+
+            <div className="px-4 pb-4">
+              <div className={cn("rounded-2xl border border-border/60 bg-white/90 p-4 shadow-sm", sidebarCollapsed && "px-2 py-3")}>
+                <div className={cn("flex items-start gap-3", sidebarCollapsed && "flex-col items-center gap-2 text-center")}>
+                  <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-[#37beff]/18 to-[#0b56d8]/14 text-[#0b56d8]">
+                    <Coins size={18} />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    {!sidebarCollapsed && <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">Créditos IA</p>}
+                    <div className={cn("mt-1 flex items-end gap-2", sidebarCollapsed && "mt-0 flex-col items-center gap-1")}>
+                      <span className="text-2xl font-semibold leading-none text-foreground">{credits.balance}</span>
+                      {!sidebarCollapsed && <span className="text-xs text-muted-foreground">Plano {subscription.definition.name}</span>}
+                    </div>
+                  </div>
+                </div>
+                <div className="mt-4">
+                  <div className="h-2 overflow-hidden rounded-full bg-slate-200/80">
+                    <motion.div
+                      className="h-full rounded-full bg-gradient-to-r from-[#37beff] to-[#0b56d8]"
+                      initial={false}
+                      animate={{ width: `${travelerCreditsProgress}%` }}
+                      transition={{ duration: 0.4, ease: "easeOut" }}
+                    />
+                  </div>
+                  {!sidebarCollapsed && (
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      {credits.balance} de {travelerPlanCredits} créditos considerados no saldo atual
+                    </p>
+                  )}
+                </div>
+                <Link
+                  href={travelerCreditsActionHref}
+                  className={cn(
+                    "mt-4 flex w-full items-center justify-center rounded-xl border border-[#0b56d8]/15 bg-[#0b56d8]/5 px-3 py-2 text-sm font-medium text-[#0b56d8] transition-colors hover:bg-[#0b56d8]/10",
+                    sidebarCollapsed && "px-2 text-xs"
+                  )}
+                  aria-label={travelerCreditsActionLabel}
+                >
+                  {sidebarCollapsed ? <ChevronRight size={16} /> : travelerCreditsActionLabel}
+                </Link>
+              </div>
+            </div>
 
             <div className="border-t border-border/50 p-4">
               <DropdownMenu>
