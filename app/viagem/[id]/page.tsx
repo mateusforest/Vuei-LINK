@@ -1097,6 +1097,17 @@ function mapFlightRecordToView(flight: TripFlightRecord, documents?: any[]) {
 }
 
 function getFlightStatusCopy(flight: any) {
+  const extractedData = flight?.extractedData && typeof flight.extractedData === "object"
+    ? flight.extractedData as Record<string, unknown>
+    : null
+  const failureReason = typeof extractedData?.failure_reason === "string" ? extractedData.failure_reason.toLowerCase() : ""
+  const reasonCode = typeof extractedData?.reason_code === "string" ? extractedData.reason_code : ""
+  const hasInsufficientCreditsError =
+    reasonCode === "insufficient_credits" ||
+    failureReason.includes("saldo insuficiente") ||
+    failureReason.includes("créditos insuficientes") ||
+    failureReason.includes("creditos insuficientes")
+
   if (flight.extractionStatus === "completed") {
     return {
       eyebrow: "Dados extraídos por IA",
@@ -1118,6 +1129,14 @@ function getFlightStatusCopy(flight: any) {
       eyebrow: "Passagem anexada",
       detail: "Analisando passagem...",
       tone: "pending" as const,
+    }
+  }
+
+  if (flight.extractionStatus === "failed" && hasInsufficientCreditsError) {
+    return {
+      eyebrow: "Créditos insuficientes",
+      detail: "Você não possui créditos suficientes para extrair automaticamente os dados desta passagem. Adicione créditos ou altere seu plano para continuar utilizando a Extração IA.",
+      tone: "error" as const,
     }
   }
 

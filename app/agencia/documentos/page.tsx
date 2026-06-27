@@ -52,6 +52,17 @@ const documentTypes = [
   { value: "insurance", label: "Seguros" },
 ]
 
+const FLIGHT_EXTRACTION_INSUFFICIENT_CREDITS_MESSAGE = "Créditos insuficientes\n\nVocê não possui créditos suficientes para extrair automaticamente os dados desta passagem.\n\nAdicione créditos ou altere seu plano para continuar utilizando a Extração IA."
+
+function resolveFlightExtractionErrorMessage(error?: string) {
+  const normalizedError = (error || "").toLowerCase()
+  if (normalizedError.includes("saldo insuficiente") || normalizedError.includes("créditos insuficientes") || normalizedError.includes("creditos insuficientes")) {
+    return FLIGHT_EXTRACTION_INSUFFICIENT_CREDITS_MESSAGE
+  }
+
+  return "Não foi possível extrair os dados desta passagem. Envie um cartão de embarque individual ou uma imagem limpa, sem cortes e com todos os dados visíveis."
+}
+
 const getFileIcon = (type: string) => {
   switch (type) {
     case "passport":
@@ -119,6 +130,14 @@ export default function DocumentsPage() {
       file: selectedFile,
     })
     setUploading(false)
+    if (created && uploadData.type === "ticket" && created.flightExtractionStatus === "failed") {
+      setActionError(resolveFlightExtractionErrorMessage(created.extractionError))
+      setUploadModalOpen(false)
+      setSelectedFile(null)
+      setUploadData({ name: "", type: "voucher", clientId: "", tripId: "", isPrivate: false })
+      return
+    }
+
     if (created) {
       const isTicketUpload = uploadData.type === "ticket"
       if (isTicketUpload) {
