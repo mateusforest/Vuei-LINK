@@ -1,14 +1,14 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { Building2, CalendarDays, FileText, Loader2, MapPin, Plus, Search } from "lucide-react"
+import { Building2, CalendarDays, FileText, Loader2, MapPin, Pencil, Plus, Search, Trash2 } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { useAgency } from "@/contexts/agency-context"
 import { useAuth } from "@/contexts/auth-context"
 import { createDocumentMetadata, getSignedDocumentUrl, uploadDocumentFile } from "@/lib/repositories/documents-repository"
-import { createTripHotel, listTripHotels, updateTripHotel, type TripHotelRecord } from "@/lib/repositories/trip-hotels-repository"
+import { createTripHotel, deleteTripHotel, listTripHotels, updateTripHotel, type TripHotelRecord } from "@/lib/repositories/trip-hotels-repository"
 import { validateDocumentFile } from "@/lib/files/file-validation"
 
 function sanitizeFileName(name: string) {
@@ -21,20 +21,43 @@ function sanitizeFileName(name: string) {
     .toLowerCase()
 }
 
+function parseDateOnly(value?: string | null) {
+  if (!value) return null
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(value)
+  if (!match) return null
+  const parsed = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]))
+  return Number.isNaN(parsed.getTime()) ? null : parsed
+}
+
 function formatShortDate(value?: string | null) {
   if (!value) return "Não informado"
-  const parsed = new Date(value)
-  if (Number.isNaN(parsed.getTime())) return value
+  const parsed = parseDateOnly(value)
+  if (!parsed) return value
   return parsed.toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" })
 }
 
 function getNightCount(checkIn?: string | null, checkOut?: string | null) {
   if (!checkIn || !checkOut) return null
-  const start = new Date(checkIn)
-  const end = new Date(checkOut)
-  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return null
+  const start = parseDateOnly(checkIn)
+  const end = parseDateOnly(checkOut)
+  if (!start || !end) return null
   const diff = Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
   return diff > 0 ? diff : null
+}
+
+function sortHotelsByCheckIn(hotels: TripHotelRecord[]) {
+  return [...hotels].sort((left, right) => {
+    const leftDate = parseDateOnly(left.checkIn)
+    const rightDate = parseDateOnly(right.checkIn)
+
+    if (leftDate && rightDate) {
+      return leftDate.getTime() - rightDate.getTime()
+    }
+
+    if (leftDate) return -1
+    if (rightDate) return 1
+    return left.createdAt.localeCompare(right.createdAt)
+  })
 }
 
 export default function AgencyHotelsPage() {
@@ -47,6 +70,7 @@ export default function AgencyHotelsPage() {
   const [saving, setSaving] = useState(false)
   const [actionError, setActionError] = useState("")
   const [actionNotice, setActionNotice] = useState("")
+  const [editingHotelId, setEditingHotelId] = useState<string | null>(null)
   const [voucherFile, setVoucherFile] = useState<File | null>(null)
   const [formData, setFormData] = useState({
     hotelName: "",
@@ -62,6 +86,7 @@ export default function AgencyHotelsPage() {
     () => trips.filter((trip) => !selectedClientId || trip.clientId === selectedClientId),
     [selectedClientId, trips],
   )
+  const sortedTripHotels = useMemo(() => sortHotelsByCheckIn(tripHotels), [tripHotels])
 
   useEffect(() => {
     if (!selectedClientId) return
@@ -134,6 +159,7 @@ export default function AgencyHotelsPage() {
   }
 
   const resetForm = () => {
+    setEditingHotelId(null)
     setFormData({
       hotelName: "",
       address: "",
@@ -143,6 +169,43 @@ export default function AgencyHotelsPage() {
       notes: "",
     })
     setVoucherFile(null)
+  }
+
+  const handleEditHotel = (hotel: TripHotelRecord) => {
+    setEditingHotelId(hotel.id)
+    setActionError("")
+    setActionNotice("")
+    setVoucherFile(null)
+    setFormData({
+      hotelName: hotel.name ?? "",
+      address: hotel.address ?? "",
+      checkIn: hotel.checkIn ?? "",
+      checkOut: hotel.checkOut ?? "",
+      confirmationCode: hotel.confirmationCode ?? "",
+      notes: hotel.notes ?? "",
+    })
+  }
+
+  const handleDeleteHotel = async (hotel: TripHotelRecord) => {
+    if (!confirm(`Tem certeza que deseja excluir a hospedagem "${hotel.name || "sem nome"}"?`)) {
+      return
+    }
+
+    setActionError("")
+    setActionNotice("")
+
+    const result = await deleteTripHotel(hotel.id)
+    if (!result.success) {
+      setActionError(result.error || "NÃ£o foi possÃ­vel excluir a hospedagem.")
+      return
+    }
+
+    await refreshAgencyWorkspace()
+    setTripHotels((prev) => prev.filter((entry) => entry.id !== hotel.id))
+    if (editingHotelId === hotel.id) {
+      resetForm()
+    }
+    setActionNotice("Hospedagem excluÃ­da com sucesso.")
   }
 
   const handleSaveHotel = async () => {
@@ -166,7 +229,7 @@ export default function AgencyHotelsPage() {
     setActionError("")
     setActionNotice("")
 
-    const hotelResult = await createTripHotel({
+    const hotelPayload = {
       tripId: selectedTrip.id,
       name: formData.hotelName.trim(),
       address: formData.address.trim() || null,
@@ -174,7 +237,18 @@ export default function AgencyHotelsPage() {
       checkOut: formData.checkOut || null,
       confirmationCode: formData.confirmationCode.trim() || null,
       notes: formData.notes.trim() || null,
-    })
+    }
+
+    const hotelResult = editingHotelId
+      ? await updateTripHotel(editingHotelId, {
+          name: hotelPayload.name,
+          address: hotelPayload.address,
+          checkIn: hotelPayload.checkIn,
+          checkOut: hotelPayload.checkOut,
+          confirmationCode: hotelPayload.confirmationCode,
+          notes: hotelPayload.notes,
+        })
+      : await createTripHotel(hotelPayload)
 
     if (!hotelResult.data) {
       setSaving(false)
@@ -183,7 +257,7 @@ export default function AgencyHotelsPage() {
     }
 
     let savedHotel = hotelResult.data
-    let notice = "Hospedagem salva com sucesso."
+    let notice = editingHotelId ? "Hospedagem atualizada com sucesso." : "Hospedagem salva com sucesso."
 
     if (voucherFile) {
       const safeName = sanitizeFileName(voucherFile.name)
@@ -230,7 +304,14 @@ export default function AgencyHotelsPage() {
 
     await refreshAgencyWorkspace()
     const hotelsResult = await listTripHotels(selectedTrip.id)
-    setTripHotels(hotelsResult.data ?? (savedHotel ? [savedHotel, ...tripHotels] : tripHotels))
+    setTripHotels(
+      hotelsResult.data ??
+        (savedHotel
+          ? editingHotelId
+            ? tripHotels.map((hotel) => (hotel.id === savedHotel.id ? savedHotel : hotel))
+            : [savedHotel, ...tripHotels]
+          : tripHotels),
+    )
     setSaving(false)
     setActionNotice(notice)
     resetForm()
@@ -261,7 +342,7 @@ export default function AgencyHotelsPage() {
           <CardContent className="space-y-5 p-5">
             <div className="flex items-center gap-2">
               <Building2 className="h-5 w-5 text-primary" />
-              <h2 className="text-lg font-semibold text-foreground">Nova hospedagem</h2>
+              <h2 className="text-lg font-semibold text-foreground">{editingHotelId ? "Editar hospedagem" : "Nova hospedagem"}</h2>
             </div>
 
             <div className="grid gap-4 md:grid-cols-2">
@@ -381,14 +462,21 @@ export default function AgencyHotelsPage() {
               />
             </div>
 
-            <Button
-              onClick={() => void handleSaveHotel()}
-              disabled={saving}
-              className="h-11 gap-2 bg-gradient-to-r from-primary to-accent text-white hover:opacity-90"
-            >
-              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-              {saving ? "Salvando hospedagem..." : "Salvar hospedagem"}
-            </Button>
+            <div className="flex flex-wrap gap-3">
+              <Button
+                onClick={() => void handleSaveHotel()}
+                disabled={saving}
+                className="h-11 gap-2 bg-gradient-to-r from-primary to-accent text-white hover:opacity-90"
+              >
+                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                {saving ? "Salvando hospedagem..." : editingHotelId ? "Salvar alterações" : "Salvar hospedagem"}
+              </Button>
+              {editingHotelId ? (
+                <Button type="button" variant="outline" className="h-11" onClick={resetForm}>
+                  Cancelar edição
+                </Button>
+              ) : null}
+            </div>
           </CardContent>
         </Card>
 
@@ -412,13 +500,13 @@ export default function AgencyHotelsPage() {
               <div className="rounded-2xl border border-dashed border-border/70 bg-[#fbfbfc] p-5 text-sm text-muted-foreground">
                 Escolha um cliente e uma viagem para listar as hospedagens.
               </div>
-            ) : tripHotels.length === 0 ? (
+            ) : sortedTripHotels.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-border/70 bg-[#fbfbfc] p-5 text-sm text-muted-foreground">
                 Nenhuma hospedagem cadastrada para esta viagem.
               </div>
             ) : (
               <div className="space-y-3">
-                {tripHotels.map((hotel) => {
+                {sortedTripHotels.map((hotel) => {
                   const nights = getNightCount(hotel.checkIn, hotel.checkOut)
                   return (
                     <div key={hotel.id} className="rounded-2xl border border-border/60 bg-[#fbfbfc] p-4">
@@ -430,12 +518,22 @@ export default function AgencyHotelsPage() {
                             <span className="line-clamp-2">{hotel.address || "Endereço não informado"}</span>
                           </div>
                         </div>
-                        {hotel.documentId ? (
-                          <Button variant="outline" size="sm" className="shrink-0" onClick={() => void handleOpenVoucher(hotel)}>
-                            <FileText className="mr-2 h-4 w-4" />
-                            Voucher
+                        <div className="flex shrink-0 flex-wrap justify-end gap-2">
+                          {hotel.documentId ? (
+                            <Button variant="outline" size="sm" onClick={() => void handleOpenVoucher(hotel)}>
+                              <FileText className="mr-2 h-4 w-4" />
+                              Voucher
+                            </Button>
+                          ) : null}
+                          <Button variant="outline" size="sm" onClick={() => handleEditHotel(hotel)}>
+                            <Pencil className="mr-2 h-4 w-4" />
+                            Editar
                           </Button>
-                        ) : null}
+                          <Button variant="outline" size="sm" onClick={() => void handleDeleteHotel(hotel)}>
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Excluir
+                          </Button>
+                        </div>
                       </div>
 
                       <div className="mt-4 grid gap-3 sm:grid-cols-2">
