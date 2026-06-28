@@ -60,6 +60,53 @@ function resolveFlightExtractionErrorMessage(error?: string) {
   return "Não foi possível extrair os dados desta passagem. Envie um cartão de embarque individual ou uma imagem limpa, sem cortes e com todos os dados visíveis."
 }
 
+const FLIGHT_EXTRACTION_FAILURE_MESSAGE = "Não foi possível extrair os dados desta passagem. Envie um cartão de embarque individual ou uma imagem limpa, sem cortes e com todos os dados visíveis."
+
+function shouldShowFlightGuidance(message?: string) {
+  const normalizedMessage = (message || "").toLowerCase()
+  return normalizedMessage.includes("não foi possível extrair os dados desta passagem") || normalizedMessage.includes("nÃ£o foi possÃ­vel extrair os dados desta passagem") || normalizedMessage.includes("nao foi possivel extrair os dados desta passagem")
+}
+
+function FlightExtractionGuidanceDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="agency-dialog sm:max-w-2xl">
+        <DialogHeader>
+          <DialogTitle className="text-slate-950">Como obter a melhor extração</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-5">
+          <p className="text-sm text-slate-600">A IA funciona melhor quando a passagem está completa, legível e sem cortes.</p>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+              <p className="text-sm font-semibold text-emerald-900">Correto</p>
+              <ul className="mt-3 space-y-2 text-sm text-emerald-800">
+                <li>- Cartão de embarque individual</li>
+                <li>- Todos os dados visíveis</li>
+                <li>- QR Code completo</li>
+                <li>- Boa resolução</li>
+                <li>- Sem cortes</li>
+              </ul>
+            </div>
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+              <p className="text-sm font-semibold text-amber-900">Evite</p>
+              <ul className="mt-3 space-y-2 text-sm text-amber-800">
+                <li>- Prints cortados</li>
+                <li>- Voucher com vários voos</li>
+                <li>- Documento desfocado</li>
+                <li>- QR Code cortado</li>
+                <li>- Parte da passagem escondida</li>
+              </ul>
+            </div>
+          </div>
+          <Button onClick={() => onOpenChange(false)} className="w-full bg-gradient-to-r from-primary to-accent text-white hover:opacity-90">
+            Entendi
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 const getFileIcon = (type: string) => {
   switch (type) {
     case "passport":
@@ -82,6 +129,7 @@ export default function DocumentsPage() {
   const [filter, setFilter] = useState("all")
   const [uploadModalOpen, setUploadModalOpen] = useState(false)
   const [editModalOpen, setEditModalOpen] = useState(false)
+  const [guidanceOpen, setGuidanceOpen] = useState(false)
   const [dragOver, setDragOver] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [savingEdit, setSavingEdit] = useState(false)
@@ -269,7 +317,14 @@ export default function DocumentsPage() {
       {/* Search and Filters */}
       {actionError ? (
         <Card className="border-red-500/20 bg-red-500/5">
-          <CardContent className="p-4 text-sm text-red-300">{actionError}</CardContent>
+          <CardContent className="p-4 text-sm text-red-300">
+            <p>{actionError}</p>
+            {shouldShowFlightGuidance(actionError) ? (
+              <button type="button" onClick={() => setGuidanceOpen(true)} className="mt-2 text-xs font-medium text-red-200 underline underline-offset-4 transition hover:text-red-100">
+                Ver dicas para uma extração melhor
+              </button>
+            ) : null}
+          </CardContent>
         </Card>
       ) : null}
       {!actionError && actionNotice ? (
@@ -505,6 +560,9 @@ export default function DocumentsPage() {
                   </p>
                   </div>
                   <p>Para viagens de ida e volta, envie cada trecho separadamente.</p>
+                  <button type="button" onClick={() => setGuidanceOpen(true)} className="pt-1 text-left text-[12px] font-medium text-primary underline underline-offset-4 transition hover:text-primary/80">
+                    Ver dicas para uma extração melhor
+                  </button>
                 </div>
               ) : null}
             </div>
@@ -596,6 +654,8 @@ export default function DocumentsPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <FlightExtractionGuidanceDialog open={guidanceOpen} onOpenChange={setGuidanceOpen} />
     </div>
   )
 }

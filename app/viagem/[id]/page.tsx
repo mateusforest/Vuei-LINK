@@ -1260,6 +1260,46 @@ function getFlightStatusCopy(flight: any) {
   }
 }
 
+function isFlightExtractionGuidanceMessage(message?: string | null) {
+  const normalizedMessage = (message || "").toLowerCase()
+  return normalizedMessage.includes("nÃ£o foi possÃ­vel extrair os dados desta passagem") || normalizedMessage.includes("nao foi possivel extrair os dados desta passagem")
+}
+
+function FlightExtractionGuidanceModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  return (
+    <Modal open={open} onClose={onClose} title="Como obter a melhor extração">
+      <div className="space-y-5">
+        <p className="text-sm text-white/70">A IA funciona melhor quando a passagem está completa, legível e sem cortes.</p>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-4">
+            <p className="text-sm font-semibold text-emerald-200">Correto</p>
+            <ul className="mt-3 space-y-2 text-sm text-emerald-100/85">
+              <li>- Cartão de embarque individual</li>
+              <li>- Todos os dados visíveis</li>
+              <li>- QR Code completo</li>
+              <li>- Boa resolução</li>
+              <li>- Sem cortes</li>
+            </ul>
+          </div>
+          <div className="rounded-2xl border border-amber-500/20 bg-amber-500/10 p-4">
+            <p className="text-sm font-semibold text-amber-200">Evite</p>
+            <ul className="mt-3 space-y-2 text-sm text-amber-100/85">
+              <li>- Prints cortados</li>
+              <li>- Voucher com vários voos</li>
+              <li>- Documento desfocado</li>
+              <li>- QR Code cortado</li>
+              <li>- Parte da passagem escondida</li>
+            </ul>
+          </div>
+        </div>
+        <Button onClick={onClose} className="w-full bg-gradient-to-r from-[#5de0e6] to-[#004aad] hover:opacity-90 text-white border-0">
+          Entendi
+        </Button>
+      </div>
+    </Modal>
+  )
+}
+
 function mapItineraryContentToLegacyDays(content?: TripItineraryContent | null) {
   if (!content?.days?.length) return [] as any[]
 
@@ -2800,6 +2840,7 @@ function FlightCard({
   onOpenDetails,
   onOpenDocument,
   onDelete,
+  onOpenGuidance,
 }: {
   flight: any
   index: number
@@ -2808,6 +2849,7 @@ function FlightCard({
   onOpenDetails: () => void
   onOpenDocument: () => void
   onDelete: () => void
+  onOpenGuidance: () => void
 }) {
   const { canWrite } = useContext(PermissionContext)
   const statusCopy = getFlightStatusCopy(flight)
@@ -2844,6 +2886,11 @@ function FlightCard({
             <div className="min-w-0 flex-1">
               <p className="text-base font-semibold text-white">Passagem anexada</p>
               <p className="mt-2 text-sm leading-6 text-white/70">{statusCopy.detail}</p>
+              {statusCopy.tone === "error" && isFlightExtractionGuidanceMessage(statusCopy.detail) ? (
+                <button type="button" onClick={onOpenGuidance} className="mt-2 text-xs font-medium text-[#7cecf0] underline underline-offset-4 transition hover:text-[#5de0e6]">
+                  Ver dicas para uma extração melhor
+                </button>
+              ) : null}
               {flight.document ? <p className="mt-2 text-xs text-white/45">VocÃª ainda pode abrir o arquivo anexado.</p> : null}
             </div>
           </div>
@@ -2901,6 +2948,11 @@ function FlightCard({
                   >
                     {statusCopy.detail}
                   </span>
+                ) : null}
+                {showStatusNote && statusCopy.tone === "error" && isFlightExtractionGuidanceMessage(statusCopy.detail) ? (
+                  <button type="button" onClick={onOpenGuidance} className="text-[11px] font-medium text-[#7cecf0] underline underline-offset-4 transition hover:text-[#5de0e6]">
+                    Ver dicas para uma extração melhor
+                  </button>
                 ) : null}
               </div>
             </div>
@@ -3263,6 +3315,7 @@ function FlightsSection({
   const [viewingQR, setViewingQR] = useState<any>(null)
   const [selectedFlight, setSelectedFlight] = useState<any>(null)
   const [addingFlight, setAddingFlight] = useState(false)
+  const [guidanceOpen, setGuidanceOpen] = useState(false)
   const { isAdmin, canWrite } = useContext(PermissionContext)
   const { showToast } = useToast()
   const flights = Array.isArray(tripData.flights) ? tripData.flights : []
@@ -3351,6 +3404,7 @@ function FlightsSection({
               onOpenDetails={() => setSelectedFlight(flight)}
               onOpenDocument={() => flight.document ? void handleOpenTicketDocument(flight.document) : undefined}
               onDelete={() => onDeleteFlight(flight.id)}
+              onOpenGuidance={() => setGuidanceOpen(true)}
             />
           ))}
           {ticketDocuments.map((document: any) => (
@@ -3390,18 +3444,20 @@ function FlightsSection({
         adminProxyMode={adminLinkMutationMode}
         ensureSensitiveAccess={ensureSensitiveAccess}
         onTrackExtraction={onTrackExtraction}
+        onOpenGuidance={() => setGuidanceOpen(true)}
         onSave={(data) => {
           onAddFlight(data)
           showToast("Passagem anexada. Estamos extraindo as informações.", "info")
           setAddingFlight(false)
         }}
       />
+      <FlightExtractionGuidanceModal open={guidanceOpen} onClose={() => setGuidanceOpen(false)} />
     </section>
   )
 }
 
 // Add Flight Modal
-function AddFlightModal({ open, onClose, onSave, tripId, ownerUserId, agencyId, tripSlug, adminToken, adminProxyMode, ensureSensitiveAccess, onTrackExtraction }: { open: boolean; onClose: () => void; onSave: (data: any) => void; tripId: string; ownerUserId: string | null; agencyId: string | null; tripSlug: string; adminToken: string | null; adminProxyMode: boolean; ensureSensitiveAccess: () => boolean; onTrackExtraction: (payload: { flightId: string; documentId: string }) => void }) {
+function AddFlightModal({ open, onClose, onSave, tripId, ownerUserId, agencyId, tripSlug, adminToken, adminProxyMode, ensureSensitiveAccess, onTrackExtraction, onOpenGuidance }: { open: boolean; onClose: () => void; onSave: (data: any) => void; tripId: string; ownerUserId: string | null; agencyId: string | null; tripSlug: string; adminToken: string | null; adminProxyMode: boolean; ensureSensitiveAccess: () => boolean; onTrackExtraction: (payload: { flightId: string; documentId: string }) => void; onOpenGuidance: () => void }) {
   const [uploading, setUploading] = useState(false)
   const [fileName, setFileName] = useState("")
   const [error, setError] = useState("")
@@ -3597,10 +3653,22 @@ function AddFlightModal({ open, onClose, onSave, tripId, ownerUserId, agencyId, 
         <div className="rounded-xl border border-white/[0.08] bg-white/[0.03] p-4">
           <p className="mt-2 text-xs leading-5 text-white/45">Para melhor leitura, envie um cartão de embarque individual ou uma imagem limpa da passagem, sem cortes e com todos os dados visíveis.</p>
           <p className="mt-1 text-xs leading-5 text-white/45">Para ida e volta, envie cada trecho separadamente.</p>
+          <button type="button" onClick={onOpenGuidance} className="mt-2 text-xs font-medium text-[#7cecf0] underline underline-offset-4 transition hover:text-[#5de0e6]">
+            Ver dicas para uma extração melhor
+          </button>
           <p className="text-sm text-white/70">A passagem será salva imediatamente. Algumas informações podem aparecer em instantes.</p>
         </div>
 
-        {error && <p className="text-sm text-red-300">{error}</p>}
+        {error ? (
+          <div>
+            <p className="text-sm text-red-300">{error}</p>
+            {isFlightExtractionGuidanceMessage(error) ? (
+              <button type="button" onClick={onOpenGuidance} className="mt-2 text-xs font-medium text-[#7cecf0] underline underline-offset-4 transition hover:text-[#5de0e6]">
+                Ver dicas para uma extração melhor
+              </button>
+            ) : null}
+          </div>
+        ) : null}
       </div>
     </Modal>
   )
