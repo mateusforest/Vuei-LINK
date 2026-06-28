@@ -84,7 +84,7 @@ function NewClientModal({ open, onClose, onSave }: { open: boolean; onClose: () 
   })
 
   const handleSubmit = async () => {
-    if (!formData.name || !formData.email) return
+    if (!formData.name.trim() || !formData.phone.trim()) return
     const saved = await onSave(formData)
     if (!saved) return
     setFormData({ name: "", email: "", phone: "", document: "", notes: "", status: "active" })
@@ -105,7 +105,7 @@ function NewClientModal({ open, onClose, onSave }: { open: boolean; onClose: () 
           />
         </div>
         <div>
-          <label className="text-xs text-white/50 uppercase tracking-wider">E-mail *</label>
+          <label className="text-xs text-white/50 uppercase tracking-wider">E-mail</label>
           <input
             type="email"
             value={formData.email}
@@ -115,7 +115,7 @@ function NewClientModal({ open, onClose, onSave }: { open: boolean; onClose: () 
           />
         </div>
         <div>
-          <label className="text-xs text-white/50 uppercase tracking-wider">Telefone</label>
+          <label className="text-xs text-white/50 uppercase tracking-wider">Telefone *</label>
           <input
             type="text"
             value={formData.phone}
@@ -136,7 +136,7 @@ function NewClientModal({ open, onClose, onSave }: { open: boolean; onClose: () 
         </div>
         <Button 
           onClick={handleSubmit} 
-          disabled={!formData.name || !formData.email}
+          disabled={!formData.name.trim() || !formData.phone.trim()}
           className="w-full bg-gradient-to-r from-[#5de0e6] to-[#004aad] hover:opacity-90 text-white border-0 disabled:opacity-50"
         >
           Cadastrar Cliente

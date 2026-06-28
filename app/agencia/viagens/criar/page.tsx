@@ -61,6 +61,10 @@ function resolveCanonicalDestinationIdForVisibleText(value: string) {
     : null
 }
 
+function getClientSecondaryInfo(client: { email: string; phone: string }) {
+  return client.email.trim() || client.phone.trim() || ""
+}
+
 function CreateTripPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -99,7 +103,7 @@ function CreateTripPageContent() {
           ...prev,
           clientId: client.id,
           clientName: client.name,
-          clientEmail: client.email
+          clientEmail: getClientSecondaryInfo(client)
         }))
       }
     }
@@ -510,7 +514,7 @@ function CreateTripPageContent() {
                             ...current,
                             clientId: client?.id ?? "",
                             clientName: client?.name ?? "",
-                            clientEmail: client?.email ?? "",
+                            clientEmail: client ? getClientSecondaryInfo(client) : "",
                           }))
                         }}
                         className="mt-1.5 w-full appearance-none rounded-xl border border-border/70 bg-white px-4 py-2.5 text-foreground focus:border-primary/50 focus:outline-none"
@@ -519,7 +523,7 @@ function CreateTripPageContent() {
                         <option value="">Buscar ou selecionar cliente</option>
                         {clients.map((client) => (
                           <option key={client.id} value={client.id}>
-                            {client.name}{client.email ? ` • ${client.email}` : ""}
+                            {client.name}{getClientSecondaryInfo(client) ? ` - ${getClientSecondaryInfo(client)}` : ""}
                           </option>
                         ))}
                       </select>
@@ -529,7 +533,7 @@ function CreateTripPageContent() {
                       <div className="rounded-2xl border border-primary/15 bg-primary/5 p-4">
                         <p className="font-medium text-foreground">{selectedClient.name}</p>
                         <p className="mt-1 text-sm text-muted-foreground">
-                          {selectedClient.email || "Email não informado"}
+                          {getClientSecondaryInfo(selectedClient) || "Telefone nao informado"}
                         </p>
                       </div>
                     ) : (

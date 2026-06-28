@@ -43,6 +43,10 @@ const itemVariants = {
   visible: { opacity: 1, y: 0 },
 }
 
+function getClientSecondaryInfo(client: Pick<Client, "email" | "phone">) {
+  return client.email.trim() || client.phone.trim() || ""
+}
+
 // Modal component
 function Modal({ open, onClose, title, children }: { open: boolean; onClose: () => void; title: string; children: React.ReactNode }) {
   if (!open) return null
@@ -92,7 +96,7 @@ function NewClientModal({ open, onClose, onSave, editClient }: {
   })
 
   const handleSubmit = async () => {
-    if (!formData.name || !formData.email) return
+    if (!formData.name.trim() || !formData.phone.trim()) return
     const saved = await onSave(formData)
     if (!saved) return
     setFormData({ name: "", email: "", phone: "", document: "", notes: "", status: "active" })
@@ -113,7 +117,7 @@ function NewClientModal({ open, onClose, onSave, editClient }: {
           />
         </div>
         <div>
-          <label className="text-xs uppercase tracking-wider text-muted-foreground">E-mail *</label>
+          <label className="text-xs uppercase tracking-wider text-muted-foreground">E-mail</label>
           <input
             type="email"
             value={formData.email}
@@ -123,7 +127,7 @@ function NewClientModal({ open, onClose, onSave, editClient }: {
           />
         </div>
         <div>
-          <label className="text-xs uppercase tracking-wider text-muted-foreground">Telefone</label>
+          <label className="text-xs uppercase tracking-wider text-muted-foreground">Telefone *</label>
           <input
             type="text"
             value={formData.phone}
@@ -154,7 +158,7 @@ function NewClientModal({ open, onClose, onSave, editClient }: {
         </div>
         <Button 
           onClick={handleSubmit} 
-          disabled={!formData.name || !formData.email}
+          disabled={!formData.name.trim() || !formData.phone.trim()}
           className="w-full bg-gradient-to-r from-[#5de0e6] to-[#004aad] hover:opacity-90 text-white border-0 disabled:opacity-50"
         >
           {editClient ? "Salvar alterações" : "Cadastrar cliente"}
@@ -186,8 +190,8 @@ function ClientProfileModal({ open, onClose, client, trips, onEdit, onNewTrip }:
           </Avatar>
           <div>
             <h3 className="text-lg font-semibold text-foreground">{client.name}</h3>
-            <p className="text-sm text-muted-foreground">{client.email}</p>
-            {client.phone && <p className="text-sm text-muted-foreground">{client.phone}</p>}
+            {client.email ? <p className="text-sm text-muted-foreground">{client.email}</p> : null}
+            {client.phone ? <p className="text-sm text-muted-foreground">{client.phone}</p> : null}
           </div>
         </div>
 
@@ -254,8 +258,11 @@ export default function ClientsPage() {
   const visibleClients = clients.filter((client) => client.status !== "archived")
   const filteredClients = clients.filter((client) => {
     if (client.status === "archived") return false
-    const matchesSearch = client.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                         client.email.toLowerCase().includes(searchQuery.toLowerCase())
+    const normalizedQuery = searchQuery.toLowerCase()
+    const matchesSearch =
+      client.name.toLowerCase().includes(normalizedQuery) ||
+      client.email.toLowerCase().includes(normalizedQuery) ||
+      client.phone.toLowerCase().includes(normalizedQuery)
     const matchesFilter = filter === "all" || client.status === filter
     return matchesSearch && matchesFilter
   })
@@ -472,16 +479,18 @@ export default function ClientsPage() {
                           <span className="text-foreground">{trip.destination}</span>
                         </div>
                       )}
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Mail className="h-3.5 w-3.5" />
-                        <span className="truncate">{client.email}</span>
-                      </div>
-                      {client.phone && (
+                      {client.email ? (
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <Mail className="h-3.5 w-3.5" />
+                          <span className="truncate">{client.email}</span>
+                        </div>
+                      ) : null}
+                      {client.phone ? (
                         <div className="flex items-center gap-2 text-sm text-muted-foreground">
                           <Phone className="h-3.5 w-3.5" />
                           <span>{client.phone}</span>
                         </div>
-                      )}
+                      ) : null}
                     </div>
 
                     <div className="mt-4 flex items-center justify-between">
