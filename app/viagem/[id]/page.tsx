@@ -4869,7 +4869,6 @@ function DocumentsSection({
                 ) : null}
               </div>
               <p className="text-sm text-white font-medium mt-2 break-words">{doc.name}</p>
-              <p className="text-xs text-white/40 mt-1">Compartilhável</p>
             </motion.div>
           ))}
         </div>
@@ -4883,7 +4882,7 @@ function DocumentsSection({
                   <Lock className="w-4 h-4 text-[#5de0e6]" />
                 </div>
                 <div>
-                  <p className="text-sm text-white font-medium">Documentos Privados</p>
+                  <p className="text-sm text-white font-medium">Documentos protegidos</p>
                   <p className="text-xs text-white/40">{privateDocs.length} arquivos protegidos</p>
                 </div>
               </div>
@@ -4952,10 +4951,6 @@ function DocumentsSection({
           </motion.div>
         )}
 
-        <div className="mt-4 flex items-center gap-2 text-white/30">
-          <Shield className="w-4 h-4" />
-          <p className="text-xs">Documentos privados não aparecem no link compartilhável</p>
-        </div>
       </div>
 
       <PortalPinUnlockModal
@@ -5608,8 +5603,6 @@ function ViewDocumentModal({
       <div className="text-center py-8">
         <span className="text-6xl">{getDocIcon(document.type)}</span>
         <p className="text-white font-medium mt-4">{document.name}</p>
-        <p className="text-white/40 text-sm mt-2">{document.private ? "Documento Privado" : "Documento Compartilhável"}</p>
-        
         <div className="mt-8 p-4 rounded-xl bg-white/[0.03] border border-white/[0.06]">
           <p className="text-xs text-white/40">Preview do documento</p>
           <div className="mt-4 h-48 bg-white/[0.02] rounded-xl flex items-center justify-center">
@@ -5801,19 +5794,6 @@ function AddDocumentModal({ open, onClose, onSave, tripId, ownerUserId, agencyId
           </select>
         </div>
 
-        <div className="flex items-center gap-3 p-4 rounded-xl bg-white/[0.02] border border-white/[0.06]">
-          <input
-            type="checkbox"
-            id="private"
-            checked={formData.private}
-            onChange={(e) => setFormData({ ...formData, private: e.target.checked })}
-            className="w-4 h-4 rounded bg-white/10 border-white/20"
-          />
-          <div>
-            <label htmlFor="private" className="text-sm text-white font-medium">Documento privado</label>
-            <p className="text-xs text-white/40">Não aparece no link compartilhável</p>
-          </div>
-        </div>
         {error && <p className="text-sm text-red-300">{error}</p>}
       </div>
     </Modal>
@@ -6189,8 +6169,8 @@ function ShareModal({ open, onClose, tripData }: { open: boolean; onClose: () =>
         <div className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.06] flex items-start gap-3">
           <Shield className="w-5 h-5 text-[#5de0e6] flex-shrink-0 mt-0.5" />
           <div>
-            <p className="text-sm text-white font-medium">Privacidade garantida</p>
-            <p className="text-xs text-white/40 mt-1">Documentos privados (passaportes, vistos) não aparecem no link compartilhável.</p>
+            <p className="text-sm text-white font-medium">Acesso protegido</p>
+            <p className="text-xs text-white/40 mt-1">Áreas sensíveis continuam seguindo a proteção configurada para esta viagem.</p>
           </div>
         </div>
       </div>

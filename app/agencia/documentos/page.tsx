@@ -8,20 +8,16 @@ import {
   FileText,
   Image,
   File,
-  Lock,
-  Unlock,
   MoreHorizontal,
   Download,
   Trash2,
   Eye,
-  Shield,
   X,
   FolderOpen,
   Pencil,
 } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import {
   DropdownMenu,
@@ -84,7 +80,6 @@ export default function DocumentsPage() {
   const { documents, clients, trips, addDocument, deleteDocument, getClientById, getTripById, isUsingRealData, workspaceError } = useAgency()
   const [searchQuery, setSearchQuery] = useState("")
   const [filter, setFilter] = useState("all")
-  const [privacyFilter, setPrivacyFilter] = useState<"all" | "private" | "shared">("all")
   const [uploadModalOpen, setUploadModalOpen] = useState(false)
   const [editModalOpen, setEditModalOpen] = useState(false)
   const [dragOver, setDragOver] = useState(false)
@@ -113,11 +108,7 @@ export default function DocumentsPage() {
       doc.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (client?.name.toLowerCase().includes(searchQuery.toLowerCase()) ?? false)
     const matchesType = filter === "all" || doc.type === filter
-    const matchesPrivacy =
-      privacyFilter === "all" ||
-      (privacyFilter === "private" && doc.isPrivate) ||
-      (privacyFilter === "shared" && !doc.isPrivate)
-    return matchesSearch && matchesType && matchesPrivacy
+    return matchesSearch && matchesType
   })
 
   const handleUpload = async () => {
@@ -253,23 +244,6 @@ export default function DocumentsPage() {
     setActionError("Documento sem arquivo disponível para visualização.")
   }
 
-  const handleTogglePrivacy = async (doc: AgencyDocument) => {
-    if (!isUsingRealData) return
-
-    const nextPrivate = !doc.isPrivate
-    const result = await updateDocumentMetadata(doc.id, {
-      isPrivate: nextPrivate,
-      visibility: nextPrivate ? "private" : "agency_only",
-    })
-
-    if (!result.data) {
-      setActionError(result.error || "Não foi possível atualizar a privacidade do documento.")
-      return
-    }
-
-    window.location.reload()
-  }
-
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr)
     return date.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })
@@ -291,21 +265,6 @@ export default function DocumentsPage() {
           Upload
         </Button>
       </div>
-
-      {/* Security Notice */}
-      <Card className="border-primary/20 bg-primary/5">
-        <CardContent className="flex items-center gap-3 p-4">
-          <div className="rounded-lg bg-primary/10 p-2">
-            <Shield className="h-5 w-5 text-primary" />
-          </div>
-          <div className="flex-1">
-            <p className="text-sm font-medium text-foreground">Documentos protegidos</p>
-            <p className="text-xs text-muted-foreground">
-              Docs privados requerem PIN/Face ID e não aparecem nos links compartilhados
-            </p>
-          </div>
-        </CardContent>
-      </Card>
 
       {/* Search and Filters */}
       {actionError ? (
@@ -329,29 +288,6 @@ export default function DocumentsPage() {
             onChange={(e) => setSearchQuery(e.target.value)}
             className="h-10 w-full rounded-xl border border-white/5 bg-white/5 pl-10 pr-4 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary/50 focus:outline-none"
           />
-        </div>
-        <div className="flex gap-2 overflow-x-auto pb-2 sm:pb-0">
-          {[
-            { value: "all", label: "Todos" },
-            { value: "private", label: "Privados" },
-            { value: "shared", label: "Compartilháveis" },
-          ].map((item) => (
-            <Button
-              key={item.value}
-              variant="outline"
-              size="sm"
-              onClick={() => setPrivacyFilter(item.value as typeof privacyFilter)}
-              className={`flex-shrink-0 border-white/10 ${
-                privacyFilter === item.value
-                  ? "bg-primary/20 text-primary"
-                  : "bg-transparent text-muted-foreground hover:bg-white/5"
-              }`}
-            >
-              {item.value === "private" && <Lock className="mr-1 h-3 w-3" />}
-              {item.value === "shared" && <Unlock className="mr-1 h-3 w-3" />}
-              {item.label}
-            </Button>
-          ))}
         </div>
       </div>
 
@@ -416,12 +352,6 @@ export default function DocumentsPage() {
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
                         <p className="truncate font-medium text-foreground">{doc.name}</p>
-                        {doc.isPrivate && (
-                          <Badge variant="outline" className="border-yellow-500/30 bg-yellow-500/10 text-[10px] text-yellow-500">
-                            <Lock className="mr-1 h-2.5 w-2.5" />
-                            Privado
-                          </Badge>
-                        )}
                       </div>
                       <div className="mt-1 flex items-center gap-3 text-xs text-muted-foreground">
                         {client && (
@@ -453,19 +383,6 @@ export default function DocumentsPage() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="border-white/10 bg-card">
-                          <DropdownMenuItem onClick={() => void handleTogglePrivacy(doc)}>
-                            {doc.isPrivate ? (
-                              <>
-                                <Unlock className="mr-2 h-4 w-4" />
-                                Tornar compartilhável
-                              </>
-                            ) : (
-                              <>
-                                <Lock className="mr-2 h-4 w-4" />
-                                Tornar privado
-                              </>
-                            )}
-                          </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => handleStartEdit(doc)}>
                             <Pencil className="mr-2 h-4 w-4" />
                             Editar
@@ -621,19 +538,6 @@ export default function DocumentsPage() {
                 ))}
               </select>
             </div>
-
-            <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-border/70 bg-slate-50 p-3">
-              <input
-                type="checkbox"
-                checked={uploadData.isPrivate}
-                onChange={(e) => setUploadData({ ...uploadData, isPrivate: e.target.checked })}
-                className="h-4 w-4 rounded border-slate-300 bg-white text-primary focus:ring-primary/50 focus:ring-offset-0"
-              />
-              <div className="flex items-center gap-2">
-                <Lock className="h-4 w-4 text-yellow-500" />
-                <span className="text-sm text-slate-900">Documento privado</span>
-              </div>
-            </label>
 
             <div className="flex gap-3">
               <Button
