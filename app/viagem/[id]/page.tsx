@@ -7781,10 +7781,13 @@ export default function TripPage() {
     })
     const requestId = loadRequestRef.current + 1
     loadRequestRef.current = requestId
+    const keepVisibleShellWhileRefreshing = sensitiveAccessGranted && Boolean(tripData?.id)
 
     const loadTrip = async () => {
       const tripPerf = startPerfMeasure("trip.base")
-      setIsLoadingTrip(true)
+      if (!keepVisibleShellWhileRefreshing) {
+        setIsLoadingTrip(true)
+      }
       setLoadError(null)
       devLog("trip.loading", routeSlug)
 
