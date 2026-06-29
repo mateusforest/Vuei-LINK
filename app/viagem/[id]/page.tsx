@@ -8,7 +8,7 @@ import { extractAgencyStorageState } from "@/lib/mappers/agency-mappers"
 import { extractTripsStoragePayload } from "@/lib/mappers/trip-mappers"
 import { shouldUseSupabase } from "@/lib/data-source"
 import { DOCUMENT_UPLOAD_TYPE_OPTIONS } from "@/lib/constants/document-upload-types"
-import { getTripByAdminToken, getTripByPublicToken, getTripBySlug } from "@/lib/repositories/trips-repository"
+import { getTripByAdminToken, getTripByPublicToken, getTripBySlug, updateTrip as updateTripRepository } from "@/lib/repositories/trips-repository"
 import { createDocumentMetadata, deleteDocument, deleteDocumentFile, getSignedDocumentUrl, listDocumentsByTrip, listPublicTripDocuments, uploadDocumentFile } from "@/lib/repositories/documents-repository"
 import { deleteTripFlight, listPublicTripFlights, listTripFlights, requestTripFlightExtraction, upsertTripFlight } from "@/lib/repositories/trip-flights-repository"
 import { createTripHotel, deleteTripHotel, listTripHotels, updateTripHotel } from "@/lib/repositories/trip-hotels-repository"
@@ -2755,18 +2755,31 @@ function TravelerPublicShell({
 }
 
 // Edit Trip Modal
-function EditTripModal({ open, onClose, tripData, onSave }: { open: boolean; onClose: () => void; tripData: any; onSave: (data: any) => void }) {
+function EditTripModal({ open, onClose, tripData, onSave }: { open: boolean; onClose: () => void; tripData: any; onSave: (data: any) => Promise<boolean> }) {
   const [formData, setFormData] = useState({
     destination: tripData.destination,
     country: tripData.country,
-    startDate: tripData.dates.start,
-    endDate: tripData.dates.end,
+    startDate: tripData.startDate || "",
+    endDate: tripData.endDate || "",
     status: tripData.status
   })
 
-  const handleSave = () => {
-    onSave(formData)
-    onClose()
+  useEffect(() => {
+    if (!open) return
+    setFormData({
+      destination: tripData.destination,
+      country: tripData.country,
+      startDate: tripData.startDate || "",
+      endDate: tripData.endDate || "",
+      status: tripData.status,
+    })
+  }, [open, tripData.country, tripData.destination, tripData.endDate, tripData.startDate, tripData.status])
+
+  const handleSave = async () => {
+    const saved = await onSave(formData)
+    if (saved) {
+      onClose()
+    }
   }
 
   return (
@@ -2794,7 +2807,7 @@ function EditTripModal({ open, onClose, tripData, onSave }: { open: boolean; onC
           <div>
             <label className="text-xs text-white/50 uppercase tracking-wider">Data Inicio</label>
             <input
-              type="text"
+              type="date"
               value={formData.startDate}
               onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
               className="w-full mt-1 px-4 py-3 rounded-xl bg-white/[0.05] border border-white/[0.08] text-white focus:outline-none focus:border-[#5de0e6]/50"
@@ -2803,7 +2816,7 @@ function EditTripModal({ open, onClose, tripData, onSave }: { open: boolean; onC
           <div>
             <label className="text-xs text-white/50 uppercase tracking-wider">Data Fim</label>
             <input
-              type="text"
+              type="date"
               value={formData.endDate}
               onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
               className="w-full mt-1 px-4 py-3 rounded-xl bg-white/[0.05] border border-white/[0.08] text-white focus:outline-none focus:border-[#5de0e6]/50"
@@ -2823,7 +2836,7 @@ function EditTripModal({ open, onClose, tripData, onSave }: { open: boolean; onC
   <option value="completed" className="bg-[#0a0a0a] text-white">Finalizada</option>
   </select>
         </div>
-        <Button onClick={handleSave} className="w-full mt-4 bg-gradient-to-r from-[#5de0e6] to-[#004aad] hover:opacity-90 text-white border-0">
+        <Button onClick={() => void handleSave()} className="w-full mt-4 bg-gradient-to-r from-[#5de0e6] to-[#004aad] hover:opacity-90 text-white border-0">
           Salvar alterações
         </Button>
       </div>
@@ -8574,18 +8587,49 @@ export default function TripPage() {
     setTravelerPanel(panel)
   }
 
-  const handleUpdateTrip = (data: any) => {
-    if (blockOfflineMutation()) return
-    requireSensitiveAccess(() => {
-      setTripData(prev => ({
+  const handleUpdateTrip = async (data: any) => {
+    if (blockOfflineMutation()) return false
+    if (!ensureSensitiveAccess()) return false
+    if (!tripData.id) {
+      showToast("Viagem nao encontrada para atualizar.", "error")
+      return false
+    }
+
+    const payload = {
+      destination: data.destination,
+      country: data.country,
+      startDate: data.startDate || null,
+      endDate: data.endDate || null,
+      status: data.status,
+    }
+
+    const result = adminLinkMutationMode
+      ? await callTripAdminApi<{ trip?: { destination?: string | null; country?: string | null; startDate?: string | null; endDate?: string | null; status?: string | null } }>({
+          action: "updateTrip",
+          ...payload,
+        })
+      : await updateTripRepository(tripData.id, payload)
+
+    const savedTrip = adminLinkMutationMode ? result.data?.trip ?? null : result.data
+    const saveError = adminLinkMutationMode ? result.error : result.error
+
+    if (saveError || !savedTrip) {
+      showToast(resolveProtectedWriteError(saveError || "Nao foi possivel atualizar a viagem."), "error")
+      return false
+    }
+
+    setTripData((prev: any) =>
+      normalizeTripViewData({
         ...prev,
-        destination: data.destination,
-        country: data.country,
-        dates: { start: data.startDate, end: data.endDate },
-        status: data.status
-      }))
-      showToast("Viagem atualizada!", "success")
-    })
+        destination: savedTrip.destination ?? payload.destination,
+        country: savedTrip.country ?? payload.country,
+        startDate: savedTrip.startDate ?? payload.startDate,
+        endDate: savedTrip.endDate ?? payload.endDate,
+        status: savedTrip.status ?? payload.status,
+      }),
+    )
+    showToast("Viagem atualizada!", "success")
+    return true
   }
 
   const handleUpdateFlight = async (id: string, data: any) => {

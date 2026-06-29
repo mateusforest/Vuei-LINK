@@ -453,6 +453,38 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: error ?? "Acesso administrativo inv?lido." }, { status: 403 })
     }
 
+    if (action === "updateTrip") {
+      const payload = {
+        destination: typeof body?.destination === "string" ? body.destination : trip.destination,
+        country: typeof body?.country === "string" ? body.country : trip.country,
+        start_date: typeof body?.startDate === "string" ? body.startDate : null,
+        end_date: typeof body?.endDate === "string" ? body.endDate : null,
+        status: typeof body?.status === "string" ? body.status : trip.status,
+      }
+
+      const result = await supabase
+        .from("trips")
+        .update(payload)
+        .eq("id", trip.id)
+        .select("id, destination, country, start_date, end_date, status")
+        .single()
+
+      if (result.error || !result.data) {
+        return NextResponse.json({ error: result.error?.message ?? "Nao foi possivel atualizar a viagem." }, { status: 400 })
+      }
+
+      return NextResponse.json({
+        trip: {
+          id: result.data.id,
+          destination: result.data.destination,
+          country: result.data.country,
+          startDate: result.data.start_date,
+          endDate: result.data.end_date,
+          status: result.data.status,
+        },
+      })
+    }
+
     if (action === "ensureTravelersPersisted") {
       const fallbackCount = typeof body?.travelersCount === "number"
         ? body.travelersCount
