@@ -1271,9 +1271,9 @@ function FlightExtractionGuidanceModal({ open, onClose }: { open: boolean; onClo
       <div className="space-y-5">
         <p className="text-sm text-white/70">A IA funciona melhor quando a passagem está completa, legível e sem cortes.</p>
         <div className="grid gap-4 sm:grid-cols-2">
-          <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-4">
-            <p className="text-sm font-semibold text-emerald-200">Correto</p>
-            <ul className="mt-3 space-y-2 text-sm text-emerald-100/85">
+          <div className="rounded-2xl border border-emerald-200/80 bg-emerald-50 p-4">
+            <p className="text-sm font-semibold text-emerald-900">Correto</p>
+            <ul className="mt-3 space-y-2 text-sm text-emerald-800">
               <li>- Cartão de embarque individual</li>
               <li>- Todos os dados visíveis</li>
               <li>- QR Code completo</li>
@@ -1281,9 +1281,9 @@ function FlightExtractionGuidanceModal({ open, onClose }: { open: boolean; onClo
               <li>- Sem cortes</li>
             </ul>
           </div>
-          <div className="rounded-2xl border border-amber-500/20 bg-amber-500/10 p-4">
-            <p className="text-sm font-semibold text-amber-200">Evite</p>
-            <ul className="mt-3 space-y-2 text-sm text-amber-100/85">
+          <div className="rounded-2xl border border-amber-200/80 bg-amber-50 p-4">
+            <p className="text-sm font-semibold text-amber-900">Evite</p>
+            <ul className="mt-3 space-y-2 text-sm text-amber-800">
               <li>- Prints cortados</li>
               <li>- Voucher com vários voos</li>
               <li>- Documento desfocado</li>
