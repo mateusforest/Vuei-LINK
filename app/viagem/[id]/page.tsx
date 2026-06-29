@@ -113,10 +113,10 @@ function isRealTripUuid(value?: string | null): value is string {
 
 function getTripPinOfflineMessage(accessMode: TripPinApiAccessMode) {
   if (accessMode === "admin") {
-    return "Voce esta offline. A viagem pode ser consultada, mas o modo de edicao precisa de internet para validar o PIN."
+    return "Você está offline. A viagem pode ser consultada, mas o modo de edição precisa de internet para validar o PIN."
   }
 
-  return "Voce esta offline. A viagem pode ser consultada, mas as areas protegidas precisam de internet para validar o PIN."
+  return "Você está offline. A viagem pode ser consultada, mas as áreas protegidas precisam de internet para validar o PIN."
 }
 
 function buildTripPinQuery(params: {
@@ -1231,6 +1231,14 @@ function getFlightStatusCopy(flight: any) {
     return {
       eyebrow: "Créditos insuficientes",
       detail: "Você não possui créditos suficientes para extrair automaticamente os dados desta passagem. Adicione créditos ou altere seu plano para continuar utilizando a Extração IA.",
+      tone: "error" as const,
+    }
+  }
+
+  if (flight.extractionStatus === "failed") {
+    return {
+      eyebrow: "Passagem anexada",
+      detail: "Não foi possível extrair os dados desta passagem. Envie um cartão de embarque individual ou uma imagem limpa, sem cortes e com todos os dados visíveis.",
       tone: "error" as const,
     }
   }
@@ -2833,7 +2841,7 @@ function EditTripModal({ open, onClose, tripData, onSave }: { open: boolean; onC
   >
   <option value="upcoming" className="bg-[#0a0a0a] text-white">Proxima</option>
   <option value="ongoing" className="bg-[#0a0a0a] text-white">Em andamento</option>
-  <option value="completed" className="bg-[#0a0a0a] text-white">Finalizada</option>
+  <option value="completed" className="bg-[#0a0a0a] text-white">Concluída</option>
   </select>
         </div>
         <Button onClick={() => void handleSave()} className="w-full mt-4 bg-gradient-to-r from-[#5de0e6] to-[#004aad] hover:opacity-90 text-white border-0">
@@ -2904,7 +2912,7 @@ function FlightCard({
                   Ver dicas para uma extração melhor
                 </button>
               ) : null}
-              {flight.document ? <p className="mt-2 text-xs text-white/45">VocÃª ainda pode abrir o arquivo anexado.</p> : null}
+              {flight.document ? <p className="mt-2 text-xs text-white/45">Você ainda pode abrir o arquivo anexado.</p> : null}
             </div>
           </div>
 
@@ -3890,7 +3898,7 @@ function EditHotelModal({ open, onClose, hotel, onSave }: { open: boolean; onClo
 
     const validation = validateDocumentFile(file)
     if (!validation.valid) {
-      setUploadError(validation.error || "Arquivo invalido.")
+      setUploadError(validation.error || "Arquivo inválido.")
       return
     }
 
@@ -5028,7 +5036,7 @@ function DocumentsSection({
               )}
             </AnimatePresence>
 
-            {!unlocked && <p className="text-xs text-white/30 text-center mt-3">Use o PIN ja criado no portal para acessar documentos privados</p>}
+            {!unlocked && <p className="text-xs text-white/30 text-center mt-3">Use o PIN já criado no portal para acessar documentos privados</p>}
           </motion.div>
         )}
 
@@ -5043,7 +5051,7 @@ function DocumentsSection({
         publicToken={tripPublicToken}
         accessMode={canWrite ? "admin" : "public"}
         title="Desbloquear Documentos"
-        configuredDescription="Use o PIN ja criado no portal para acessar os documentos protegidos."
+        configuredDescription="Use o PIN já criado no portal para acessar os documentos protegidos."
         onSuccess={() => {
           setUnlocked(true)
           onSensitiveAccessGranted()
@@ -5377,7 +5385,7 @@ function PortalPinUnlockModal({
       }
 
       if (!result.data.verified) {
-        setError("PIN invalido.")
+        setError("PIN inválido.")
         return
       }
 
@@ -8877,7 +8885,7 @@ export default function TripPage() {
             const path = `${tripOwnerUserId}/${tripData.id}/hotel-vouchers/${Date.now()}-${voucherFile.name.replace(/\s+/g, "-")}`
             const uploadedFile = await uploadDocumentFile(voucherFile, path)
             if (uploadedFile.error || !uploadedFile.data) {
-              return { ok: false, data: null, error: resolveProtectedWriteError(uploadedFile.error || "NÃ£o foi possÃ­vel anexar o voucher.") }
+              return { ok: false, data: null, error: resolveProtectedWriteError(uploadedFile.error || "Não foi possível anexar o voucher.") }
             }
 
             const metadataResult = await createDocumentMetadata({
@@ -8906,7 +8914,7 @@ export default function TripPage() {
       linkedDocument = uploadResult.data?.document ?? null
       if (!uploadResult.ok || !linkedDocument) {
         console.error("[HOTEL] voucher upload error", uploadResult.error)
-        showToast(uploadResult.error || "NÃ£o foi possÃ­vel anexar o voucher da hospedagem.", "error")
+        showToast(uploadResult.error || "Não foi possível anexar o voucher da hospedagem.", "error")
         return false
       }
 
@@ -8925,7 +8933,7 @@ export default function TripPage() {
       const hotelWithVoucher = adminLinkMutationMode ? hotelWithVoucherResult.data?.hotel ?? null : hotelWithVoucherResult.data
       if (hotelWithVoucherResult.error || !hotelWithVoucher) {
         console.error("[HOTEL] voucher link error", hotelWithVoucherResult.error)
-        showToast(resolveProtectedWriteError(hotelWithVoucherResult.error || "NÃ£o foi possÃ­vel vincular o voucher da hospedagem."), "error")
+        showToast(resolveProtectedWriteError(hotelWithVoucherResult.error || "Não foi possível vincular o voucher da hospedagem."), "error")
         return false
       }
 
@@ -9399,7 +9407,7 @@ export default function TripPage() {
     }
 
     if (!travelerId?.trim()) {
-      showToast("Nao foi possivel identificar este viajante para edicao.", "error")
+      showToast("Não foi possível identificar este viajante para edição.", "error")
       return false
     }
 
@@ -9436,7 +9444,7 @@ export default function TripPage() {
     }
 
     if (!travelerId?.trim()) {
-      showToast("Nao foi possivel identificar este viajante para exclusao.", "error")
+      showToast("Não foi possível identificar este viajante para exclusão.", "error")
       return false
     }
 
@@ -9474,7 +9482,7 @@ export default function TripPage() {
     }
 
     if (!travelerId?.trim()) {
-      showToast("Nao foi possivel identificar este viajante principal.", "error")
+      showToast("Não foi possível identificar este viajante principal.", "error")
       return false
     }
 
@@ -9518,7 +9526,7 @@ export default function TripPage() {
           publicToken={tripPublicToken}
           accessMode="admin"
           title="Desbloqueie para editar esta viagem"
-          configuredDescription="Use o PIN ja criado no portal para liberar o modo administrador desta viagem."
+          configuredDescription="Use o PIN já criado no portal para liberar o modo administrador desta viagem."
           tone="light"
           onSuccess={(status) => {
             if (status?.adminToken) {
@@ -9696,10 +9704,10 @@ export default function TripPage() {
               adminToken={tripAdminToken}
               publicToken={tripPublicToken}
               accessMode={securityAccessMode}
-              title={securityAccessMode === "admin" ? "Desbloquear para editar esta viagem" : "Desbloquear areas protegidas"}
+              title={securityAccessMode === "admin" ? "Desbloquear para editar esta viagem" : "Desbloquear áreas protegidas"}
               configuredDescription={securityAccessMode === "admin"
-                ? "Use o PIN ja criado no portal para liberar a edicao e os dados protegidos desta viagem."
-                : "Use o PIN ja criado no portal para abrir documentos, passagens, hospedagens e outras areas protegidas."}
+                ? "Use o PIN já criado no portal para liberar a edição e os dados protegidos desta viagem."
+                : "Use o PIN já criado no portal para abrir documentos, passagens, hospedagens e outras áreas protegidas."}
               tone="light"
               onSuccess={(status) => {
                 if (status?.adminToken) {
@@ -9912,7 +9920,7 @@ export default function TripPage() {
               publicToken={tripPublicToken}
               accessMode="admin"
               title="Desbloqueie para editar esta viagem"
-              configuredDescription="Use o PIN ja criado no portal para liberar as acoes administrativas desta viagem."
+              configuredDescription="Use o PIN já criado no portal para liberar as ações administrativas desta viagem."
               onSuccess={(status) => {
                 if (status?.adminToken) {
                   setTripAdminToken(status.adminToken)
@@ -10063,14 +10071,14 @@ export default function TripPage() {
             adminToken={tripAdminToken}
             publicToken={tripPublicToken}
             accessMode={adminRouteActive ? "admin" : "public"}
-            title="Desbloquear areas protegidas"
-            configuredDescription={adminRouteActive ? "Use o PIN ja criado no portal para liberar as acoes administrativas desta viagem." : "Use o PIN ja criado no portal para liberar as areas protegidas desta viagem."}
+            title="Desbloquear áreas protegidas"
+            configuredDescription={adminRouteActive ? "Use o PIN já criado no portal para liberar as ações administrativas desta viagem." : "Use o PIN já criado no portal para liberar as áreas protegidas desta viagem."}
             onSuccess={() => {
               setSensitiveAccessGranted(true)
               setSecurityModalOpen(false)
               const pendingAction = pendingSensitiveActionRef.current
               pendingSensitiveActionRef.current = null
-              setToast({ message: "Acesso liberado para areas protegidas.", type: "success" })
+              setToast({ message: "Acesso liberado para áreas protegidas.", type: "success" })
               pendingAction?.()
             }}
             onLogin={handleRequireAuthenticatedAdmin}

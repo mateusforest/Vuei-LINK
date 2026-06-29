@@ -70,7 +70,7 @@ function formatTravelersLabel(count?: number) {
 function formatItineraryStatus(status: TripItineraryRecord["status"]) {
   switch (status) {
     case "completed":
-      return "Concluído"
+      return "Concluída"
     case "generating":
       return "Gerando"
     case "failed":

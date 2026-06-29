@@ -223,7 +223,7 @@ function ClientProfileModal({ open, onClose, client, trips, onEdit, onNewTrip }:
                   <Badge variant="outline" className={`text-[10px] ${
                     trip.status === "upcoming" ? "border-green-500/30 bg-green-500/10 text-green-400" : "border-white/10"
                   }`}>
-                    {trip.status === "upcoming" ? "Próximo" : trip.status === "ongoing" ? "Em andamento" : "Concluído"}
+                    {trip.status === "upcoming" ? "Planejada" : trip.status === "ongoing" ? "Em andamento" : "Concluída"}
                   </Badge>
                 </div>
               ))}
@@ -508,7 +508,7 @@ export default function ClientsPage() {
                           {status === "traveling"
                             ? "Em viagem"
                             : status === "preparation"
-                              ? "Preparacao"
+                              ? "Planejada"
                               : "Sem viagem"}
                         </Badge>
                       </div>

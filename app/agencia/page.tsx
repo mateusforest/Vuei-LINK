@@ -371,7 +371,7 @@ export default function AgencyDashboard() {
                           variant="outline"
                           className="mt-1 text-[10px] border-green-500/30 bg-green-500/10 text-green-400"
                         >
-                          Pr?ximo
+                          Planejada
                         </Badge>
                       </div>
                       <Button

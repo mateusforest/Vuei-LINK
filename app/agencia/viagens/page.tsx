@@ -366,7 +366,7 @@ export default function TripsPage() {
             { value: "all", label: "Todas" },
             { value: "upcoming", label: "Próximas" },
             { value: "ongoing", label: "Em andamento" },
-            { value: "completed", label: "Finalizadas" },
+            { value: "completed", label: "Concluídas" },
           ].map((item) => (
             <Button
               key={item.value}
@@ -450,8 +450,8 @@ export default function TripsPage() {
                           {trip.status === "ongoing"
                             ? "Em andamento"
                             : trip.status === "upcoming"
-                              ? "Próximo"
-                              : "Finalizada"}
+                              ? "Planejada"
+                              : "Concluída"}
                         </Badge>
                       </div>
                     </div>

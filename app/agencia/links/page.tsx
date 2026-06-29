@@ -279,7 +279,7 @@ export default function LinksPage() {
                           trip.status === "ongoing" ? "border-green-500/30 bg-green-500/10 text-green-400" :
                           "border-white/10"
                         }`}>
-                          {trip.status === "upcoming" ? "Próximo" : trip.status === "ongoing" ? "Em andamento" : "Concluído"}
+                          {trip.status === "upcoming" ? "Planejada" : trip.status === "ongoing" ? "Em andamento" : "Concluída"}
                         </Badge>
                       </div>
                     </div>

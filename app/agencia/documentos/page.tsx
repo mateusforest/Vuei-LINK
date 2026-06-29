@@ -226,7 +226,7 @@ export default function DocumentsPage() {
       if (uploadData.type === "ticket") {
         if (created.flightExtractionStatus === "failed") {
           setActionError(created.extractionError || "Passagem anexada, mas não foi possível iniciar a extração agora.")
-          setActionError("NÃ£o foi possÃ­vel extrair os dados desta passagem. Envie um cartÃ£o de embarque individual ou uma imagem limpa, sem cortes e com todos os dados visÃ­veis.")
+          setActionError("Não foi possível extrair os dados desta passagem. Envie um cartão de embarque individual ou uma imagem limpa, sem cortes e com todos os dados visíveis.")
         } else {
           setActionNotice("Passagem anexada. Estamos extraindo as informações.")
         }
@@ -254,7 +254,7 @@ export default function DocumentsPage() {
     if (!file) return
     const validation = validateDocumentFile(file)
     if (!validation.valid) {
-      setActionError(validation.error || "Arquivo inv?lido.")
+      setActionError(validation.error || "Arquivo inválido.")
       setActionNotice("")
       return
     }
@@ -331,7 +331,7 @@ export default function DocumentsPage() {
         <div>
           <h1 className="text-2xl font-bold text-foreground">Documentos</h1>
           <p className="mt-1 text-muted-foreground">
-            {hasScopedFilter ? `${filteredDocs.length} documentos nesta visualizacao` : `${documents.length} documentos armazenados`}
+            {hasScopedFilter ? `${filteredDocs.length} documentos nesta visualização` : `${documents.length} documentos armazenados`}
           </p>
         </div>
         <Button
@@ -599,7 +599,7 @@ export default function DocumentsPage() {
                   <p>Para melhor leitura, envie um cartão de embarque individual ou uma imagem limpa da passagem, sem cortes e com todos os dados visíveis.</p>
                   <p>Para viagens de ida e volta, envie cada trecho separadamente.</p>
                   <p className="hidden">
-                  Para melhor leitura, envie um cartÃ£o de embarque individual ou uma imagem limpa da passagem, sem cortes e com todos os dados visÃ­veis. Para ida e volta, envie cada trecho separadamente.
+                  Para melhor leitura, envie um cartão de embarque individual ou uma imagem limpa da passagem, sem cortes e com todos os dados visíveis. Para ida e volta, envie cada trecho separadamente.
                   </p>
                   </div>
                   <p>Para viagens de ida e volta, envie cada trecho separadamente.</p>
