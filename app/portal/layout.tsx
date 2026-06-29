@@ -14,6 +14,7 @@ import {
   Settings,
   LifeBuoy,
   Plus,
+  BookOpen,
   ChevronLeft,
   ChevronRight,
   User,
@@ -33,6 +34,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { QuickGuideModal } from "@/components/onboarding/quick-guide-modal"
+
+const TRAVELER_QUICK_GUIDE_STORAGE_KEY = "vuei_traveler_quick_guide_seen_v1"
 
 const navItems = [
   { href: "/portal", icon: Home, label: "Início" },
@@ -60,8 +64,9 @@ function PortalLayoutInner({ children }: { children: React.ReactNode }) {
   const isMobile = useIsMobile()
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [mobileHeaderOffset, setMobileHeaderOffset] = useState(132)
+  const [quickGuideOpen, setQuickGuideOpen] = useState(false)
   const mobileHeaderRef = useRef<HTMLElement | null>(null)
-  const { credits, subscription } = useTrips()
+  const { credits, subscription, trips, loadingTrips } = useTrips()
   const { profile, signOut } = useAuth()
   const firstName = profile?.name?.trim().split(" ")[0] ?? ""
   const initials = profile?.name
@@ -119,6 +124,14 @@ function PortalLayoutInner({ children }: { children: React.ReactNode }) {
       window.removeEventListener("orientationchange", updateMobileHeaderOffset)
     }
   }, [isMobile])
+
+  useEffect(() => {
+    if (loadingTrips || typeof window === "undefined" || trips.length > 0) return
+    if (window.localStorage.getItem(TRAVELER_QUICK_GUIDE_STORAGE_KEY) === "1") return
+
+    window.localStorage.setItem(TRAVELER_QUICK_GUIDE_STORAGE_KEY, "1")
+    setQuickGuideOpen(true)
+  }, [loadingTrips, trips.length])
 
   return (
     <div className="portal-shell min-h-screen bg-background text-foreground">
@@ -269,6 +282,13 @@ function PortalLayoutInner({ children }: { children: React.ReactNode }) {
                       </Link>
                     </DropdownMenuItem>
                   ))}
+                  <DropdownMenuItem onSelect={(event) => {
+                    event.preventDefault()
+                    setQuickGuideOpen(true)
+                  }}>
+                    <BookOpen className="h-4 w-4" />
+                    <span>Guia rápido</span>
+                  </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={() => void handleSignOut()} className="flex items-center gap-2 text-red-600 focus:text-red-600">
                     <LogOut className="h-4 w-4" />
@@ -316,6 +336,13 @@ function PortalLayoutInner({ children }: { children: React.ReactNode }) {
                       </Link>
                     </DropdownMenuItem>
                   ))}
+                  <DropdownMenuItem onSelect={(event) => {
+                    event.preventDefault()
+                    setQuickGuideOpen(true)
+                  }}>
+                    <BookOpen className="h-4 w-4" />
+                    <span>Guia rápido</span>
+                  </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={() => void handleSignOut()} className="flex items-center gap-2 text-red-600 focus:text-red-600">
                     <LogOut className="h-4 w-4" />
@@ -360,6 +387,8 @@ function PortalLayoutInner({ children }: { children: React.ReactNode }) {
       >
         {children}
       </main>
+
+      <QuickGuideModal open={quickGuideOpen} onOpenChange={setQuickGuideOpen} variant="traveler" />
 
       {isMobile && (
         <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-border/60 vuei-glass">

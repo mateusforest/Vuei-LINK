@@ -19,6 +19,7 @@ import {
   Coins,
   BarChart3,
   Settings,
+  BookOpen,
   ChevronLeft,
   ChevronRight,
   Bell,
@@ -47,6 +48,9 @@ import { AgencyProvider, useAgency } from "@/contexts/agency-context"
 import { RouteGuard } from "@/components/auth/route-guard"
 import { useAuth } from "@/contexts/auth-context"
 import { SupportFab } from "@/components/support/support-fab"
+import { QuickGuideModal } from "@/components/onboarding/quick-guide-modal"
+
+const AGENCY_QUICK_GUIDE_STORAGE_KEY = "vuei_agency_quick_guide_seen_v1"
 
 const navItems = [
   { href: "/agencia", icon: LayoutDashboard, label: "Início" },
@@ -77,8 +81,9 @@ function AgencyLayoutInner({ children }: { children: React.ReactNode }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [notificationsOpen, setNotificationsOpen] = useState(false)
+  const [quickGuideOpen, setQuickGuideOpen] = useState(false)
   const { profile, signOut } = useAuth()
-  const { credits, conciergeRequests, agency, workspaceLoading, subscription, limitDialog, clearLimitDialog, canCreateMoreTrips, showPlanLimitDialog } = useAgency()
+  const { credits, conciergeRequests, agency, workspaceLoading, subscription, limitDialog, clearLimitDialog, canCreateMoreTrips, showPlanLimitDialog, trips } = useAgency()
   const [agencyNotifications, setAgencyNotifications] = useState<Array<{
     id: string
     title: string
@@ -148,6 +153,14 @@ function AgencyLayoutInner({ children }: { children: React.ReactNode }) {
     window.addEventListener("keydown", handleEscape)
     return () => window.removeEventListener("keydown", handleEscape)
   }, [notificationsOpen])
+
+  useEffect(() => {
+    if (workspaceLoading || typeof window === "undefined" || trips.length > 0) return
+    if (window.localStorage.getItem(AGENCY_QUICK_GUIDE_STORAGE_KEY) === "1") return
+
+    window.localStorage.setItem(AGENCY_QUICK_GUIDE_STORAGE_KEY, "1")
+    setQuickGuideOpen(true)
+  }, [workspaceLoading, trips.length])
 
   const renderNotificationsMenu = () => (
     <div className="agency-dropdown absolute right-0 top-full z-50 mt-3 w-80 overflow-hidden rounded-2xl border backdrop-blur-xl">
@@ -444,6 +457,16 @@ function AgencyLayoutInner({ children }: { children: React.ReactNode }) {
                     {item.label}
                   </DropdownMenuItem>
                 ))}
+                <DropdownMenuItem
+                  className="gap-2"
+                  onSelect={(event) => {
+                    event.preventDefault()
+                    setQuickGuideOpen(true)
+                  }}
+                >
+                  <BookOpen className="h-4 w-4" />
+                  Guia rápido
+                </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem className="gap-2 text-red-500 focus:text-red-500" onClick={() => void handleSignOut()}>
                   <LogOut className="h-4 w-4" />
@@ -603,6 +626,16 @@ function AgencyLayoutInner({ children }: { children: React.ReactNode }) {
                       {item.label}
                     </DropdownMenuItem>
                   ))}
+                  <DropdownMenuItem
+                    className="gap-2"
+                    onSelect={(event) => {
+                      event.preventDefault()
+                      setQuickGuideOpen(true)
+                    }}
+                  >
+                    <BookOpen className="h-4 w-4" />
+                    Guia rápido
+                  </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem className="gap-2 text-red-500 focus:text-red-500" onClick={() => void handleSignOut()}>
                     <LogOut className="h-4 w-4" />
@@ -640,6 +673,16 @@ function AgencyLayoutInner({ children }: { children: React.ReactNode }) {
           )}
         </div>
       </main>
+
+      <QuickGuideModal
+        open={quickGuideOpen}
+        onOpenChange={setQuickGuideOpen}
+        variant="agency"
+        onCreateTrip={() => {
+          setQuickGuideOpen(false)
+          handleOpenCreateTrip()
+        }}
+      />
 
       {/* Mobile Bottom Navigation */}
       <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-border/60 bg-white/92 backdrop-blur-xl lg:hidden">
