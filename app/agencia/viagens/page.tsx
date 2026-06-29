@@ -531,7 +531,15 @@ export default function TripsPage() {
                               </Link>
                             </DropdownMenuItem>
                             <DropdownMenuItem asChild>
-                              <Link href="/agencia/documentos">
+                              <Link
+                                href={{
+                                  pathname: "/agencia/documentos",
+                                  query: {
+                                    tripId: trip.id,
+                                    clientId: trip.clientId,
+                                  },
+                                }}
+                              >
                                 <FileText className="mr-2 h-4 w-4" />
                                 Documentos
                               </Link>

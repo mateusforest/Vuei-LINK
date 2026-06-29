@@ -1,7 +1,8 @@
 "use client"
 
-import { useRef, useState } from "react"
+import { useMemo, useRef, useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import {
   Search,
   Upload,
@@ -124,6 +125,9 @@ const getFileIcon = (type: string) => {
 }
 
 export default function DocumentsPage() {
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
   const { documents, clients, trips, addDocument, deleteDocument, getClientById, getTripById, isUsingRealData, workspaceError } = useAgency()
   const [searchQuery, setSearchQuery] = useState("")
   const [filter, setFilter] = useState("all")
@@ -147,6 +151,27 @@ export default function DocumentsPage() {
     isPrivate: false
   })
   const activeClients = clients.filter((client) => client.status === "active")
+  const selectedTripId = searchParams.get("tripId")?.trim() || ""
+  const selectedClientIdFromQuery = searchParams.get("clientId")?.trim() || ""
+  const selectedTrip = selectedTripId ? getTripById(selectedTripId) : null
+  const selectedClient = (selectedTrip?.clientId ? getClientById(selectedTrip.clientId) : null) ?? (selectedClientIdFromQuery ? getClientById(selectedClientIdFromQuery) : null)
+  const hasScopedFilter = Boolean(selectedTripId || selectedClientIdFromQuery)
+
+  const filteredSummary = useMemo(() => {
+    if (selectedTrip && selectedClient) {
+      return `Filtrado por ${selectedClient.name} • ${selectedTrip.name || selectedTrip.destination}`
+    }
+
+    if (selectedTrip) {
+      return `Filtrado por ${selectedTrip.name || selectedTrip.destination}`
+    }
+
+    if (selectedClient) {
+      return `Filtrado por ${selectedClient.name}`
+    }
+
+    return ""
+  }, [selectedClient, selectedTrip])
 
   const filteredDocs = documents.filter((doc) => {
     const client = doc.clientId ? getClientById(doc.clientId) : null
@@ -156,7 +181,9 @@ export default function DocumentsPage() {
       doc.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (client?.name.toLowerCase().includes(searchQuery.toLowerCase()) ?? false)
     const matchesType = filter === "all" || doc.type === filter
-    return matchesSearch && matchesType
+    const matchesTrip = !selectedTripId || doc.tripId === selectedTripId
+    const matchesClient = !selectedClientIdFromQuery || doc.clientId === selectedClientIdFromQuery || trip?.clientId === selectedClientIdFromQuery
+    return matchesSearch && matchesType && matchesTrip && matchesClient
   })
 
   const handleUpload = async () => {
@@ -303,7 +330,9 @@ export default function DocumentsPage() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Documentos</h1>
-          <p className="mt-1 text-muted-foreground">{documents.length} documentos armazenados</p>
+          <p className="mt-1 text-muted-foreground">
+            {hasScopedFilter ? `${filteredDocs.length} documentos nesta visualizacao` : `${documents.length} documentos armazenados`}
+          </p>
         </div>
         <Button
           onClick={() => setUploadModalOpen(true)}
@@ -313,6 +342,20 @@ export default function DocumentsPage() {
           Upload
         </Button>
       </div>
+
+      {hasScopedFilter ? (
+        <Card className="border-primary/20 bg-primary/5">
+          <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="space-y-1">
+              <p className="text-sm font-medium text-foreground">Visualizando documentos filtrados</p>
+              <p className="text-sm text-muted-foreground">{filteredSummary}</p>
+            </div>
+            <Button variant="outline" size="sm" className="border-border/70 bg-white" onClick={() => router.push(pathname)}>
+              Ver todos os documentos
+            </Button>
+          </CardContent>
+        </Card>
+      ) : null}
 
       {/* Search and Filters */}
       {actionError ? (
