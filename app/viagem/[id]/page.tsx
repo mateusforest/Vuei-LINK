@@ -6534,7 +6534,7 @@ function TripSettingsModal({
             className="mt-2 min-h-[110px] w-full rounded-2xl border border-white/10 bg-white/[0.03] p-4 text-sm text-white outline-none"
           />
         </div>
-        <div className="grid gap-4 sm:grid-cols-2">
+        {false ? <div className="grid gap-4 sm:grid-cols-2">
           <div>
             <Label className="text-white/60">Privacidade</Label>
             <div className="mt-2 grid gap-2">
@@ -6571,7 +6571,7 @@ function TripSettingsModal({
               ))}
             </div>
           </div>
-        </div>
+        </div> : null}
         <div>
           <Label className="text-white/60">Status da viagem</Label>
           <div className="mt-2 grid grid-cols-3 gap-2">
