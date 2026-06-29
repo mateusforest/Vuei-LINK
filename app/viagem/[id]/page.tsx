@@ -3629,7 +3629,7 @@ function AddFlightModal({ open, onClose, onSave, tripId, ownerUserId, agencyId, 
 
   return (
     <Modal open={open} onClose={onClose} title="Anexar Passagem">
-      <div className="space-y-4">
+      <div className="max-h-[calc(100dvh-12rem)] space-y-4 overflow-y-auto overscroll-contain pr-1 [-webkit-overflow-scrolling:touch] sm:max-h-none">
         <div>
           <label className="text-xs text-white/50 uppercase tracking-wider">Nome do arquivo</label>
           <input
