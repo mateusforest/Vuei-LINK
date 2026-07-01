@@ -108,7 +108,7 @@ function escapeHtml(value: string) {
     .replace(/'/g, "&#39;")
 }
 
-function safeText(value: string | null | undefined, fallback = "Nao informado") {
+function safeText(value: string | null | undefined, fallback = "Não informado") {
   const normalized = value?.trim()
   if (!normalized) return fallback
 
@@ -120,7 +120,7 @@ function safeText(value: string | null | undefined, fallback = "Nao informado") 
   return escapeHtml(normalized)
 }
 
-function formatDate(value: string | null | undefined, fallback = "Nao informado") {
+function formatDate(value: string | null | undefined, fallback = "Não informado") {
   if (!value) return fallback
   const normalized = value.trim()
   if (!normalized || normalized.toLowerCase() === "invalid date") return fallback
@@ -160,7 +160,7 @@ function activityTypeLabel(type: GeneratedItineraryActivity["type"]) {
     case "transport":
       return "Transporte"
     case "experience":
-      return "Experiencia"
+      return "Experiência"
     case "flight":
       return "Voo"
     case "hotel":
@@ -279,10 +279,10 @@ function renderPeriodGrid(day: GeneratedItineraryDay) {
 }
 
 function renderSummaryCards(input: TripPdfInput) {
-  const accommodation = input.hotels[0]?.name ?? "Nao informada"
+  const accommodation = input.hotels[0]?.name ?? "Não informada"
   const documentsStatus = input.documents.length > 0 ? `${input.documents.length} documento(s) cadastrados` : "Nenhum documento cadastrado"
   const flightStatus = input.flights.length > 0 ? `${input.flights.length} voo(s) cadastrados` : "Nenhuma passagem cadastrada"
-  const duration = calculateTripDuration(input.startDate, input.endDate) ?? "Periodo nao informado"
+  const duration = calculateTripDuration(input.startDate, input.endDate) ?? "Período não informado"
   const normalizedDestination = input.destination.trim().toLocaleLowerCase("pt-BR")
   const normalizedCountry = input.country?.trim().toLocaleLowerCase("pt-BR")
   const destinationLabel =
@@ -292,13 +292,13 @@ function renderSummaryCards(input: TripPdfInput) {
 
   const summaryItems = [
     ["Destino", destinationLabel],
-    ["Periodo", `${formatDate(input.startDate)} - ${formatDate(input.endDate)}`],
-    ["Duracao", duration],
+    ["Período", `${formatDate(input.startDate)} - ${formatDate(input.endDate)}`],
+    ["Duração", duration],
     ["Viajantes", input.travelersLabel || `${input.travelersCount} pessoa(s)`],
     ["Hospedagem", accommodation],
     ["Passagens", flightStatus],
     ["Documentos", documentsStatus],
-    ["Pais", safeText(input.country, "Destino internacional")],
+    ["País", safeText(input.country, "Destino internacional")],
   ]
 
   return `
@@ -330,7 +330,7 @@ function renderExperiences(days: GeneratedItineraryDay[]) {
   ).slice(0, 6)
 
   if (cards.length === 0) {
-    return `<div class="empty-card">Nenhuma experiencia adicional foi cadastrada alem do roteiro principal.</div>`
+    return `<div class="empty-card">Nenhuma experiência adicional foi cadastrada além do roteiro principal.</div>`
   }
 
   return `
@@ -367,11 +367,11 @@ function renderHotels(input: TripPdfInput) {
               </div>
               <div class="hotel-content">
                 <h3>${safeText(hotel.name, "Hospedagem")}</h3>
-                <p class="hotel-address">${safeText(hotel.address, "Endereco nao informado")}</p>
+                <p class="hotel-address">${safeText(hotel.address, "Endereço não informado")}</p>
                 <div class="hotel-grid">
                   <div><span>Check-in</span><strong>${formatDate(hotel.checkIn)}</strong></div>
                   <div><span>Check-out</span><strong>${formatDate(hotel.checkOut)}</strong></div>
-                  <div><span>Confirmacao</span><strong>${safeText(hotel.confirmationCode, "Nao informada")}</strong></div>
+                  <div><span>Confirmação</span><strong>${safeText(hotel.confirmationCode, "Não informada")}</strong></div>
                 </div>
                 ${hotel.notes ? `<div class="hotel-notes">${safeText(hotel.notes, "")}</div>` : ""}
               </div>
@@ -414,7 +414,7 @@ function renderImportantInfo(input: TripPdfInput) {
   const baggageInfo = input.flights.map((flight) => flight.baggageInfo).filter((value): value is string => Boolean(value && value.trim()))
   const flightContacts = input.contacts.length
     ? input.contacts.map((contact) => `<li><strong>${safeText(contact.label)}</strong>: ${safeText(contact.value)}</li>`).join("")
-    : `<li>Nenhum contato util cadastrado.</li>`
+    : `<li>Nenhum contato útil cadastrado.</li>`
 
   return `
     <div class="info-grid">
@@ -433,19 +433,61 @@ function renderImportantInfo(input: TripPdfInput) {
         <ul>
           <li><strong>Clima</strong>: ${safeText(input.quickInfo.weather ?? null)}</li>
           <li><strong>Bagagem</strong>: ${safeText(baggageInfo[0] ?? input.quickInfo.baggage ?? null)}</li>
-          <li><strong>Emergencia</strong>: ${safeText(input.quickInfo.emergency ?? null)}</li>
+          <li><strong>Emergência</strong>: ${safeText(input.quickInfo.emergency ?? null)}</li>
         </ul>
       </article>
       <article class="info-card info-card-wide">
         <div class="info-kicker">Suporte</div>
-        <h3>Contatos uteis</h3>
+        <h3>Contatos úteis</h3>
         <ul>${flightContacts}</ul>
       </article>
     </div>
   `
 }
 
-function renderHtml(input: TripPdfInput, assets: { heroImage: string | null; agencyLogo: string | null }) {
+function renderDayPages(days: GeneratedItineraryDay[]) {
+  return days
+    .map(
+      (day, index) => `
+        <section class="page section-page page-break day-page" style="background:#f8f5ef;">
+          <div class="section-content day-page-content">
+            ${renderSectionHeader({
+              number: String(index + 2).padStart(2, "0"),
+              eyebrow: "Programação completa",
+              title: `Dia ${day.day}`,
+              description: "Cada dia foi organizado em blocos estáveis, com melhor distribuição vertical e sem quebras visuais irregulares.",
+            })}
+            <article class="day-card day-card-single">
+              <div class="day-header">
+                <div class="day-badge"><span>Dia</span><strong>${day.day}</strong></div>
+                <div>
+                  <h3>${safeText(day.title)}</h3>
+                  <div class="day-date">${safeText(day.date, "Data a confirmar")}</div>
+                  <div class="day-summary">${safeText(day.summary, "Sem resumo adicional para este dia.")}</div>
+                </div>
+              </div>
+              <div class="period-grid">
+                ${renderPeriodGrid(day)}
+              </div>
+              <div class="day-bottom">
+                <div class="note-box">
+                  <strong>Dicas e notas úteis</strong>
+                  <p>${safeText(day.tips, "Sem dicas adicionais para este dia.")}</p>
+                </div>
+                <div class="note-box">
+                  <strong>Observações importantes</strong>
+                  <p>${safeText(day.important, "Nenhuma observação crítica registrada para este dia.")}</p>
+                </div>
+              </div>
+            </article>
+          </div>
+        </section>
+      `,
+    )
+    .join("")
+}
+
+function renderHtml(input: TripPdfInput, assets: { heroImage: string | null; agencyLogo: string | null; vueiLogo: string | null }) {
   const isAgency = input.branding.isAgency === true && Boolean(input.branding.agencyName)
   const travelWindow = `${formatDate(input.startDate)} - ${formatDate(input.endDate)}`
 
@@ -471,20 +513,22 @@ function renderHtml(input: TripPdfInput, assets: { heroImage: string | null; age
         .cover { min-height: 1122px; position: relative; color: #fff; background: ${DARK}; overflow: hidden; }
         .cover::before { content: ""; position: absolute; inset: 0; background-image: ${assets.heroImage ? `url('${assets.heroImage}')` : `linear-gradient(135deg, ${PRIMARY}, ${SECONDARY})`}; background-size: cover; background-position: center; transform: scale(1.02); }
         .cover::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(12,12,12,0.46), rgba(12,12,12,0.18) 28%, rgba(12,12,12,0.8)); }
-        .cover-inner { position: relative; z-index: 2; min-height: 1122px; padding: 52px 56px 58px; display: flex; flex-direction: column; }
+        .cover-inner { position: relative; z-index: 2; min-height: 1122px; padding: 44px 54px 56px; display: flex; flex-direction: column; }
         .cover-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; }
-        .vuei-badge { display: inline-flex; align-items: center; gap: 10px; border: 1px solid rgba(255,255,255,0.24); border-radius: 999px; padding: 11px 16px; background: rgba(255,255,255,0.08); font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; }
+        .vuei-mark { display: inline-flex; align-items: center; justify-content: center; }
+        .vuei-mark img { width: auto; height: 36px; object-fit: contain; }
         .agency-card { display: inline-flex; align-items: center; gap: 14px; border: 1px solid rgba(255,255,255,0.24); border-radius: 18px; padding: 14px 18px; background: rgba(255,255,255,0.08); max-width: 360px; }
         .agency-card img { width: 54px; height: 54px; object-fit: contain; border-radius: 14px; background: rgba(255,255,255,0.96); padding: 6px; }
         .agency-card strong { display: block; font-size: 16px; margin-bottom: 4px; }
         .agency-card span { display: block; font-size: 12px; color: rgba(255,255,255,0.78); }
-        .cover-main { margin-top: auto; max-width: 620px; padding-bottom: 42px; }
+        .cover-bottom { margin-top: auto; display: flex; flex-direction: column; gap: 24px; padding-bottom: 10px; }
+        .cover-main { max-width: 620px; }
         .eyebrow { font-size: 12px; text-transform: uppercase; letter-spacing: 0.28em; color: rgba(255,255,255,0.8); margin-bottom: 18px; }
         .cover-title { font-size: 64px; line-height: 0.96; letter-spacing: -0.055em; font-weight: 700; margin: 0 0 22px; text-wrap: balance; }
         .cover-meta { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 28px; }
         .cover-meta span { border: 1px solid rgba(255,255,255,0.18); background: rgba(255,255,255,0.1); border-radius: 999px; padding: 9px 14px; font-size: 13px; }
         .cover-summary { font-size: 18px; line-height: 1.75; color: rgba(255,255,255,0.88); margin: 0; max-width: 560px; }
-        .cover-line { margin-top: auto; width: 52px; height: 1px; background: rgba(212,185,120,0.9); }
+        .cover-line { width: 52px; height: 1px; background: rgba(212,185,120,0.9); }
         .section-head { display: grid; grid-template-columns: 54px 1fr; gap: 18px; align-items: start; margin-bottom: 6px; }
         .section-head-center { align-items: start; }
         .section-index { width: 54px; height: 54px; border-radius: 14px; background: #111111; color: #ffffff; display: flex; align-items: center; justify-content: center; font-size: 14px; letter-spacing: 0.16em; font-weight: 700; }
@@ -502,7 +546,10 @@ function renderHtml(input: TripPdfInput, assets: { heroImage: string | null; age
         .panel p, .panel li { color: ${TEXT}; line-height: 1.7; font-size: 14px; }
         .panel ul { padding-left: 18px; margin: 0; }
         .days-flow { display: grid; gap: 16px; }
-        .day-card { border: 1px solid ${BORDER}; border-radius: 22px; background: #ffffff; padding: 18px; box-shadow: 0 8px 30px rgba(23,23,23,0.04); }
+        .day-page { display: flex; flex-direction: column; justify-content: center; }
+        .day-page-content { min-height: 100%; justify-content: center; gap: 20px; }
+        .day-card { border: 1px solid ${BORDER}; border-radius: 22px; background: #ffffff; padding: 20px; box-shadow: 0 8px 30px rgba(23,23,23,0.04); }
+        .day-card-single { max-width: 100%; }
         .day-header { display: grid; grid-template-columns: 76px 1fr; gap: 16px; align-items: start; margin-bottom: 16px; padding: 18px; border-radius: 18px; background: linear-gradient(180deg, rgba(180,138,63,0.11), rgba(180,138,63,0.03)); border: 1px solid rgba(180,138,63,0.12); }
         .day-badge { width: 76px; border-radius: 16px; background: ${PRIMARY}; color: #fff; padding: 12px 8px; text-align: center; box-shadow: 0 10px 28px rgba(180,138,63,0.18); }
         .day-badge span { display: block; font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; opacity: 0.88; }
@@ -566,21 +613,23 @@ function renderHtml(input: TripPdfInput, assets: { heroImage: string | null; age
         .empty-card { border: 1px dashed ${BORDER}; border-radius: 24px; padding: 24px; color: ${MUTED}; background: #fffdf9; }
         .footer-page { background: #faf7f1; color: ${DARK}; }
         .footer-main { display: flex; flex-direction: column; justify-content: center; align-items: center; min-height: 1014px; text-align: center; }
-        .footer-stack { width: 100%; max-width: 720px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 26px; }
+        .footer-stack { width: 100%; max-width: 760px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 28px; }
         .footer-hero h2 { margin: 0 0 14px; font-size: 52px; letter-spacing: -0.05em; }
         .footer-hero p { margin: 0 auto; max-width: 620px; color: ${MUTED}; line-height: 1.8; }
         .footer-card { width: 100%; border-radius: 28px; background: #ffffff; padding: 28px; border: 1px solid ${BORDER}; }
-        .footer-card-row { display: flex; align-items: center; justify-content: space-between; gap: 20px; text-align: left; }
+        .footer-card-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 24px; text-align: left; }
         .footer-brand { display: flex; align-items: center; gap: 18px; }
         .footer-brand img { width: 70px; height: 70px; object-fit: contain; background: ${SOFT}; border-radius: 18px; padding: 8px; }
         .footer-brand-badge { width: 70px; height: 70px; border-radius: 18px; background: #111111; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 28px; font-weight: 700; }
         .footer-brand h3 { margin: 0 0 5px; font-size: 24px; }
         .footer-brand p { margin: 0; color: ${MUTED}; }
-        .footer-links { display: flex; gap: 12px; flex-wrap: wrap; justify-content: flex-end; }
-        .footer-link { padding: 11px 15px; border-radius: 999px; background: ${SOFT}; color: ${DARK}; font-size: 12px; white-space: nowrap; border: 1px solid ${BORDER}; }
+        .footer-links { display: grid; gap: 10px; justify-items: end; }
+        .footer-link { padding: 11px 15px; border-radius: 999px; background: ${SOFT}; color: ${DARK}; font-size: 12px; white-space: nowrap; overflow-wrap: normal; word-break: normal; border: 1px solid ${BORDER}; }
         .footer-bottom { width: 100%; border-top: 1px solid ${BORDER}; padding-top: 18px; display: flex; justify-content: space-between; align-items: center; color: ${MUTED}; font-size: 13px; }
-        .powered { display: flex; align-items: center; gap: 8px; }
-        .vuei-wordmark { font-weight: 800; letter-spacing: -0.04em; background: linear-gradient(90deg, ${PRIMARY}, ${SECONDARY}); -webkit-background-clip: text; color: transparent; }
+        .powered { display: flex; align-items: center; gap: 10px; }
+        .powered img { height: 22px; width: auto; object-fit: contain; }
+        .footer-vuei { display: inline-flex; align-items: center; }
+        .footer-vuei img { height: 38px; width: auto; object-fit: contain; }
       </style>
     </head>
     <body>
@@ -590,26 +639,28 @@ function renderHtml(input: TripPdfInput, assets: { heroImage: string | null; age
             <div class="cover-top">
               ${isAgency ? `
                 <div class="agency-card">
-                  ${assets.agencyLogo ? `<img src="${assets.agencyLogo}" alt="${safeText(input.branding.agencyName, "Agencia")}" />` : ""}
+                  ${assets.agencyLogo ? `<img src="${assets.agencyLogo}" alt="${safeText(input.branding.agencyName, "Agência")}" />` : ""}
                   <div>
-                    <strong>${safeText(input.branding.agencyName, "Agencia parceira")}</strong>
-                    <span>${input.branding.consultantName ? `Consultor: ${safeText(input.branding.consultantName, "")}` : "Roteiro produzido com branding da agencia"}</span>
+                    <strong>${safeText(input.branding.agencyName, "Agência parceira")}</strong>
+                    <span>${input.branding.consultantName ? `Consultor: ${safeText(input.branding.consultantName, "")}` : "Roteiro produzido com atendimento personalizado"}</span>
                   </div>
                 </div>
               ` : `<div></div>`}
-              <div class="vuei-badge"><span>Criado com</span><span class="vuei-wordmark">Vuei</span></div>
+              <div class="vuei-mark">${assets.vueiLogo ? `<img src="${assets.vueiLogo}" alt="Vuei" />` : "Vuei"}</div>
             </div>
-            <div class="cover-main">
-              <div class="eyebrow">Roteiro Personalizado</div>
-              <h1 class="cover-title">${safeText(input.destination)}</h1>
-              <div class="cover-meta">
-                ${input.travelerName ? `<span>${safeText(input.travelerName)}</span>` : ""}
-                <span>${travelWindow}</span>
-                <span>${safeText(input.country, "Destino internacional")}</span>
+            <div class="cover-bottom">
+              <div class="cover-main">
+                <div class="eyebrow">Roteiro Personalizado</div>
+                <h1 class="cover-title">${safeText(input.destination)}</h1>
+                <div class="cover-meta">
+                  ${input.travelerName ? `<span>${safeText(input.travelerName)}</span>` : ""}
+                  <span>${travelWindow}</span>
+                  <span>${safeText(input.country, "Destino internacional")}</span>
+                </div>
+                <p class="cover-summary">${safeText(input.tripSummary, "Uma experi&ecirc;ncia organizada com contexto real da sua viagem.")}</p>
               </div>
-              <p class="cover-summary">${safeText(input.tripSummary, "Uma experiencia organizada com contexto real da sua viagem.")}</p>
+              <div class="cover-line"></div>
             </div>
-            <div class="cover-line"></div>
           </div>
         </section>
 
@@ -617,71 +668,34 @@ function renderHtml(input: TripPdfInput, assets: { heroImage: string | null; age
           <div class="section-content">
             ${renderSectionHeader({
               number: "01",
-              eyebrow: "Visao geral",
+              eyebrow: "Visão geral",
               title: "Resumo da viagem",
-              description: "Dados reais reunidos em uma pagina dedicada, com leitura limpa e estrutura previsivel.",
+              description: "Dados reais reunidos em uma página dedicada, com leitura limpa e estrutura previsível.",
             })}
             ${renderSummaryCards(input)}
             <div class="summary-panels">
               <article class="panel">
                 <h3>Resumo executivo</h3>
-                <p>${safeText(input.content.summary ?? input.tripSummary, "Resumo indisponivel no momento.")}</p>
+                <p>${safeText(input.content.summary ?? input.tripSummary, "Resumo indisponível no momento.")}</p>
                 ${input.usefulInfo.length > 0 ? `<ul>${input.usefulInfo.map((item) => `<li>${safeText(item, "")}</li>`).join("")}</ul>` : ""}
               </article>
               <article class="panel">
-                <h3>Observacoes</h3>
-                ${input.content.observations.length > 0 ? `<ul>${input.content.observations.map((item) => `<li>${safeText(item, "")}</li>`).join("")}</ul>` : `<p>Nenhuma observacao adicional cadastrada.</p>`}
+                <h3>Observações</h3>
+                ${input.content.observations.length > 0 ? `<ul>${input.content.observations.map((item) => `<li>${safeText(item, "")}</li>`).join("")}</ul>` : `<p>Nenhuma observação adicional cadastrada.</p>`}
               </article>
             </div>
           </div>
         </section>
 
-        <section class="page section-page page-break" style="background:#f8f5ef;">
-          <div class="section-content">
-            ${renderSectionHeader({
-              number: "02",
-              eyebrow: "Programacao completa",
-              title: "Dia a dia",
-              description: "Cada dia foi separado em blocos estaveis para evitar mistura de cards, titulos soltos e quebras visuais irregulares.",
-              center: true,
-            })}
-            <div class="days-flow">
-              ${input.content.days.map((day) => `
-                <article class="day-card">
-                  <div class="day-header">
-                    <div class="day-badge"><span>Dia</span><strong>${day.day}</strong></div>
-                    <div>
-                      <h3>${safeText(day.title)}</h3>
-                      <div class="day-date">${safeText(day.date, "Data a confirmar")}</div>
-                      <div class="day-summary">${safeText(day.summary, "Sem resumo adicional para este dia.")}</div>
-                    </div>
-                  </div>
-                  <div class="period-grid">
-                    ${renderPeriodGrid(day)}
-                  </div>
-                  <div class="day-bottom">
-                    <div class="note-box">
-                      <strong>Dicas e notas uteis</strong>
-                      <p>${safeText(day.tips, "Sem dicas adicionais para este dia.")}</p>
-                    </div>
-                    <div class="note-box">
-                      <strong>Observacoes importantes</strong>
-                      <p>${safeText(day.important, "Nenhuma observacao critica registrada para este dia.")}</p>
-                    </div>
-                  </div>
-                </article>
-              `).join("")}
-            </div>
-          </div>
-        </section>
+        ${renderDayPages(input.content.days)}
 
         <section class="page section-page page-break">
           <div class="section-content">
             ${renderSectionHeader({
-              number: "03",
-              eyebrow: "Onde voce vai ficar",
+              number: String(input.content.days.length + 2).padStart(2, "0"),
+              eyebrow: "Onde você vai ficar",
               title: "Hospedagem",
-              description: "Informacoes da hospedagem organizadas em uma pagina propria, sem quebrar cards entre paginas.",
+              description: "Informações da hospedagem organizadas em uma página própria, sem quebrar cards entre páginas.",
             })}
             ${renderHotels(input)}
           </div>
@@ -690,9 +704,9 @@ function renderHtml(input: TripPdfInput, assets: { heroImage: string | null; age
         <section class="page section-page page-break">
           <div class="section-content">
             ${renderSectionHeader({
-              number: "04",
+              number: String(input.content.days.length + 3).padStart(2, "0"),
               eyebrow: "Momentos especiais",
-              title: "Experiencias e passeios",
+              title: "Experiências e passeios",
               description: "Recortes derivados do roteiro completo, com leitura mais editorial e cards de largura padronizada.",
             })}
             ${renderExperiences(input.content.days)}
@@ -702,10 +716,10 @@ function renderHtml(input: TripPdfInput, assets: { heroImage: string | null; age
         <section class="page section-page page-break">
           <div class="section-content">
             ${renderSectionHeader({
-              number: "05",
+              number: String(input.content.days.length + 4).padStart(2, "0"),
               eyebrow: "Prepare-se",
-              title: "Informacoes importantes",
-              description: "Somente informacoes reais cadastradas ou estados honestos quando algo ainda nao estiver disponivel.",
+              title: "Informações importantes",
+              description: "Somente informações reais cadastradas ou estados honestos quando algo ainda não estiver disponível.",
             })}
             ${renderImportantInfo(input)}
           </div>
@@ -714,10 +728,10 @@ function renderHtml(input: TripPdfInput, assets: { heroImage: string | null; age
         <section class="page section-page page-break">
           <div class="section-content">
             ${renderSectionHeader({
-              number: "06",
+              number: String(input.content.days.length + 5).padStart(2, "0"),
               eyebrow: "Arquivos da viagem",
               title: "Documentos",
-              description: "Documentos e itens de checklist exibidos em pagina propria para evitar mistura com outras secoes.",
+              description: "Documentos e itens de checklist exibidos em página própria para evitar mistura com outras seções.",
             })}
             ${renderDocumentsSection(input)}
           </div>
@@ -728,19 +742,19 @@ function renderHtml(input: TripPdfInput, assets: { heroImage: string | null; age
             <div class="footer-stack">
               <div class="footer-hero">
                 <h2>Boa viagem!</h2>
-                <p>Esperamos que esta experiencia seja inesquecivel. Este roteiro foi preparado para facilitar seu acesso aos principais detalhes da viagem.</p>
+                <p>Esperamos que esta experiência seja inesquecível. Este roteiro foi preparado para facilitar seu acesso aos principais detalhes da viagem.</p>
               </div>
               <div class="footer-card">
                 <div class="footer-card-row">
                   <div class="footer-brand">
                     ${isAgency
                       ? assets.agencyLogo
-                        ? `<img src="${assets.agencyLogo}" alt="${safeText(input.branding.agencyName, "Agencia")}" />`
+                        ? `<img src="${assets.agencyLogo}" alt="${safeText(input.branding.agencyName, "Agência")}" />`
                         : `<div class="footer-brand-badge">${safeText(input.branding.agencyName?.charAt(0) ?? "A", "A")}</div>`
                       : `<div class="footer-brand-badge">V</div>`}
                     <div>
-                      <h3>${isAgency ? safeText(input.branding.agencyName, "Agencia parceira") : "Vuei"}</h3>
-                      <p>${isAgency ? safeText(input.branding.website ?? input.branding.contactEmail ?? "Branding da agencia", "Branding da agencia") : "Criado com Vuei"}</p>
+                      <h3>${isAgency ? safeText(input.branding.agencyName, "Agência parceira") : "Vuei"}</h3>
+                      <p>${isAgency ? safeText(input.branding.website ?? input.branding.contactEmail ?? "Atendimento personalizado", "Atendimento personalizado") : "Criado com Vuei"}</p>
                     </div>
                   </div>
                   <div class="footer-links">
@@ -751,8 +765,8 @@ function renderHtml(input: TripPdfInput, assets: { heroImage: string | null; age
                 </div>
               </div>
               <div class="footer-bottom">
-                <div class="powered"><span>Roteiro gerado com</span><span class="vuei-wordmark">Vuei</span></div>
-                <div>${isAgency ? "Branding da agencia aplicado" : "Versao individual do roteiro"}</div>
+                <div class="powered"><span>Roteiro gerado com</span>${assets.vueiLogo ? `<img src="${assets.vueiLogo}" alt="Vuei" />` : `<span>Vuei</span>`}</div>
+                <div class="footer-vuei">${assets.vueiLogo ? `<img src="${assets.vueiLogo}" alt="Vuei" />` : `<span>Vuei</span>`}</div>
               </div>
             </div>
           </div>
@@ -800,16 +814,18 @@ export async function buildTripItineraryPdf(input: TripPdfInput) {
     hasAgencyLogo: Boolean(input.branding.agencyLogoUrl),
   })
 
-  const [heroImage, agencyLogo] = await Promise.all([
+  const [heroImage, agencyLogo, vueiLogo] = await Promise.all([
     assetToDataUrl(input.heroImage),
     assetToDataUrl(input.branding.agencyLogoUrl),
+    assetToDataUrl("/vuei-logo.png"),
   ])
   logItineraryPdfDev("assets_resolved", {
     heroImageResolved: Boolean(heroImage),
     agencyLogoResolved: Boolean(agencyLogo),
+    vueiLogoResolved: Boolean(vueiLogo),
   })
 
-  const html = renderHtml(input, { heroImage, agencyLogo })
+  const html = renderHtml(input, { heroImage, agencyLogo, vueiLogo })
   logItineraryPdfDev("html_rendered", {
     htmlLength: html.length,
   })
