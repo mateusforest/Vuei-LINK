@@ -17,6 +17,9 @@ import { hasAgencyMutationAccess, resolveTripLinkAccess } from "@/lib/security/t
 
 export const runtime = "nodejs"
 export const maxDuration = 60
+const REQUEST_BUDGET_MS = 52_000
+const PDF_MIN_WINDOW_MS = 12_000
+const PDF_MAX_TIMEOUT_MS = 15_000
 
 type JsonObject = Record<string, unknown>
 type TripRow = Database["public"]["Tables"]["trips"]["Row"]
@@ -31,6 +34,16 @@ type TripItineraryRow = Database["public"]["Tables"]["trip_itineraries"]["Row"]
 function logItineraryDev(stage: string, details?: Record<string, unknown>) {
   if (process.env.NODE_ENV !== "development") return
   console.log("[AI][ITINERARY]", stage, details ?? {})
+}
+
+function getRemainingBudgetMs(startedAt: number) {
+  return REQUEST_BUDGET_MS - (Date.now() - startedAt)
+}
+
+function isTimeoutMessage(message: string | null | undefined) {
+  if (!message) return false
+  const normalized = message.toLowerCase()
+  return normalized.includes("tempo limite") || normalized.includes("timeout")
 }
 
 function calculateTripDays(startDate?: string | null, endDate?: string | null) {
@@ -270,6 +283,8 @@ async function updateItinerary(
 }
 
 export async function POST(request: Request) {
+  const requestStartedAt = Date.now()
+
   if (!shouldUseSupabase()) {
     return NextResponse.json({ error: "A gera??o operacional real de roteiros so fica dispon?vel quando o Supabase estiver ativo." }, { status: 503 })
   }
@@ -404,6 +419,10 @@ export async function POST(request: Request) {
     endDate: accessResult.trip.end_date,
     expectedDays,
     travelContext: context,
+    timeoutMs:
+      mode === "complete_pdf"
+        ? Math.max(15_000, Math.min(32_000, getRemainingBudgetMs(requestStartedAt) - PDF_MIN_WINDOW_MS))
+        : Math.max(15_000, Math.min(45_000, getRemainingBudgetMs(requestStartedAt) - 5_000)),
   })
 
   logItineraryDev("ai_finished", {
@@ -423,7 +442,10 @@ export async function POST(request: Request) {
       },
     })
 
-    return NextResponse.json({ error: aiResult.error ?? "A IA n?o foi chamada para gerar o roteiro." }, { status: 503 })
+    return NextResponse.json(
+      { error: aiResult.error ?? "A IA n?o foi chamada para gerar o roteiro." },
+      { status: isTimeoutMessage(aiResult.error) ? 504 : 503 },
+    )
   }
 
   const usageMetadata: JsonObject = {
@@ -459,7 +481,10 @@ export async function POST(request: Request) {
       metadata: usageMetadata,
     })
 
-    return NextResponse.json({ error: aiResult.error ?? "N?o foi poss?vel gerar o roteiro." }, { status: 422 })
+    return NextResponse.json(
+      { error: aiResult.error ?? "N?o foi poss?vel gerar o roteiro." },
+      { status: isTimeoutMessage(aiResult.error) ? 504 : 422 },
+    )
   }
 
   let document: DocumentRow | null = null
@@ -467,6 +492,11 @@ export async function POST(request: Request) {
 
   if (mode === "complete_pdf") {
     try {
+    const remainingBudgetBeforePdf = getRemainingBudgetMs(requestStartedAt)
+    if (remainingBudgetBeforePdf <= PDF_MIN_WINDOW_MS) {
+      throw new Error("A geração do PDF foi interrompida porque o tempo restante da requisição ficou abaixo do limite seguro.")
+    }
+
     const branding = (agencyResult.data?.branding ?? {}) as Record<string, unknown>
     const agencySettings = (agencyResult.data?.settings ?? {}) as Record<string, unknown>
     const destinationMetadata = getDestinationMetadata(accessResult.trip.destination, accessResult.trip.country, accessResult.trip.city)
@@ -591,6 +621,8 @@ export async function POST(request: Request) {
         documents: (documentsResult.data ?? []).map((documentRow) => documentRow.name),
       },
       content: aiResult.data,
+    }, {
+      timeoutMs: Math.max(8_000, Math.min(PDF_MAX_TIMEOUT_MS, remainingBudgetBeforePdf - 2_000)),
     })
 
     logItineraryDev("pdf_created", {
@@ -763,7 +795,10 @@ export async function POST(request: Request) {
         },
       })
 
-      return NextResponse.json({ error: `Falha na gera??o do PDF do roteiro: ${message}` }, { status: 500 })
+      return NextResponse.json(
+        { error: `Falha na gera??o do PDF do roteiro: ${message}` },
+        { status: isTimeoutMessage(message) ? 504 : 500 },
+      )
     }
   }
 

@@ -8,6 +8,7 @@ export interface ItineraryGenerationRequest {
   endDate?: string | null
   expectedDays?: number | null
   travelContext: string
+  timeoutMs?: number
 }
 
 export interface GeneratedItineraryActivity {
@@ -211,11 +212,13 @@ export async function requestItineraryGeneration({
   endDate,
   expectedDays,
   travelContext,
+  timeoutMs,
 }: ItineraryGenerationRequest): Promise<GeneratedItineraryResult> {
   const tripCalendar = buildTripCalendar(startDate, endDate)
   const completionBudget = mode === "simple"
     ? Math.min(12_000, Math.max(2_200, 600 + (expectedDays ?? 3) * 260))
     : Math.min(18_000, Math.max(3_600, 1_000 + (expectedDays ?? 3) * 420))
+  const requestTimeoutMs = timeoutMs ?? (mode === "simple" ? 45_000 : 32_000)
 
   const apiKey = process.env.OPENAI_API_KEY
   if (!apiKey) {
@@ -230,108 +233,130 @@ export async function requestItineraryGeneration({
     }
   }
 
-  const response = await fetch("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model: OPENAI_ITINERARY_MODEL,
-      temperature: mode === "simple" ? 0.3 : 0.4,
-      max_completion_tokens: completionBudget,
-      response_format: {
-        type: "json_schema",
-        json_schema: {
-          name: "trip_itinerary_generation",
-          strict: true,
-          schema: {
-            type: "object",
-            additionalProperties: false,
-            properties: {
-              title: { type: "string" },
-              summary: { type: ["string", "null"] },
-              travelStyle: { type: ["string", "null"] },
-              usefulTips: { type: "array", items: { type: "string" } },
-              observations: { type: "array", items: { type: "string" } },
-              contacts: {
-                type: "array",
-                items: {
-                  type: "object",
-                  additionalProperties: false,
-                  properties: {
-                    label: { type: "string" },
-                    value: { type: "string" },
+  let response: Response
+
+  try {
+    response = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      signal: AbortSignal.timeout(requestTimeoutMs),
+      body: JSON.stringify({
+        model: OPENAI_ITINERARY_MODEL,
+        temperature: mode === "simple" ? 0.3 : 0.4,
+        max_completion_tokens: completionBudget,
+        response_format: {
+          type: "json_schema",
+          json_schema: {
+            name: "trip_itinerary_generation",
+            strict: true,
+            schema: {
+              type: "object",
+              additionalProperties: false,
+              properties: {
+                title: { type: "string" },
+                summary: { type: ["string", "null"] },
+                travelStyle: { type: ["string", "null"] },
+                usefulTips: { type: "array", items: { type: "string" } },
+                observations: { type: "array", items: { type: "string" } },
+                contacts: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    additionalProperties: false,
+                    properties: {
+                      label: { type: "string" },
+                      value: { type: "string" },
+                    },
+                    required: ["label", "value"],
                   },
-                  required: ["label", "value"],
                 },
-              },
-              days: {
-                type: "array",
-                items: {
-                  type: "object",
-                  additionalProperties: false,
-                  properties: {
-                    id: { type: "string" },
-                    day: { type: "number" },
-                    date: { type: ["string", "null"] },
-                    title: { type: "string" },
-                    summary: { type: ["string", "null"] },
-                    tips: { type: ["string", "null"] },
-                    important: { type: ["string", "null"] },
-                    activities: {
-                      type: "array",
-                      items: {
-                        type: "object",
-                        additionalProperties: false,
-                        properties: {
-                          id: { type: "string" },
-                          time: { type: ["string", "null"] },
-                          title: { type: "string" },
-                          location: { type: ["string", "null"] },
-                          description: { type: ["string", "null"] },
-                          period: {
-                            type: "string",
-                            enum: ["morning", "afternoon", "evening", "flexible"],
+                days: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    additionalProperties: false,
+                    properties: {
+                      id: { type: "string" },
+                      day: { type: "number" },
+                      date: { type: ["string", "null"] },
+                      title: { type: "string" },
+                      summary: { type: ["string", "null"] },
+                      tips: { type: ["string", "null"] },
+                      important: { type: ["string", "null"] },
+                      activities: {
+                        type: "array",
+                        items: {
+                          type: "object",
+                          additionalProperties: false,
+                          properties: {
+                            id: { type: "string" },
+                            time: { type: ["string", "null"] },
+                            title: { type: "string" },
+                            location: { type: ["string", "null"] },
+                            description: { type: ["string", "null"] },
+                            period: {
+                              type: "string",
+                              enum: ["morning", "afternoon", "evening", "flexible"],
+                            },
+                            type: {
+                              type: "string",
+                              enum: ["attraction", "food", "transport", "hotel", "experience", "flight", "other"],
+                            },
+                            highlight: { type: "boolean" },
                           },
-                          type: {
-                            type: "string",
-                            enum: ["attraction", "food", "transport", "hotel", "experience", "flight", "other"],
-                          },
-                          highlight: { type: "boolean" },
+                          required: ["id", "time", "title", "location", "description", "period", "type", "highlight"],
                         },
-                        required: ["id", "time", "title", "location", "description", "period", "type", "highlight"],
                       },
                     },
+                    required: ["id", "day", "date", "title", "summary", "tips", "important", "activities"],
                   },
-                  required: ["id", "day", "date", "title", "summary", "tips", "important", "activities"],
                 },
               },
+              required: ["title", "summary", "travelStyle", "usefulTips", "observations", "contacts", "days"],
             },
-            required: ["title", "summary", "travelStyle", "usefulTips", "observations", "contacts", "days"],
           },
         },
-      },
-      messages: [
-        {
-          role: "system",
-          content: getSystemPrompt(mode),
-        },
-        {
-          role: "user",
-          content:
-            `Crie um roteiro em modo ${mode} para a viagem "${tripTitle}" em ${destination}. ` +
-            `Periodo real: ${startDate ?? "nao informado"} ate ${endDate ?? "nao informado"}. ` +
-            `${expectedDays ? `Gere exatamente ${expectedDays} dia(s), um para cada dia real do periodo. ` : ""}` +
-            (mode === "simple"
-              ? "No modo simples, cada dia precisa refletir manha, tarde e noite por meio do campo period das atividades, com 2 a 4 atividades no total por dia. "
-              : "No modo completo, mantenha profundidade maior, mas ainda respeitando exatamente o periodo real. ") +
-            "Use o contexto real abaixo. Quando nao houver dado critico confirmado, mantenha a informacao ausente ou identifique como sugestao geral sem inventar reservas.\n\n" +
-            travelContext,
-        },
-      ],
-    }),
-  })
+        messages: [
+          {
+            role: "system",
+            content: getSystemPrompt(mode),
+          },
+          {
+            role: "user",
+            content:
+              `Crie um roteiro em modo ${mode} para a viagem "${tripTitle}" em ${destination}. ` +
+              `Periodo real: ${startDate ?? "nao informado"} ate ${endDate ?? "nao informado"}. ` +
+              `${expectedDays ? `Gere exatamente ${expectedDays} dia(s), um para cada dia real do periodo. ` : ""}` +
+              (mode === "simple"
+                ? "No modo simples, cada dia precisa refletir manha, tarde e noite por meio do campo period das atividades, com 2 a 4 atividades no total por dia. "
+                : "No modo completo, mantenha profundidade maior, mas ainda respeitando exatamente o periodo real. ") +
+              "Use o contexto real abaixo. Quando nao houver dado critico confirmado, mantenha a informacao ausente ou identifique como sugestao geral sem inventar reservas.\n\n" +
+              travelContext,
+          },
+        ],
+      }),
+    })
+  } catch (error) {
+    const message =
+      error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError")
+        ? `A geração do roteiro excedeu o tempo limite interno de ${Math.ceil(requestTimeoutMs / 1000)} segundos.`
+        : error instanceof Error
+          ? error.message
+          : "A chamada real de IA para gerar o roteiro falhou no servidor."
+
+    return {
+      ok: false,
+      calledModel: true,
+      model: OPENAI_ITINERARY_MODEL,
+      error: message,
+      rawText: null,
+      data: null,
+      usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
+    }
+  }
 
   const payload = await response.json().catch(() => null)
 

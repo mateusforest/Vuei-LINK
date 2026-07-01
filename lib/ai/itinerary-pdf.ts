@@ -83,6 +83,9 @@ const MUTED = "#6f6a62"
 const BORDER = "#e6e0d5"
 const SOFT = "#f7f3ec"
 const PAGE_BG = "#fbf9f4"
+const REMOTE_ASSET_TIMEOUT_MS = 4_000
+const IMAGE_SETTLE_TIMEOUT_MS = 4_000
+const PDF_TIMEOUT_MS = 15_000
 
 function logItineraryPdfDev(stage: string, details?: Record<string, unknown>) {
   if (process.env.NODE_ENV !== "development") return
@@ -179,8 +182,10 @@ async function assetToDataUrl(url: string | null | undefined) {
     if (url.startsWith("data:")) return url
 
     if (url.startsWith("http://") || url.startsWith("https://")) {
-      const response = await fetch(url)
-      if (!response.ok) return url
+      const response = await fetch(url, {
+        signal: AbortSignal.timeout(REMOTE_ASSET_TIMEOUT_MS),
+      })
+      if (!response.ok) return null
       const contentType = response.headers.get("content-type") || "image/png"
       const buffer = Buffer.from(await response.arrayBuffer())
       return `data:${contentType};base64,${buffer.toString("base64")}`
@@ -201,8 +206,14 @@ async function assetToDataUrl(url: string | null | undefined) {
 
     return `data:${contentType};base64,${file.toString("base64")}`
   } catch {
-    return url
+    return null
   }
+}
+
+function wait(ms: number) {
+  return new Promise<void>((resolve) => {
+    setTimeout(resolve, ms)
+  })
 }
 
 function renderSectionHeader(params: { number: string; eyebrow: string; title: string; description?: string; center?: boolean }) {
@@ -806,7 +817,7 @@ async function resolveExecutablePath(chromium: ChromiumRuntime | null) {
   return chromium.executablePath()
 }
 
-export async function buildTripItineraryPdf(input: TripPdfInput) {
+export async function buildTripItineraryPdf(input: TripPdfInput, options?: { timeoutMs?: number }) {
   logItineraryPdfDev("start", {
     destination: input.destination,
     days: input.content.days.length,
@@ -830,77 +841,100 @@ export async function buildTripItineraryPdf(input: TripPdfInput) {
     htmlLength: html.length,
   })
 
+  const timeoutMs = options?.timeoutMs ?? PDF_TIMEOUT_MS
   const puppeteer = await loadPuppeteerRuntime()
-  const chromium = process.platform === "win32" && !process.env.PUPPETEER_EXECUTABLE_PATH
-    ? null
-    : await loadChromiumRuntime()
-  const executablePath = await resolveExecutablePath(chromium)
-  const launchArgs =
-    process.platform === "win32"
-      ? ["--headless=new", "--disable-gpu", "--disable-crash-reporter", "--disable-features=Crashpad", "--no-first-run", "--allow-file-access-from-files"]
-      : await puppeteer.defaultArgs({
-          args: chromium?.args ?? [],
-          headless: "shell",
-        })
+  let browser: Awaited<ReturnType<PuppeteerRuntime["launch"]>> | null = null
 
-  logItineraryPdfDev("executable_resolved", {
-    executablePath,
-    platform: process.platform,
-    chromiumMode: chromium ? "serverless" : "local",
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    setTimeout(async () => {
+      try {
+        await browser?.close()
+      } catch {
+        // ignora falha de fechamento em timeout
+      }
+
+      reject(new Error(`A geração do PDF excedeu o tempo limite interno de ${Math.ceil(timeoutMs / 1000)} segundos.`))
+    }, timeoutMs)
   })
 
-  const browser = await puppeteer.launch({
-    executablePath,
-    args: launchArgs,
-    headless: process.platform === "win32" ? true : "shell",
-    defaultViewport: {
-      width: 1440,
-      height: 2048,
-      deviceScaleFactor: 2,
-    },
-  })
-  logItineraryPdfDev("browser_launched")
+  const pdfTask = (async () => {
+    const chromium = process.platform === "win32" && !process.env.PUPPETEER_EXECUTABLE_PATH
+      ? null
+      : await loadChromiumRuntime()
+    const executablePath = await resolveExecutablePath(chromium)
+    const launchArgs =
+      process.platform === "win32"
+        ? ["--headless=new", "--disable-gpu", "--disable-crash-reporter", "--disable-features=Crashpad", "--no-first-run", "--allow-file-access-from-files"]
+        : await puppeteer.defaultArgs({
+            args: chromium?.args ?? [],
+            headless: "shell",
+          })
 
-  try {
-    const page = await browser.newPage()
-    await page.setContent(html, { waitUntil: "load" })
-    logItineraryPdfDev("content_loaded")
-    await page.evaluate(async () => {
-      const pendingImages = Array.from(document.images).filter((image) => !image.complete)
-      await Promise.all(
-        pendingImages.map(
-          (image) =>
-            new Promise<void>((resolve) => {
-              image.addEventListener("load", () => resolve(), { once: true })
-              image.addEventListener("error", () => resolve(), { once: true })
-            }),
-        ),
+    logItineraryPdfDev("executable_resolved", {
+      executablePath,
+      platform: process.platform,
+      chromiumMode: chromium ? "serverless" : "local",
+      timeoutMs,
+    })
+
+    browser = await puppeteer.launch({
+      executablePath,
+      args: launchArgs,
+      headless: process.platform === "win32" ? true : "shell",
+      defaultViewport: {
+        width: 1440,
+        height: 2048,
+        deviceScaleFactor: 2,
+      },
+    })
+    logItineraryPdfDev("browser_launched")
+
+    try {
+      const page = await browser.newPage()
+      await page.setContent(html, { waitUntil: "load" })
+      logItineraryPdfDev("content_loaded")
+      await Promise.race([
+        page.evaluate(async () => {
+          const pendingImages = Array.from(document.images).filter((image) => !image.complete)
+          await Promise.all(
+            pendingImages.map(
+              (image) =>
+                new Promise<void>((resolve) => {
+                  image.addEventListener("load", () => resolve(), { once: true })
+                  image.addEventListener("error", () => resolve(), { once: true })
+                }),
+            ),
+          )
+        }),
+        wait(IMAGE_SETTLE_TIMEOUT_MS),
+      ])
+      await page.emulateMediaType("screen")
+      logItineraryPdfDev("page_ready_for_pdf")
+
+      const pdfBytes = Buffer.from(
+        await page.pdf({
+          format: "A4",
+          printBackground: true,
+          preferCSSPageSize: true,
+          margin: { top: "0", right: "0", bottom: "0", left: "0" },
+        }),
       )
-    })
-    await page.emulateMediaType("screen")
-    logItineraryPdfDev("page_ready_for_pdf")
 
-    const pdfBytes = Buffer.from(
-      await page.pdf({
-        format: "A4",
-        printBackground: true,
-        preferCSSPageSize: true,
-        margin: { top: "0", right: "0", bottom: "0", left: "0" },
-      }),
-    )
+      logItineraryPdfDev("pdf_created", {
+        bytes: pdfBytes.byteLength,
+      })
 
-    logItineraryPdfDev("pdf_created", {
-      bytes: pdfBytes.byteLength,
-    })
+      return pdfBytes
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Falha desconhecida ao gerar PDF."
+      logItineraryPdfDev("error", {
+        message,
+      })
+      throw error
+    } finally {
+      await browser.close()
+    }
+  })()
 
-    return pdfBytes
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Falha desconhecida ao gerar PDF."
-    logItineraryPdfDev("error", {
-      message,
-    })
-    throw error
-  } finally {
-    await browser.close()
-  }
+  return Promise.race([pdfTask, timeoutPromise])
 }
