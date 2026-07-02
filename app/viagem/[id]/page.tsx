@@ -5405,9 +5405,7 @@ function PortalPinUnlockModal({
   const hasConfiguredPin = !isLoadingView && pinStatus?.pinConfigured === true
   const hasMissingPin = !isLoadingView && !hasErrorView && !isOfflineUnavailable && pinStatus?.pinConfigured === false
   const helperText = isLoadingView
-    ? hasResolvedTripId
-      ? "Estamos verificando a configuracao do PIN desta viagem."
-      : "Estamos localizando a viagem antes de consultar o PIN."
+    ? configuredDescription
     : isOfflineUnavailable
       ? getTripPinOfflineMessage(accessMode)
     : hasConfiguredPin
@@ -5429,8 +5427,9 @@ function PortalPinUnlockModal({
             <div className={cn("rounded-2xl border p-5 text-sm", isLight ? "border-slate-200 bg-[#fcfbf8] text-slate-600" : "border-white/[0.06] bg-white/[0.02] text-white/60")}>
               <div className="flex items-center justify-center gap-3">
                 <div className={cn("h-5 w-5 animate-spin rounded-full border-2 border-transparent", isLight ? "border-slate-200 border-t-[#2563eb]" : "border-white/20 border-t-[#5de0e6]")} />
-                <span>Verificando configuracao do PIN...</span>
+                <span>Verificando PIN...</span>
               </div>
+              <p className="mt-2 text-center text-sm">Aguarde um instante.</p>
             </div>
           ) : null}
 
@@ -5496,7 +5495,7 @@ function PortalPinUnlockModal({
         ) : null}
 
         <p className={cn("mt-4 text-xs text-center", isLight ? "text-slate-500" : "text-white/35")}>
-          O link nao cria PIN. O desbloqueio usa apenas o PIN ja configurado no portal responsavel pela viagem.
+          Este PIN foi definido por quem criou a viagem.
         </p>
       </div>
     </Modal>
@@ -9525,8 +9524,8 @@ export default function TripPage() {
           adminToken={tripAdminToken}
           publicToken={tripPublicToken}
           accessMode="admin"
-          title="Desbloqueie para editar esta viagem"
-          configuredDescription="Use o PIN já criado no portal para liberar o modo administrador desta viagem."
+          title="Desbloquear viagem"
+          configuredDescription="Digite o PIN de 4 dígitos para acessar e editar esta viagem."
           tone="light"
           onSuccess={(status) => {
             if (status?.adminToken) {
@@ -9704,10 +9703,8 @@ export default function TripPage() {
               adminToken={tripAdminToken}
               publicToken={tripPublicToken}
               accessMode={securityAccessMode}
-              title={securityAccessMode === "admin" ? "Desbloquear para editar esta viagem" : "Desbloquear áreas protegidas"}
-              configuredDescription={securityAccessMode === "admin"
-                ? "Use o PIN já criado no portal para liberar a edição e os dados protegidos desta viagem."
-                : "Use o PIN já criado no portal para abrir documentos, passagens, hospedagens e outras áreas protegidas."}
+              title="Desbloquear viagem"
+              configuredDescription="Digite o PIN de 4 dígitos para acessar e editar esta viagem."
               tone="light"
               onSuccess={(status) => {
                 if (status?.adminToken) {
@@ -9919,8 +9916,8 @@ export default function TripPage() {
               adminToken={tripAdminToken}
               publicToken={tripPublicToken}
               accessMode="admin"
-              title="Desbloqueie para editar esta viagem"
-              configuredDescription="Use o PIN já criado no portal para liberar as ações administrativas desta viagem."
+              title="Desbloquear viagem"
+              configuredDescription="Digite o PIN de 4 dígitos para acessar e editar esta viagem."
               onSuccess={(status) => {
                 if (status?.adminToken) {
                   setTripAdminToken(status.adminToken)
@@ -10071,8 +10068,8 @@ export default function TripPage() {
             adminToken={tripAdminToken}
             publicToken={tripPublicToken}
             accessMode={adminRouteActive ? "admin" : "public"}
-            title="Desbloquear áreas protegidas"
-            configuredDescription={adminRouteActive ? "Use o PIN já criado no portal para liberar as ações administrativas desta viagem." : "Use o PIN já criado no portal para liberar as áreas protegidas desta viagem."}
+            title="Desbloquear viagem"
+            configuredDescription="Digite o PIN de 4 dígitos para acessar e editar esta viagem."
             onSuccess={() => {
               setSensitiveAccessGranted(true)
               setSecurityModalOpen(false)
