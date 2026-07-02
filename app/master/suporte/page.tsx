@@ -247,6 +247,8 @@ export default function MasterSupportPage() {
 
   const urgentCount = tickets.filter((ticket) => ticket.priority === "urgent" && ticket.status !== "resolved").length
   const selectedTargetType = bonusTarget.startsWith("agency:") ? "agency" : "traveler"
+  const modalFieldClass =
+    "rounded-xl border border-white/12 bg-[#0b132b] text-slate-100 placeholder:text-slate-500 focus-visible:border-primary/50 focus-visible:ring-primary/20 dark:bg-[#0b132b]"
 
   return (
     <div className="space-y-6">
@@ -255,26 +257,26 @@ export default function MasterSupportPage() {
           <h1 className="text-2xl font-bold text-foreground">Suporte</h1>
           <p className="mt-1 text-sm text-muted-foreground">Acompanhe chamados enviados pelos portais viajante e agência.</p>
         </div>
-        <div className="flex items-center gap-2 rounded-2xl border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700">
+        <div className="flex items-center gap-2 rounded-2xl border border-red-500/30 bg-red-500/12 px-4 py-2 text-sm text-red-200">
           <AlertTriangle className="h-4 w-4" />
           {urgentCount} urgente(s) em aberto
         </div>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-[1.8fr_1fr]">
-        <Card className="border-border/60 bg-card/80 p-4">
+        <Card className="border-white/10 bg-white/[0.04] p-4">
           <div className="mb-4 flex flex-col gap-3 lg:flex-row">
             <div className="relative flex-1">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar por assunto, usuário ou portal..." className="pl-9" />
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar por assunto, usuário ou portal..." className="border-white/10 bg-white/[0.04] pl-9 text-slate-100 placeholder:text-slate-500" />
             </div>
-            <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as "all" | SupportTicketStatus)} className="h-10 rounded-md border border-input bg-background px-3 text-sm">
+            <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as "all" | SupportTicketStatus)} className="h-10 rounded-md border border-white/10 bg-white/[0.04] px-3 text-sm text-slate-100">
               <option value="all">Todos os status</option>
               <option value="open">Aberto</option>
               <option value="in_progress">Em andamento</option>
               <option value="resolved">Resolvido</option>
             </select>
-            <select value={priorityFilter} onChange={(event) => setPriorityFilter(event.target.value as "all" | SupportTicketPriority)} className="h-10 rounded-md border border-input bg-background px-3 text-sm">
+            <select value={priorityFilter} onChange={(event) => setPriorityFilter(event.target.value as "all" | SupportTicketPriority)} className="h-10 rounded-md border border-white/10 bg-white/[0.04] px-3 text-sm text-slate-100">
               <option value="all">Todas as prioridades</option>
               <option value="normal">Normal</option>
               <option value="urgent">Urgente</option>
@@ -298,7 +300,7 @@ export default function MasterSupportPage() {
                   onClick={() => setSelectedTicketId(ticket.id)}
                   className={cn(
                     "w-full rounded-2xl border p-4 text-left transition",
-                    ticket.priority === "urgent" ? "border-red-200 bg-red-50/60" : "border-border/60 bg-background/70",
+                    ticket.priority === "urgent" ? "border-red-500/30 bg-red-500/10" : "border-white/10 bg-white/[0.03] hover:bg-white/[0.05]",
                   )}
                 >
                   <div className="flex flex-wrap items-start justify-between gap-3">
@@ -329,22 +331,22 @@ export default function MasterSupportPage() {
           </div>
         </Card>
 
-        <Card className="border-border/60 bg-card/80 p-4">
+        <Card className="border-white/10 bg-white/[0.04] p-4">
           <p className="text-sm font-semibold text-foreground">Resumo rápido</p>
           <div className="mt-4 space-y-3 text-sm text-muted-foreground">
-            <div className="flex items-center justify-between rounded-2xl border border-border/60 bg-background/70 px-4 py-3">
+            <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3">
               <span>Chamados abertos</span>
               <strong className="text-foreground">{tickets.filter((ticket) => ticket.status === "open").length}</strong>
             </div>
-            <div className="flex items-center justify-between rounded-2xl border border-border/60 bg-background/70 px-4 py-3">
+            <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3">
               <span>Em andamento</span>
               <strong className="text-foreground">{tickets.filter((ticket) => ticket.status === "in_progress").length}</strong>
             </div>
-            <div className="flex items-center justify-between rounded-2xl border border-border/60 bg-background/70 px-4 py-3">
+            <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3">
               <span>Resolvidos</span>
               <strong className="text-foreground">{tickets.filter((ticket) => ticket.status === "resolved").length}</strong>
             </div>
-            <div className="flex items-center justify-between rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-red-700">
+            <div className="flex items-center justify-between rounded-2xl border border-red-500/30 bg-red-500/12 px-4 py-3 text-red-200">
               <span>Urgentes</span>
               <strong>{urgentCount}</strong>
             </div>
@@ -354,12 +356,12 @@ export default function MasterSupportPage() {
       </div>
 
       <Dialog open={Boolean(selectedTicketId)} onOpenChange={(open) => !open && setSelectedTicketId(null)}>
-        <DialogContent className="max-h-[92vh] overflow-hidden rounded-[28px] border border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(248,250,252,0.96)_100%)] p-0 shadow-[0_32px_90px_rgba(15,23,42,0.18)] sm:max-w-4xl">
+        <DialogContent className="max-h-[92vh] overflow-hidden rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(5,8,22,0.98)_0%,rgba(9,12,28,0.98)_100%)] p-0 text-slate-100 shadow-[0_32px_90px_rgba(2,6,23,0.55)] sm:max-w-4xl">
           <div className="max-h-[92vh] overflow-y-auto">
-            <div className="border-b border-slate-200/80 bg-white/90 px-6 pb-5 pt-6 backdrop-blur">
+            <div className="border-b border-white/10 bg-white/[0.03] px-6 pb-5 pt-6 backdrop-blur">
               <DialogHeader>
-                <DialogTitle className="pr-8 text-left text-xl font-semibold tracking-tight text-slate-950">{detail?.ticket.title ?? "Chamado"}</DialogTitle>
-                <DialogDescription className="mt-2 text-left text-sm text-slate-600">
+                <DialogTitle className="pr-8 text-left text-xl font-semibold tracking-tight text-slate-50">{detail?.ticket.title ?? "Chamado"}</DialogTitle>
+                <DialogDescription className="mt-2 text-left text-sm text-slate-400">
                   {detail?.ticket ? `${getSupportCategoryLabel(detail.ticket.category as any)} • ${getSupportStatusLabel(detail.ticket.status as any)}` : "Carregando detalhes..."}
                 </DialogDescription>
               </DialogHeader>
@@ -367,20 +369,20 @@ export default function MasterSupportPage() {
 
             {detail?.ticket ? (
               <div className="space-y-6 px-6 pb-6 pt-5">
-                <div className="grid gap-3 rounded-[24px] border border-slate-200/80 bg-white p-5 text-sm text-slate-700 shadow-[0_18px_48px_rgba(15,23,42,0.06)] sm:grid-cols-2">
+                <div className="grid gap-3 rounded-[24px] border border-white/10 bg-white/[0.03] p-5 text-sm text-slate-300 shadow-[0_18px_48px_rgba(2,6,23,0.28)] sm:grid-cols-2">
                   <div>
                     <p className="text-xs uppercase tracking-wide text-slate-500">Usuário</p>
-                    <p className="mt-1 font-medium">{String(detail.ticket.context?.name ?? "Usuário")}</p>
-                    <p className="text-xs text-slate-500">{String(detail.ticket.context?.email ?? "Sem email")}</p>
+                    <p className="mt-1 font-medium text-slate-100">{String(detail.ticket.context?.name ?? "Usuário")}</p>
+                    <p className="text-xs text-slate-400">{String(detail.ticket.context?.email ?? "Sem email")}</p>
                   </div>
                   <div>
                     <p className="text-xs uppercase tracking-wide text-slate-500">Origem</p>
-                    <p className="mt-1 font-medium">{getSupportPortalLabel((detail.ticket.context?.portalType as any) ?? "traveler")}</p>
-                    <p className="text-xs text-slate-500">{String(detail.ticket.context?.currentRoute ?? "Rota não informada")}</p>
+                    <p className="mt-1 font-medium text-slate-100">{getSupportPortalLabel((detail.ticket.context?.portalType as any) ?? "traveler")}</p>
+                    <p className="text-xs text-slate-400">{String(detail.ticket.context?.currentRoute ?? "Rota não informada")}</p>
                   </div>
                   <div>
                     <p className="text-xs uppercase tracking-wide text-slate-500">Agência</p>
-                    <p className="mt-1 font-medium">{String(detail.ticket.context?.agencyName ?? detail.ticket.agencyId ?? "Não vinculada")}</p>
+                    <p className="mt-1 font-medium text-slate-100">{String(detail.ticket.context?.agencyName ?? detail.ticket.agencyId ?? "Não vinculada")}</p>
                   </div>
                   <div className="text-xs text-slate-500">
                     Criado em {new Date(detail.ticket.createdAt).toLocaleString("pt-BR")}
@@ -391,13 +393,13 @@ export default function MasterSupportPage() {
                   </div>
                   <div>
                     <p className="text-xs uppercase tracking-wide text-slate-500">Mensagem inicial</p>
-                    <p className="mt-1 text-sm leading-6 text-slate-800">{detail.ticket.message}</p>
+                    <p className="mt-1 text-sm leading-6 text-slate-200">{detail.ticket.message}</p>
                   </div>
                 </div>
 
                 <div className="space-y-3">
-                  <p className="text-sm font-semibold text-slate-900">Histórico</p>
-                  <div className="max-h-[45vh] space-y-3 overflow-y-auto rounded-[24px] border border-slate-200/80 bg-[linear-gradient(180deg,#f8fafc_0%,#fdfefe_100%)] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.6)]">
+                  <p className="text-sm font-semibold text-slate-100">Histórico</p>
+                  <div className="max-h-[45vh] space-y-3 overflow-y-auto rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(8,13,31,0.92)_0%,rgba(10,16,36,0.98)_100%)] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
                     {detail.messages.map((message) => {
                       const isMasterMessage = message.senderRole === "master"
                       const isSystem = message.senderRole === "system"
@@ -407,16 +409,16 @@ export default function MasterSupportPage() {
                           key={message.id}
                           className={cn(
                             "rounded-[22px] px-4 py-3 shadow-sm",
-                            isSystem && "mx-auto max-w-[92%] border border-amber-200/80 bg-amber-50/95 text-amber-950",
-                            isMasterMessage && "ml-auto max-w-[88%] border border-sky-200/70 bg-[linear-gradient(180deg,rgba(224,242,254,0.98)_0%,rgba(219,234,254,0.96)_100%)] text-slate-900 shadow-[0_12px_28px_rgba(14,116,144,0.10)]",
-                            !isMasterMessage && !isSystem && "mr-auto max-w-[88%] border border-slate-200/80 bg-white text-slate-900 shadow-[0_14px_32px_rgba(15,23,42,0.07)]"
+                            isSystem && "mx-auto max-w-[92%] border border-amber-400/30 bg-amber-500/12 text-amber-100",
+                            isMasterMessage && "ml-auto max-w-[88%] border border-sky-400/25 bg-[linear-gradient(180deg,rgba(8,47,73,0.92)_0%,rgba(14,116,144,0.78)_100%)] text-slate-50 shadow-[0_12px_28px_rgba(8,47,73,0.35)]",
+                            !isMasterMessage && !isSystem && "mr-auto max-w-[88%] border border-white/10 bg-white/[0.05] text-slate-100 shadow-[0_14px_32px_rgba(2,6,23,0.24)]"
                           )}
                         >
                           <div className="mb-1.5 flex items-center justify-between gap-3 text-xs">
-                            <span className="font-semibold text-slate-700">{getSupportSenderRoleLabel(message.senderRole as any)}</span>
-                            <span className="text-slate-500">{new Date(message.createdAt).toLocaleString("pt-BR")}</span>
+                            <span className="font-semibold text-slate-200">{getSupportSenderRoleLabel(message.senderRole as any)}</span>
+                            <span className="text-slate-400">{new Date(message.createdAt).toLocaleString("pt-BR")}</span>
                           </div>
-                          <p className="text-sm leading-6 text-slate-800">{message.body}</p>
+                          <p className="text-sm leading-6 text-current">{message.body}</p>
                         </div>
                       )
                     })}
@@ -424,10 +426,10 @@ export default function MasterSupportPage() {
                 </div>
 
                 <div className="grid gap-3 md:grid-cols-3">
-                  <Button variant="outline" className="rounded-xl border-slate-200 bg-white text-slate-700" onClick={() => void handleStatusUpdate("open")} disabled={statusUpdating !== null}>
+                  <Button variant="outline" className="rounded-xl border-white/12 bg-white/[0.03] text-slate-200 hover:bg-white/[0.06]" onClick={() => void handleStatusUpdate("open")} disabled={statusUpdating !== null}>
                     Reabrir
                   </Button>
-                  <Button variant="outline" className="rounded-xl border-slate-200 bg-white text-slate-700" onClick={() => void handleStatusUpdate("in_progress")} disabled={statusUpdating !== null}>
+                  <Button variant="outline" className="rounded-xl border-white/12 bg-white/[0.03] text-slate-200 hover:bg-white/[0.06]" onClick={() => void handleStatusUpdate("in_progress")} disabled={statusUpdating !== null}>
                     Em andamento
                   </Button>
                   <Button className="rounded-xl bg-emerald-600 text-white shadow-[0_18px_34px_rgba(5,150,105,0.18)] hover:bg-emerald-700" onClick={() => void handleStatusUpdate("resolved")} disabled={statusUpdating !== null}>
@@ -436,10 +438,10 @@ export default function MasterSupportPage() {
                   </Button>
                 </div>
 
-                <div className="space-y-3 rounded-[24px] border border-slate-200/80 bg-white p-5 shadow-[0_18px_48px_rgba(15,23,42,0.06)]">
+                <div className="space-y-3 rounded-[24px] border border-white/10 bg-white/[0.03] p-5 shadow-[0_18px_48px_rgba(2,6,23,0.24)]">
                   <div className="flex items-center gap-2">
                     <Gift className="h-4 w-4 text-primary" />
-                    <p className="text-sm font-semibold text-slate-900">Bonificar conta</p>
+                    <p className="text-sm font-semibold text-slate-100">Bonificar conta</p>
                   </div>
                   <div className="grid gap-3 md:grid-cols-2">
                     <div className="space-y-2">
@@ -447,7 +449,7 @@ export default function MasterSupportPage() {
                       <select
                         value={bonusTarget}
                         onChange={(event) => setBonusTarget(event.target.value)}
-                        className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900"
+                        className="h-11 w-full rounded-xl border border-white/12 bg-[#0b132b] px-3 text-sm text-slate-100"
                       >
                         {ticketTargets.length === 0 ? <option value="">Sem conta disponível</option> : null}
                         {ticketTargets.map((target) => (
@@ -462,7 +464,7 @@ export default function MasterSupportPage() {
                       <select
                         value={bonusType}
                         onChange={(event) => setBonusType(event.target.value as SupportBonusType)}
-                        className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900"
+                        className="h-11 w-full rounded-xl border border-white/12 bg-[#0b132b] px-3 text-sm text-slate-100"
                       >
                         <option value="credits">Créditos extras</option>
                         {selectedTargetType === "agency" ? <option value="client_extra">Cliente extra</option> : null}
@@ -471,24 +473,24 @@ export default function MasterSupportPage() {
                     </div>
                     <div className="space-y-2">
                       <label className="text-xs font-medium uppercase tracking-wide text-slate-500">Quantidade</label>
-                      <Input value={bonusQuantity} onChange={(event) => setBonusQuantity(event.target.value)} placeholder="1" />
+                      <Input value={bonusQuantity} onChange={(event) => setBonusQuantity(event.target.value)} placeholder="1" className={modalFieldClass} />
                     </div>
                     <div className="space-y-2">
                       <label className="text-xs font-medium uppercase tracking-wide text-slate-500">Viagem relacionada</label>
-                      <Input value={bonusTripTitle} onChange={(event) => setBonusTripTitle(event.target.value)} placeholder="Opcional" />
+                      <Input value={bonusTripTitle} onChange={(event) => setBonusTripTitle(event.target.value)} placeholder="Opcional" className={modalFieldClass} />
                     </div>
                     <div className="space-y-2 md:col-span-2">
                       <label className="text-xs font-medium uppercase tracking-wide text-slate-500">Cliente relacionado</label>
-                      <Input value={bonusClientName} onChange={(event) => setBonusClientName(event.target.value)} placeholder="Opcional" />
+                      <Input value={bonusClientName} onChange={(event) => setBonusClientName(event.target.value)} placeholder="Opcional" className={modalFieldClass} />
                     </div>
                     <div className="space-y-2 md:col-span-2">
                       <label className="text-xs font-medium uppercase tracking-wide text-slate-500">Motivo</label>
-                      <Textarea value={bonusReason} onChange={(event) => setBonusReason(event.target.value)} placeholder="Explique a compensação aplicada." className="min-h-28 rounded-2xl border-slate-200 bg-slate-50/80 text-slate-900 placeholder:text-slate-400 focus-visible:ring-primary/30" />
+                      <Textarea value={bonusReason} onChange={(event) => setBonusReason(event.target.value)} placeholder="Explique a compensação aplicada." className="min-h-28 rounded-2xl border border-white/12 bg-[#0b132b] text-slate-100 placeholder:text-slate-500 focus-visible:border-primary/50 focus-visible:ring-primary/20 dark:bg-[#0b132b]" />
                     </div>
                   </div>
 
                   {bonusError ? <p className="text-sm text-red-600">{bonusError}</p> : null}
-                  {bonusSuccess ? <p className="text-sm text-emerald-700">{bonusSuccess}</p> : null}
+                  {bonusSuccess ? <p className="text-sm text-emerald-300">{bonusSuccess}</p> : null}
 
                   <div className="flex justify-end">
                     <Button className="rounded-xl bg-gradient-to-r from-primary to-accent text-white shadow-[0_18px_34px_rgba(11,86,216,0.20)]" disabled={bonusSubmitting || ticketTargets.length === 0} onClick={() => void handleBonusSubmit()}>
@@ -497,9 +499,9 @@ export default function MasterSupportPage() {
                   </div>
                 </div>
 
-                <div className="space-y-3 rounded-[24px] border border-slate-200/80 bg-white p-5 shadow-[0_18px_48px_rgba(15,23,42,0.06)]">
-                  <p className="text-sm font-semibold text-slate-900">Responder</p>
-                  <Textarea value={reply} onChange={(event) => setReply(event.target.value)} placeholder="Escreva a resposta do suporte..." className="min-h-32 rounded-2xl border-slate-200 bg-slate-50/80 text-slate-900 placeholder:text-slate-400 focus-visible:ring-primary/30" />
+                <div className="space-y-3 rounded-[24px] border border-white/10 bg-white/[0.03] p-5 shadow-[0_18px_48px_rgba(2,6,23,0.24)]">
+                  <p className="text-sm font-semibold text-slate-100">Responder</p>
+                  <Textarea value={reply} onChange={(event) => setReply(event.target.value)} placeholder="Escreva a resposta do suporte..." className="min-h-32 rounded-2xl border border-white/12 bg-[#0b132b] text-slate-100 placeholder:text-slate-500 focus-visible:border-primary/50 focus-visible:ring-primary/20 dark:bg-[#0b132b]" />
                   <div className="flex justify-end">
                     <Button className="gap-2 rounded-xl bg-gradient-to-r from-primary to-accent text-white shadow-[0_18px_34px_rgba(11,86,216,0.20)]" onClick={() => void handleReply()} disabled={replying || !reply.trim()}>
                       <MessageCircleReply className="h-4 w-4" />
@@ -510,7 +512,7 @@ export default function MasterSupportPage() {
               </div>
             ) : (
               <div className="px-6 pb-6 pt-5">
-                <p className="text-sm text-slate-600">Carregando detalhes do chamado...</p>
+                <p className="text-sm text-slate-400">Carregando detalhes do chamado...</p>
               </div>
             )}
           </div>
