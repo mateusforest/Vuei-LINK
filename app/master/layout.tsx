@@ -135,7 +135,7 @@ function MasterLayoutInner({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="min-h-screen bg-[#050816] text-slate-100">
+    <div className="min-h-screen bg-background">
       {/* Background Grid */}
       <div className="fixed inset-0 bg-[linear-gradient(rgba(93,224,230,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(93,224,230,0.02)_1px,transparent_1px)] bg-[size:64px_64px] pointer-events-none" />
       
@@ -160,18 +160,18 @@ function MasterLayoutInner({ children }: { children: React.ReactNode }) {
               exit={{ opacity: 0, scale: 0.95 }}
               className="fixed top-[20%] left-1/2 -translate-x-1/2 w-full max-w-xl z-50 p-4"
             >
-              <div className="overflow-hidden rounded-2xl border border-white/10 bg-[rgba(9,12,28,0.96)] shadow-2xl backdrop-blur-xl">
-                <div className="flex items-center gap-3 border-b border-white/10 px-4 py-3">
-                  <Search className="h-5 w-5 text-slate-400" />
+              <div className="bg-card/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl overflow-hidden">
+                <div className="flex items-center gap-3 px-4 py-3 border-b border-white/5">
+                  <Search className="h-5 w-5 text-muted-foreground" />
                   <input
                     type="text"
                     placeholder="Buscar agências, usuários, viagens..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     autoFocus
-                    className="flex-1 bg-transparent text-sm text-slate-100 outline-none placeholder:text-slate-500"
+                    className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
                   />
-                  <kbd className="rounded border border-white/10 bg-white/5 px-2 py-1 text-xs text-slate-400">ESC</kbd>
+                  <kbd className="px-2 py-1 text-xs bg-white/5 border border-white/10 rounded text-muted-foreground">ESC</kbd>
                 </div>
                 
                 {searchQuery.length > 1 && (
@@ -249,7 +249,7 @@ function MasterLayoutInner({ children }: { children: React.ReactNode }) {
         initial={false}
         animate={{ width: collapsed ? 80 : 260 }}
         transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
-        className="fixed left-0 top-0 bottom-0 z-40 hidden lg:flex flex-col border-r border-white/10 bg-[rgba(5,8,22,0.86)] backdrop-blur-xl"
+        className="fixed left-0 top-0 bottom-0 z-40 hidden lg:flex flex-col border-r border-white/5 bg-black/40 backdrop-blur-xl"
       >
         {/* Logo */}
         <div className="h-16 flex items-center justify-between px-4 border-b border-white/5">
@@ -266,8 +266,8 @@ function MasterLayoutInner({ children }: { children: React.ReactNode }) {
                   transition={{ duration: 0.2 }}
                   className="flex flex-col"
                 >
-                  <span className="text-sm font-semibold text-slate-50">Vuei</span>
-                  <span className="text-[10px] font-medium uppercase tracking-wider text-primary/90">Master</span>
+                  <span className="text-sm font-semibold text-foreground">Vuei</span>
+                  <span className="text-[10px] font-medium text-primary/80 uppercase tracking-wider">Master</span>
                 </motion.div>
               )}
             </AnimatePresence>
@@ -276,7 +276,7 @@ function MasterLayoutInner({ children }: { children: React.ReactNode }) {
             variant="ghost"
             size="icon"
             onClick={() => setCollapsed(!collapsed)}
-            className="h-8 w-8 text-slate-400 hover:bg-white/8 hover:text-slate-100"
+            className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-white/5"
           >
             {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
           </Button>
@@ -293,7 +293,7 @@ function MasterLayoutInner({ children }: { children: React.ReactNode }) {
                     href={item.href}
                     className={cn(
                       "group relative flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-300",
-                      isActive ? "text-slate-50" : "text-slate-400 hover:bg-white/6 hover:text-slate-100"
+                      isActive ? "text-foreground" : "text-muted-foreground hover:text-foreground hover:bg-white/5"
                     )}
                   >
                     {isActive && (
@@ -321,7 +321,7 @@ function MasterLayoutInner({ children }: { children: React.ReactNode }) {
                       )}
                     </AnimatePresence>
                     {collapsed && (
-                      <div className="absolute left-full ml-2 rounded-md border border-white/10 bg-[rgba(9,12,28,0.96)] px-2 py-1 text-xs font-medium text-slate-100 opacity-0 transition-opacity whitespace-nowrap pointer-events-none z-50 group-hover:opacity-100">
+                      <div className="absolute left-full ml-2 px-2 py-1 bg-card border border-border rounded-md text-xs font-medium opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50">
                         {item.label}
                       </div>
                     )}
@@ -340,13 +340,13 @@ function MasterLayoutInner({ children }: { children: React.ReactNode }) {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="rounded-xl border border-white/10 bg-[linear-gradient(180deg,rgba(11,18,38,0.94)_0%,rgba(7,13,28,0.94)_100%)] p-3"
+                className="p-3 rounded-xl bg-gradient-to-br from-primary/10 to-accent/5 border border-primary/10"
               >
                 <div className="flex items-center gap-2 mb-2">
                   <Sparkles className="h-4 w-4 text-primary" />
-                  <span className="text-xs font-semibold text-slate-100">Vuei Platform</span>
+                  <span className="text-xs font-semibold text-foreground">Vuei Platform</span>
                 </div>
-                <p className="text-[10px] leading-relaxed text-slate-400">
+                <p className="text-[10px] text-muted-foreground leading-relaxed">
                   Portal Master v2.0
                 </p>
               </motion.div>
@@ -371,7 +371,7 @@ function MasterLayoutInner({ children }: { children: React.ReactNode }) {
               animate={{ x: 0 }}
               exit={{ x: "-100%" }}
               transition={{ type: "spring", damping: 25, stiffness: 300 }}
-              className="fixed left-0 top-0 bottom-0 z-50 flex w-72 flex-col border-r border-white/10 bg-[rgba(5,8,22,0.96)] backdrop-blur-xl lg:hidden"
+              className="fixed left-0 top-0 bottom-0 w-72 z-50 flex flex-col border-r border-white/5 bg-background/95 backdrop-blur-xl lg:hidden"
             >
               <div className="h-16 flex items-center justify-between px-4 border-b border-white/5">
                 <Link href="/master" className="flex items-center gap-3">
@@ -398,8 +398,8 @@ function MasterLayoutInner({ children }: { children: React.ReactNode }) {
                           className={cn(
                             "relative flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-300",
                             isActive
-                              ? "border border-primary/20 bg-gradient-to-r from-primary/20 to-accent/10 text-slate-50"
-                              : "text-slate-400 hover:bg-white/6 hover:text-slate-100"
+                              ? "text-foreground bg-gradient-to-r from-primary/20 to-accent/10 border border-primary/20"
+                              : "text-muted-foreground hover:text-foreground hover:bg-white/5"
                           )}
                         >
                           <item.icon className={cn("h-5 w-5", isActive && "text-primary")} />
@@ -420,7 +420,7 @@ function MasterLayoutInner({ children }: { children: React.ReactNode }) {
         {/* Header */}
         <header className={cn(
           "sticky top-0 z-30 h-16 flex items-center justify-between px-4 lg:px-8 transition-all duration-300",
-          scrolled ? "border-b border-white/10 bg-[rgba(5,8,22,0.82)] backdrop-blur-xl shadow-[0_10px_30px_rgba(0,0,0,0.35)]" : "bg-transparent"
+          scrolled ? "bg-background/80 backdrop-blur-xl border-b border-white/5 shadow-[0_4px_20px_rgba(0,0,0,0.3)]" : "bg-transparent"
         )}>
           <div className="flex items-center gap-4">
             <Button variant="ghost" size="icon" onClick={() => setMobileOpen(true)} className="lg:hidden h-9 w-9">
@@ -428,15 +428,15 @@ function MasterLayoutInner({ children }: { children: React.ReactNode }) {
             </Button>
             <button
               onClick={() => setSearchOpen(true)}
-              className="group hidden cursor-pointer items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 transition-colors hover:border-white/20 md:flex"
+              className="hidden md:flex items-center gap-2 px-3 py-2 rounded-xl bg-white/5 border border-white/5 hover:border-white/10 transition-colors cursor-pointer group"
             >
-              <Search className="h-4 w-4 text-slate-400 transition-colors group-hover:text-slate-100" />
-              <span className="text-sm text-slate-400 transition-colors group-hover:text-slate-100">Buscar...</span>
+              <Search className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+              <span className="text-sm text-muted-foreground group-hover:text-foreground transition-colors">Buscar...</span>
               <div className="flex items-center gap-1 ml-8">
-                <kbd className="rounded border border-white/10 bg-white/5 px-1.5 py-0.5 text-[10px] font-medium text-slate-400">
+                <kbd className="px-1.5 py-0.5 text-[10px] font-medium bg-white/5 border border-white/10 rounded text-muted-foreground">
                   <Command className="h-2.5 w-2.5 inline" />
                 </kbd>
-                <kbd className="rounded border border-white/10 bg-white/5 px-1.5 py-0.5 text-[10px] font-medium text-slate-400">K</kbd>
+                <kbd className="px-1.5 py-0.5 text-[10px] font-medium bg-white/5 border border-white/10 rounded text-muted-foreground">K</kbd>
               </div>
             </button>
           </div>
