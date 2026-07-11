@@ -35,7 +35,6 @@ export function LinkCeremony({
     if (!visible) return
 
     setPhraseIndex(0)
-    document.body.style.overflow = "hidden"
 
     const interval = window.setInterval(() => {
       setPhraseIndex((current) => (current + 1) % phrases.length)
@@ -43,21 +42,22 @@ export function LinkCeremony({
 
     return () => {
       window.clearInterval(interval)
-      document.body.style.overflow = ""
     }
   }, [visible])
 
   if (!visible) return null
 
   return (
-    <div className="landing-shell fixed inset-0 z-[100] flex flex-col bg-[radial-gradient(120%_90%_at_50%_-5%,#ffffff_0%,#faf8f4_60%)]">
+    <div className="landing-shell fixed inset-0 z-[100] overflow-y-auto bg-[radial-gradient(120%_90%_at_50%_-5%,#ffffff_0%,#faf8f4_60%)]">
       <header className="w-full">
         <div className="mx-auto flex w-full max-w-6xl items-center px-6 py-5">
           <Image src="/vuei-logo.png" alt="Vuei" width={124} height={40} className="h-8 w-auto" priority />
         </div>
       </header>
 
-      <div className="flex flex-1 flex-col items-center justify-center px-6 pb-24 text-center">
+      <div
+        className="flex min-h-[calc(100dvh-72px)] flex-col items-center justify-center px-6 pb-[calc(2rem+env(safe-area-inset-bottom))] pt-6 text-center"
+      >
         {!tripUrl && !error ? (
           <>
             <CeremonyMark />

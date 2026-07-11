@@ -1,6 +1,7 @@
 "use client"
 
 export const PENDING_TRIP_CLAIM_STORAGE_KEY = "vuei_pending_trip_claim"
+export const PENDING_TRIP_CLAIM_TTL_MS = 24 * 60 * 60 * 1000
 
 export interface PendingTripClaimSession {
   tripId: string
@@ -40,4 +41,13 @@ export function readPendingTripClaimSession() {
 export function clearPendingTripClaimSession() {
   if (typeof window === "undefined") return
   window.localStorage.removeItem(PENDING_TRIP_CLAIM_STORAGE_KEY)
+}
+
+export function isPendingTripClaimSessionActive(session: PendingTripClaimSession | null | undefined) {
+  if (!session) return false
+
+  const createdAt = new Date(session.createdAt).getTime()
+  if (Number.isNaN(createdAt)) return false
+
+  return createdAt + PENDING_TRIP_CLAIM_TTL_MS > Date.now()
 }

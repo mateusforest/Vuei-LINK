@@ -28,7 +28,7 @@ import { isOfflineModeActive } from "@/lib/offline/offline-mode"
 import { useAuth } from "@/contexts/auth-context"
 import { buildAdminTripUrl, buildPublicTripUrl, isAdminLinkMode } from "@/lib/security/link-tokens"
 import { resolveTravelerPlan, resolveTravelerPlanFromBillingStatus } from "@/lib/billing/traveler-plans"
-import { readPendingTripClaimSession } from "@/lib/pending-trip-claim"
+import { isPendingTripClaimSessionActive, readPendingTripClaimSession } from "@/lib/pending-trip-claim"
 import { ImageWithFallback } from "@/components/system/image-with-fallback"
 import { getTravelerBillingStatus } from "@/lib/repositories/traveler-billing-repository"
 import type { TripFlightRecord } from "@/types/flight"
@@ -7686,14 +7686,35 @@ export default function TripPage() {
     }
 
     const pendingClaimSession = readPendingTripClaimSession()
+    const shareLinkMatchesRoute = (() => {
+      if (!pendingClaimSession?.shareLink) return false
+
+      try {
+        const url = new URL(pendingClaimSession.shareLink)
+        return url.pathname === `/viagem/${routeSlug}` || url.pathname === `/v/${routeSlug}`
+      } catch {
+        return pendingClaimSession.shareLink.includes(`/viagem/${routeSlug}`) || pendingClaimSession.shareLink.includes(`/v/${routeSlug}`)
+      }
+    })()
     const hasMatchingTemporaryClaim =
       Boolean(pendingClaimSession) &&
       pendingClaimSession?.tripId === tripData.id &&
+      typeof pendingClaimSession?.claimToken === "string" &&
+      pendingClaimSession.claimToken.length > 0 &&
+      isPendingTripClaimSessionActive(pendingClaimSession) &&
+      shareLinkMatchesRoute &&
       !tripOwnerUserId &&
       !adminRouteActive
 
     setHasTemporaryClaimAccess(hasMatchingTemporaryClaim)
-  }, [adminRouteActive, tripData?.id, tripOwnerUserId])
+  }, [adminRouteActive, routeSlug, tripData?.id, tripOwnerUserId])
+
+  useEffect(() => {
+    if (hasTemporaryClaimAccess && securityAccessMode === "public" && securityModalOpen) {
+      setSecurityModalOpen(false)
+      pendingSensitiveActionRef.current = null
+    }
+  }, [hasTemporaryClaimAccess, securityAccessMode, securityModalOpen])
 
   useEffect(() => {
     setTravelerPanel(null)
