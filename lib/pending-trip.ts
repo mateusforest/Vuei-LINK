@@ -1,6 +1,7 @@
 import type { CreateTripPayload } from "@/lib/repositories/trips-repository"
 
 export const PENDING_TRIP_STORAGE_KEY = "vuei_pending_trip"
+export const PENDING_TRIP_REDIRECT_STORAGE_KEY = "vuei_pending_trip_redirect_to_share"
 
 export type PendingTripPayload = Pick<
   CreateTripPayload,
@@ -35,4 +36,20 @@ export function writePendingTrip(payload: Omit<PendingTripPayload, "createdAt">)
 export function clearPendingTrip() {
   if (typeof window === "undefined") return
   window.localStorage.removeItem(PENDING_TRIP_STORAGE_KEY)
+}
+
+export function shouldRedirectPendingTripToShare() {
+  if (typeof window === "undefined") return false
+  return window.localStorage.getItem(PENDING_TRIP_REDIRECT_STORAGE_KEY) === "1"
+}
+
+export function setPendingTripRedirectToShare(enabled: boolean) {
+  if (typeof window === "undefined") return
+
+  if (enabled) {
+    window.localStorage.setItem(PENDING_TRIP_REDIRECT_STORAGE_KEY, "1")
+    return
+  }
+
+  window.localStorage.removeItem(PENDING_TRIP_REDIRECT_STORAGE_KEY)
 }

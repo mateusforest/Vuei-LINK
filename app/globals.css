@@ -18,6 +18,8 @@
   --muted-foreground: #888888;
   --accent: #004aad;
   --accent-foreground: #ffffff;
+  --success: #16a34a;
+  --success-foreground: #ffffff;
   --destructive: oklch(0.577 0.245 27.325);
   --destructive-foreground: oklch(0.577 0.245 27.325);
   --border: #1a1a1a;
@@ -49,6 +51,8 @@
   --color-muted-foreground: var(--muted-foreground);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
   --color-border: var(--border);
@@ -319,4 +323,194 @@ html {
   background: rgba(255, 255, 255, 0.96);
   color: #101828;
   box-shadow: 0 28px 80px rgba(15, 23, 42, 0.12);
+}
+
+.landing-shell {
+  --background: #faf8f4;
+  --foreground: #101a2c;
+  --card: #ffffff;
+  --card-foreground: #101a2c;
+  --popover: #ffffff;
+  --popover-foreground: #101a2c;
+  --primary: #1b5cf0;
+  --primary-foreground: #ffffff;
+  --secondary: #f2f0ea;
+  --secondary-foreground: #101a2c;
+  --muted: #f4f2ec;
+  --muted-foreground: #737a86;
+  --accent: #eef3ff;
+  --accent-foreground: #1b5cf0;
+  --success: #16a34a;
+  --success-foreground: #ffffff;
+  --border: #ece9e1;
+  --input: #ece9e1;
+  --ring: #1b5cf0;
+  color-scheme: light;
+}
+
+@keyframes vuei-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes vuei-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes vuei-fade-out {
+  from {
+    opacity: 0.9;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes vuei-pop-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  70% {
+    transform: scale(1.08);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes vuei-pin-drop {
+  0% {
+    opacity: 0;
+    transform: translateY(-18px) scale(0.85);
+  }
+  60% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes vuei-glow-travel {
+  0% {
+    offset-distance: 0%;
+    opacity: 0;
+  }
+  20% {
+    opacity: 1;
+  }
+  80% {
+    opacity: 1;
+  }
+  100% {
+    offset-distance: 100%;
+    opacity: 0;
+  }
+}
+
+@keyframes vuei-links-join-left {
+  0% {
+    opacity: 0;
+    transform: translateX(-26px) rotate(-18deg);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0) rotate(0);
+  }
+}
+
+@keyframes vuei-links-join-right {
+  0% {
+    opacity: 0;
+    transform: translateX(26px) rotate(18deg);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0) rotate(0);
+  }
+}
+
+@keyframes vuei-sheen {
+  0% {
+    opacity: 0;
+    transform: translateX(-130%) skewX(-14deg);
+  }
+  8% {
+    opacity: 0.35;
+  }
+  22% {
+    opacity: 0;
+    transform: translateX(130%) skewX(-14deg);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(130%) skewX(-14deg);
+  }
+}
+
+@keyframes vuei-notify {
+  0%,
+  100% {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.96);
+  }
+  6%,
+  30% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  38% {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.96);
+  }
+}
+
+@keyframes chat-msg-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes typing-bounce {
+  0%,
+  60%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.4;
+  }
+  30% {
+    transform: translateY(-4px);
+    opacity: 1;
+  }
+}
+
+.chat-msg-in {
+  animation: chat-msg-in 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.typing-dot {
+  animation: typing-bounce 1.2s infinite ease-in-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chat-msg-in,
+  .typing-dot,
+  [class*="vuei-"] {
+    animation: none !important;
+  }
 }

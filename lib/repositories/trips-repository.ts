@@ -7,11 +7,13 @@ import { extractAgencyStorageState } from "@/lib/mappers/agency-mappers"
 import { buildUniqueTripSlug, extractTripsStoragePayload, mapStoredTripToTrip, slugifyTripBase, type LegacyStoredTrip } from "@/lib/mappers/trip-mappers"
 import { buildAdminTripUrl, buildPublicTripUrl, generateSecureToken } from "@/lib/security/link-tokens"
 import type { Database } from "@/lib/supabase/types"
-import { resolveTripHeroImage } from "@/lib/trip-destination"
 import { ensureTripTravelersPersistedWithClient } from "@/lib/repositories/trip-travelers-repository"
 import { getTravelerBillingStatus } from "@/lib/repositories/traveler-billing-repository"
 import { AGENCY_PLAN_LIMIT_ERROR } from "@/lib/billing/agency-plans"
 import { countActiveAgencyTripsForClient, getAgencyBillingStatusForClient } from "@/lib/billing/agency-billing"
+import { buildTripInsertPayload, mapTripRowToTrip, parseDestinationParts } from "@/lib/trips/trip-record"
+import { CREATE_TRIP_ERROR_MESSAGE, FREE_PLAN_TRIP_LIMIT_ERROR_MESSAGE } from "@/lib/trips/trip-policies"
+import { isTripSlugConflict, listExistingTripSlugs } from "@/lib/trips/trip-slug"
 
 export interface ListTripsParams {
   ownerType?: TripOwnerType
@@ -33,17 +35,6 @@ interface RepositoryTripResult {
   config?: ReturnType<typeof createSupabaseBrowserClientPlaceholder>
 }
 
-function parseTripPinSettings(value: unknown) {
-  if (!value || typeof value !== "object") return null
-  const settings = value as Record<string, unknown>
-  return {
-    enabled: settings.enabled === true,
-    pinHash: typeof settings.pinHash === "string" ? settings.pinHash : null,
-    pinSalt: typeof settings.pinSalt === "string" ? settings.pinSalt : null,
-    pinIterations: typeof settings.pinIterations === "number" ? settings.pinIterations : null,
-  }
-}
-
 function stripSensitiveTripTokens<T extends Trip | null>(trip: T): T {
   if (!trip) return trip
   return {
@@ -54,8 +45,6 @@ function stripSensitiveTripTokens<T extends Trip | null>(trip: T): T {
   } as T
 }
 
-const CREATE_TRIP_ERROR_MESSAGE = "Nao foi possivel criar a viagem. Tente novamente."
-const FREE_PLAN_TRIP_LIMIT_ERROR_MESSAGE = "Seu plano Free permite 1 viagem ativa. Para criar novas viagens, finalize uma viagem existente ou fa\u00e7a upgrade."
 const MAX_TRIP_SLUG_ATTEMPTS = 5
 
 function isDeletedTripStatus(status?: string | null) {
@@ -64,92 +53,6 @@ function isDeletedTripStatus(status?: string | null) {
 
 function readStoredTrips() {
   return [...normalizeLegacyTrips(), ...normalizeLegacyAgencyTrips()]
-}
-
-function escapeRegExp(value: string) {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
-}
-
-function isMatchingTripSlug(slug: string, baseSlug: string) {
-  const matcher = new RegExp(`^${escapeRegExp(baseSlug)}(?:-\\d+)?$`)
-  return matcher.test(slug)
-}
-
-function isTripSlugConflict(error: { code?: string | null; message?: string | null; details?: string | null } | null | undefined) {
-  if (!error) return false
-
-  const diagnostic = [error.code, error.message, error.details].filter(Boolean).join(" ")
-  return error.code === "23505" && /trips_slug_key/i.test(diagnostic)
-}
-
-async function listExistingTripSlugs(
-  supabase: NonNullable<ReturnType<typeof createSupabaseBrowserClient>>,
-  baseSlug: string
-) {
-  const { data, error } = await supabase.from("trips").select("slug").like("slug", `${baseSlug}%`)
-
-  if (error) {
-    console.error("[TRIP] slug lookup error", error)
-    return []
-  }
-
-  return (data ?? [])
-    .map((row) => row.slug)
-    .filter((slug): slug is string => typeof slug === "string" && isMatchingTripSlug(slug, baseSlug))
-}
-
-function mapTripRowToTrip(row: Database["public"]["Tables"]["trips"]["Row"]): Trip {
-  const permissions = (row.permissions as Record<string, unknown>) ?? {}
-  const creditsSummary = (row.credits_summary as Record<string, unknown>) ?? {}
-  return {
-    id: row.id,
-    title: row.title,
-    slug: row.slug,
-    destination: row.destination,
-    country: row.country,
-    city: row.city,
-    startDate: row.start_date,
-    endDate: row.end_date,
-    status: row.status,
-    style: row.style,
-    ownerType: row.owner_type,
-    ownerUserId: row.owner_user_id,
-    agencyId: row.agency_id,
-    clientId: row.client_id,
-    adminToken: row.admin_token,
-    publicToken: row.public_token,
-    adminLink: buildAdminTripUrl(row.slug, row.admin_token),
-    publicLink: buildPublicTripUrl(row.slug),
-    coverImage: resolveTripHeroImage({
-      coverImage: row.cover_image,
-      destination: row.destination,
-      city: row.city,
-      country: row.country,
-    }),
-    visibility: row.visibility,
-    travelersCount: row.travelers_count,
-    travelers: [],
-    flights: [],
-    accommodations: [],
-    itinerary: [],
-    documents: [],
-    permissions: {
-      publicCanViewItinerary: typeof permissions.publicCanViewItinerary === "boolean" ? permissions.publicCanViewItinerary : true,
-      publicCanViewAccommodation: typeof permissions.publicCanViewAccommodation === "boolean" ? permissions.publicCanViewAccommodation : true,
-      publicCanViewFlights: typeof permissions.publicCanViewFlights === "boolean" ? permissions.publicCanViewFlights : false,
-      publicCanViewPublicDocuments: typeof permissions.publicCanViewPublicDocuments === "boolean" ? permissions.publicCanViewPublicDocuments : true,
-      publicCanUseConcierge: typeof permissions.publicCanUseConcierge === "boolean" ? permissions.publicCanUseConcierge : false,
-      tripPin: parseTripPinSettings(permissions.tripPin),
-    },
-    creditsSummary: {
-      balance: typeof creditsSummary.balance === "number" ? creditsSummary.balance : null,
-      used: typeof creditsSummary.used === "number" ? creditsSummary.used : null,
-      total: typeof creditsSummary.total === "number" ? creditsSummary.total : null,
-    },
-    offlineEnabled: row.offline_enabled,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-  }
 }
 
 function writeLocalTrips(nextTrips: Trip[]) {
@@ -257,16 +160,6 @@ function filterTrips(trips: Trip[], params?: ListTripsParams) {
     if (params.status && trip.status !== params.status) return false
     return true
   })
-}
-
-function parseDestinationParts(destination?: string | null) {
-  const value = (destination ?? "").trim()
-  const parts = value.split(",").map((part) => part.trim()).filter(Boolean)
-
-  return {
-    city: parts[0] || value || null,
-    country: parts.length > 1 ? parts[parts.length - 1] : null,
-  }
 }
 
 function buildTrip(payload: CreateTripPayload, existingTrips: Trip[], slugOverride?: string): Trip {
@@ -592,33 +485,18 @@ export async function createTrip(payload: CreateTripPayload) {
         const publicToken = trip.publicToken || generateSecureToken()
         const adminLink = buildAdminTripUrl(trip.slug, adminToken)
         const publicLink = buildPublicTripUrl(trip.slug)
-        const parsedDestination = parseDestinationParts(trip.destination)
-        const insertPayload: Database["public"]["Tables"]["trips"]["Insert"] = {
-          title: trip.title,
-          slug: trip.slug,
-          destination: trip.destination,
-          country: trip.country ?? parsedDestination.country,
-          city: trip.city ?? parsedDestination.city,
-          start_date: trip.startDate,
-          end_date: trip.endDate,
-          status: trip.status ?? "draft",
-          style: trip.style,
-          owner_type: trip.ownerType,
-          owner_user_id: trip.ownerUserId,
-          agency_id: trip.agencyId,
-          client_id: trip.clientId,
-          admin_token: adminToken,
-          public_token: publicToken,
-          admin_link: adminLink,
-          public_link: publicLink,
-          cover_image: trip.coverImage ?? null,
-          visibility: trip.visibility ?? "public",
-          travelers_count: trip.travelersCount || 1,
-          permissions: trip.permissions ?? {},
-          credits_summary: {},
-          offline_enabled: trip.offlineEnabled,
-          source: "manual",
-        }
+        const insertPayload: Database["public"]["Tables"]["trips"]["Insert"] = buildTripInsertPayload(
+          trip,
+          {
+            adminToken,
+            publicToken,
+            adminLink,
+            publicLink,
+          },
+          {
+            source: "manual",
+          },
+        )
         console.log("[TRIP] payload", insertPayload)
 
         const { data, error } = await supabase.from("trips").insert(insertPayload).select("*").single()

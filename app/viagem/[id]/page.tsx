@@ -28,6 +28,7 @@ import { isOfflineModeActive } from "@/lib/offline/offline-mode"
 import { useAuth } from "@/contexts/auth-context"
 import { buildAdminTripUrl, buildPublicTripUrl, isAdminLinkMode } from "@/lib/security/link-tokens"
 import { resolveTravelerPlan, resolveTravelerPlanFromBillingStatus } from "@/lib/billing/traveler-plans"
+import { readPendingTripClaimSession } from "@/lib/pending-trip-claim"
 import { ImageWithFallback } from "@/components/system/image-with-fallback"
 import { getTravelerBillingStatus } from "@/lib/repositories/traveler-billing-repository"
 import type { TripFlightRecord } from "@/types/flight"
@@ -7599,6 +7600,8 @@ export default function TripPage() {
   const [offlineDocumentContext, setOfflineDocumentContext] = useState<OfflineDocumentContext | null>(null)
   const [agencyBranding, setAgencyBranding] = useState<{ name: string | null; logoUrl: string | null; isAgency: boolean }>({ name: null, logoUrl: null, isAgency: false })
   const [travelerCredits, setTravelerCredits] = useState<TripTravelerCreditsPayload | null>(null)
+  const [hasTemporaryClaimAccess, setHasTemporaryClaimAccess] = useState(false)
+  const [temporaryClaimNoticeDismissed, setTemporaryClaimNoticeDismissed] = useState(false)
   const [sectionsLoading, setSectionsLoading] = useState({
     flights: true,
     hotels: true,
@@ -7672,7 +7675,25 @@ export default function TripPage() {
     pendingSensitiveActionRef.current = null
     setTripTravelersSource("fallback")
     setTravelersLoading(false)
+    setHasTemporaryClaimAccess(false)
+    setTemporaryClaimNoticeDismissed(false)
   }, [tripOwnerUserId, user?.id, params?.id, params?.slug])
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !tripData?.id) {
+      setHasTemporaryClaimAccess(false)
+      return
+    }
+
+    const pendingClaimSession = readPendingTripClaimSession()
+    const hasMatchingTemporaryClaim =
+      Boolean(pendingClaimSession) &&
+      pendingClaimSession?.tripId === tripData.id &&
+      !tripOwnerUserId &&
+      !adminRouteActive
+
+    setHasTemporaryClaimAccess(hasMatchingTemporaryClaim)
+  }, [adminRouteActive, tripData?.id, tripOwnerUserId])
 
   useEffect(() => {
     setTravelerPanel(null)
@@ -8513,6 +8534,7 @@ export default function TripPage() {
   }
 
   const hasRequiredSensitiveAccess = (accessMode: TripPinApiAccessMode) => {
+    if (accessMode === "public" && hasTemporaryClaimAccess) return true
     if (!sensitiveAccessGranted) return false
     if (accessMode === "admin") return canWrite
     return true
@@ -9580,6 +9602,35 @@ export default function TripPage() {
           <ToastContext.Provider value={{ showToast }}>
             <main className="min-h-screen bg-[#f4f1ea] text-slate-900">
               <TripLinkLightThemeStyles />
+            {hasTemporaryClaimAccess && !temporaryClaimNoticeDismissed ? (
+              <div className="px-4 pt-4 sm:px-6">
+                <div className="mx-auto flex w-full max-w-5xl flex-col gap-4 rounded-[28px] border border-[#0b56d8]/10 bg-[#f8fbff] p-5 shadow-[0_18px_40px_-28px_rgba(16,26,44,0.35)] sm:flex-row sm:items-center sm:justify-between">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-slate-950">Voce ja pode usar e compartilhar este link.</p>
+                    <p className="mt-1 text-sm leading-6 text-slate-600">
+                      Crie seu acesso para proteger documentos, editar em outros dispositivos e configurar um PIN de seguranca.
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 flex-col gap-3 sm:flex-row">
+                    <Button
+                      size="sm"
+                      className="rounded-full bg-[#0f172a] px-5 text-white hover:bg-[#111f35]"
+                      onClick={() => router.push(`/signup?redirect=${encodeURIComponent("/portal")}`)}
+                    >
+                      Criar acesso e proteger viagem
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="rounded-full px-5 text-slate-600 hover:text-slate-950"
+                      onClick={() => setTemporaryClaimNoticeDismissed(true)}
+                    >
+                      Agora nao
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ) : null}
             <TravelerPublicShell
               tripData={tripData}
               itineraryRecords={tripItineraryRecords}

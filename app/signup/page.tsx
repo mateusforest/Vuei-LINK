@@ -36,6 +36,7 @@ export default function SignupPage() {
     formData.password.length >= 6 &&
     formData.password === formData.confirmPassword &&
     acceptTerms
+  const loginHref = safeRedirect ? `/login?redirect=${encodeURIComponent(safeRedirect)}` : "/login"
 
   useEffect(() => {
     setSafeRedirect(getSafeRedirectFromWindow())
@@ -362,7 +363,7 @@ export default function SignupPage() {
 
                 <p className="mt-8 text-center text-sm text-[#667085]">
                   Já possui uma conta?{" "}
-                  <Link href="/login" className="font-medium text-[#0b56d8] hover:underline">
+                  <Link href={loginHref} className="font-medium text-[#0b56d8] hover:underline">
                     Entrar
                   </Link>
                 </p>

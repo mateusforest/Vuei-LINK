@@ -103,6 +103,9 @@ create table if not exists public.trips (
   credits_summary jsonb not null default '{}'::jsonb,
   offline_enabled boolean not null default false,
   source text not null default 'manual',
+  claim_token_hash text,
+  claim_token_expires_at timestamptz,
+  claim_token_claimed_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   constraint trips_status_check check (status in ('draft', 'upcoming', 'ongoing', 'completed', 'cancelled')),
@@ -110,7 +113,14 @@ create table if not exists public.trips (
   constraint trips_visibility_check check (visibility in ('private', 'public')),
   constraint trips_travelers_count_check check (travelers_count >= 1),
   constraint trips_owner_consistency_check check (
-    (owner_type = 'traveler' and owner_user_id is not null)
+    (
+      owner_type = 'traveler'
+      and (
+        (owner_user_id is not null and claim_token_hash is null)
+        or
+        (owner_user_id is null and claim_token_hash is not null and claim_token_expires_at is not null and claim_token_claimed_at is null)
+      )
+    )
     or
     (owner_type = 'agency' and agency_id is not null and client_id is not null)
   )
@@ -121,6 +131,7 @@ create unique index if not exists idx_agencies_slug on public.agencies (slug);
 create unique index if not exists idx_trips_slug on public.trips (slug);
 create unique index if not exists idx_trips_admin_token on public.trips (admin_token) where admin_token is not null;
 create unique index if not exists idx_trips_public_token on public.trips (public_token) where public_token is not null;
+create unique index if not exists idx_trips_claim_token_hash on public.trips (claim_token_hash) where claim_token_hash is not null;
 
 create index if not exists idx_profiles_role on public.profiles (role);
 create index if not exists idx_trips_owner_user_id on public.trips (owner_user_id);
@@ -198,6 +209,72 @@ as $$
     where agency.id = target_agency_id
       and agency.owner_user_id = auth.uid()
   );
+$$;
+
+create or replace function public.claim_pending_trip_with_limit(
+  p_claim_token_hash text,
+  p_user_id uuid,
+  p_max_active_trips integer default null
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  trip_row public.trips%rowtype;
+  active_trip_count integer;
+begin
+  perform pg_advisory_xact_lock(hashtextextended(coalesce(p_user_id::text, ''), 0));
+
+  select *
+  into trip_row
+  from public.trips
+  where claim_token_hash = p_claim_token_hash
+    and owner_type = 'traveler'
+    and owner_user_id is null
+  for update;
+
+  if not found then
+    return jsonb_build_object('status', 'invalid');
+  end if;
+
+  if trip_row.claim_token_claimed_at is not null then
+    return jsonb_build_object('status', 'already_claimed');
+  end if;
+
+  if trip_row.claim_token_expires_at is null or trip_row.claim_token_expires_at <= now() then
+    return jsonb_build_object('status', 'expired');
+  end if;
+
+  if p_max_active_trips is not null then
+    select count(*)
+    into active_trip_count
+    from public.trips
+    where owner_user_id = p_user_id
+      and owner_type = 'traveler'
+      and status in ('draft', 'upcoming', 'ongoing');
+
+    if active_trip_count >= p_max_active_trips then
+      return jsonb_build_object('status', 'limit_exceeded');
+    end if;
+  end if;
+
+  update public.trips
+  set
+    owner_user_id = p_user_id,
+    claim_token_hash = null,
+    claim_token_expires_at = null,
+    claim_token_claimed_at = now(),
+    updated_at = now()
+  where id = trip_row.id
+  returning * into trip_row;
+
+  return jsonb_build_object(
+    'status', 'claimed',
+    'trip_id', trip_row.id
+  );
+end;
 $$;
 
 alter table public.profiles enable row level security;

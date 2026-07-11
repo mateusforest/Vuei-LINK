@@ -24,6 +24,7 @@ export default function LoginPage() {
   const [errors, setErrors] = useState<{ email?: string; password?: string; auth?: string }>({})
   const [safeRedirect, setSafeRedirect] = useState<string | null | undefined>(undefined)
   const canSubmit = email.trim().length > 0 && password.length >= 6
+  const signupHref = safeRedirect ? `/signup?redirect=${encodeURIComponent(safeRedirect)}` : "/criar-viagem"
 
   useEffect(() => {
     setSafeRedirect(getSafeRedirectFromWindow())
@@ -253,7 +254,7 @@ export default function LoginPage() {
                 <div className="mt-8 text-center">
                   <p className="text-sm text-[#667085]">
                     Não tem uma conta?{" "}
-                    <Link href="/criar-viagem" className="font-medium text-[#0b56d8] hover:underline">
+                    <Link href={signupHref} className="font-medium text-[#0b56d8] hover:underline">
                       Criar conta
                     </Link>
                   </p>

@@ -897,6 +897,9 @@ export interface Database {
           credits_summary: Json
           offline_enabled: boolean
           source: string
+          claim_token_hash: string | null
+          claim_token_expires_at: string | null
+          claim_token_claimed_at: string | null
           created_at: string
           updated_at: string
         }
@@ -926,6 +929,9 @@ export interface Database {
           credits_summary?: Json
           offline_enabled?: boolean
           source?: string
+          claim_token_hash?: string | null
+          claim_token_expires_at?: string | null
+          claim_token_claimed_at?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -954,6 +960,9 @@ export interface Database {
           credits_summary?: Json
           offline_enabled?: boolean
           source?: string
+          claim_token_hash?: string | null
+          claim_token_expires_at?: string | null
+          claim_token_claimed_at?: string | null
           updated_at?: string
         }
       }

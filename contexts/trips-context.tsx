@@ -4,9 +4,11 @@ import { createContext, useContext, useState, useEffect, useCallback, type React
 import type { CreditBalance, CreditTransaction, Trip as CanonicalTrip, TripStatus } from "@/types"
 import { useAuth } from "@/contexts/auth-context"
 import { createTrip as createTripInRepository, deleteTrip as deleteTripInRepository, listTripsByUser } from "@/lib/repositories/trips-repository"
+import { claimPendingTrip } from "@/lib/repositories/pending-trip-claim-repository"
 import { shouldUseSupabase } from "@/lib/data-source"
 import { withTimeout } from "@/lib/async/with-timeout"
-import { clearPendingTrip, readPendingTrip } from "@/lib/pending-trip"
+import { clearPendingTrip, readPendingTrip, setPendingTripRedirectToShare, shouldRedirectPendingTripToShare } from "@/lib/pending-trip"
+import { clearPendingTripClaimSession, readPendingTripClaimSession } from "@/lib/pending-trip-claim"
 import { buildAdminTripUrl, buildPublicTripUrl } from "@/lib/security/link-tokens"
 import {
   buildUniqueTripSlug,
@@ -444,6 +446,33 @@ export function TripsProvider({ children }: { children: ReactNode }) {
           return remoteTrips[0] ?? null
         })
 
+        const pendingClaimSession = readPendingTripClaimSession()
+        if (pendingClaimSession) {
+          const claimResult = await claimPendingTrip(pendingClaimSession.claimToken)
+          const isDefinitiveClaimError =
+            claimResult.code === "claim_invalid" ||
+            claimResult.code === "claim_expired" ||
+            claimResult.code === "claim_already_claimed"
+
+          if (claimResult.data) {
+            const nextTrip = mapCanonicalTripToLegacyTrip(
+              claimResult.data,
+              inferCompanionsFromCount(claimResult.data.travelersCount),
+            )
+
+            setTrips((prev) => [nextTrip, ...prev.filter((trip) => trip.id !== nextTrip.id)])
+            setActiveTripState(nextTrip)
+            clearPendingTripClaimSession()
+            window.location.replace(nextTrip.shareLink)
+            return
+          }
+
+          console.error("[TRIPS] pending claim error", claimResult.error)
+          if (isDefinitiveClaimError) {
+            clearPendingTripClaimSession()
+          }
+        }
+
         const pendingTrip = readPendingTrip()
         if (!pendingTrip) return
 
@@ -466,12 +495,18 @@ export function TripsProvider({ children }: { children: ReactNode }) {
             pendingResult.data,
             inferCompanionsFromCount(pendingResult.data.travelersCount)
           )
+          const shouldRedirectToShare = shouldRedirectPendingTripToShare()
 
           setTrips((prev) => [nextTrip, ...prev.filter((trip) => trip.id !== nextTrip.id)])
           setActiveTripState(nextTrip)
           clearPendingTrip()
+          setPendingTripRedirectToShare(false)
           console.log("[TRIPS] loaded trips", remoteTrips.length + 1)
           console.log("[BOOT] trips loaded", remoteTrips.length + 1)
+
+          if (shouldRedirectToShare && typeof window !== "undefined") {
+            window.location.replace(nextTrip.shareLink)
+          }
         }
       } catch (error) {
         const message = error instanceof Error ? error.message : "Falha ao carregar viagens."
