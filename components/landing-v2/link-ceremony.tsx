@@ -16,6 +16,7 @@ type LinkCeremonyProps = {
   onOpenTrip: () => void
   onCopyLink: () => void | Promise<void>
   onProtectTrip: () => void
+  onContinueWithoutAccount: () => void
 }
 
 export function LinkCeremony({
@@ -28,6 +29,7 @@ export function LinkCeremony({
   onOpenTrip,
   onCopyLink,
   onProtectTrip,
+  onContinueWithoutAccount,
 }: LinkCeremonyProps) {
   const [phraseIndex, setPhraseIndex] = useState(0)
 
@@ -135,16 +137,16 @@ export function LinkCeremony({
                   Criar acesso e proteger viagem
                   <ArrowRight className="size-5" aria-hidden="true" />
                 </button>
+
+                <button
+                  type="button"
+                  onClick={onContinueWithoutAccount}
+                  className="mt-4 flex w-full items-center justify-center gap-2 rounded-full border border-border/70 bg-white px-6 py-4 text-base font-semibold text-foreground transition-colors hover:bg-muted/40"
+                >
+                  Agora nao
+                </button>
               </>
             ) : null}
-
-            <button
-              type="button"
-              onClick={onClose}
-              className="mt-4 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
-            >
-              Voltar
-            </button>
           </div>
         )}
       </div>

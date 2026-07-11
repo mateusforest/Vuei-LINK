@@ -7686,23 +7686,13 @@ export default function TripPage() {
     }
 
     const pendingClaimSession = readPendingTripClaimSession()
-    const shareLinkMatchesRoute = (() => {
-      if (!pendingClaimSession?.shareLink) return false
-
-      try {
-        const url = new URL(pendingClaimSession.shareLink)
-        return url.pathname === `/viagem/${routeSlug}` || url.pathname === `/v/${routeSlug}`
-      } catch {
-        return pendingClaimSession.shareLink.includes(`/viagem/${routeSlug}`) || pendingClaimSession.shareLink.includes(`/v/${routeSlug}`)
-      }
-    })()
     const hasMatchingTemporaryClaim =
       Boolean(pendingClaimSession) &&
       pendingClaimSession?.tripId === tripData.id &&
+      pendingClaimSession?.tripSlug === routeSlug &&
       typeof pendingClaimSession?.claimToken === "string" &&
       pendingClaimSession.claimToken.length > 0 &&
       isPendingTripClaimSessionActive(pendingClaimSession) &&
-      shareLinkMatchesRoute &&
       !tripOwnerUserId &&
       !adminRouteActive
 

@@ -42,6 +42,15 @@ export function Hero({
   const [creationError, setCreationError] = useState<string | null>(null)
   const [isCreatingTrip, setIsCreatingTrip] = useState(false)
 
+  function buildSameOriginTripPath(url: string) {
+    try {
+      const parsed = new URL(url)
+      return `${parsed.pathname}${parsed.search}${parsed.hash}`
+    } catch {
+      return url
+    }
+  }
+
   function handleSubmit(event: FormEvent) {
     event.preventDefault()
     if (!destination.trim()) return
@@ -92,11 +101,14 @@ export function Hero({
     setIsCreatingTrip(false)
 
     if (pendingResult.data) {
+      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
       writePendingTripClaimSession({
         tripId: pendingResult.data.trip.id,
+        tripSlug: pendingResult.data.trip.slug,
         claimToken: pendingResult.data.claimToken,
         shareLink: pendingResult.data.trip.publicLink,
         createdAt: new Date().toISOString(),
+        expiresAt,
       })
       setCreatedTripUrl(pendingResult.data.trip.publicLink)
       return
@@ -107,7 +119,7 @@ export function Hero({
 
   function handleOpenTrip() {
     if (!createdTripUrl) return
-    window.location.assign(createdTripUrl)
+    window.location.assign(buildSameOriginTripPath(createdTripUrl))
   }
 
   async function handleCopyLink() {
@@ -117,6 +129,11 @@ export function Hero({
 
   function handleProtectTrip() {
     router.push(`/signup?redirect=${encodeURIComponent("/portal")}`)
+  }
+
+  function handleContinueWithoutAccount() {
+    if (!createdTripUrl) return
+    window.location.assign(buildSameOriginTripPath(createdTripUrl))
   }
 
   return (
@@ -245,6 +262,7 @@ export function Hero({
         onOpenTrip={handleOpenTrip}
         onCopyLink={handleCopyLink}
         onProtectTrip={handleProtectTrip}
+        onContinueWithoutAccount={handleContinueWithoutAccount}
       />
     </>
   )

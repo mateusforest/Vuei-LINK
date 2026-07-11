@@ -1,0 +1,117 @@
+
+> my-project@0.1.0 build
+> next build
+
+▲ Next.js 16.2.6 (Turbopack)
+- Environments: .env.local
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 106s
+  Skipping validation of types
+  Finished TypeScript config validation in 182ms ...
+  Collecting page data using 11 workers ...
+  Generating static pages using 11 workers (0/88) ...
+  Generating static pages using 11 workers (22/88) 
+  Generating static pages using 11 workers (44/88) 
+  Generating static pages using 11 workers (66/88) 
+✓ Generating static pages using 11 workers (88/88) in 3.6s
+  Finalizing page optimization ...
+
+Route (app)
+┌ ○ /
+├ ○ /_not-found
+├ ○ /agencia
+├ ○ /agencia/analytics
+├ ○ /agencia/clientes
+├ ○ /agencia/concierge
+├ ○ /agencia/configuracoes
+├ ○ /agencia/creditos
+├ ○ /agencia/documentos
+├ ○ /agencia/equipe
+├ ○ /agencia/hospedagens
+├ ○ /agencia/links
+├ ○ /agencia/passagens
+├ ○ /agencia/planos
+├ ○ /agencia/roteiros
+├ ○ /agencia/roteiros-ia
+├ ○ /agencia/suporte
+├ ○ /agencia/viagens
+├ ○ /agencia/viagens/criar
+├ ○ /agency
+├ ○ /agency/onboarding
+├ ○ /agency/signup
+├ ƒ /api/ai/concierge
+├ ƒ /api/ai/itineraries/generate
+├ ƒ /api/ai/trip-flights/extract
+├ ƒ /api/billing/agency/checkout
+├ ƒ /api/billing/agency/credits/checkout
+├ ƒ /api/billing/agency/portal
+├ ƒ /api/billing/agency/status
+├ ƒ /api/billing/traveler/checkout
+├ ƒ /api/billing/traveler/credits/checkout
+├ ƒ /api/billing/traveler/portal
+├ ƒ /api/billing/traveler/status
+├ ƒ /api/destination-image
+├ ƒ /api/internal/mf-metrics
+├ ƒ /api/stripe/webhook
+├ ƒ /api/support/tickets
+├ ƒ /api/support/tickets/[ticketId]
+├ ƒ /api/support/tickets/[ticketId]/bonus
+├ ƒ /api/support/tickets/[ticketId]/messages
+├ ƒ /api/trip-admin
+├ ƒ /api/trip-branding
+├ ƒ /api/trip-credits
+├ ƒ /api/trip-documents
+├ ƒ /api/trip-pin
+├ ƒ /api/trips/claim
+├ ƒ /api/trips/pending
+├ ○ /apple-icon.png
+├ ƒ /auth/callback
+├ ○ /cadastro
+├ ○ /criar-viagem
+├ ○ /forgot-password
+├ ○ /health
+├ ○ /icon.png
+├ ○ /login
+├ ○ /master
+├ ○ /master/agencias
+├ ○ /master/analytics
+├ ○ /master/clientes
+├ ○ /master/concierge
+├ ○ /master/configuracoes
+├ ○ /master/creditos
+├ ○ /master/financeiro
+├ ○ /master/ia
+├ ○ /master/suporte
+├ ○ /master/templates
+├ ○ /master/usuarios
+├ ○ /master/viagens
+├ ○ /onboarding
+├ ○ /portal
+├ ○ /portal/compartilhar
+├ ○ /portal/concierge
+├ ○ /portal/configuracoes
+├ ○ /portal/creditos
+├ ○ /portal/criar-viagem
+├ ○ /portal/documentos
+├ ○ /portal/offline
+├ ○ /portal/planos
+├ ○ /portal/suporte
+├ ○ /portal/viagem
+├ ○ /portal/viagem/roteiro
+├ ○ /portal/viagens
+├ ○ /privacidade
+├ ○ /privacy
+├ ○ /reset-password
+├ ○ /signup
+├ ○ /suporte
+├ ○ /termos
+├ ○ /terms
+├ ƒ /v/[id]
+├ ƒ /viagem/[id]
+└ ƒ /viagem/[id]/admin
+
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+
