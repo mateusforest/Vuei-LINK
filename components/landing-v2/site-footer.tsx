@@ -5,7 +5,7 @@ import { Camera, MessageCircle } from "lucide-react"
 const links = [
   { label: "Como funciona", href: "#como-funciona" },
   { label: "Concierge", href: "#concierge" },
-  { label: "Demonstracao", href: "#como-funciona" },
+  { label: "Demonstração", href: "#como-funciona" },
   { label: "Central de ajuda", href: "/suporte" },
   { label: "Privacidade", href: "/privacy" },
   { label: "Termos", href: "/terms" },
@@ -15,11 +15,11 @@ export function SiteFooter() {
   return (
     <footer className="mx-auto w-full max-w-6xl px-6 pb-10 pt-4">
       <div className="flex flex-col gap-8 border-t border-border/60 pt-8 md:flex-row md:items-center md:justify-between">
-        <Link href="/" className="flex items-center" aria-label="Vuei - pagina inicial">
+        <Link href="/" className="flex items-center" aria-label="Vuei - página inicial">
           <Image src="/vuei-logo.png" alt="Vuei" width={112} height={36} className="h-7 w-auto" />
         </Link>
 
-        <nav className="flex flex-wrap items-center gap-x-6 gap-y-2" aria-label="Rodape">
+        <nav className="flex flex-wrap items-center gap-x-6 gap-y-2" aria-label="Rodapé">
           {links.map((link) => (
             <Link key={link.label} href={link.href} className="text-sm text-muted-foreground transition-colors hover:text-foreground">
               {link.label}
@@ -45,7 +45,7 @@ export function SiteFooter() {
         </div>
       </div>
 
-      <p className="mt-8 text-center text-xs text-muted-foreground md:text-left">Toda a sua viagem, em um unico link.</p>
+      <p className="mt-8 text-center text-xs text-muted-foreground md:text-left">Toda a sua viagem, em um único link.</p>
     </footer>
   )
 }

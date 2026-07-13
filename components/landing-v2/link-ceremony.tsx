@@ -57,9 +57,7 @@ export function LinkCeremony({
         </div>
       </header>
 
-      <div
-        className="flex min-h-[calc(100dvh-72px)] flex-col items-center justify-center px-6 pb-[calc(2rem+env(safe-area-inset-bottom))] pt-6 text-center"
-      >
+      <div className="flex min-h-[calc(100dvh-72px)] flex-col items-center justify-center px-6 pb-[calc(2rem+env(safe-area-inset-bottom))] pt-6 text-center">
         {!tripUrl && !error ? (
           <>
             <CeremonyMark />
@@ -74,7 +72,7 @@ export function LinkCeremony({
         ) : error ? (
           <div className="w-full max-w-md" style={{ animation: "vuei-pop-in 0.6s cubic-bezier(0.22,1,0.36,1) both" }}>
             <h1 className="text-balance text-4xl font-bold leading-[1.05] tracking-tight text-foreground sm:text-5xl">
-              Nao foi possivel concluir agora.
+              Não foi possível concluir agora.
             </h1>
             <p className="mt-5 text-lg leading-8 text-muted-foreground">{error}</p>
             <button

@@ -230,7 +230,7 @@ function isActiveTripStatus(status: Trip["status"]) {
 }
 
 export function TripsProvider({ children }: { children: ReactNode }) {
-  // Mantemos a persistencia local nesta fase para nao alterar o fluxo aprovado.
+  // Mantemos a persistência local nesta fase para não alterar o fluxo aprovado.
   // A migracao gradual para trips-repository/credits-repository fica isolada fora deste contexto.
   const { user, profile, loading } = useAuth()
   const defaultCreditsHistory = [
@@ -593,7 +593,7 @@ export function TripsProvider({ children }: { children: ReactNode }) {
         console.error("[TRIPS] delete error", result.error)
         setTrips(previousTrips)
         setActiveTripState(previousActiveTrip)
-        return { success: false, error: result.error ?? "Nao foi possivel excluir viagem." }
+        return { success: false, error: result.error ?? "Não foi possível excluir a viagem." }
       }
     }
 

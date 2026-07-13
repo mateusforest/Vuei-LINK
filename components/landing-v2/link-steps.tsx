@@ -12,10 +12,10 @@ export function LinkSteps() {
     <section id="como-funciona" className="mx-auto w-full max-w-6xl scroll-mt-24 px-6 py-28 sm:py-36">
       <div className="text-center">
         <h2 className="text-balance text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
-          Seu link esta sendo criado...
+          Seu link está sendo criado...
         </h2>
         <p className="mx-auto mt-4 max-w-md text-pretty text-muted-foreground">
-          Em segundos, tudo da sua viagem ganha um endereco so seu.
+          Em segundos, tudo da sua viagem ganha um endereço só seu.
         </p>
       </div>
 

@@ -20,12 +20,12 @@ function definitiveClaimError(error: string, code: string) {
 
 export async function POST(request: Request) {
   if (!hasSupabaseAdminEnv()) {
-    return NextResponse.json({ error: "Supabase admin indisponivel para assumir a viagem." }, { status: 503 })
+    return NextResponse.json({ error: "Supabase admin indisponível para assumir a viagem." }, { status: 503 })
   }
 
   const serverClient = await createSupabaseServerClient()
   if (!serverClient) {
-    return unauthorized("Sessao indisponivel.")
+    return unauthorized("Sessão indisponível.")
   }
 
   const {
@@ -34,7 +34,7 @@ export async function POST(request: Request) {
   } = await serverClient.auth.getUser()
 
   if (authError || !user) {
-    return unauthorized("Login obrigatorio para assumir a viagem.")
+    return unauthorized("Login obrigatório para assumir a viagem.")
   }
 
   let body: { claimToken?: string }
@@ -42,12 +42,12 @@ export async function POST(request: Request) {
   try {
     body = await request.json()
   } catch {
-    return badRequest("Payload invalido.")
+    return badRequest("Payload inválido.")
   }
 
   const claimToken = body.claimToken?.trim()
   if (!claimToken) {
-    return badRequest("Claim token obrigatorio.")
+    return badRequest("Claim token obrigatório.")
   }
 
   try {
@@ -55,7 +55,7 @@ export async function POST(request: Request) {
     const billingStatus = await getTravelerCreditBalance(supabase, user.id)
     if (billingStatus.error || !billingStatus.data) {
       return NextResponse.json(
-        { error: billingStatus.error ?? "Nao foi possivel validar seu plano atual." },
+        { error: billingStatus.error ?? "Não foi possível validar seu plano atual." },
         { status: 500 },
       )
     }
@@ -70,21 +70,21 @@ export async function POST(request: Request) {
 
     if (claimRpcError) {
       console.error("[TRIP] claim rpc error", claimRpcError)
-      return NextResponse.json({ error: "Nao foi possivel concluir a posse da viagem." }, { status: 500 })
+      return NextResponse.json({ error: "Não foi possível concluir a posse da viagem." }, { status: 500 })
     }
 
     const claimStatus = typeof claimResult?.status === "string" ? claimResult.status : null
 
     if (claimStatus === "invalid") {
-      return definitiveClaimError("Posse temporaria invalida ou ja utilizada.", "claim_invalid")
+      return definitiveClaimError("Posse temporária inválida ou já utilizada.", "claim_invalid")
     }
 
     if (claimStatus === "expired") {
-      return definitiveClaimError("Posse temporaria expirada. Gere uma nova viagem para continuar.", "claim_expired")
+      return definitiveClaimError("Posse temporária expirada. Gere uma nova viagem para continuar.", "claim_expired")
     }
 
     if (claimStatus === "already_claimed") {
-      return definitiveClaimError("Esta viagem ja foi reivindicada.", "claim_already_claimed")
+      return definitiveClaimError("Esta viagem já foi reivindicada.", "claim_already_claimed")
     }
 
     if (claimStatus === "limit_exceeded") {
@@ -92,7 +92,7 @@ export async function POST(request: Request) {
     }
 
     if (claimStatus !== "claimed" || typeof claimResult?.trip_id !== "string") {
-      return NextResponse.json({ error: "Nao foi possivel concluir a posse da viagem." }, { status: 500 })
+      return NextResponse.json({ error: "Não foi possível concluir a posse da viagem." }, { status: 500 })
     }
 
     const { data: claimedRow, error: claimError } = await supabase
@@ -103,7 +103,7 @@ export async function POST(request: Request) {
 
     if (claimError || !claimedRow) {
       console.error("[TRIP] claim update error", claimError)
-      return NextResponse.json({ error: "Nao foi possivel concluir a posse da viagem." }, { status: 500 })
+      return NextResponse.json({ error: "Não foi possível concluir a posse da viagem." }, { status: 500 })
     }
 
     return NextResponse.json({
@@ -111,11 +111,11 @@ export async function POST(request: Request) {
     })
   } catch (error) {
     if (isMissingSupabaseAdminEnvError(error)) {
-      return NextResponse.json({ error: "Supabase admin indisponivel para assumir a viagem." }, { status: 503 })
+      return NextResponse.json({ error: "Supabase admin indisponível para assumir a viagem." }, { status: 503 })
     }
 
-    const message = error instanceof Error ? error.message : "Nao foi possivel concluir a posse da viagem."
+    const message = error instanceof Error ? error.message : "Não foi possível concluir a posse da viagem."
     console.error("[TRIP] claim route error", message)
-    return NextResponse.json({ error: "Nao foi possivel concluir a posse da viagem." }, { status: 500 })
+    return NextResponse.json({ error: "Não foi possível concluir a posse da viagem." }, { status: 500 })
   }
 }

@@ -32,12 +32,12 @@ export function PrepareTrip({
     >
       <div className="mx-auto w-full max-w-2xl px-6">
         <div className="animate-in fade-in slide-in-from-bottom-4 text-center duration-700">
-          <p className="text-sm font-medium tracking-wide text-primary">Quase la</p>
+          <p className="text-sm font-medium tracking-wide text-primary">Quase lá</p>
           <h2 className="mt-4 text-balance text-4xl font-bold leading-[1.05] tracking-tight text-foreground sm:text-5xl">
             Vamos preparar sua viagem.
           </h2>
           <p className="mt-5 text-pretty text-lg text-muted-foreground">
-            So mais alguns detalhes e seu link estara pronto para compartilhar.
+            Só mais alguns detalhes e seu link estará pronto para compartilhar.
           </p>
         </div>
 

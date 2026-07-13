@@ -18,15 +18,15 @@ export function Cta() {
 
         <div>
           <h2 className="text-balance text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
-            Sua viagem comeca aqui.
+            Sua viagem começa aqui.
           </h2>
           <p className="mt-4 text-pretty text-lg text-muted-foreground">
-            Crie seu link em segundos e tenha tudo da sua viagem em um so lugar.
+            Crie seu link em segundos e tenha tudo da sua viagem em um só lugar.
           </p>
 
           <div className="mt-8 flex items-center gap-2 rounded-full bg-card p-2 pl-5 shadow-[0_30px_70px_-30px_rgba(16,26,44,0.28)] ring-1 ring-border/60">
             <MapPin className="size-5 shrink-0 text-primary" aria-hidden="true" />
-            <span className="w-full py-2.5 text-base text-muted-foreground">Para onde voce vai?</span>
+            <span className="w-full py-2.5 text-base text-muted-foreground">Para onde você vai?</span>
             <Link
               href="/criar-viagem"
               aria-label="Criar link da viagem"

@@ -31,7 +31,7 @@ async function parseJson<T>(response: Response) {
 
 export async function createPendingTripClaim(payload: CreatePendingTripPayload) {
   if (!shouldUseSupabase()) {
-    return { data: null, error: "Criacao pendente exige Supabase configurado." }
+    return { data: null, error: "Criação pendente exige Supabase configurado." }
   }
 
   const response = await fetch("/api/trips/pending", {
@@ -48,7 +48,7 @@ export async function createPendingTripClaim(payload: CreatePendingTripPayload) 
     data: response.ok && data?.trip && data?.claimToken
       ? { trip: data.trip as PendingTripCreationSnapshot, claimToken: data.claimToken }
       : null,
-    error: response.ok ? null : data?.error ?? "Nao foi possivel criar a viagem agora.",
+    error: response.ok ? null : data?.error ?? "Não foi possível criar a viagem agora.",
     code: data?.code ?? null,
   }
 }
@@ -70,7 +70,7 @@ export async function claimPendingTrip(claimToken: string) {
 
   return {
     data: response.ok && data?.trip ? data.trip : null,
-    error: response.ok ? null : data?.error ?? "Nao foi possivel assumir a viagem agora.",
+    error: response.ok ? null : data?.error ?? "Não foi possível assumir a viagem agora.",
     code: data?.code ?? null,
     status: response.status,
   }

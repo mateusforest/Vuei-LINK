@@ -20,10 +20,10 @@ export function SharedLink() {
     <section className="mx-auto grid w-full max-w-6xl items-center gap-16 px-6 py-28 sm:py-36 lg:grid-cols-2">
       <div>
         <h2 className="text-balance text-3xl font-bold leading-[1.1] tracking-tight text-foreground sm:text-4xl">
-          Quem viaja com voce entra pelo mesmo link.
+          Quem viaja com você entra pelo mesmo link.
         </h2>
         <p className="mt-5 text-pretty text-lg text-muted-foreground">
-          Um link para todos verem, editarem e viverem a viagem juntos - do primeiro plano ao ultimo dia.
+          Um link para todos verem, editarem e viverem a viagem juntos, do primeiro plano ao último dia.
         </p>
 
         <div className="mt-10 flex items-center gap-2 rounded-full bg-card p-2 pl-5 shadow-[0_24px_60px_-40px_rgba(16,26,44,0.3)] ring-1 ring-border/50">

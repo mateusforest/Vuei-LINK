@@ -14,7 +14,7 @@ const script: Message[] = [
   { from: "user", text: "Preciso de quais documentos para Aruba?" },
   {
     from: "bot",
-    text: "Voce precisara de passaporte valido, passagens de ida e volta e comprovante de hospedagem.",
+    text: "Você precisará de passaporte válido, passagens de ida e volta e comprovante de hospedagem.",
   },
 ]
 

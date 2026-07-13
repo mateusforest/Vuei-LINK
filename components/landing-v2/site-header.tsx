@@ -7,7 +7,7 @@ export function SiteHeader({ onCreateTrip }: { onCreateTrip: () => void }) {
   return (
     <header className="sticky top-0 z-50 w-full bg-background/70 backdrop-blur-xl">
       <div className="mx-auto grid w-full max-w-6xl grid-cols-2 items-center px-6 py-5 md:grid-cols-[1fr_auto_1fr]">
-        <Link href="/" className="flex items-center" aria-label="Vuei - pagina inicial">
+        <Link href="/" className="flex items-center" aria-label="Vuei - página inicial">
           <Image src="/vuei-logo.png" alt="Vuei" width={124} height={40} className="h-8 w-auto" priority />
         </Link>
 
@@ -16,7 +16,7 @@ export function SiteHeader({ onCreateTrip }: { onCreateTrip: () => void }) {
             Abrir viagem
           </Link>
           <Link href="#como-funciona" className="text-sm font-medium text-foreground/70 transition-colors hover:text-foreground">
-            Ver demonstracao
+            Ver demonstração
           </Link>
         </nav>
 

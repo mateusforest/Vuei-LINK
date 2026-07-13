@@ -174,7 +174,7 @@ async function loadTripPinStatus(params: {
     return {
       ok: response.ok,
       data,
-      error: response.ok ? null : data?.error ?? "Nao foi possivel consultar o PIN desta viagem.",
+      error: response.ok ? null : data?.error ?? "Não foi possível consultar o PIN desta viagem.",
       isOffline: false,
     }
   } catch (error) {
@@ -184,7 +184,7 @@ async function loadTripPinStatus(params: {
     return {
       ok: false,
       data: null,
-      error: offline || aborted ? getTripPinOfflineMessage(params.accessMode) : error instanceof Error ? error.message : "Nao foi possivel consultar o PIN desta viagem.",
+      error: offline || aborted ? getTripPinOfflineMessage(params.accessMode) : error instanceof Error ? error.message : "Não foi possível consultar o PIN desta viagem.",
       isOffline: offline || aborted,
     }
   } finally {
@@ -229,10 +229,10 @@ async function verifyTripPinOnServer(params: {
 
 function getTripPinSetupMessage(status: TripPinStatusPayload | null) {
   if (status?.ownerType === "agency") {
-    return "PIN ainda nao configurado. Peca ao responsavel pela viagem para configurar o PIN no portal."
+    return "PIN ainda não configurado. Peça ao responsável pela viagem para configurar o PIN no portal."
   }
 
-  return "PIN ainda nao configurado. Peca ao responsavel pela viagem para configurar o PIN no portal."
+  return "PIN ainda não configurado. Peça ao responsável pela viagem para configurar o PIN no portal."
 }
 
 function hasTripAuthenticatedAdminAccess(params: {
@@ -976,7 +976,7 @@ function formatFlightDateTimeSafe(dateString?: string | null) {
     }
 
     if (parsedParts.hasTime && parsedParts.hour !== null && parsedParts.minute !== null) {
-      return { date: "Data nao informada", time: formatTime(parsedParts.hour, parsedParts.minute), hasDate: false }
+      return { date: "Data não informada", time: formatTime(parsedParts.hour, parsedParts.minute), hasDate: false }
     }
   }
 
@@ -1271,7 +1271,7 @@ function getFlightStatusCopy(flight: any) {
 
 function isFlightExtractionGuidanceMessage(message?: string | null) {
   const normalizedMessage = (message || "").toLowerCase()
-  return normalizedMessage.includes("nÃ£o foi possÃ­vel extrair os dados desta passagem") || normalizedMessage.includes("nao foi possivel extrair os dados desta passagem")
+  return normalizedMessage.includes("não foi possível extrair os dados desta passagem") || normalizedMessage.includes("nao foi possivel extrair os dados desta passagem")
 }
 
 function FlightExtractionGuidanceModal({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -2251,7 +2251,7 @@ function TripHero({ tripData, onEditTrip }: { tripData: any; onEditTrip: () => v
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.7 }} className="mt-8">
               <div className="inline-flex items-center gap-2 text-[#5de0e6]">
                 <Sparkles className="w-4 h-4" />
-                <span className="text-sm font-medium">Sua aventura comeca em breve</span>
+                <span className="text-sm font-medium">Sua aventura começa em breve</span>
               </div>
             </motion.div>
           )}
@@ -5345,7 +5345,7 @@ function PortalPinUnlockModal({
       if (!result.ok || !result.data) {
         setPinStatus(null)
         setStatusUnavailableReason(result.isOffline && accessMode === "admin" ? "offline" : null)
-        setError(result.error ?? "Nao foi possivel consultar o PIN desta viagem.")
+        setError(result.error ?? "Não foi possível consultar o PIN desta viagem.")
         return
       }
 
@@ -5560,15 +5560,15 @@ function LinkSecurityInfoModal({
   }, [open, hasResolvedTripId, tripId, tripSlug, adminToken, publicToken, accessMode])
 
   return (
-    <Modal open={open} onClose={onClose} title="Seguranca">
+    <Modal open={open} onClose={onClose} title="Segurança">
       <div className="space-y-4">
         <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4">
           <p className="text-sm font-medium text-white">O PIN desta viagem e definido apenas no portal responsavel.</p>
-          <p className="mt-2 text-xs text-white/40">Este link serve apenas para solicitar o PIN ja existente quando uma area protegida for aberta.</p>
+          <p className="mt-2 text-xs text-white/40">Este link serve apenas para solicitar o PIN já existente quando uma área protegida for aberta.</p>
         </div>
         <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4">
           <p className="text-xs uppercase tracking-wider text-white/40">Status do PIN</p>
-          <p className="mt-2 text-sm text-white">{status?.pinConfigured ? "PIN configurado" : "PIN ainda nao configurado"}</p>
+          <p className="mt-2 text-sm text-white">{status?.pinConfigured ? "PIN configurado" : "PIN ainda não configurado"}</p>
           <p className="mt-2 text-xs text-white/40">{getTripPinSetupMessage(status)}</p>
         </div>
         {error ? (
@@ -7407,7 +7407,7 @@ function SensitiveAccessModal({
           onClick={onConfigureQuickAccess}
           className="mt-3 w-full text-[#5de0e6] hover:bg-white/[0.04] hover:text-[#5de0e6]"
         >
-          Gerenciar seguranca neste dispositivo
+          Gerenciar segurança neste dispositivo
         </Button>
       </div>
     </Modal>
@@ -8634,7 +8634,7 @@ export default function TripPage() {
     if (blockOfflineMutation()) return false
     if (!ensureSensitiveAccess()) return false
     if (!tripData.id) {
-      showToast("Viagem nao encontrada para atualizar.", "error")
+      showToast("Viagem não encontrada para atualizar.", "error")
       return false
     }
 
@@ -8657,7 +8657,7 @@ export default function TripPage() {
     const saveError = adminLinkMutationMode ? result.error : result.error
 
     if (saveError || !savedTrip) {
-      showToast(resolveProtectedWriteError(saveError || "Nao foi possivel atualizar a viagem."), "error")
+      showToast(resolveProtectedWriteError(saveError || "Não foi possível atualizar a viagem."), "error")
       return false
     }
 
@@ -9617,9 +9617,9 @@ export default function TripPage() {
               <div className="px-4 pt-4 sm:px-6">
                 <div className="mx-auto flex w-full max-w-5xl flex-col gap-4 rounded-[28px] border border-[#0b56d8]/10 bg-[#f8fbff] p-5 shadow-[0_18px_40px_-28px_rgba(16,26,44,0.35)] sm:flex-row sm:items-center sm:justify-between">
                   <div className="min-w-0">
-                    <p className="text-sm font-semibold text-slate-950">Voce ja pode usar e compartilhar este link.</p>
+                    <p className="text-sm font-semibold text-slate-950">Você já pode usar e compartilhar este link.</p>
                     <p className="mt-1 text-sm leading-6 text-slate-600">
-                      Crie seu acesso para proteger documentos, editar em outros dispositivos e configurar um PIN de seguranca.
+                      Crie seu acesso para proteger documentos, editar em outros dispositivos e configurar um PIN de segurança.
                     </p>
                   </div>
                   <div className="flex shrink-0 flex-col gap-3 sm:flex-row">
@@ -9636,7 +9636,7 @@ export default function TripPage() {
                       className="rounded-full px-5 text-slate-600 hover:text-slate-950"
                       onClick={() => setTemporaryClaimNoticeDismissed(true)}
                     >
-                      Agora nao
+                      Agora não
                     </Button>
                   </div>
                 </div>

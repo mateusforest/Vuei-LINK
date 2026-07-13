@@ -87,7 +87,7 @@ export function Hero({
         return
       }
 
-      setCreationError(result.error ?? "Nao foi possivel criar a viagem agora.")
+      setCreationError(result.error ?? "Não foi possível criar a viagem agora.")
       return
     }
 
@@ -114,7 +114,7 @@ export function Hero({
       return
     }
 
-    setCreationError(pendingResult.error ?? "Nao foi possivel criar a viagem agora.")
+    setCreationError(pendingResult.error ?? "Não foi possível criar a viagem agora.")
   }
 
   function handleOpenTrip() {
@@ -142,7 +142,7 @@ export function Hero({
         <div className="mx-auto flex min-h-[calc(100vh-73px)] w-full max-w-6xl flex-col items-center gap-16 px-6 py-16 lg:flex-row lg:gap-12 lg:py-8">
           <div className="flex w-full flex-col lg:w-[46%]">
             <h1 className="text-balance text-5xl font-bold leading-[1.03] tracking-tight text-foreground sm:text-6xl lg:text-7xl">
-              Sua viagem comeca aqui.
+              Sua viagem começa aqui.
             </h1>
             <p className="mt-6 text-lg text-muted-foreground sm:text-xl">Crie seu link em segundos.</p>
 
@@ -152,14 +152,14 @@ export function Hero({
             >
               <MapPin className="size-5 shrink-0 text-primary" aria-hidden="true" />
               <label htmlFor="hero-destination" className="sr-only">
-                Para onde voce vai?
+                Para onde você vai?
               </label>
               <input
                 id="hero-destination"
                 type="text"
                 value={destination}
                 onChange={(event) => onDestinationChange(event.target.value)}
-                placeholder="Para onde voce vai?"
+                placeholder="Para onde você vai?"
                 className="w-full bg-transparent py-2.5 text-base text-foreground outline-none placeholder:text-muted-foreground"
               />
               <button
@@ -185,7 +185,7 @@ export function Hero({
                 ))}
               </div>
               <p className="text-sm text-muted-foreground">
-                +12 mil pessoas ja organizam
+                +12 mil pessoas já organizam
                 <br />
                 suas viagens com o Vuei
               </p>
@@ -205,7 +205,7 @@ export function Hero({
                     loop
                     playsInline
                     preload="auto"
-                    aria-label="Demonstracao do aplicativo Vuei"
+                    aria-label="Demonstração do aplicativo Vuei"
                   >
                     <source src="/videos/vuei-demo.mp4" type="video/mp4" />
                   </video>

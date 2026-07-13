@@ -59,7 +59,7 @@ export function LinkDetails() {
         <h2 className="text-balance text-center text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
           Seu link. Tudo da sua viagem.
         </h2>
-        <p className="mt-4 text-center text-muted-foreground">Conectado, organizado e sempre a mao.</p>
+        <p className="mt-4 text-center text-muted-foreground">Conectado, organizado e sempre à mão.</p>
 
         <div className="mt-20 grid items-center gap-10 lg:grid-cols-[1fr_auto_1fr] lg:gap-14">
           <div className="flex flex-col gap-6">
@@ -150,7 +150,7 @@ export function LinkDetails() {
                         <p className="text-xs font-semibold text-foreground">1</p>
                       </div>
                       <div>
-                        <p className="text-[9px] text-muted-foreground">Portao</p>
+                        <p className="text-[9px] text-muted-foreground">Portão</p>
                         <p className="text-xs font-semibold text-foreground">11</p>
                       </div>
                       <div>
@@ -193,7 +193,7 @@ export function LinkDetails() {
                 <Download className="size-5" aria-hidden="true" />
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold text-foreground">Disponivel offline</p>
+                <p className="text-sm font-semibold text-foreground">Disponível offline</p>
                 <p className="text-xs text-muted-foreground">Baixe seus documentos</p>
               </div>
               <span className="flex items-center gap-1 rounded-full bg-accent px-3 py-1.5 text-[11px] font-medium text-primary">
