@@ -92,9 +92,9 @@ export function LinkCeremony({
               <Check className="size-7" aria-hidden="true" />
             </div>
             <h1 className="mt-8 text-balance text-4xl font-bold leading-[1.05] tracking-tight text-foreground sm:text-5xl">
-              Seu link ja esta pronto.
+              Seu link já está pronto.
             </h1>
-            <p className="mt-5 text-lg leading-8 text-muted-foreground">A viagem ja existe no Vuei com slug e URL reais.</p>
+            <p className="mt-5 text-lg leading-8 text-muted-foreground">Você já pode abrir, visualizar e compartilhar sua viagem.</p>
 
             <div className="mt-8 rounded-[28px] border border-border/60 bg-card/90 p-5 text-left shadow-[0_18px_50px_-28px_rgba(16,26,44,0.32)]">
               <p className="text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground">Link da viagem</p>
@@ -122,10 +122,40 @@ export function LinkCeremony({
 
             {needsClaim ? (
               <>
-                <div className="mt-8 rounded-[28px] border border-[#0b56d8]/10 bg-[#f8fbff] p-5 text-left">
-                  <p className="text-sm font-semibold text-foreground">Proteja sua viagem</p>
-                  <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                    Crie seu acesso ao Vuei e configure um PIN de seguranca para proteger documentos e informacoes importantes.
+                <p className="mt-4 text-sm leading-6 text-muted-foreground">
+                  Sua viagem permanecerá disponível neste navegador por até 24 horas.
+                  Ao ativar sua conta, ela ficará sincronizada e poderá ser acessada de qualquer dispositivo.
+                </p>
+
+                <div className="mt-8 rounded-[28px] border border-[#0b56d8]/10 bg-[#f8fbff] p-5 text-left shadow-[0_18px_40px_-30px_rgba(37,99,235,0.25)]">
+                  <div className="space-y-3 text-sm">
+                    {[
+                      { label: "Compartilhar sua viagem", active: true },
+                      { label: "Acompanhar tudo em um único link", active: true },
+                      { label: "Editar informações", active: false },
+                      { label: "Anexar documentos e passagens", active: false },
+                      { label: "Gerar roteiros com IA", active: false },
+                      { label: "Configurar um PIN de segurança", active: false },
+                    ].map((item) => (
+                      <div key={item.label} className="flex items-center gap-3">
+                        <span
+                          className={`flex size-5 shrink-0 items-center justify-center rounded-full border text-[11px] font-semibold ${
+                            item.active
+                              ? "border-[#16a34a]/30 bg-[#16a34a]/10 text-[#16a34a]"
+                              : "border-slate-300 bg-white text-slate-400"
+                          }`}
+                          aria-hidden="true"
+                        >
+                          {item.active ? "✓" : "○"}
+                        </span>
+                        <span className={item.active ? "text-slate-900" : "text-slate-500"}>{item.label}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  <p className="mt-5 text-sm leading-6 text-muted-foreground">
+                    Para editar a viagem, anexar documentos, usar todos os recursos e proteger seus dados com um PIN,
+                    ative gratuitamente sua conta.
                   </p>
                 </div>
 
@@ -134,7 +164,7 @@ export function LinkCeremony({
                   onClick={onProtectTrip}
                   className="mt-6 flex w-full items-center justify-center gap-2 rounded-full bg-[#0f172a] px-6 py-4 text-base font-semibold text-white transition-colors hover:bg-[#111f35]"
                 >
-                  Criar acesso e proteger viagem
+                  Ativar minha viagem
                   <ArrowRight className="size-5" aria-hidden="true" />
                 </button>
 
@@ -143,7 +173,7 @@ export function LinkCeremony({
                   onClick={onContinueWithoutAccount}
                   className="mt-4 flex w-full items-center justify-center gap-2 rounded-full border border-border/70 bg-white px-6 py-4 text-base font-semibold text-foreground transition-colors hover:bg-muted/40"
                 >
-                  Agora nao
+                  Agora não
                 </button>
               </>
             ) : null}
