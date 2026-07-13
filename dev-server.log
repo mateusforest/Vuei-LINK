@@ -1,0 +1,10 @@
+
+> my-project@0.1.0 dev
+> next dev
+
+▲ Next.js 16.2.6 (Turbopack)
+- Local:         http://localhost:3002
+- Network:       http://192.168.0.105:3002
+- Environments: .env.local
+✓ Ready in 1633ms
+[?25h

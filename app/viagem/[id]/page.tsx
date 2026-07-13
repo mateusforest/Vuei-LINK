@@ -7560,8 +7560,8 @@ export default function TripPage() {
   const router = useRouter()
   const { user, profile, loading: authLoading } = useAuth()
   const [travelerPlan, setTravelerPlan] = useState(() => resolveTravelerPlan(profile))
-  const adminRouteActive = Boolean(pathname?.startsWith("/viagem/"))
-  const isTripLinkRoute = Boolean(adminRouteActive || (pathname?.startsWith("/v/") ?? false))
+  const adminRouteActive = Boolean(pathname?.startsWith("/viagem/") && pathname?.endsWith("/admin"))
+  const isTripLinkRoute = Boolean((pathname?.startsWith("/viagem/") ?? false) || (pathname?.startsWith("/v/") ?? false))
   const routeSlug =
     typeof params?.id === "string"
       ? params.id

@@ -1,0 +1,9 @@
+⚠ Port 3000 is in use by process 18616, using available port 3002 instead.
+⨯ Another next dev server is already running.
+
+- Local:        http://localhost:3001
+- PID:          39148
+- Dir:          C:\Users\mateu\Downloads\Vuei LINK 2
+- Log:          .next\dev\logs\next-development.log
+
+Run taskkill /PID 39148 /F to stop it.
