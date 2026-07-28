@@ -447,6 +447,153 @@ export interface Database {
           updated_at?: string
         }
       }
+      wallets: {
+        Row: {
+          id: string
+          owner_type: "traveler" | "agency"
+          owner_user_id: string | null
+          agency_id: string | null
+          status: "active" | "archived"
+          metadata: Json
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          owner_type: "traveler" | "agency"
+          owner_user_id?: string | null
+          agency_id?: string | null
+          status?: "active" | "archived"
+          metadata?: Json
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          owner_type?: "traveler" | "agency"
+          owner_user_id?: string | null
+          agency_id?: string | null
+          status?: "active" | "archived"
+          metadata?: Json
+          updated_at?: string
+        }
+      }
+      wallet_balances: {
+        Row: {
+          id: string
+          wallet_id: string
+          asset_type: "trip_link"
+          balance: number
+          starter_grant_applied: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          wallet_id: string
+          asset_type: "trip_link"
+          balance?: number
+          starter_grant_applied?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          wallet_id?: string
+          asset_type?: "trip_link"
+          balance?: number
+          starter_grant_applied?: boolean
+          updated_at?: string
+        }
+      }
+      wallet_products: {
+        Row: {
+          id: string
+          code: string
+          name: string
+          asset_type: "trip_link"
+          quantity: number
+          active: boolean
+          stripe_price_id: string | null
+          metadata: Json
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          code: string
+          name: string
+          asset_type: "trip_link"
+          quantity: number
+          active?: boolean
+          stripe_price_id?: string | null
+          metadata?: Json
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          code?: string
+          name?: string
+          asset_type?: "trip_link"
+          quantity?: number
+          active?: boolean
+          stripe_price_id?: string | null
+          metadata?: Json
+          updated_at?: string
+        }
+      }
+      wallet_transactions: {
+        Row: {
+          id: string
+          wallet_id: string
+          asset_type: "trip_link"
+          transaction_type: "starter_grant" | "purchase" | "consume" | "refund" | "adjustment" | "migration_grant"
+          amount: number
+          balance_after: number
+          reason: string
+          source: string
+          trip_id: string | null
+          wallet_product_id: string | null
+          stripe_checkout_session_id: string | null
+          stripe_payment_intent_id: string | null
+          idempotency_key: string | null
+          metadata: Json
+          created_by: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          wallet_id: string
+          asset_type: "trip_link"
+          transaction_type: "starter_grant" | "purchase" | "consume" | "refund" | "adjustment" | "migration_grant"
+          amount: number
+          balance_after: number
+          reason: string
+          source: string
+          trip_id?: string | null
+          wallet_product_id?: string | null
+          stripe_checkout_session_id?: string | null
+          stripe_payment_intent_id?: string | null
+          idempotency_key?: string | null
+          metadata?: Json
+          created_by?: string | null
+          created_at?: string
+        }
+        Update: {
+          wallet_id?: string
+          asset_type?: "trip_link"
+          transaction_type?: "starter_grant" | "purchase" | "consume" | "refund" | "adjustment" | "migration_grant"
+          amount?: number
+          balance_after?: number
+          reason?: string
+          source?: string
+          trip_id?: string | null
+          wallet_product_id?: string | null
+          stripe_checkout_session_id?: string | null
+          stripe_payment_intent_id?: string | null
+          idempotency_key?: string | null
+          metadata?: Json
+          created_by?: string | null
+        }
+      }
       trip_itineraries: {
         Row: {
           id: string
