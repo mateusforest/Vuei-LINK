@@ -12,7 +12,11 @@ import { getTravelerBillingStatus } from "@/lib/repositories/traveler-billing-re
 import { AGENCY_PLAN_LIMIT_ERROR } from "@/lib/billing/agency-plans"
 import { countActiveAgencyTripsForClient, getAgencyBillingStatusForClient } from "@/lib/billing/agency-billing"
 import { buildTripInsertPayload, mapTripRowToTrip, parseDestinationParts } from "@/lib/trips/trip-record"
-import { CREATE_TRIP_ERROR_MESSAGE, FREE_PLAN_TRIP_LIMIT_ERROR_MESSAGE } from "@/lib/trips/trip-policies"
+import {
+  CREATE_TRIP_ERROR_MESSAGE,
+  FREE_PLAN_TRIP_LIMIT_ERROR_MESSAGE,
+  TRIP_LINK_REQUIRED_ERROR_MESSAGE,
+} from "@/lib/trips/trip-policies"
 import { isTripSlugConflict, listExistingTripSlugs } from "@/lib/trips/trip-slug"
 
 export interface ListTripsParams {
@@ -46,6 +50,65 @@ function stripSensitiveTripTokens<T extends Trip | null>(trip: T): T {
 }
 
 const MAX_TRIP_SLUG_ATTEMPTS = 5
+
+async function createAuthenticatedTravelerTripWithBackend(payload: CreateTripPayload): Promise<RepositoryTripResult | null> {
+  if (typeof window === "undefined") {
+    return null
+  }
+
+  const response = await fetch("/api/trips/authenticated", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      title: payload.title,
+      destination: payload.destination,
+      country: payload.country ?? null,
+      city: payload.city ?? null,
+      startDate: payload.startDate ?? null,
+      endDate: payload.endDate ?? null,
+      style: payload.style ?? null,
+      status: payload.status ?? "draft",
+      visibility: payload.visibility ?? "public",
+      travelersCount: payload.travelersCount ?? 1,
+      creditsSummary: payload.creditsSummary ?? { balance: null, used: null, total: null },
+      permissions: payload.permissions ?? {},
+      offlineEnabled: payload.offlineEnabled ?? false,
+      idempotencyKey:
+        typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+          ? crypto.randomUUID()
+          : `wallet-trip-${Date.now()}`,
+    }),
+  })
+
+  const body = await response.json().catch(() => null) as { trip?: Database["public"]["Tables"]["trips"]["Row"]; error?: string | null } | null
+
+  if (!response.ok) {
+    return {
+      source: "supabase",
+      config: createSupabaseBrowserClientPlaceholder(),
+      data: null,
+      error: body?.error ?? (response.status === 409 ? TRIP_LINK_REQUIRED_ERROR_MESSAGE : CREATE_TRIP_ERROR_MESSAGE),
+    }
+  }
+
+  if (!body?.trip) {
+    return {
+      source: "supabase",
+      config: createSupabaseBrowserClientPlaceholder(),
+      data: null,
+      error: CREATE_TRIP_ERROR_MESSAGE,
+    }
+  }
+
+  return {
+    source: "supabase",
+    config: createSupabaseBrowserClientPlaceholder(),
+    data: mapTripRowToTrip(body.trip),
+    error: null,
+  }
+}
 
 function isDeletedTripStatus(status?: string | null) {
   return status === "cancelled" || status === "deleted" || status === "archived"
@@ -388,6 +451,13 @@ export async function createTrip(payload: CreateTripPayload) {
 
       if (authUser && payload.ownerType !== "agency") {
         await ensureProfile(authUser, supabase)
+      }
+
+      if (payload.ownerType === "traveler" && authUser && payload.ownerUserId === authUser.id) {
+        const authenticatedResult = await createAuthenticatedTravelerTripWithBackend(payload)
+        if (authenticatedResult) {
+          return authenticatedResult
+        }
       }
 
       if (payload.ownerType === "agency" && !payload.agencyId) {

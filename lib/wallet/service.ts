@@ -8,6 +8,7 @@ import type {
   WalletBalance,
   WalletBalanceLookup,
   WalletCanConsumeResult,
+  WalletCreateAuthenticatedTravelerTripParams,
   WalletConsumeTripLinkParams,
   WalletGrantPurchaseParams,
   WalletOwnerReference,
@@ -44,6 +45,8 @@ interface WalletRpcStatusPayload {
   applied?: boolean
   transaction_id?: string | null
 }
+
+type TripRow = Database["public"]["Tables"]["trips"]["Row"]
 
 function mapRpcBalancePayload(payload: WalletRpcStatusPayload): WalletBalance {
   const nowIso = new Date().toISOString()
@@ -177,6 +180,42 @@ export class WalletService {
     }
 
     return transactionResult.data
+  }
+
+  async createAuthenticatedTravelerTripWithWallet(
+    params: WalletCreateAuthenticatedTravelerTripParams,
+  ): Promise<TripRow> {
+    const db = this.client as UntypedSupabaseClient
+    const result = await db.rpc("create_authenticated_traveler_trip_with_wallet", {
+      p_owner_user_id: params.ownerUserId,
+      p_title: params.title,
+      p_slug: params.slug,
+      p_destination: params.destination,
+      p_country: params.country ?? null,
+      p_city: params.city ?? null,
+      p_start_date: params.startDate ?? null,
+      p_end_date: params.endDate ?? null,
+      p_status: params.status ?? "draft",
+      p_style: params.style ?? null,
+      p_admin_token: params.adminToken,
+      p_public_token: params.publicToken,
+      p_admin_link: params.adminLink,
+      p_public_link: params.publicLink,
+      p_cover_image: params.coverImage ?? null,
+      p_visibility: params.visibility ?? "public",
+      p_travelers_count: params.travelersCount ?? 1,
+      p_permissions: params.permissions ?? {},
+      p_credits_summary: params.creditsSummary ?? {},
+      p_offline_enabled: params.offlineEnabled ?? false,
+      p_source: params.source ?? "manual",
+      p_idempotency_key: params.idempotencyKey ?? null,
+    })
+
+    if (result.error || !result.data) {
+      throw new Error(result.error?.message ?? "Nao foi possivel criar a viagem com a wallet.")
+    }
+
+    return result.data as TripRow
   }
 
   async grantPurchase(params: WalletGrantPurchaseParams): Promise<WalletTransaction> {

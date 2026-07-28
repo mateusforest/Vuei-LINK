@@ -131,3 +131,28 @@ export interface WalletCanConsumeResult {
   balance: WalletBalance
   reasonCode: "insufficient_balance" | null
 }
+
+export interface WalletCreateAuthenticatedTravelerTripParams {
+  ownerUserId: string
+  title: string
+  slug: string
+  destination: string
+  country?: string | null
+  city?: string | null
+  startDate?: string | null
+  endDate?: string | null
+  status?: "draft" | "upcoming" | "ongoing" | "completed" | "cancelled"
+  style?: string | null
+  adminToken: string
+  publicToken: string
+  adminLink: string
+  publicLink: string
+  coverImage?: string | null
+  visibility?: "private" | "public"
+  travelersCount?: number
+  permissions?: Record<string, unknown>
+  creditsSummary?: Record<string, unknown>
+  offlineEnabled?: boolean
+  source?: string
+  idempotencyKey?: string | null
+}
