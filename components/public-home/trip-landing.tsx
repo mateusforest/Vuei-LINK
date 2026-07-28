@@ -61,6 +61,10 @@ export function TripLanding() {
   const router = useRouter()
   const { user, initialized, loading } = useAuth()
   const { trips, loadingTrips, syncTripFromBackend } = useTrips()
+  const destinationStepRef = useRef<HTMLDivElement>(null)
+  const datesStepRef = useRef<HTMLDivElement>(null)
+  const travelersStepRef = useRef<HTMLDivElement>(null)
+  const createButtonRef = useRef<HTMLButtonElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
   const [destination, setDestination] = useState("")
@@ -114,6 +118,54 @@ export function TripLanding() {
       inputRef.current?.focus()
     }
   }, [active])
+
+  function blurActiveElement() {
+    const activeElement = document.activeElement
+    if (activeElement instanceof HTMLElement) {
+      activeElement.blur()
+    }
+  }
+
+  function scrollElementIntoView(element: HTMLElement | null, block: ScrollLogicalPosition = "nearest") {
+    if (!element) return
+
+    requestAnimationFrame(() => {
+      element.scrollIntoView({
+        behavior: "smooth",
+        block,
+        inline: "nearest",
+      })
+    })
+  }
+
+  function openStep(step: Step) {
+    setPopupOpen(false)
+    setActive(step)
+    const target =
+      step === "destination" ? destinationStepRef.current : step === "dates" ? datesStepRef.current : travelersStepRef.current
+    scrollElementIntoView(target, "center")
+  }
+
+  function advanceToDates() {
+    blurActiveElement()
+    setActive("dates")
+    scrollElementIntoView(datesStepRef.current, "center")
+  }
+
+  function advanceToTravelers() {
+    blurActiveElement()
+    setActive("travelers")
+    scrollElementIntoView(travelersStepRef.current, "center")
+  }
+
+  function focusCreateCta() {
+    blurActiveElement()
+    setActive(null)
+    requestAnimationFrame(() => {
+      createButtonRef.current?.focus()
+      scrollElementIntoView(createButtonRef.current, "center")
+    })
+  }
 
   const realTrips = useMemo(() => trips.map(mapLegacyTripToBagItem), [trips])
   const bagTrips = useMemo(() => {
@@ -273,9 +325,12 @@ export function TripLanding() {
     setPopupOpen(false)
     setActive("destination")
     requestAnimationFrame(() => {
+      scrollElementIntoView(destinationStepRef.current, "center")
       inputRef.current?.focus()
     })
   }
+
+  const bagInteractionBlocked = popupOpen || active !== null
 
   return (
     <main className="landing-shell relative flex h-[100dvh] w-full flex-col overflow-hidden overscroll-none text-foreground">
@@ -313,8 +368,8 @@ export function TripLanding() {
         </nav>
       </header>
 
-      <div className="relative z-10 flex flex-1 items-center overflow-hidden px-6 pb-8 pt-2 md:px-10">
-        <div className="w-full max-w-xl">
+      <div className="relative z-10 flex min-h-0 flex-1 items-start overflow-y-auto overscroll-contain px-6 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] pt-2 md:items-center md:overflow-hidden md:px-10 md:pb-8">
+        <div className="w-full max-w-xl py-3 md:py-0">
           <h1 className="text-balance text-[2.45rem] font-semibold leading-[1.05] tracking-tight text-foreground md:text-[3.25rem]">
             Sua viagem comeca <span className="text-brand-gradient">aqui.</span>
           </h1>
@@ -322,10 +377,11 @@ export function TripLanding() {
 
           <div className="mt-8 flex flex-col gap-2.5">
             <StepRow
+              rowRef={destinationStepRef}
               index={1}
               done={destination.trim().length > 1}
               active={active === "destination"}
-              onOpen={() => setActive("destination")}
+              onOpen={() => openStep("destination")}
               icon={<MapPin className="size-[1.15rem] text-brand" />}
               title="Para onde voce vai?"
               subtitle="Digite o destino da sua proxima viagem."
@@ -341,16 +397,21 @@ export function TripLanding() {
                     setSelectedDestination(null)
                   }
                 }}
-                onSelect={setSelectedDestination}
+                onSelect={(nextDestination) => {
+                  setSelectedDestination(nextDestination)
+                  advanceToDates()
+                }}
+                onSubmitValue={() => advanceToDates()}
                 placeholder="Ex.: Lisboa, Aruba, Rio de Janeiro..."
               />
             </StepRow>
 
             <StepRow
+              rowRef={datesStepRef}
               index={2}
               done={Boolean(startDate)}
               active={active === "dates"}
-              onOpen={() => setActive("dates")}
+              onOpen={() => openStep("dates")}
               icon={<Calendar className="size-[1.15rem] text-emerald-600" />}
               title="Quando sera?"
               subtitle="Informe as datas da sua viagem."
@@ -364,14 +425,16 @@ export function TripLanding() {
                   setStartDate(nextStartDate)
                   setEndDate(nextEndDate)
                 }}
+                onComplete={advanceToTravelers}
               />
             </StepRow>
 
             <StepRow
+              rowRef={travelersStepRef}
               index={3}
               done
               active={active === "travelers"}
-              onOpen={() => setActive("travelers")}
+              onOpen={() => openStep("travelers")}
               icon={<Users className="size-[1.15rem] text-indigo-500" />}
               title="Quem vai com voce?"
               subtitle="Adicione os participantes da viagem."
@@ -383,7 +446,10 @@ export function TripLanding() {
                   <button
                     type="button"
                     aria-label="Menos viajantes"
-                    onClick={() => setTravelers((current) => Math.max(1, current - 1))}
+                    onClick={() => {
+                      setTravelers((current) => Math.max(1, current - 1))
+                      focusCreateCta()
+                    }}
                     className="grid size-9 place-items-center rounded-full text-foreground transition-colors hover:bg-muted disabled:opacity-40"
                     disabled={travelers <= 1}
                   >
@@ -393,7 +459,10 @@ export function TripLanding() {
                   <button
                     type="button"
                     aria-label="Mais viajantes"
-                    onClick={() => setTravelers((current) => Math.min(20, current + 1))}
+                    onClick={() => {
+                      setTravelers((current) => Math.min(20, current + 1))
+                      focusCreateCta()
+                    }}
                     className="grid size-9 place-items-center rounded-full text-foreground transition-colors hover:bg-muted"
                   >
                     <Plus className="size-4" />
@@ -404,7 +473,10 @@ export function TripLanding() {
                     <button
                       key={option.id}
                       type="button"
-                      onClick={() => setTravelers(option.id)}
+                      onClick={() => {
+                        setTravelers(option.id)
+                        focusCreateCta()
+                      }}
                       className={cn(
                         "rounded-full border px-3 py-1.5 text-sm transition-colors",
                         travelers === option.id
@@ -441,6 +513,7 @@ export function TripLanding() {
           <div className="mt-7">
             {!createdTrip ? (
               <Button
+                ref={createButtonRef}
                 size="lg"
                 disabled={!canCreate || creating}
                 onClick={handleCreate}
@@ -526,6 +599,7 @@ export function TripLanding() {
 
       <TripBag
         count={bagTrips.length}
+        disabled={bagInteractionBlocked}
         glow={glow}
         showBalloon={showBalloon}
         onDismissBalloon={() => setShowBalloon(false)}
@@ -550,6 +624,7 @@ export function TripLanding() {
 }
 
 function StepRow({
+  rowRef,
   index,
   done,
   active,
@@ -563,6 +638,7 @@ function StepRow({
   static: isStatic,
   highlight,
 }: {
+  rowRef?: React.RefObject<HTMLDivElement | null>
   index: number
   done?: boolean
   active: boolean
@@ -577,7 +653,7 @@ function StepRow({
   highlight?: boolean
 }) {
   return (
-    <div className="flex items-start gap-3">
+    <div ref={rowRef} className="flex scroll-mt-6 items-start gap-3">
       <div className="flex flex-col items-center pt-3.5">
         <span
           className={cn(

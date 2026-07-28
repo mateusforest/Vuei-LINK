@@ -6,20 +6,22 @@ import { VueiSymbol } from "@/components/public-home/vuei-mark"
 
 export function TripBag({
   count,
+  disabled,
   glow,
   showBalloon,
   onDismissBalloon,
   onOpen,
 }: {
   count: number
+  disabled?: boolean
   glow: boolean
   showBalloon: boolean
   onDismissBalloon: () => void
   onOpen: () => void
 }) {
   return (
-    <div className="pointer-events-none absolute inset-0 z-20">
-      {showBalloon ? (
+    <div className={cn("pointer-events-none absolute inset-0 z-20", disabled && "z-0")}>
+      {showBalloon && !disabled ? (
         <div className="vuei-pop pointer-events-auto absolute bottom-[23%] right-[6%] sm:right-[10%] lg:bottom-[34%] lg:right-[20%]">
           <div className="vuei-glass relative w-[15.5rem] rounded-2xl border border-border/50 p-4 shadow-[0_28px_70px_-30px_rgba(20,60,120,0.4)] sm:w-64">
             <button
@@ -46,9 +48,13 @@ export function TripBag({
 
       <button
         type="button"
+        disabled={disabled}
         onClick={onOpen}
         aria-label={count > 0 ? `Abrir sua bolsa Vuei (${count})` : "Abrir sua bolsa Vuei"}
-        className="group pointer-events-auto absolute bottom-[6%] right-[4%] h-[17vh] min-h-[112px] w-[38vw] min-w-[128px] max-w-[210px] rounded-[28px] transition-transform duration-[600ms] [transition-timing-function:var(--ease-out-soft)] hover:scale-[1.015] sm:bottom-[7%] sm:right-[8%] sm:h-[19vh] sm:w-[34vw] lg:bottom-[10%] lg:right-[20%] lg:h-[150px] lg:w-[210px]"
+        className={cn(
+          "group pointer-events-auto absolute bottom-[6%] right-[4%] h-[17vh] min-h-[112px] w-[38vw] min-w-[128px] max-w-[210px] rounded-[28px] transition-transform duration-[600ms] [transition-timing-function:var(--ease-out-soft)] hover:scale-[1.015] sm:bottom-[7%] sm:right-[8%] sm:h-[19vh] sm:w-[34vw] lg:bottom-[10%] lg:right-[20%] lg:h-[150px] lg:w-[210px]",
+          disabled && "pointer-events-none opacity-0",
+        )}
       >
         <span
           aria-hidden="true"

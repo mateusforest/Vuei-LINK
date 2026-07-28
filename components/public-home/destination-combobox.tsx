@@ -13,12 +13,14 @@ export function DestinationCombobox({
   value,
   onChange,
   onSelect,
+  onSubmitValue,
   inputRef,
   placeholder,
 }: {
   value: string
   onChange: (value: string) => void
   onSelect?: (destination: DestinationOption) => void
+  onSubmitValue?: (value: string) => void
   inputRef?: React.RefObject<HTMLInputElement | null>
   placeholder?: string
 }) {
@@ -81,7 +83,7 @@ export function DestinationCombobox({
   useEffect(() => {
     if (!open) return
 
-    function handlePointerDown(event: MouseEvent) {
+    function handlePointerDown(event: PointerEvent) {
       const target = event.target as Node
       if (wrapperRef.current?.contains(target) || document.getElementById(listboxId)?.contains(target)) {
         return
@@ -89,8 +91,8 @@ export function DestinationCombobox({
       setOpen(false)
     }
 
-    document.addEventListener("mousedown", handlePointerDown)
-    return () => document.removeEventListener("mousedown", handlePointerDown)
+    document.addEventListener("pointerdown", handlePointerDown)
+    return () => document.removeEventListener("pointerdown", handlePointerDown)
   }, [listboxId, open])
 
   function commit(destination: DestinationOption) {
@@ -120,6 +122,14 @@ export function DestinationCombobox({
       if (open && activeIndex >= 0 && results[activeIndex]) {
         event.preventDefault()
         commit(results[activeIndex])
+        return
+      }
+
+      if (value.trim().length >= MIN_CHARS) {
+        event.preventDefault()
+        setOpen(false)
+        setActiveIndex(-1)
+        onSubmitValue?.(value.trim())
       }
       return
     }
@@ -224,9 +234,7 @@ export function DestinationCombobox({
                         <MapPin className="size-4" />
                       </span>
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm font-medium text-foreground">
-                          <Highlight text={destination.label} query={value} />
-                        </span>
+                        <span className="block truncate text-sm font-medium text-foreground">{destination.label}</span>
                         <span className="block truncate text-xs text-muted-foreground">
                           {[destination.city, destination.country].filter(Boolean).join(" - ")}
                         </span>
@@ -240,34 +248,5 @@ export function DestinationCombobox({
           )
         : null}
     </div>
-  )
-}
-
-function Highlight({ text, query }: { text: string; query: string }) {
-  const trimmedQuery = query.trim()
-  if (!trimmedQuery) return <>{text}</>
-
-  const normalize = (value: string) =>
-    value
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .toLowerCase()
-
-  const normalizedText = normalize(text)
-  const normalizedQuery = normalize(trimmedQuery)
-  const startIndex = normalizedText.indexOf(normalizedQuery)
-
-  if (startIndex === -1) {
-    return <>{text}</>
-  }
-
-  return (
-    <>
-      {text.slice(0, startIndex)}
-      <mark className="bg-transparent font-semibold text-brand">
-        {text.slice(startIndex, startIndex + trimmedQuery.length)}
-      </mark>
-      {text.slice(startIndex + trimmedQuery.length)}
-    </>
   )
 }

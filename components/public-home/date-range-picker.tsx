@@ -57,10 +57,12 @@ export function DateRangePicker({
   start,
   end,
   onChange,
+  onComplete,
 }: {
   start: string | null
   end: string | null
   onChange: (start: string | null, end: string | null) => void
+  onComplete?: () => void
 }) {
   const today = useMemo(() => {
     const date = new Date()
@@ -108,10 +110,11 @@ export function DateRangePicker({
     }
 
     onChange(toIso(startDate), toIso(day))
+    onComplete?.()
   }
 
   return (
-    <div className="w-[19rem] select-none p-1">
+    <div className="w-[19rem] select-none p-1" onPointerDown={(event) => event.stopPropagation()}>
       <div className="mb-2 flex items-center justify-between px-1">
         <button
           type="button"
