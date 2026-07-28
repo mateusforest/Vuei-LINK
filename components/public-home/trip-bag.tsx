@@ -1,6 +1,7 @@
 "use client"
 
 import { X } from "lucide-react"
+import { useEffect, useState } from "react"
 import { cn } from "@/lib/utils"
 import { VueiSymbol } from "@/components/public-home/vuei-mark"
 
@@ -8,6 +9,7 @@ export function TripBag({
   count,
   disabled,
   glow,
+  pulseToken,
   showBalloon,
   onDismissBalloon,
   onOpen,
@@ -15,10 +17,21 @@ export function TripBag({
   count: number
   disabled?: boolean
   glow: boolean
+  pulseToken?: number
   showBalloon: boolean
   onDismissBalloon: () => void
   onOpen: () => void
 }) {
+  const [pulsing, setPulsing] = useState(false)
+
+  useEffect(() => {
+    if (!pulseToken) return
+
+    setPulsing(true)
+    const timeoutId = window.setTimeout(() => setPulsing(false), 720)
+    return () => window.clearTimeout(timeoutId)
+  }, [pulseToken])
+
   return (
     <div className={cn("pointer-events-none absolute inset-0 z-20", disabled && "z-0")}>
       {showBalloon && !disabled ? (
@@ -53,6 +66,7 @@ export function TripBag({
         aria-label={count > 0 ? `Abrir sua bolsa Vuei (${count})` : "Abrir sua bolsa Vuei"}
         className={cn(
           "group pointer-events-auto absolute bottom-[6%] right-[4%] h-[17vh] min-h-[112px] w-[38vw] min-w-[128px] max-w-[210px] rounded-[28px] transition-transform duration-[600ms] [transition-timing-function:var(--ease-out-soft)] hover:scale-[1.015] sm:bottom-[7%] sm:right-[8%] sm:h-[19vh] sm:w-[34vw] lg:bottom-[10%] lg:right-[20%] lg:h-[150px] lg:w-[210px]",
+          pulsing && "vuei-bag-nudge",
           disabled && "pointer-events-none opacity-0",
         )}
       >
@@ -70,7 +84,7 @@ export function TripBag({
         />
 
         {glow ? (
-          <span className="vuei-glow absolute right-[30%] top-[30%] size-2.5 rounded-full bg-brand" />
+          <span className={cn("vuei-glow absolute right-[30%] top-[30%] size-2.5 rounded-full bg-brand", pulsing && "vuei-bag-spark")} />
         ) : null}
 
         {count > 0 ? (

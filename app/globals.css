@@ -387,6 +387,46 @@ html {
   animation: vuei-glow-pulse 2.8s var(--ease-in-out-soft) infinite;
 }
 
+@keyframes vuei-bag-nudge {
+  0% {
+    transform: scale(1) rotate(0deg);
+  }
+  32% {
+    transform: scale(1.04) rotate(-1.2deg);
+  }
+  68% {
+    transform: scale(1.02) rotate(1deg);
+  }
+  100% {
+    transform: scale(1) rotate(0deg);
+  }
+}
+
+.vuei-bag-nudge {
+  animation: vuei-bag-nudge 0.72s var(--ease-out-soft) both;
+}
+
+@keyframes vuei-bag-spark {
+  0% {
+    transform: scale(1);
+    opacity: 0.95;
+  }
+  45% {
+    transform: scale(1.45);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 0.95;
+  }
+}
+
+.vuei-bag-spark {
+  animation:
+    vuei-glow-pulse 2.8s var(--ease-in-out-soft) infinite,
+    vuei-bag-spark 0.72s var(--ease-out-soft) both;
+}
+
 @keyframes vuei-rise {
   from {
     opacity: 0;

@@ -71,13 +71,13 @@ export function TripsPopup({
   if (!open) return null
 
   return (
-    <div className="fixed inset-0 z-50 flex items-stretch justify-end">
+    <div className="fixed inset-0 z-50 flex items-end justify-end sm:items-stretch">
       <div className="vuei-scrim absolute inset-0 bg-foreground/15 backdrop-blur-[4px]" onClick={onClose} aria-hidden="true" />
       <div
         role="dialog"
         aria-modal="true"
         aria-label="Sua bolsa Vuei"
-        className="vuei-drawer relative flex h-full w-full max-w-[420px] flex-col border-l border-border/60 bg-popover shadow-[0_0_120px_-20px_rgba(20,60,120,0.55)] max-sm:max-w-none"
+        className="vuei-drawer relative flex h-[94dvh] w-full flex-col border border-border/60 bg-popover shadow-[0_0_120px_-20px_rgba(20,60,120,0.55)] max-sm:max-w-none max-sm:rounded-t-[2rem] max-sm:border-b-0 sm:h-full sm:max-w-[420px] sm:rounded-none sm:border-b sm:border-r-0 sm:border-t-0"
       >
         <div className="flex items-center justify-between px-6 pb-5 pt-6">
           <div className="flex items-center gap-3">

@@ -83,6 +83,7 @@ export function TripLanding() {
   const [popupOpen, setPopupOpen] = useState(false)
   const [showBalloon, setShowBalloon] = useState(false)
   const [highlightTripId, setHighlightTripId] = useState<string | null>(null)
+  const [bagPulseToken, setBagPulseToken] = useState(0)
 
   useEffect(() => {
     const session = readPendingTripClaimSession()
@@ -176,8 +177,9 @@ export function TripLanding() {
     return items
   }, [pendingSession, realTrips])
 
+  const hasCreatedTrip = Boolean(createdTrip)
   const canCreate = destination.trim().length > 1 && Boolean(startDate)
-  const glow = bagTrips.length > 0
+  const glow = bagTrips.length > 0 && !hasCreatedTrip
 
   function resetWizard() {
     setDestination("")
@@ -281,6 +283,8 @@ export function TripLanding() {
   async function handleGuardInWallet() {
     if (!pendingSession || claiming) return
 
+    setBagPulseToken((current) => current + 1)
+
     if (!user) {
       router.push(`/signup?redirect=${encodeURIComponent("/")}`)
       return
@@ -375,7 +379,13 @@ export function TripLanding() {
           </h1>
           <p className="mt-3 text-pretty text-lg text-muted-foreground">Um unico link para organizar tudo.</p>
 
-          <div className="mt-8 flex flex-col gap-2.5">
+          <div
+            className={cn(
+              "mt-8 flex max-md:max-h-[40rem] flex-col gap-2.5 transition-[opacity,transform,max-height] duration-500 [transition-timing-function:var(--ease-out-soft)]",
+              hasCreatedTrip && "md:scale-[0.985] md:opacity-55",
+              hasCreatedTrip && "max-md:max-h-0 max-md:-translate-y-3 max-md:overflow-hidden max-md:opacity-0",
+            )}
+          >
             <StepRow
               rowRef={destinationStepRef}
               index={1}
@@ -491,7 +501,10 @@ export function TripLanding() {
               </div>
             </StepRow>
 
-            {createdTrip ? (
+          </div>
+
+          {createdTrip ? (
+            <div className="mt-6 flex flex-col gap-4">
               <div className="vuei-celebrate">
                 <StepRow
                   index={4}
@@ -507,11 +520,62 @@ export function TripLanding() {
                   highlight
                 />
               </div>
-            ) : null}
-          </div>
 
-          <div className="mt-7">
-            {!createdTrip ? (
+              <div className="vuei-rise rounded-[1.75rem] border border-border/60 bg-background/72 p-3 shadow-[0_18px_48px_-28px_rgba(20,60,120,0.35)] backdrop-blur-xl md:bg-transparent md:p-0 md:shadow-none md:backdrop-blur-0">
+                <div className="flex flex-col gap-2.5 md:flex-row md:flex-wrap md:items-center md:gap-2">
+                  <Button
+                    size="lg"
+                    onClick={() => handleOpenTrip(createdTrip.publicLink)}
+                    className="h-12 w-full rounded-2xl bg-foreground px-6 text-[0.95rem] text-background shadow-[0_14px_40px_-16px_var(--brand)] ring-1 ring-inset ring-white/10 transition-transform duration-300 [transition-timing-function:var(--ease-out-soft)] hover:bg-foreground/90 active:scale-[0.98] md:w-auto"
+                  >
+                    <ExternalLink className="size-4" />
+                    Abrir viagem
+                  </Button>
+
+                  <div className="grid grid-cols-2 gap-2 md:flex md:items-center">
+                    <Button
+                      size="lg"
+                      variant="ghost"
+                      onClick={handleShareLink}
+                      className="h-12 rounded-2xl border border-border/60 bg-background/70 px-4 text-[0.9rem] text-muted-foreground transition-colors hover:bg-foreground/5 hover:text-foreground md:border-0 md:bg-transparent"
+                    >
+                      <Share2 className="size-4" />
+                      Compartilhar
+                    </Button>
+                    <Button
+                      size="lg"
+                      variant="ghost"
+                      onClick={handleCopyLink}
+                      className="h-12 rounded-2xl border border-border/60 bg-background/70 px-4 text-[0.9rem] text-muted-foreground transition-colors hover:bg-foreground/5 hover:text-foreground md:border-0 md:bg-transparent"
+                    >
+                      {copied ? <Check className="size-4 text-emerald-600" /> : <Copy className="size-4" />}
+                      {copied ? "Copiado" : "Copiar"}
+                    </Button>
+                  </div>
+
+                  <Button
+                    size="lg"
+                    variant={pendingSession ? "outline" : "ghost"}
+                    disabled={claiming || !pendingSession}
+                    onClick={pendingSession ? handleGuardInWallet : () => setPopupOpen(true)}
+                    className="h-12 w-full rounded-2xl border-border/70 bg-background/88 px-4 text-[0.92rem] shadow-[0_10px_28px_-18px_rgba(20,60,120,0.28)] md:w-auto md:bg-transparent md:shadow-none"
+                  >
+                    {claiming ? <Loader2 className="size-4 animate-spin" /> : <ShoppingBag className="size-4" />}
+                    {pendingSession ? "Guardar na Bolsa" : "Ver na Bolsa"}
+                  </Button>
+
+                  <button
+                    type="button"
+                    onClick={resetWizard}
+                    className="h-10 rounded-2xl px-2 text-center text-[0.82rem] text-muted-foreground/80 underline-offset-4 transition-colors hover:text-foreground hover:underline md:ml-auto"
+                  >
+                    Criar outra viagem
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="mt-7">
               <Button
                 ref={createButtonRef}
                 size="lg"
@@ -531,69 +595,20 @@ export function TripLanding() {
                   </>
                 )}
               </Button>
-            ) : (
-              <div className="vuei-rise flex flex-wrap items-center gap-1.5">
-                <Button
-                  size="lg"
-                  onClick={() => handleOpenTrip(createdTrip.publicLink)}
-                  className="h-12 rounded-2xl bg-foreground px-6 text-[0.95rem] text-background shadow-[0_14px_40px_-16px_var(--brand)] ring-1 ring-inset ring-white/10 transition-transform duration-300 [transition-timing-function:var(--ease-out-soft)] hover:bg-foreground/90 active:scale-[0.98]"
-                >
-                  <ExternalLink className="size-4" />
-                  Abrir viagem
-                </Button>
-                <Button
-                  size="lg"
-                  variant="ghost"
-                  onClick={handleShareLink}
-                  className="h-12 rounded-2xl px-4 text-[0.9rem] text-muted-foreground transition-colors hover:bg-foreground/5 hover:text-foreground"
-                >
-                  <Share2 className="size-4" />
-                  Compartilhar
-                </Button>
-                <Button
-                  size="lg"
-                  variant="ghost"
-                  onClick={handleCopyLink}
-                  className="h-12 rounded-2xl px-4 text-[0.9rem] text-muted-foreground transition-colors hover:bg-foreground/5 hover:text-foreground"
-                >
-                  {copied ? <Check className="size-4 text-emerald-600" /> : <Copy className="size-4" />}
-                  {copied ? "Copiado" : "Copiar link"}
-                </Button>
-                <Button
-                  size="lg"
-                  variant={pendingSession ? "outline" : "ghost"}
-                  disabled={claiming || !pendingSession}
-                  onClick={pendingSession ? handleGuardInWallet : () => setPopupOpen(true)}
-                  className="h-12 rounded-2xl px-4 text-[0.9rem]"
-                >
-                  {claiming ? <Loader2 className="size-4 animate-spin" /> : <ShoppingBag className="size-4" />}
-                  {pendingSession ? "Guardar na Bolsa" : "Ver na Bolsa"}
-                </Button>
-                <button
-                  type="button"
-                  onClick={resetWizard}
-                  className="ml-auto text-[0.82rem] text-muted-foreground/80 underline-offset-4 transition-colors hover:text-foreground hover:underline"
-                >
-                  Criar outra
-                </button>
-              </div>
-            )}
+            </div>
+          )}
 
-            {creationError ? <p className="mt-3 max-w-md text-sm text-red-600">{creationError}</p> : null}
-            {claimError ? <p className="mt-3 max-w-md text-sm text-red-600">{claimError}</p> : null}
-            {createdTrip && !user && initialized && !loading ? (
-              <div className="mt-4 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-                <Button size="sm" variant="ghost" onClick={() => router.push(`/signup?redirect=${encodeURIComponent("/")}`)} className="rounded-full">
-                  <ShoppingBag className="size-4" />
-                  Guardar na Bolsa
-                </Button>
-                <Button size="sm" variant="ghost" onClick={openLogin} className="rounded-full">
-                  <LogIn className="size-4" />
-                  Entrar para reivindicar
-                </Button>
-              </div>
-            ) : null}
-          </div>
+          {creationError ? <p className="mt-3 max-w-md text-sm text-red-600">{creationError}</p> : null}
+          {claimError ? <p className="mt-3 max-w-md text-sm text-red-600">{claimError}</p> : null}
+          {createdTrip && !user && initialized && !loading ? (
+            <div className="mt-4 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+              <p className="text-[0.9rem] text-muted-foreground">A opcao Guardar na Bolsa vai pedir login ou cadastro quando necessario.</p>
+              <Button size="sm" variant="ghost" onClick={openLogin} className="rounded-full">
+                <LogIn className="size-4" />
+                Ja tenho conta
+              </Button>
+            </div>
+          ) : null}
         </div>
       </div>
 
@@ -601,6 +616,7 @@ export function TripLanding() {
         count={bagTrips.length}
         disabled={bagInteractionBlocked}
         glow={glow}
+        pulseToken={bagPulseToken}
         showBalloon={showBalloon}
         onDismissBalloon={() => setShowBalloon(false)}
         onOpen={() => setPopupOpen(true)}
