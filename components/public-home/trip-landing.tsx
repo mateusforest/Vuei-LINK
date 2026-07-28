@@ -278,17 +278,17 @@ export function TripLanding() {
   }
 
   return (
-    <main className="landing-shell relative h-[100dvh] w-full overflow-hidden overscroll-none bg-background text-foreground">
+    <main className="landing-shell relative flex h-[100dvh] w-full flex-col overflow-hidden overscroll-none text-foreground">
       <img
         src="/beach-landing/beach-scene.png"
         alt="Praia ao entardecer com uma cadeira e uma bolsa de viagem Vuei"
-        className="absolute inset-0 -z-10 h-full w-full object-cover object-[73%_center] sm:object-[72%_center] lg:object-[60%_center] xl:object-[center_90%]"
+        className="absolute inset-0 z-0 h-full w-full object-cover object-[68%_center] md:object-[58%_center] lg:object-[center_90%]"
       />
       <div
-        className="absolute inset-0 -z-10"
+        className="absolute inset-0 z-0"
         style={{
           background:
-            "linear-gradient(90deg, color-mix(in oklch, var(--background) 94%, transparent) 0%, color-mix(in oklch, var(--background) 82%, transparent) 26%, color-mix(in oklch, var(--background) 36%, transparent) 54%, transparent 74%)",
+            "linear-gradient(90deg, color-mix(in oklch, var(--background) 90%, transparent) 0%, color-mix(in oklch, var(--background) 74%, transparent) 32%, color-mix(in oklch, var(--background) 18%, transparent) 58%, transparent 76%)",
         }}
       />
 
@@ -313,7 +313,7 @@ export function TripLanding() {
         </nav>
       </header>
 
-      <div className="relative z-10 flex h-[calc(100dvh-84px)] items-center overflow-hidden px-6 pb-8 pt-2 md:px-10">
+      <div className="relative z-10 flex flex-1 items-center overflow-hidden px-6 pb-8 pt-2 md:px-10">
         <div className="w-full max-w-xl">
           <h1 className="text-balance text-[2.45rem] font-semibold leading-[1.05] tracking-tight text-foreground md:text-[3.25rem]">
             Sua viagem comeca <span className="text-brand-gradient">aqui.</span>
