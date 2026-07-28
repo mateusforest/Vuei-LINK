@@ -1,5 +1,10 @@
-import { PublicLanding } from "@/components/landing-v2/public-landing"
+import { TripsProvider } from "@/contexts/trips-context"
+import { TripLanding } from "@/components/public-home/trip-landing"
 
 export default function Home() {
-  return <PublicLanding />
+  return (
+    <TripsProvider>
+      <TripLanding />
+    </TripsProvider>
+  )
 }

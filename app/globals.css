@@ -348,6 +348,158 @@ html {
   color-scheme: light;
 }
 
+:root {
+  --brand: #2563eb;
+  --brand-2: #8bc9ff;
+  --ease-out-soft: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out-soft: cubic-bezier(0.65, 0, 0.35, 1);
+}
+
+.text-brand-gradient {
+  background: linear-gradient(120deg, var(--brand-2), var(--brand));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+@keyframes vuei-glow-pulse {
+  0% {
+    box-shadow:
+      0 0 0 0 color-mix(in oklch, var(--brand) 50%, transparent),
+      0 0 14px 3px color-mix(in oklch, var(--brand) 38%, transparent);
+    opacity: 0.95;
+  }
+  70% {
+    box-shadow:
+      0 0 0 12px transparent,
+      0 0 20px 5px color-mix(in oklch, var(--brand) 22%, transparent);
+    opacity: 0.7;
+  }
+  100% {
+    box-shadow:
+      0 0 0 0 transparent,
+      0 0 14px 3px color-mix(in oklch, var(--brand) 38%, transparent);
+    opacity: 0.95;
+  }
+}
+
+.vuei-glow {
+  animation: vuei-glow-pulse 2.8s var(--ease-in-out-soft) infinite;
+}
+
+@keyframes vuei-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.vuei-rise {
+  animation: vuei-rise 0.55s var(--ease-out-soft) both;
+}
+
+@keyframes vuei-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.97) translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.vuei-pop {
+  animation: vuei-pop 0.4s var(--ease-out-soft) both;
+}
+
+@keyframes vuei-expand {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+    clip-path: inset(0 0 100% 0);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+.vuei-expand {
+  animation: vuei-expand 0.42s var(--ease-out-soft) both;
+}
+
+@keyframes vuei-celebrate {
+  0% {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+  55% {
+    opacity: 1;
+    transform: translateY(0) scale(1.015);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.vuei-celebrate {
+  animation: vuei-celebrate 0.7s var(--ease-out-soft) both;
+}
+
+@keyframes vuei-ring {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in oklch, var(--brand) 45%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 16px transparent;
+  }
+}
+
+.vuei-ring {
+  animation: vuei-ring 1.1s var(--ease-out-soft) 0.15s both;
+}
+
+@keyframes vuei-drawer-in {
+  from {
+    opacity: 0;
+    transform: translateX(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.vuei-drawer {
+  animation: vuei-drawer-in 0.5s var(--ease-out-soft) both;
+}
+
+@keyframes vuei-scrim-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.vuei-scrim {
+  animation: vuei-scrim-in 0.4s var(--ease-out-soft) both;
+}
+
+.vuei-glass {
+  background: color-mix(in oklch, var(--background) 66%, transparent);
+  backdrop-filter: blur(22px) saturate(150%);
+  -webkit-backdrop-filter: blur(22px) saturate(150%);
+}
+
 @keyframes vuei-draw {
   to {
     stroke-dashoffset: 0;
@@ -510,6 +662,14 @@ html {
 @media (prefers-reduced-motion: reduce) {
   .chat-msg-in,
   .typing-dot,
+  .vuei-glow,
+  .vuei-rise,
+  .vuei-pop,
+  .vuei-expand,
+  .vuei-celebrate,
+  .vuei-ring,
+  .vuei-drawer,
+  .vuei-scrim,
   [class*="vuei-"] {
     animation: none !important;
   }
