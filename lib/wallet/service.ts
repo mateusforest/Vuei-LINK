@@ -8,6 +8,7 @@ import type {
   WalletBalance,
   WalletBalanceLookup,
   WalletCanConsumeResult,
+  WalletClaimPendingTripResult,
   WalletCreateAuthenticatedTravelerTripParams,
   WalletConsumeTripLinkParams,
   WalletGrantPurchaseParams,
@@ -216,6 +217,34 @@ export class WalletService {
     }
 
     return result.data as TripRow
+  }
+
+  async claimPendingTripWithWallet(params: {
+    claimTokenHash: string
+    userId: string
+  }): Promise<WalletClaimPendingTripResult> {
+    const db = this.client as UntypedSupabaseClient
+    const result = await db.rpc("claim_pending_trip_with_wallet", {
+      p_claim_token_hash: params.claimTokenHash,
+      p_user_id: params.userId,
+    })
+
+    if (result.error || !result.data) {
+      throw new Error(result.error?.message ?? "Nao foi possivel concluir o claim com a wallet.")
+    }
+
+    const payload = result.data as { status?: string; trip_id?: string | null }
+    return {
+      status:
+        payload.status === "claimed" ||
+        payload.status === "invalid" ||
+        payload.status === "expired" ||
+        payload.status === "already_claimed" ||
+        payload.status === "insufficient_balance"
+          ? payload.status
+          : "invalid",
+      tripId: typeof payload.trip_id === "string" ? payload.trip_id : null,
+    }
   }
 
   async grantPurchase(params: WalletGrantPurchaseParams): Promise<WalletTransaction> {

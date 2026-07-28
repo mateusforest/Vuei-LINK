@@ -156,3 +156,13 @@ export interface WalletCreateAuthenticatedTravelerTripParams {
   source?: string
   idempotencyKey?: string | null
 }
+
+export interface WalletClaimPendingTripResult {
+  status:
+    | "claimed"
+    | "invalid"
+    | "expired"
+    | "already_claimed"
+    | "insufficient_balance"
+  tripId: string | null
+}
