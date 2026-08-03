@@ -83,14 +83,14 @@ export function TripsPopup({
         role="dialog"
         aria-modal="true"
         aria-label="Sua bolsa Vuei"
-        className="vuei-drawer relative flex h-[94dvh] w-full flex-col border border-border/60 bg-popover shadow-[0_0_120px_-20px_rgba(20,60,120,0.55)] max-sm:max-w-none max-sm:rounded-t-[2rem] max-sm:border-b-0 sm:h-full sm:max-w-[420px] sm:rounded-none sm:border-b sm:border-r-0 sm:border-t-0"
+        className="vuei-drawer relative flex h-[92dvh] w-full flex-col overflow-hidden border border-border/60 bg-popover shadow-[0_0_120px_-20px_rgba(20,60,120,0.55)] max-sm:max-w-none max-sm:rounded-t-[2rem] max-sm:border-b-0 sm:h-full sm:max-w-[396px] sm:rounded-none sm:border-b sm:border-r-0 sm:border-t-0"
       >
-        <div className="flex items-center justify-between px-6 pb-5 pt-6">
+        <div className="flex items-center justify-between gap-3 px-5 pb-4 pt-5">
           <div className="flex items-center gap-3">
-            <span className="grid size-10 place-items-center rounded-2xl bg-brand/10">
-              <VueiSymbol className="size-6" />
+            <span className="grid size-9 place-items-center rounded-2xl bg-brand/10">
+              <VueiSymbol className="size-5" />
             </span>
-            <div>
+            <div className="min-w-0">
               <p className="text-[1rem] font-semibold leading-tight tracking-tight">Sua bolsa Vuei</p>
               <p className="text-[0.8rem] leading-tight text-muted-foreground">
                 {loading
@@ -113,20 +113,19 @@ export function TripsPopup({
 
         {emptyStateMode !== "guest-bag" || trips.length > 0 ? (
           <div className="px-4 pb-3">
-            <div className="rounded-2xl border border-border/60 bg-background/60 p-4 shadow-[0_2px_10px_-6px_rgba(20,60,120,0.15)]">
+            <div className="rounded-2xl border border-border/60 bg-background/60 p-3.5 shadow-[0_2px_10px_-6px_rgba(20,60,120,0.15)]">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">Links disponiveis</p>
+                  <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">Links disponíveis</p>
                   <p className="mt-1 text-xl font-semibold text-foreground">
-                    {walletBalanceLabel ?? "Indisponivel nesta etapa"}
+                    {walletBalanceLabel ?? "0"}
                   </p>
                 </div>
                 <Button
                   size="sm"
                   variant="outline"
-                  disabled
                   onClick={onOpenWalletAction}
-                  className="rounded-xl border-border/60 bg-background/70 text-muted-foreground"
+                  className="h-9 rounded-xl border-border/60 bg-background/70 px-3 text-[0.82rem] text-foreground"
                 >
                   Comprar Links
                 </Button>
@@ -137,32 +136,32 @@ export function TripsPopup({
 
         <div className="flex-1 overflow-y-auto px-4 pb-2">
           {loading ? (
-            <div className="flex flex-col items-center gap-3 px-6 py-16 text-center">
+            <div className="flex flex-col items-center gap-3 px-6 py-14 text-center">
               <Loader2 className="size-6 animate-spin text-muted-foreground" />
               <p className="max-w-[16rem] text-pretty text-sm leading-relaxed text-muted-foreground">
                 Carregando suas viagens reais...
               </p>
             </div>
           ) : trips.length === 0 ? (
-            <div className="flex flex-col items-center gap-3 px-6 py-16 text-center">
-              <span className="grid size-14 place-items-center rounded-2xl bg-muted">
+            <div className="flex flex-col items-center gap-3 px-6 py-14 text-center">
+              <span className="grid size-12 place-items-center rounded-2xl bg-muted">
                 <ShoppingBag className="size-6 text-muted-foreground" />
               </span>
               {emptyStateMode === "guest-bag" ? (
                 <>
                   <p className="text-lg font-semibold tracking-tight text-foreground">Sua Bolsa Vuei</p>
                   <p className="max-w-[18rem] text-pretty text-sm leading-relaxed text-muted-foreground">
-                    Guarde suas viagens, acesse de qualquer dispositivo e mantenha tudo em um so lugar.
+                    Guarde suas viagens, acesse de qualquer dispositivo e mantenha tudo em um só lugar.
                   </p>
                 </>
               ) : (
                 <p className="max-w-[16rem] text-pretty text-sm leading-relaxed text-muted-foreground">
-                  Crie sua primeira viagem para guarda-la aqui.
+                  Crie sua primeira viagem para guardá-la aqui.
                 </p>
               )}
             </div>
           ) : (
-            <ul className="flex flex-col gap-2.5">
+            <ul className="flex flex-col gap-2">
               {trips.map((trip, index) => (
                 <li key={trip.id} className="vuei-rise" style={{ animationDelay: `${Math.min(index, 6) * 55}ms` }}>
                   <TripCard
@@ -182,24 +181,24 @@ export function TripsPopup({
               <Button
                 size="lg"
                 onClick={onEmptyPrimaryAction}
-                className="h-12 w-full rounded-2xl bg-foreground text-[0.92rem] text-background shadow-[0_14px_40px_-16px_var(--brand)] transition-transform duration-300 [transition-timing-function:var(--ease-out-soft)] hover:bg-foreground/90 active:scale-[0.98]"
+                className="h-11 w-full rounded-2xl bg-foreground text-[0.9rem] text-background shadow-[0_14px_40px_-16px_var(--brand)] transition-transform duration-300 [transition-timing-function:var(--ease-out-soft)] hover:bg-foreground/90 active:scale-[0.98]"
               >
-                Criar minha Bolsa
+                Criar uma viagem
               </Button>
               <Button
                 size="lg"
                 variant="outline"
                 onClick={onEmptySecondaryAction}
-                className="h-12 w-full rounded-2xl border-border/70 bg-background/88 text-[0.92rem] shadow-[0_10px_28px_-18px_rgba(20,60,120,0.28)]"
+                className="h-11 w-full rounded-2xl border-border/70 bg-background/88 text-[0.9rem] shadow-[0_10px_28px_-18px_rgba(20,60,120,0.28)]"
               >
-                Ja tenho uma Bolsa
+                Já tenho uma Bolsa
               </Button>
             </div>
           ) : (
             <Button
               size="lg"
               onClick={onNewTrip}
-              className="h-12 w-full rounded-2xl bg-foreground text-[0.92rem] text-background shadow-[0_14px_40px_-16px_var(--brand)] transition-transform duration-300 [transition-timing-function:var(--ease-out-soft)] hover:bg-foreground/90 active:scale-[0.98]"
+              className="h-11 w-full rounded-2xl bg-foreground text-[0.9rem] text-background shadow-[0_14px_40px_-16px_var(--brand)] transition-transform duration-300 [transition-timing-function:var(--ease-out-soft)] hover:bg-foreground/90 active:scale-[0.98]"
             >
               <Plus className="size-4" />
               Nova viagem
@@ -236,7 +235,7 @@ function TripCard({
   return (
     <div
       className={cn(
-        "group rounded-2xl border border-border/60 bg-background/55 p-4 shadow-[0_2px_10px_-6px_rgba(20,60,120,0.15)] transition-[border-color,box-shadow] duration-300 [transition-timing-function:var(--ease-out-soft)] hover:border-border hover:shadow-[0_12px_36px_-22px_rgba(20,60,120,0.4)]",
+        "group rounded-2xl border border-border/60 bg-background/55 p-3.5 shadow-[0_2px_10px_-6px_rgba(20,60,120,0.15)] transition-[border-color,box-shadow] duration-300 [transition-timing-function:var(--ease-out-soft)] hover:border-border hover:shadow-[0_12px_36px_-22px_rgba(20,60,120,0.4)]",
         highlighted && "border-brand/40 shadow-[0_18px_44px_-20px_rgba(20,60,120,0.42)]",
       )}
     >
@@ -254,17 +253,17 @@ function TripCard({
               {trip.statusLabel}
             </span>
           </div>
-          <p className="mt-1 text-[0.82rem] text-muted-foreground">
+          <p className="mt-1 text-[0.8rem] text-muted-foreground">
             {range ? range : "Datas a definir"} · {trip.travelersCount ?? 1} {(trip.travelersCount ?? 1) === 1 ? "pessoa" : "pessoas"}
           </p>
-          <p className="mt-1.5 truncate font-mono text-[0.78rem] text-brand/90">{trip.url}</p>
+          <p className="mt-1.5 truncate font-mono text-[0.75rem] text-brand/90">{trip.url}</p>
         </div>
         <div className="flex shrink-0 gap-1.5">
           <Button
             size="sm"
             variant="ghost"
             onClick={() => onOpen(trip.url)}
-            className="h-9 rounded-xl px-3 text-[0.82rem] text-muted-foreground transition-colors hover:bg-foreground/5 hover:text-foreground"
+            className="h-8 rounded-xl px-2.5 text-[0.78rem] text-muted-foreground transition-colors hover:bg-foreground/5 hover:text-foreground"
           >
             <ExternalLink className="size-3.5" />
             Abrir
@@ -273,7 +272,7 @@ function TripCard({
             size="sm"
             variant="ghost"
             onClick={handleCopy}
-            className="h-9 rounded-xl px-3 text-[0.82rem] text-muted-foreground transition-colors hover:bg-foreground/5 hover:text-foreground"
+            className="h-8 rounded-xl px-2.5 text-[0.78rem] text-muted-foreground transition-colors hover:bg-foreground/5 hover:text-foreground"
           >
             {copied ? <Check className="size-3.5 text-emerald-600" /> : <Copy className="size-3.5" />}
             {copied ? "Copiado" : "Copiar"}

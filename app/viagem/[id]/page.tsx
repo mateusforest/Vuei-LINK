@@ -9615,17 +9615,17 @@ export default function TripPage() {
               <TripLinkLightThemeStyles />
             {hasTemporaryClaimAccess && !temporaryClaimNoticeDismissed && !tripOwnerUserId ? (
               <div className="px-4 pt-4 sm:px-6">
-                <div className="mx-auto flex w-full max-w-5xl flex-col gap-4 rounded-[28px] border border-[#0b56d8]/10 bg-[#f8fbff] p-5 shadow-[0_18px_40px_-28px_rgba(16,26,44,0.35)] sm:flex-row sm:items-center sm:justify-between">
-                  <div className="min-w-0">
+                <div className="mx-auto flex w-full max-w-5xl flex-col gap-4 rounded-[28px] border border-[#0b56d8]/10 bg-[#f8fbff] p-4 shadow-[0_18px_40px_-28px_rgba(16,26,44,0.35)] sm:flex-row sm:items-center sm:justify-between sm:gap-6 sm:p-5">
+                  <div className="min-w-0 flex-1">
                     <p className="text-sm font-semibold text-slate-950">Guarde esta viagem na sua Bolsa.</p>
                     <p className="mt-1 text-sm leading-6 text-slate-600">
                       Crie um acesso ou entre na sua Bolsa para editar, anexar documentos, configurar um PIN e acessar esta viagem em qualquer dispositivo.
                     </p>
                   </div>
-                  <div className="flex shrink-0 flex-col gap-3 sm:flex-row">
+                  <div className="hidden shrink-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
                     <Button
                       size="sm"
-                      className="rounded-full bg-[#0f172a] px-5 text-white hover:bg-[#111f35]"
+                      className="h-10 rounded-full bg-[#0f172a] px-4 text-white hover:bg-[#111f35]"
                       onClick={() => router.push(`/signup?redirect=${encodeURIComponent("/")}`)}
                     >
                       Criar minha Bolsa
@@ -9633,7 +9633,7 @@ export default function TripPage() {
                     <Button
                       size="sm"
                       variant="outline"
-                      className="rounded-full border-slate-200 bg-white px-5 text-slate-700 hover:bg-slate-50"
+                      className="h-10 rounded-full border-slate-200 bg-white px-4 text-slate-700 hover:bg-slate-50"
                       onClick={() => router.push(`/login?redirect=${encodeURIComponent("/")}`)}
                     >
                       JÃ¡ tenho uma Bolsa
@@ -9645,6 +9645,31 @@ export default function TripPage() {
                       onClick={() => setTemporaryClaimNoticeDismissed(true)}
                     >
                       Agora nÃ£o
+                    </Button>
+                  </div>
+                  <div className="flex shrink-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
+                    <Button
+                      size="sm"
+                      className="h-10 rounded-full bg-[#0f172a] px-4 text-white hover:bg-[#111f35]"
+                      onClick={() => router.push(`/signup?redirect=${encodeURIComponent("/")}`)}
+                    >
+                      Criar minha Bolsa
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-10 rounded-full border-slate-200 bg-white px-4 text-slate-700 hover:bg-slate-50"
+                      onClick={() => router.push(`/login?redirect=${encodeURIComponent("/")}`)}
+                    >
+                      Já tenho uma Bolsa
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-10 rounded-full px-4 text-slate-600 hover:text-slate-950"
+                      onClick={() => setTemporaryClaimNoticeDismissed(true)}
+                    >
+                      Agora não
                     </Button>
                   </div>
                 </div>

@@ -35,6 +35,8 @@ type PendingTripSnapshot = {
   publicLink: string
 }
 
+const BUY_LINKS_PLACEHOLDER_ROUTE = "/portal/creditos"
+
 const companionOptions = [
   { id: 1, label: "1 pessoa" },
   { id: 2, label: "2 pessoas" },
@@ -68,7 +70,7 @@ function toPendingBagItem(session: PendingTripClaimSession): PublicBagTripItem {
 export function TripLanding() {
   const router = useRouter()
   const { user, initialized, loading } = useAuth()
-  const { trips, loadingTrips, syncTripFromBackend } = useTrips()
+  const { trips, loadingTrips, syncTripFromBackend, credits } = useTrips()
   const destinationStepRef = useRef<HTMLDivElement>(null)
   const datesStepRef = useRef<HTMLDivElement>(null)
   const travelersStepRef = useRef<HTMLDivElement>(null)
@@ -266,6 +268,10 @@ export function TripLanding() {
     router.push(`/login?redirect=${encodeURIComponent("/agencia")}`)
   }
 
+  function openBuyLinks() {
+    router.push(BUY_LINKS_PLACEHOLDER_ROUTE)
+  }
+
   async function handleCreate() {
     if (!canCreate || creating) return
 
@@ -406,6 +412,8 @@ export function TripLanding() {
   }
 
   const bagInteractionBlocked = popupOpen
+  const finalLinkValue = createdTrip?.publicLink.replace(/^https?:\/\//, "") ?? ""
+  const walletBalanceLabel = String(credits.balance ?? 0)
 
   return (
     <main className="landing-shell relative flex h-[100dvh] w-full flex-col overflow-hidden overscroll-none text-foreground">
@@ -438,23 +446,27 @@ export function TripLanding() {
             onClick={openStart}
             className="h-10 rounded-full bg-foreground px-5 text-[0.9rem] text-background shadow-[0_8px_30px_-8px_var(--brand)] ring-1 ring-inset ring-white/10 hover:bg-foreground/90"
           >
-            Comecar agora
+            Começar agora
           </Button>
         </nav>
       </header>
 
-      <div className="relative z-10 flex min-h-0 flex-1 items-start overflow-y-auto overscroll-contain px-6 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] pt-2 md:items-center md:overflow-hidden md:px-10 md:pb-8">
-        <div className="w-full max-w-xl py-3 md:py-0">
+      <div
+        className={cn(
+          "relative z-10 flex min-h-0 flex-1 items-start px-6 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-2 md:items-center md:px-10 md:pb-8",
+          hasPendingCreatedTrip ? "overflow-hidden" : "overflow-y-auto overscroll-contain md:overflow-hidden",
+        )}
+      >
+        <div className={cn("w-full max-w-xl py-3 md:py-0", hasPendingCreatedTrip && "flex min-h-0 flex-1 flex-col justify-center")}>
           <h1 className="text-balance text-[2.45rem] font-semibold leading-[1.05] tracking-tight text-foreground md:text-[3.25rem]">
-            Sua viagem comeca <span className="text-brand-gradient">aqui.</span>
+            Sua viagem começa <span className="text-brand-gradient">aqui.</span>
           </h1>
-          <p className="mt-3 text-pretty text-lg text-muted-foreground">Um unico link para organizar tudo.</p>
+          <p className="mt-3 text-pretty text-lg text-muted-foreground">Um único link para organizar tudo.</p>
 
           <div
             className={cn(
-              "mt-8 flex max-md:max-h-[40rem] flex-col gap-2.5 transition-[opacity,transform,max-height] duration-500 [transition-timing-function:var(--ease-out-soft)]",
-              hasPendingCreatedTrip && "md:scale-[0.985] md:opacity-55",
-              hasPendingCreatedTrip && "max-md:max-h-0 max-md:-translate-y-3 max-md:overflow-hidden max-md:opacity-0",
+              "mt-8 flex flex-col gap-2.5 transition-[opacity,transform,max-height] duration-500 [transition-timing-function:var(--ease-out-soft)]",
+              hasPendingCreatedTrip && "max-h-0 -translate-y-3 overflow-hidden opacity-0 pointer-events-none",
             )}
           >
             <StepRow
@@ -464,8 +476,8 @@ export function TripLanding() {
               active={active === "destination"}
               onOpen={() => openStep("destination")}
               icon={<MapPin className="size-[1.15rem] text-brand" />}
-              title="Para onde voce vai?"
-              subtitle="Digite o destino da sua proxima viagem."
+              title="Para onde você vai?"
+              subtitle="Digite o destino da sua próxima viagem."
               value={destination.trim() || undefined}
               valueIcon={<MapPin className="size-4" />}
             >
@@ -494,7 +506,7 @@ export function TripLanding() {
               active={active === "dates"}
               onOpen={() => openStep("dates")}
               icon={<Calendar className="size-[1.15rem] text-emerald-600" />}
-              title="Quando sera?"
+              title="Quando será?"
               subtitle="Informe as datas da sua viagem."
               value={formatRange(startDate, endDate) ?? undefined}
               valueIcon={<Calendar className="size-4" />}
@@ -517,7 +529,7 @@ export function TripLanding() {
               active={active === "travelers"}
               onOpen={() => openStep("travelers")}
               icon={<Users className="size-[1.15rem] text-indigo-500" />}
-              title="Quem vai com voce?"
+              title="Quem vai com você?"
               subtitle="Adicione os participantes da viagem."
               value={`${travelers} ${travelers === 1 ? "pessoa" : "pessoas"}`}
               valueIcon={<Users className="size-4" />}
@@ -575,6 +587,140 @@ export function TripLanding() {
           </div>
 
           {createdTrip && !ownedCreatedTrip && !pendingNoticeDismissed ? (
+            <div className="mt-6 flex min-h-0 flex-col justify-center">
+              <div className="vuei-celebrate overflow-hidden rounded-[2rem] border border-border/60 bg-background/78 p-4 shadow-[0_22px_60px_-28px_rgba(20,60,120,0.42)] backdrop-blur-xl sm:p-5">
+                <div className="flex items-start gap-3">
+                  <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-brand/12">
+                    <Link2 className="size-5 text-brand" />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="text-lg font-semibold leading-tight text-foreground sm:text-[1.15rem]">Seu Link está pronto.</p>
+                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/12 px-2.5 py-1 text-[0.72rem] font-medium text-emerald-700">
+                        <Check className="size-3.5" />
+                        Pronto para abrir
+                      </span>
+                    </div>
+                    <p className="mt-1 text-sm leading-6 text-muted-foreground">Sua viagem já pode ser aberta e compartilhada.</p>
+                    <div className="mt-3 rounded-2xl border border-border/60 bg-background/72 px-3 py-2.5">
+                      <p className="truncate font-mono text-[0.78rem] text-brand/90 sm:text-[0.82rem]">{finalLinkValue}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-4 flex flex-col gap-2.5">
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
+                    <Button
+                      size="lg"
+                      onClick={() => handleOpenTrip(createdTrip.publicLink)}
+                      className="h-11 w-full rounded-2xl bg-foreground px-5 text-[0.92rem] text-background shadow-[0_14px_40px_-16px_var(--brand)] ring-1 ring-inset ring-white/10 transition-transform duration-300 [transition-timing-function:var(--ease-out-soft)] hover:bg-foreground/90 active:scale-[0.98]"
+                    >
+                      <ExternalLink className="size-4" />
+                      Abrir viagem
+                    </Button>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button
+                        size="lg"
+                        variant="outline"
+                        onClick={handleShareLink}
+                        className="h-11 rounded-2xl border-border/70 bg-background/88 px-3 text-[0.88rem] text-foreground shadow-[0_10px_28px_-18px_rgba(20,60,120,0.28)]"
+                      >
+                        <Share2 className="size-4" />
+                        Compartilhar
+                      </Button>
+                      <Button
+                        size="lg"
+                        variant="outline"
+                        onClick={handleCopyLink}
+                        className="h-11 rounded-2xl border-border/70 bg-background/88 px-3 text-[0.88rem] text-foreground shadow-[0_10px_28px_-18px_rgba(20,60,120,0.28)]"
+                      >
+                        {copied ? <Check className="size-4 text-emerald-600" /> : <Copy className="size-4" />}
+                        {copied ? "Copiado" : "Copiar"}
+                      </Button>
+                    </div>
+                  </div>
+
+                  {pendingSession ? (
+                    user ? (
+                      claimError ? (
+                        <Button
+                          size="lg"
+                          variant="outline"
+                          onClick={() => void executePendingClaim()}
+                          className="h-11 w-full rounded-2xl border-border/70 bg-background/88 px-4 text-[0.9rem] text-foreground shadow-[0_10px_28px_-18px_rgba(20,60,120,0.28)] sm:w-auto sm:self-start"
+                        >
+                          <ShoppingBag className="size-4" />
+                          Guardar na Bolsa
+                        </Button>
+                      ) : (
+                        <Button
+                          size="lg"
+                          variant="outline"
+                          disabled
+                          className="h-11 w-full rounded-2xl border-border/70 bg-background/88 px-4 text-[0.9rem] text-foreground shadow-[0_10px_28px_-18px_rgba(20,60,120,0.28)] sm:w-auto sm:self-start"
+                        >
+                          {claiming ? <Loader2 className="size-4 animate-spin" /> : <ShoppingBag className="size-4" />}
+                          Adicionando esta viagem à sua Bolsa...
+                        </Button>
+                      )
+                    ) : (
+                      <Button
+                        size="lg"
+                        variant="outline"
+                        onClick={handleCreateMyBag}
+                        className="h-11 w-full rounded-2xl border-border/70 bg-background/88 px-4 text-[0.9rem] text-foreground shadow-[0_10px_28px_-18px_rgba(20,60,120,0.28)] sm:w-auto sm:self-start"
+                      >
+                        <ShoppingBag className="size-4" />
+                        Guardar na Bolsa
+                      </Button>
+                    )
+                  ) : (
+                    <Button
+                      size="lg"
+                      variant="outline"
+                      onClick={() => setPopupOpen(true)}
+                      className="h-11 w-full rounded-2xl border-border/70 bg-background/88 px-4 text-[0.9rem] text-foreground shadow-[0_10px_28px_-18px_rgba(20,60,120,0.28)] sm:w-auto sm:self-start"
+                    >
+                      <ShoppingBag className="size-4" />
+                      Ver na Bolsa
+                    </Button>
+                  )}
+
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-[0.82rem] text-muted-foreground">
+                    {!user && pendingSession ? (
+                      <button
+                        type="button"
+                        onClick={handleIAlreadyHaveBag}
+                        className="inline-flex items-center gap-1 underline-offset-4 transition-colors hover:text-foreground hover:underline"
+                      >
+                        <LogIn className="size-3.5" />
+                        Já tenho uma Bolsa
+                      </button>
+                    ) : null}
+                    {pendingSession ? (
+                      <button
+                        type="button"
+                        onClick={() => setPendingNoticeDismissed(true)}
+                        className="underline-offset-4 transition-colors hover:text-foreground hover:underline"
+                      >
+                        Agora não
+                      </button>
+                    ) : null}
+                    <button
+                      type="button"
+                      onClick={resetWizard}
+                      className="underline-offset-4 transition-colors hover:text-foreground hover:underline"
+                    >
+                      Criar outra
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          {createdTrip && !ownedCreatedTrip && !pendingNoticeDismissed && false ? (
             <div className="mt-6 flex flex-col gap-4">
               <div className="vuei-celebrate">
                 <StepRow
@@ -746,7 +892,7 @@ export function TripLanding() {
         loading={Boolean(user) && loadingTrips}
         trips={bagTrips}
         highlightTripId={highlightTripId}
-        walletBalanceLabel={null}
+        walletBalanceLabel={walletBalanceLabel}
         emptyStateMode={!user && bagTrips.length === 0 ? "guest-bag" : "default"}
         onClose={() => setPopupOpen(false)}
         onNewTrip={() => {
@@ -754,7 +900,8 @@ export function TripLanding() {
           openStart()
         }}
         onOpenTrip={(url) => handleOpenTrip(url)}
-        onEmptyPrimaryAction={handleCreateMyBag}
+        onOpenWalletAction={openBuyLinks}
+        onEmptyPrimaryAction={openStart}
         onEmptySecondaryAction={handleIAlreadyHaveBag}
       />
 
@@ -806,11 +953,11 @@ function LoginChoiceDialog({
       <div
         role="dialog"
         aria-modal="true"
-        aria-label="Como voce usa o Vuei?"
+        aria-label="Como você usa o Vuei?"
         className="relative w-full max-w-md rounded-[2rem] border border-border/70 bg-background/95 p-6 shadow-[0_24px_80px_-24px_rgba(20,60,120,0.45)]"
       >
         <div className="mb-5">
-          <p className="text-xl font-semibold tracking-tight text-foreground">Como voce usa o Vuei?</p>
+          <p className="text-xl font-semibold tracking-tight text-foreground">Como você usa o Vuei?</p>
         </div>
 
         <div className="flex flex-col gap-3">
@@ -828,7 +975,7 @@ function LoginChoiceDialog({
             onClick={onChooseAgency}
             className="rounded-[1.5rem] border border-border/60 bg-background/80 p-4 text-left transition-colors hover:border-brand/30 hover:bg-brand/5"
           >
-            <span className="block text-base font-semibold text-foreground">Portal da Agencia</span>
+            <span className="block text-base font-semibold text-foreground">Portal da Agência</span>
             <span className="mt-1 block text-sm leading-relaxed text-muted-foreground">Gerencie clientes e viagens.</span>
           </button>
         </div>
