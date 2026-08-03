@@ -8,7 +8,7 @@ import { claimPendingTrip } from "@/lib/repositories/pending-trip-claim-reposito
 import { shouldUseSupabase } from "@/lib/data-source"
 import { withTimeout } from "@/lib/async/with-timeout"
 import { clearPendingTrip, readPendingTrip, setPendingTripRedirectToShare, shouldRedirectPendingTripToShare } from "@/lib/pending-trip"
-import { clearPendingTripClaimSession, readPendingTripClaimSession } from "@/lib/pending-trip-claim"
+import { clearPendingTripClaimSession, readPendingTripClaimSession, writeClaimedTripBagFocus } from "@/lib/pending-trip-claim"
 import { buildAdminTripUrl, buildPublicTripUrl } from "@/lib/security/link-tokens"
 import {
   buildUniqueTripSlug,
@@ -463,7 +463,7 @@ export function TripsProvider({ children }: { children: ReactNode }) {
             setTrips((prev) => [nextTrip, ...prev.filter((trip) => trip.id !== nextTrip.id)])
             setActiveTripState(nextTrip)
             clearPendingTripClaimSession()
-            window.location.replace(nextTrip.shareLink)
+            writeClaimedTripBagFocus(nextTrip.id)
             return
           }
 

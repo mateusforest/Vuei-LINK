@@ -2,6 +2,7 @@
 
 export const PENDING_TRIP_CLAIM_STORAGE_KEY = "vuei_pending_trip_claim"
 export const PENDING_TRIP_CLAIM_TTL_MS = 24 * 60 * 60 * 1000
+const CLAIMED_TRIP_BAG_FOCUS_STORAGE_KEY = "vuei_claimed_trip_bag_focus"
 
 export interface PendingTripClaimSession {
   tripId: string
@@ -110,4 +111,19 @@ export function isPendingTripClaimSessionActive(session: PendingTripClaimSession
   if (Number.isNaN(expiresAt)) return false
 
   return expiresAt > Date.now()
+}
+
+export function writeClaimedTripBagFocus(tripId: string) {
+  if (typeof window === "undefined") return
+  window.localStorage.setItem(CLAIMED_TRIP_BAG_FOCUS_STORAGE_KEY, tripId)
+}
+
+export function readClaimedTripBagFocus() {
+  if (typeof window === "undefined") return null
+  return window.localStorage.getItem(CLAIMED_TRIP_BAG_FOCUS_STORAGE_KEY)
+}
+
+export function clearClaimedTripBagFocus() {
+  if (typeof window === "undefined") return
+  window.localStorage.removeItem(CLAIMED_TRIP_BAG_FOCUS_STORAGE_KEY)
 }

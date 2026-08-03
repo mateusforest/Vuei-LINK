@@ -12,7 +12,15 @@ import { DestinationCombobox } from "@/components/public-home/destination-combob
 import { TripBag } from "@/components/public-home/trip-bag"
 import { TripsPopup, mapLegacyTripToBagItem, type PublicBagTripItem } from "@/components/public-home/trips-popup"
 import { VueiWordmark } from "@/components/public-home/vuei-mark"
-import { clearPendingTripClaimSession, isPendingTripClaimSessionActive, readPendingTripClaimSession, writePendingTripClaimSession, type PendingTripClaimSession } from "@/lib/pending-trip-claim"
+import {
+  clearClaimedTripBagFocus,
+  clearPendingTripClaimSession,
+  isPendingTripClaimSessionActive,
+  readClaimedTripBagFocus,
+  readPendingTripClaimSession,
+  writePendingTripClaimSession,
+  type PendingTripClaimSession,
+} from "@/lib/pending-trip-claim"
 import { claimPendingTrip, createPendingTripClaim } from "@/lib/repositories/pending-trip-claim-repository"
 import { resolveDestinationInput, type DestinationOption } from "@/lib/destinations/catalog"
 import { cn } from "@/lib/utils"
@@ -66,6 +74,7 @@ export function TripLanding() {
   const travelersStepRef = useRef<HTMLDivElement>(null)
   const createButtonRef = useRef<HTMLButtonElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  const autoClaimTokenRef = useRef<string | null>(null)
 
   const [destination, setDestination] = useState("")
   const [selectedDestination, setSelectedDestination] = useState<DestinationOption | null>(null)
@@ -84,6 +93,7 @@ export function TripLanding() {
   const [showBalloon, setShowBalloon] = useState(false)
   const [highlightTripId, setHighlightTripId] = useState<string | null>(null)
   const [bagPulseToken, setBagPulseToken] = useState(0)
+  const [pendingNoticeDismissed, setPendingNoticeDismissed] = useState(false)
 
   useEffect(() => {
     const session = readPendingTripClaimSession()
@@ -107,6 +117,15 @@ export function TripLanding() {
     })
     setActive(null)
   }, [])
+
+  useEffect(() => {
+    if (!pendingSession) {
+      autoClaimTokenRef.current = null
+      return
+    }
+
+    setPendingNoticeDismissed(false)
+  }, [pendingSession?.claimToken])
 
   useEffect(() => {
     if (!showBalloon) return
@@ -169,6 +188,10 @@ export function TripLanding() {
   }
 
   const realTrips = useMemo(() => trips.map(mapLegacyTripToBagItem), [trips])
+  const ownedCreatedTrip = useMemo(
+    () => (createdTrip ? realTrips.some((trip) => trip.id === createdTrip.id) : false),
+    [createdTrip, realTrips],
+  )
   const bagTrips = useMemo(() => {
     const items = [...realTrips]
     if (pendingSession && !items.some((trip) => trip.id === pendingSession.tripId)) {
@@ -177,9 +200,45 @@ export function TripLanding() {
     return items
   }, [pendingSession, realTrips])
 
-  const hasCreatedTrip = Boolean(createdTrip)
+  const hasPendingCreatedTrip = Boolean(createdTrip && pendingSession)
   const canCreate = destination.trim().length > 1 && Boolean(startDate)
-  const glow = bagTrips.length > 0 && !hasCreatedTrip
+  const glow = bagTrips.length > 0 && !hasPendingCreatedTrip
+
+  useEffect(() => {
+    if (pendingSession) return
+    if (!ownedCreatedTrip) return
+
+    setCreatedTrip(null)
+  }, [ownedCreatedTrip, pendingSession])
+
+  useEffect(() => {
+    if (!user || !initialized || loading) return
+    if (!pendingSession || claiming) return
+    if (autoClaimTokenRef.current === pendingSession.claimToken) return
+
+    autoClaimTokenRef.current = pendingSession.claimToken
+    void executePendingClaim()
+  }, [claiming, initialized, loading, pendingSession, user])
+
+  useEffect(() => {
+    const focusedTripId = readClaimedTripBagFocus()
+    if (!focusedTripId) return
+    if (!bagTrips.some((trip) => trip.id === focusedTripId && !trip.isPending)) return
+
+    clearClaimedTripBagFocus()
+    setHighlightTripId(focusedTripId)
+    setPopupOpen(true)
+    setShowBalloon(true)
+  }, [bagTrips])
+
+  useEffect(() => {
+    const activeSession = readPendingTripClaimSession()
+    if (isPendingTripClaimSessionActive(activeSession)) return
+
+    if (pendingSession) {
+      setPendingSession(null)
+    }
+  }, [pendingSession, realTrips])
 
   function resetWizard() {
     setDestination("")
@@ -192,6 +251,14 @@ export function TripLanding() {
     setClaimError(null)
     setCreatedTrip(null)
     setCopied(false)
+  }
+
+  function openTravelerSignup() {
+    router.push(`/signup?redirect=${encodeURIComponent("/")}`)
+  }
+
+  function openTravelerLogin() {
+    router.push(`/login?redirect=${encodeURIComponent("/")}`)
   }
 
   async function handleCreate() {
@@ -280,16 +347,8 @@ export function TripLanding() {
     window.location.assign(buildSameOriginPath(url))
   }
 
-  async function handleGuardInWallet() {
-    if (!pendingSession || claiming) return
-
-    setBagPulseToken((current) => current + 1)
-
-    if (!user) {
-      router.push(`/signup?redirect=${encodeURIComponent("/")}`)
-      return
-    }
-
+  async function executePendingClaim() {
+    if (!pendingSession || claiming || !user) return
     setClaiming(true)
     setClaimError(null)
 
@@ -304,6 +363,7 @@ export function TripLanding() {
         const trip = syncTripFromBackend(result.data as CanonicalTrip)
         clearPendingTripClaimSession()
         setPendingSession(null)
+        setCreatedTrip(null)
         setHighlightTripId(trip.id)
         setPopupOpen(true)
         setShowBalloon(true)
@@ -321,8 +381,14 @@ export function TripLanding() {
     }
   }
 
-  function openLogin() {
-    router.push(`/login?redirect=${encodeURIComponent("/")}`)
+  function handleCreateMyBag() {
+    setBagPulseToken((current) => current + 1)
+    openTravelerSignup()
+  }
+
+  function handleIAlreadyHaveBag() {
+    setBagPulseToken((current) => current + 1)
+    openTravelerLogin()
   }
 
   function openStart() {
@@ -357,7 +423,7 @@ export function TripLanding() {
           <Button
             variant="secondary"
             size="lg"
-            onClick={openLogin}
+            onClick={openTravelerLogin}
             className="vuei-glass h-10 rounded-full border border-border/60 px-5 text-[0.9rem] text-foreground shadow-sm"
           >
             Entrar
@@ -382,8 +448,8 @@ export function TripLanding() {
           <div
             className={cn(
               "mt-8 flex max-md:max-h-[40rem] flex-col gap-2.5 transition-[opacity,transform,max-height] duration-500 [transition-timing-function:var(--ease-out-soft)]",
-              hasCreatedTrip && "md:scale-[0.985] md:opacity-55",
-              hasCreatedTrip && "max-md:max-h-0 max-md:-translate-y-3 max-md:overflow-hidden max-md:opacity-0",
+              hasPendingCreatedTrip && "md:scale-[0.985] md:opacity-55",
+              hasPendingCreatedTrip && "max-md:max-h-0 max-md:-translate-y-3 max-md:overflow-hidden max-md:opacity-0",
             )}
           >
             <StepRow
@@ -503,7 +569,7 @@ export function TripLanding() {
 
           </div>
 
-          {createdTrip ? (
+          {createdTrip && !ownedCreatedTrip && !pendingNoticeDismissed ? (
             <div className="mt-6 flex flex-col gap-4">
               <div className="vuei-celebrate">
                 <StepRow
@@ -512,8 +578,12 @@ export function TripLanding() {
                   active={false}
                   onOpen={() => undefined}
                   icon={<Link2 className="size-[1.15rem] text-brand" />}
-                  title="Seu link ja esta pronto!"
-                  subtitle="Sua viagem foi criada pela API real e ja pode ser compartilhada."
+                  title="Guarde esta viagem na sua Bolsa."
+                  subtitle={
+                    user && pendingSession && !claimError
+                      ? "Adicionando esta viagem à sua Bolsa..."
+                      : "Crie um acesso ou entre na sua Bolsa para editar, anexar documentos, configurar um PIN e acessar esta viagem em qualquer dispositivo."
+                  }
                   value={createdTrip.publicLink.replace(/^https?:\/\//, "")}
                   valueIcon={<Check className="size-4 text-emerald-600" />}
                   static
@@ -553,16 +623,69 @@ export function TripLanding() {
                     </Button>
                   </div>
 
-                  <Button
-                    size="lg"
-                    variant={pendingSession ? "outline" : "ghost"}
-                    disabled={claiming || !pendingSession}
-                    onClick={pendingSession ? handleGuardInWallet : () => setPopupOpen(true)}
-                    className="h-12 w-full rounded-2xl border-border/70 bg-background/88 px-4 text-[0.92rem] shadow-[0_10px_28px_-18px_rgba(20,60,120,0.28)] md:w-auto md:bg-transparent md:shadow-none"
-                  >
-                    {claiming ? <Loader2 className="size-4 animate-spin" /> : <ShoppingBag className="size-4" />}
-                    {pendingSession ? "Guardar na Bolsa" : "Ver na Bolsa"}
-                  </Button>
+                  {pendingSession ? (
+                    user ? (
+                      claimError ? (
+                        <Button
+                          size="lg"
+                          variant="outline"
+                          onClick={() => void executePendingClaim()}
+                          className="h-12 w-full rounded-2xl border-border/70 bg-background/88 px-4 text-[0.92rem] shadow-[0_10px_28px_-18px_rgba(20,60,120,0.28)] md:w-auto md:bg-transparent md:shadow-none"
+                        >
+                          <ShoppingBag className="size-4" />
+                          Tentar novamente
+                        </Button>
+                      ) : (
+                        <Button
+                          size="lg"
+                          variant="outline"
+                          disabled
+                          className="h-12 w-full rounded-2xl border-border/70 bg-background/88 px-4 text-[0.92rem] shadow-[0_10px_28px_-18px_rgba(20,60,120,0.28)] md:w-auto md:bg-transparent md:shadow-none"
+                        >
+                          {claiming ? <Loader2 className="size-4 animate-spin" /> : <ShoppingBag className="size-4" />}
+                          Adicionando esta viagem à sua Bolsa...
+                        </Button>
+                      )
+                    ) : (
+                      <>
+                        <Button
+                          size="lg"
+                          onClick={handleCreateMyBag}
+                          className="h-12 w-full rounded-2xl bg-foreground px-6 text-[0.95rem] text-background shadow-[0_14px_40px_-16px_var(--brand)] ring-1 ring-inset ring-white/10 transition-transform duration-300 [transition-timing-function:var(--ease-out-soft)] hover:bg-foreground/90 active:scale-[0.98] md:w-auto"
+                        >
+                          <ShoppingBag className="size-4" />
+                          Criar minha Bolsa
+                        </Button>
+                        <Button
+                          size="lg"
+                          variant="outline"
+                          onClick={handleIAlreadyHaveBag}
+                          className="h-12 w-full rounded-2xl border-border/70 bg-background/88 px-4 text-[0.92rem] shadow-[0_10px_28px_-18px_rgba(20,60,120,0.28)] md:w-auto md:bg-transparent md:shadow-none"
+                        >
+                          <LogIn className="size-4" />
+                          Já tenho uma Bolsa
+                        </Button>
+                        <Button
+                          size="lg"
+                          variant="ghost"
+                          onClick={() => setPendingNoticeDismissed(true)}
+                          className="h-12 w-full rounded-2xl border border-border/60 bg-background/70 px-4 text-[0.9rem] text-muted-foreground transition-colors hover:bg-foreground/5 hover:text-foreground md:w-auto md:border-0 md:bg-transparent"
+                        >
+                          Agora não
+                        </Button>
+                      </>
+                    )
+                  ) : (
+                    <Button
+                      size="lg"
+                      variant="ghost"
+                      onClick={() => setPopupOpen(true)}
+                      className="h-12 w-full rounded-2xl border-border/70 bg-background/88 px-4 text-[0.92rem] shadow-[0_10px_28px_-18px_rgba(20,60,120,0.28)] md:w-auto md:bg-transparent md:shadow-none"
+                    >
+                      <ShoppingBag className="size-4" />
+                      Ver na Bolsa
+                    </Button>
+                  )}
 
                   <button
                     type="button"
@@ -600,15 +723,6 @@ export function TripLanding() {
 
           {creationError ? <p className="mt-3 max-w-md text-sm text-red-600">{creationError}</p> : null}
           {claimError ? <p className="mt-3 max-w-md text-sm text-red-600">{claimError}</p> : null}
-          {createdTrip && !user && initialized && !loading ? (
-            <div className="mt-4 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-              <p className="text-[0.9rem] text-muted-foreground">A opcao Guardar na Bolsa vai pedir login ou cadastro quando necessario.</p>
-              <Button size="sm" variant="ghost" onClick={openLogin} className="rounded-full">
-                <LogIn className="size-4" />
-                Ja tenho conta
-              </Button>
-            </div>
-          ) : null}
         </div>
       </div>
 
