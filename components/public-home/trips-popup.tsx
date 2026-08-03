@@ -40,20 +40,26 @@ export function TripsPopup({
   trips,
   highlightTripId,
   walletBalanceLabel,
+  emptyStateMode = "default",
   onClose,
   onNewTrip,
   onOpenTrip,
   onOpenWalletAction,
+  onEmptyPrimaryAction,
+  onEmptySecondaryAction,
 }: {
   open: boolean
   loading?: boolean
   trips: PublicBagTripItem[]
   highlightTripId?: string | null
   walletBalanceLabel?: string | null
+  emptyStateMode?: "default" | "guest-bag"
   onClose: () => void
   onNewTrip: () => void
   onOpenTrip: (url: string) => void
   onOpenWalletAction?: () => void
+  onEmptyPrimaryAction?: () => void
+  onEmptySecondaryAction?: () => void
 }) {
   useEffect(() => {
     if (!open) return
@@ -105,27 +111,29 @@ export function TripsPopup({
           </button>
         </div>
 
-        <div className="px-4 pb-3">
-          <div className="rounded-2xl border border-border/60 bg-background/60 p-4 shadow-[0_2px_10px_-6px_rgba(20,60,120,0.15)]">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">Links disponiveis</p>
-                <p className="mt-1 text-xl font-semibold text-foreground">
-                  {walletBalanceLabel ?? "Indisponivel nesta etapa"}
-                </p>
+        {emptyStateMode !== "guest-bag" || trips.length > 0 ? (
+          <div className="px-4 pb-3">
+            <div className="rounded-2xl border border-border/60 bg-background/60 p-4 shadow-[0_2px_10px_-6px_rgba(20,60,120,0.15)]">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">Links disponiveis</p>
+                  <p className="mt-1 text-xl font-semibold text-foreground">
+                    {walletBalanceLabel ?? "Indisponivel nesta etapa"}
+                  </p>
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled
+                  onClick={onOpenWalletAction}
+                  className="rounded-xl border-border/60 bg-background/70 text-muted-foreground"
+                >
+                  Comprar Links
+                </Button>
               </div>
-              <Button
-                size="sm"
-                variant="outline"
-                disabled
-                onClick={onOpenWalletAction}
-                className="rounded-xl border-border/60 bg-background/70 text-muted-foreground"
-              >
-                Comprar Links
-              </Button>
             </div>
           </div>
-        </div>
+        ) : null}
 
         <div className="flex-1 overflow-y-auto px-4 pb-2">
           {loading ? (
@@ -140,9 +148,18 @@ export function TripsPopup({
               <span className="grid size-14 place-items-center rounded-2xl bg-muted">
                 <ShoppingBag className="size-6 text-muted-foreground" />
               </span>
-              <p className="max-w-[16rem] text-pretty text-sm leading-relaxed text-muted-foreground">
-                Crie sua primeira viagem para guarda-la aqui.
-              </p>
+              {emptyStateMode === "guest-bag" ? (
+                <>
+                  <p className="text-lg font-semibold tracking-tight text-foreground">Sua Bolsa Vuei</p>
+                  <p className="max-w-[18rem] text-pretty text-sm leading-relaxed text-muted-foreground">
+                    Guarde suas viagens, acesse de qualquer dispositivo e mantenha tudo em um so lugar.
+                  </p>
+                </>
+              ) : (
+                <p className="max-w-[16rem] text-pretty text-sm leading-relaxed text-muted-foreground">
+                  Crie sua primeira viagem para guarda-la aqui.
+                </p>
+              )}
             </div>
           ) : (
             <ul className="flex flex-col gap-2.5">
@@ -160,14 +177,34 @@ export function TripsPopup({
         </div>
 
         <div className="border-t border-border/50 p-4">
-          <Button
-            size="lg"
-            onClick={onNewTrip}
-            className="h-12 w-full rounded-2xl bg-foreground text-[0.92rem] text-background shadow-[0_14px_40px_-16px_var(--brand)] transition-transform duration-300 [transition-timing-function:var(--ease-out-soft)] hover:bg-foreground/90 active:scale-[0.98]"
-          >
-            <Plus className="size-4" />
-            Nova viagem
-          </Button>
+          {emptyStateMode === "guest-bag" && trips.length === 0 ? (
+            <div className="flex flex-col gap-2.5">
+              <Button
+                size="lg"
+                onClick={onEmptyPrimaryAction}
+                className="h-12 w-full rounded-2xl bg-foreground text-[0.92rem] text-background shadow-[0_14px_40px_-16px_var(--brand)] transition-transform duration-300 [transition-timing-function:var(--ease-out-soft)] hover:bg-foreground/90 active:scale-[0.98]"
+              >
+                Criar minha Bolsa
+              </Button>
+              <Button
+                size="lg"
+                variant="outline"
+                onClick={onEmptySecondaryAction}
+                className="h-12 w-full rounded-2xl border-border/70 bg-background/88 text-[0.92rem] shadow-[0_10px_28px_-18px_rgba(20,60,120,0.28)]"
+              >
+                Ja tenho uma Bolsa
+              </Button>
+            </div>
+          ) : (
+            <Button
+              size="lg"
+              onClick={onNewTrip}
+              className="h-12 w-full rounded-2xl bg-foreground text-[0.92rem] text-background shadow-[0_14px_40px_-16px_var(--brand)] transition-transform duration-300 [transition-timing-function:var(--ease-out-soft)] hover:bg-foreground/90 active:scale-[0.98]"
+            >
+              <Plus className="size-4" />
+              Nova viagem
+            </Button>
+          )}
         </div>
       </div>
     </div>

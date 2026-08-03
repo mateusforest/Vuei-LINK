@@ -94,6 +94,7 @@ export function TripLanding() {
   const [highlightTripId, setHighlightTripId] = useState<string | null>(null)
   const [bagPulseToken, setBagPulseToken] = useState(0)
   const [pendingNoticeDismissed, setPendingNoticeDismissed] = useState(false)
+  const [loginChoiceOpen, setLoginChoiceOpen] = useState(false)
 
   useEffect(() => {
     const session = readPendingTripClaimSession()
@@ -261,6 +262,10 @@ export function TripLanding() {
     router.push(`/login?redirect=${encodeURIComponent("/")}`)
   }
 
+  function openAgencyLogin() {
+    router.push(`/login?redirect=${encodeURIComponent("/agencia")}`)
+  }
+
   async function handleCreate() {
     if (!canCreate || creating) return
 
@@ -400,7 +405,7 @@ export function TripLanding() {
     })
   }
 
-  const bagInteractionBlocked = popupOpen || active !== null
+  const bagInteractionBlocked = popupOpen
 
   return (
     <main className="landing-shell relative flex h-[100dvh] w-full flex-col overflow-hidden overscroll-none text-foreground">
@@ -423,7 +428,7 @@ export function TripLanding() {
           <Button
             variant="secondary"
             size="lg"
-            onClick={openTravelerLogin}
+            onClick={() => setLoginChoiceOpen(true)}
             className="vuei-glass h-10 rounded-full border border-border/60 px-5 text-[0.9rem] text-foreground shadow-sm"
           >
             Entrar
@@ -742,14 +747,93 @@ export function TripLanding() {
         trips={bagTrips}
         highlightTripId={highlightTripId}
         walletBalanceLabel={null}
+        emptyStateMode={!user && bagTrips.length === 0 ? "guest-bag" : "default"}
         onClose={() => setPopupOpen(false)}
         onNewTrip={() => {
           setPopupOpen(false)
           openStart()
         }}
         onOpenTrip={(url) => handleOpenTrip(url)}
+        onEmptyPrimaryAction={handleCreateMyBag}
+        onEmptySecondaryAction={handleIAlreadyHaveBag}
+      />
+
+      <LoginChoiceDialog
+        open={loginChoiceOpen}
+        onClose={() => setLoginChoiceOpen(false)}
+        onChooseTraveler={() => {
+          setLoginChoiceOpen(false)
+          openTravelerLogin()
+        }}
+        onChooseAgency={() => {
+          setLoginChoiceOpen(false)
+          openAgencyLogin()
+        }}
       />
     </main>
+  )
+}
+
+function LoginChoiceDialog({
+  open,
+  onClose,
+  onChooseTraveler,
+  onChooseAgency,
+}: {
+  open: boolean
+  onClose: () => void
+  onChooseTraveler: () => void
+  onChooseAgency: () => void
+}) {
+  useEffect(() => {
+    if (!open) return
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        onClose()
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown)
+    return () => window.removeEventListener("keydown", handleKeyDown)
+  }, [onClose, open])
+
+  if (!open) return null
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center px-4">
+      <div className="absolute inset-0 bg-foreground/20 backdrop-blur-[6px]" onClick={onClose} aria-hidden="true" />
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Como voce usa o Vuei?"
+        className="relative w-full max-w-md rounded-[2rem] border border-border/70 bg-background/95 p-6 shadow-[0_24px_80px_-24px_rgba(20,60,120,0.45)]"
+      >
+        <div className="mb-5">
+          <p className="text-xl font-semibold tracking-tight text-foreground">Como voce usa o Vuei?</p>
+        </div>
+
+        <div className="flex flex-col gap-3">
+          <button
+            type="button"
+            onClick={onChooseTraveler}
+            className="rounded-[1.5rem] border border-border/60 bg-background/80 p-4 text-left transition-colors hover:border-brand/30 hover:bg-brand/5"
+          >
+            <span className="block text-base font-semibold text-foreground">Minha Bolsa</span>
+            <span className="mt-1 block text-sm leading-relaxed text-muted-foreground">Acesse suas viagens pessoais.</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={onChooseAgency}
+            className="rounded-[1.5rem] border border-border/60 bg-background/80 p-4 text-left transition-colors hover:border-brand/30 hover:bg-brand/5"
+          >
+            <span className="block text-base font-semibold text-foreground">Portal da Agencia</span>
+            <span className="mt-1 block text-sm leading-relaxed text-muted-foreground">Gerencie clientes e viagens.</span>
+          </button>
+        </div>
+      </div>
+    </div>
   )
 }
 
