@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useAuth } from "@/contexts/auth-context"
 import { getRedirectByRole } from "@/lib/auth/role-redirect"
-import { getSafeRedirectFromWindow } from "@/lib/auth/safe-redirect"
+import { getSafeRedirectFromWindow, resolvePostAuthRedirect } from "@/lib/auth/safe-redirect"
 
 type AppRole = "traveler" | "agency_owner" | "agency_member" | "master"
 
@@ -34,7 +34,7 @@ export default function LoginPage() {
     if (safeRedirect === undefined || !initialized) return
     const resolvedRole = (profile?.role ?? user?.user_metadata?.role) as AppRole | undefined
     if (!loading && user && resolvedRole) {
-      router.replace(safeRedirect || getRedirectByRole(resolvedRole))
+      router.replace(resolvePostAuthRedirect(resolvedRole, safeRedirect, getRedirectByRole(resolvedRole)))
     }
   }, [initialized, loading, profile?.role, router, safeRedirect, user])
 
@@ -67,7 +67,7 @@ export default function LoginPage() {
       }
 
       const detectedRole = (result.profile?.role ?? profile?.role ?? result.user?.user_metadata?.role) as AppRole | undefined
-      const redirectPath = safeRedirect || getRedirectByRole(detectedRole)
+      const redirectPath = resolvePostAuthRedirect(detectedRole, safeRedirect, getRedirectByRole(detectedRole))
       console.log("[AUTH] role detected", detectedRole ?? null)
       console.log("[AUTH] redirect target", redirectPath)
       router.replace(redirectPath)
