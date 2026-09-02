@@ -1,6 +1,7 @@
 export const DOCUMENT_UPLOAD_TYPE_OPTIONS = [
   { value: "itinerary", label: "Roteiro" },
   { value: "ticket", label: "Passagem" },
+  { value: "admission_ticket", label: "Ingresso" },
   { value: "hotel", label: "Hospedagem" },
   { value: "personal_document", label: "Documento pessoal" },
   { value: "insurance", label: "Seguro viagem" },

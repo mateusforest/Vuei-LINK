@@ -374,36 +374,29 @@ function Modal({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className={cn("fixed inset-0 z-50 backdrop-blur-sm", resolvedTone === "light" ? "bg-[rgba(148,163,184,0.18)]" : "bg-black/80")}
+            data-tone={resolvedTone}
+            className="trip-dialog-backdrop fixed inset-0 z-50"
           />
           <motion.div
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            className={cn(
-              "fixed inset-3 z-50 max-h-[calc(100vh-1.5rem)] overflow-y-auto overscroll-contain rounded-3xl sm:inset-auto sm:left-1/2 sm:w-full sm:max-w-lg sm:-translate-x-1/2 sm:-translate-y-1/2 sm:top-1/2 sm:max-h-[90vh]",
-              resolvedTone === "light"
-                ? "border border-slate-200 bg-[linear-gradient(180deg,#ffffff_0%,#f7f4ee_100%)] shadow-[0_24px_60px_rgba(148,163,184,0.26)]"
-                : "border border-white/10 bg-[#0a0a0a] shadow-2xl",
-            )}
+            data-tone={resolvedTone}
+            className="trip-modal-surface fixed inset-3 z-50 max-h-[calc(100dvh-1.5rem)] overflow-y-auto overscroll-contain sm:inset-auto sm:left-1/2 sm:top-1/2 sm:w-[calc(100%-2rem)] sm:max-w-lg sm:-translate-x-1/2 sm:-translate-y-1/2 sm:max-h-[90dvh]"
           >
             {title && (
               <div
-                className={cn(
-                  "sticky top-0 z-10 flex items-center p-5 backdrop-blur-xl",
-                  showCloseButton ? "justify-between" : "justify-center",
-                  resolvedTone === "light" ? "border-b border-slate-200 bg-[rgba(255,255,255,0.92)]" : "border-b border-white/[0.06] bg-[#0a0a0a]/95",
-                )}
+                className={cn("trip-dialog-header sticky top-0 z-10 flex items-center", showCloseButton ? "justify-between" : "justify-center")}
               >
-                <h3 className={cn("text-lg font-semibold", resolvedTone === "light" ? "text-slate-950" : "text-white")}>{title}</h3>
+                <h3 className="trip-dialog-title">{title}</h3>
                 {showCloseButton ? (
-                  <button onClick={onClose} className={cn("rounded-xl p-2 transition-colors", resolvedTone === "light" ? "hover:bg-slate-100" : "hover:bg-white/10")}>
-                    <X className={cn("w-5 h-5", resolvedTone === "light" ? "text-slate-500" : "text-white/60")} />
+                  <button onClick={onClose} className="trip-dialog-close" aria-label="Fechar modal">
+                    <X className="h-5 w-5" />
                   </button>
                 ) : null}
               </div>
             )}
-            <div className={cn("p-5 pb-[calc(env(safe-area-inset-bottom)+20px)]", resolvedTone === "light" ? "trip-link-light-shell" : "trip-link-dark-shell")}>{children}</div>
+            <div className={cn("trip-dialog-content trip-modal-content", resolvedTone === "light" ? "trip-link-light-shell" : "trip-link-dark-shell")}>{children}</div>
           </motion.div>
         </>
       )}
@@ -447,41 +440,35 @@ function BottomSheet({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className={cn("fixed inset-0 z-50 backdrop-blur-sm", resolvedTone === "light" ? "bg-[rgba(148,163,184,0.18)]" : "bg-black/80")}
+            data-tone={resolvedTone}
+            className="trip-dialog-backdrop fixed inset-0 z-50"
           />
           <motion.div
             initial={{ y: "100%" }}
             animate={{ y: 0 }}
             exit={{ y: "100%" }}
             transition={{ type: "spring", damping: 30, stiffness: 300 }}
-            className={cn(
-              "fixed bottom-0 left-0 right-0 z-50 max-h-[85vh] overflow-auto rounded-t-3xl",
-              resolvedTone === "light"
-                ? "border-t border-slate-200 bg-[linear-gradient(180deg,#fdfdfc_0%,#f7f4ee_100%)] shadow-[0_-24px_60px_rgba(148,163,184,0.24)]"
-                : "border-t border-white/10 bg-[#0a0a0a]",
-              contentClassName,
-            )}
+            data-tone={resolvedTone}
+            className={cn("trip-sheet-surface fixed bottom-0 left-0 right-0 z-50 max-h-[88dvh] overflow-auto", contentClassName)}
           >
             <div
-              className={cn(
-                "sticky top-0 z-10 pt-3 pb-4 px-5",
-                resolvedTone === "light" ? "bg-[rgba(253,253,252,0.94)] backdrop-blur-xl" : "bg-[#0a0a0a]",
-              )}
+              className="trip-dialog-header trip-sheet-header sticky top-0 z-10"
             >
-              <div className={cn("mx-auto mb-4 h-1 w-12 rounded-full", resolvedTone === "light" ? "bg-slate-300" : "bg-white/20")} />
+              <div className="trip-sheet-handle" />
               {title && (
                 <div className="flex items-center justify-between">
-                  <h3 className={cn("text-lg font-semibold", resolvedTone === "light" ? "text-slate-950" : "text-white")}>{title}</h3>
+                  <h3 className="trip-dialog-title">{title}</h3>
                   <button
                     onClick={onClose}
-                    className={cn("rounded-xl p-2 transition-colors", resolvedTone === "light" ? "hover:bg-slate-100" : "hover:bg-white/10")}
+                    className="trip-dialog-close"
+                    aria-label="Fechar seção"
                   >
-                    <X className={cn("h-5 w-5", resolvedTone === "light" ? "text-slate-500" : "text-white/60")} />
+                    <X className="h-5 w-5" />
                   </button>
                 </div>
               )}
             </div>
-            <div className={cn("px-4 pb-[calc(env(safe-area-inset-bottom)+20px)] sm:px-5", resolvedTone === "light" ? "trip-link-light-shell" : "trip-link-dark-shell")}>{children}</div>
+            <div className={cn("trip-dialog-content trip-panel-content", resolvedTone === "light" ? "trip-link-light-shell" : "trip-link-dark-shell")}>{children}</div>
           </motion.div>
         </>
       )}
@@ -2565,10 +2552,31 @@ function TripLinkThemeStyles() {
         margin-top: 14px;
         aspect-ratio: 1.68 / 1;
         min-height: 250px;
+        width: 100%;
+        min-width: 0;
+        max-width: 100%;
         overflow: hidden;
+        overflow: clip;
+        isolation: isolate;
         border: 1px solid rgba(255,255,255,0.7);
         border-radius: 29px;
         box-shadow: 0 26px 54px rgba(35, 45, 61, 0.2), inset 0 1px 0 rgba(255,255,255,0.55);
+      }
+      .trip-hero-media {
+        position: absolute;
+        inset: 0;
+        z-index: 0;
+        overflow: hidden;
+        border-radius: inherit;
+      }
+      .trip-hero-image {
+        inset: 0 !important;
+        display: block;
+        height: 100% !important;
+        width: 100% !important;
+        max-width: none !important;
+        object-fit: cover;
+        object-position: 68% 52%;
       }
       .trip-link-page[data-theme="dark"] .trip-hero-card {
         border-color: rgba(255,255,255,0.5);
@@ -2577,6 +2585,7 @@ function TripLinkThemeStyles() {
       .trip-hero-overlay {
         position: absolute;
         inset: 0;
+        z-index: 1;
         background:
           linear-gradient(90deg, rgba(5,14,27,0.76) 0%, rgba(5,14,27,0.38) 52%, rgba(5,14,27,0.04) 82%),
           linear-gradient(0deg, rgba(5,12,22,0.78) 0%, rgba(5,12,22,0.04) 58%);
@@ -2589,6 +2598,7 @@ function TripLinkThemeStyles() {
       .trip-hero-content {
         position: absolute;
         inset: 0;
+        z-index: 2;
         display: flex;
         max-width: 78%;
         flex-direction: column;
@@ -2907,6 +2917,9 @@ function TripLinkThemeStyles() {
           min-height: 244px;
           border-radius: 27px;
         }
+        .trip-hero-image {
+          object-position: 64% 52%;
+        }
         .trip-hero-content {
           max-width: 86%;
           padding: 21px 20px;
@@ -3061,6 +3074,285 @@ function TripLinkThemeStyles() {
       .trip-link-dark-shell option {
         background: #111923 !important;
         color: #f7f4ef !important;
+      }
+      .trip-dialog-backdrop {
+        background: rgba(52, 63, 78, 0.2);
+        -webkit-backdrop-filter: blur(8px) saturate(110%);
+        backdrop-filter: blur(8px) saturate(110%);
+      }
+      .trip-dialog-backdrop[data-tone="dark"] {
+        background: rgba(1, 6, 12, 0.74);
+      }
+      .trip-modal-surface,
+      .trip-sheet-surface {
+        --dialog-text: #10203a;
+        --dialog-muted: #657187;
+        --dialog-faint: #8f98a8;
+        --dialog-accent: #1769ef;
+        --dialog-accent-soft: rgba(23, 105, 239, 0.1);
+        --dialog-border: rgba(255, 255, 255, 0.84);
+        --dialog-divider: rgba(112, 126, 148, 0.2);
+        --dialog-card: rgba(255, 255, 255, 0.58);
+        --dialog-card-strong: rgba(255, 255, 255, 0.78);
+        --dialog-icon: linear-gradient(145deg, rgba(255,255,255,0.96), rgba(231,237,247,0.72));
+        --dialog-header: rgba(248, 246, 241, 0.82);
+        border: 1px solid var(--dialog-border);
+        color: var(--dialog-text);
+        background:
+          radial-gradient(circle at 92% 0%, rgba(210, 224, 247, 0.52), transparent 28%),
+          radial-gradient(circle at 8% 100%, rgba(235, 218, 198, 0.46), transparent 32%),
+          linear-gradient(145deg, rgba(252,251,248,0.96), rgba(239,235,228,0.92));
+        box-shadow: 0 30px 90px rgba(35, 45, 61, 0.2), inset 0 1px 0 rgba(255,255,255,0.94);
+        -webkit-backdrop-filter: blur(24px) saturate(135%);
+        backdrop-filter: blur(24px) saturate(135%);
+      }
+      .trip-modal-surface[data-tone="dark"],
+      .trip-sheet-surface[data-tone="dark"] {
+        --dialog-text: #f7f4ef;
+        --dialog-muted: #a7adb8;
+        --dialog-faint: #7d8795;
+        --dialog-accent: #efbd72;
+        --dialog-accent-soft: rgba(239, 189, 114, 0.11);
+        --dialog-border: rgba(255, 255, 255, 0.16);
+        --dialog-divider: rgba(255, 255, 255, 0.1);
+        --dialog-card: rgba(255, 255, 255, 0.052);
+        --dialog-card-strong: rgba(255, 255, 255, 0.078);
+        --dialog-icon: linear-gradient(145deg, rgba(255,255,255,0.105), rgba(255,255,255,0.025));
+        --dialog-header: rgba(10, 18, 28, 0.84);
+        background:
+          radial-gradient(circle at 94% 0%, rgba(126, 82, 36, 0.22), transparent 27%),
+          radial-gradient(circle at 3% 96%, rgba(23, 68, 103, 0.2), transparent 31%),
+          linear-gradient(145deg, rgba(12,21,32,0.97), rgba(5,11,18,0.96));
+        box-shadow: 0 34px 100px rgba(0, 0, 0, 0.52), inset 0 1px 0 rgba(255,255,255,0.1);
+      }
+      .trip-modal-surface {
+        border-radius: 30px;
+      }
+      .trip-sheet-surface {
+        width: min(100%, 680px);
+        margin-inline: auto;
+        overflow-x: hidden;
+        border-bottom: 0;
+        border-radius: 34px 34px 0 0;
+        box-shadow: 0 -28px 84px rgba(35, 45, 61, 0.2), inset 0 1px 0 rgba(255,255,255,0.92);
+      }
+      .trip-sheet-surface[data-tone="dark"] {
+        box-shadow: 0 -32px 92px rgba(0,0,0,0.52), inset 0 1px 0 rgba(255,255,255,0.1);
+      }
+      .trip-dialog-header {
+        padding: 17px 20px;
+        border-bottom: 1px solid var(--dialog-divider);
+        color: var(--dialog-text);
+        background: var(--dialog-header);
+        -webkit-backdrop-filter: blur(22px) saturate(130%);
+        backdrop-filter: blur(22px) saturate(130%);
+      }
+      .trip-sheet-header {
+        padding-top: 11px;
+        padding-bottom: 15px;
+      }
+      .trip-sheet-handle {
+        width: 46px;
+        height: 4px;
+        margin: 0 auto 13px;
+        border-radius: 999px;
+        background: var(--dialog-divider);
+        box-shadow: inset 0 1px 0 rgba(255,255,255,0.4);
+      }
+      .trip-dialog-title {
+        color: var(--dialog-text);
+        font-family: Georgia, "Times New Roman", serif;
+        font-size: 1.3rem;
+        font-weight: 500;
+        line-height: 1.15;
+        letter-spacing: -0.03em;
+      }
+      .trip-dialog-close {
+        display: flex;
+        height: 38px;
+        width: 38px;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        border: 1px solid var(--dialog-border);
+        border-radius: 14px;
+        color: var(--dialog-muted);
+        background: var(--dialog-card);
+        box-shadow: 0 9px 22px rgba(46, 58, 75, 0.08), inset 0 1px 0 rgba(255,255,255,0.55);
+        transition: background 180ms ease, color 180ms ease, transform 180ms ease;
+      }
+      .trip-dialog-close:hover {
+        color: var(--dialog-text);
+        background: var(--dialog-card-strong);
+        transform: translateY(-1px);
+      }
+      .trip-dialog-content {
+        padding: 20px 20px calc(env(safe-area-inset-bottom) + 24px);
+        color: var(--dialog-text);
+      }
+      .trip-panel-content {
+        padding-top: 17px;
+      }
+      .trip-panel-content section[id] {
+        padding: 0 0 8px !important;
+      }
+      .trip-panel-content section[id] > div {
+        width: 100%;
+        max-width: none !important;
+        margin: 0 !important;
+      }
+      .trip-panel-content section[id] > div > :first-child {
+        margin-bottom: 18px !important;
+      }
+      .trip-panel-content section[id] > div > :first-child > div:first-child > div:first-child {
+        border: 1px solid var(--dialog-border);
+        color: var(--dialog-accent);
+        background: var(--dialog-icon) !important;
+        box-shadow: 0 10px 24px rgba(46,58,75,0.09), inset 0 1px 0 rgba(255,255,255,0.5);
+      }
+      .trip-panel-content section[id] > div > :first-child > div:first-child > div:first-child svg {
+        color: var(--dialog-accent) !important;
+      }
+      .trip-panel-content section[id] h2 {
+        color: var(--dialog-text) !important;
+        font-family: Georgia, "Times New Roman", serif;
+        font-size: 1.32rem !important;
+        font-weight: 500 !important;
+        letter-spacing: -0.025em;
+      }
+      .trip-panel-content section[id] h2 + p {
+        color: var(--dialog-muted) !important;
+      }
+      .trip-panel-content section[id] > div > :first-child button {
+        border: 1px solid var(--dialog-border);
+        border-radius: 999px;
+        color: var(--dialog-accent) !important;
+        background: var(--dialog-card) !important;
+        box-shadow: inset 0 1px 0 rgba(255,255,255,0.35);
+      }
+      .trip-panel-heading {
+        gap: 14px;
+      }
+      .trip-panel-heading-icon {
+        display: flex;
+        height: 46px !important;
+        width: 46px !important;
+        flex-shrink: 0;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid var(--dialog-border);
+        border-radius: 16px !important;
+        color: var(--dialog-accent);
+        background: var(--dialog-icon) !important;
+        box-shadow: 0 11px 28px rgba(46,58,75,0.09), inset 0 1px 0 rgba(255,255,255,0.48);
+      }
+      .trip-panel-heading-icon svg {
+        color: var(--dialog-accent) !important;
+      }
+      .trip-panel-heading-title {
+        color: var(--dialog-text) !important;
+      }
+      .trip-panel-heading-title + p {
+        color: var(--dialog-muted) !important;
+      }
+      .trip-panel-card {
+        border-color: var(--dialog-border) !important;
+        color: var(--dialog-text);
+        background: var(--dialog-card) !important;
+        box-shadow: 0 15px 38px rgba(42,53,70,0.08), inset 0 1px 0 rgba(255,255,255,0.38);
+        -webkit-backdrop-filter: blur(16px) saturate(125%);
+        backdrop-filter: blur(16px) saturate(125%);
+      }
+      .trip-panel-card:hover {
+        border-color: color-mix(in srgb, var(--dialog-accent) 28%, var(--dialog-border)) !important;
+        background: var(--dialog-card-strong) !important;
+      }
+      .trip-sheet-surface[data-tone="dark"] .trip-panel-card [class*="from-slate-100"][class*="via-white"] {
+        background: var(--dialog-icon) !important;
+      }
+      .trip-panel-content [class*="rounded-3xl"][class*="border"]:not([class*="amber"]):not([class*="emerald"]):not([class*="red"]),
+      .trip-panel-content [class*="rounded-2xl"][class*="border"]:not([class*="amber"]):not([class*="emerald"]):not([class*="red"]),
+      .trip-modal-content [class*="rounded-3xl"][class*="border"]:not([class*="amber"]):not([class*="emerald"]):not([class*="red"]),
+      .trip-modal-content [class*="rounded-2xl"][class*="border"]:not([class*="amber"]):not([class*="emerald"]):not([class*="red"]) {
+        border-color: var(--dialog-border) !important;
+        background: var(--dialog-card) !important;
+        box-shadow: 0 14px 36px rgba(42,53,70,0.08), inset 0 1px 0 rgba(255,255,255,0.4);
+      }
+      .trip-modal-surface[data-tone="dark"] .trip-panel-content [class*="from-[#5de0e6]"][class*="to-[#004aad]"],
+      .trip-modal-surface[data-tone="dark"] .trip-modal-content [class*="from-[#5de0e6]"][class*="to-[#004aad]"],
+      .trip-sheet-surface[data-tone="dark"] .trip-panel-content [class*="from-[#5de0e6]"][class*="to-[#004aad]"] {
+        background: linear-gradient(135deg, #efbd72, #9c6330) !important;
+      }
+      .trip-dialog-content input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+      .trip-dialog-content textarea,
+      .trip-dialog-content select {
+        min-height: 46px;
+        border: 1px solid var(--dialog-border) !important;
+        border-radius: 15px !important;
+        color: var(--dialog-text) !important;
+        background-color: var(--dialog-card-strong) !important;
+        box-shadow: inset 0 1px 0 rgba(255,255,255,0.38), 0 8px 20px rgba(43,54,70,0.05);
+      }
+      .trip-dialog-content input::placeholder,
+      .trip-dialog-content textarea::placeholder {
+        color: var(--dialog-faint) !important;
+      }
+      .trip-dialog-content label:not(.trip-upload-dropzone) {
+        color: var(--dialog-muted) !important;
+        font-weight: 600;
+        letter-spacing: 0.04em;
+      }
+      .trip-dialog-content code {
+        color: var(--dialog-muted) !important;
+      }
+      .trip-upload-dropzone {
+        border: 1px dashed color-mix(in srgb, var(--dialog-accent) 38%, var(--dialog-border)) !important;
+        border-radius: 22px !important;
+        color: var(--dialog-muted) !important;
+        background:
+          radial-gradient(circle at 50% 0%, var(--dialog-accent-soft), transparent 48%),
+          var(--dialog-card) !important;
+        box-shadow: inset 0 1px 0 rgba(255,255,255,0.38);
+      }
+      .trip-upload-dropzone:hover {
+        border-color: color-mix(in srgb, var(--dialog-accent) 64%, transparent) !important;
+        background-color: var(--dialog-card-strong) !important;
+      }
+      .trip-upload-dropzone svg,
+      .trip-upload-dropzone [class*="text-white"] {
+        color: var(--dialog-accent) !important;
+      }
+      .trip-upload-dropzone p {
+        color: var(--dialog-muted) !important;
+      }
+      .trip-upload-dropzone p + p {
+        color: var(--dialog-faint) !important;
+      }
+      .trip-document-type-select {
+        padding-right: 42px !important;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23657087'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='1.8' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E") !important;
+        background-repeat: no-repeat !important;
+        background-position: right 14px center !important;
+        background-size: 16px !important;
+      }
+      .trip-modal-surface[data-tone="dark"] .trip-document-type-select {
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23efbd72'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='1.8' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E") !important;
+      }
+      @media (max-width: 639px) {
+        .trip-modal-surface {
+          border-radius: 27px;
+        }
+        .trip-sheet-surface {
+          border-left: 0;
+          border-right: 0;
+          border-radius: 29px 29px 0 0;
+        }
+        .trip-dialog-header {
+          padding-inline: 16px;
+        }
+        .trip-dialog-content {
+          padding: 16px 16px calc(env(safe-area-inset-bottom) + 22px);
+        }
       }
     `}</style>
   )
@@ -3304,14 +3596,17 @@ function TravelerPublicShell({
           transition={{ duration: 0.5, ease: "easeOut" }}
           className="trip-hero-card"
         >
-          <ImageWithFallback
-            src={tripData.heroImage}
-            fallbackSrc={DEFAULT_HERO_IMAGE}
-            alt={tripData.destination}
-            fill
-            className="object-cover object-center"
-            priority
-          />
+          <div className="trip-hero-media">
+            <ImageWithFallback
+              src={tripData.heroImage}
+              fallbackSrc={DEFAULT_HERO_IMAGE}
+              alt={tripData.destination}
+              fill
+              sizes="(max-width: 639px) calc(100vw - 24px), 472px"
+              className="trip-hero-image"
+              priority
+            />
+          </div>
           <div className="trip-hero-overlay" />
           <div className="trip-hero-content">
             <h1 className="trip-display-title">{parsedDestination.city}</h1>
@@ -3546,7 +3841,7 @@ function FlightCard({
         transition={{ delay: index * 0.1 }}
         className="group"
       >
-        <div className="relative overflow-hidden rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4 backdrop-blur-xl transition-all duration-300 hover:border-[#5de0e6]/20 sm:p-5">
+        <div className="trip-panel-card relative overflow-hidden rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4 backdrop-blur-xl transition-all duration-300 hover:border-[#5de0e6]/20 sm:p-5">
           <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-px bg-gradient-to-r from-transparent via-[#5de0e6]/30 to-transparent" />
           <div className="flex items-start gap-3">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#5de0e6]/20 to-[#004aad]/20">
@@ -3592,7 +3887,7 @@ function FlightCard({
       className="group"
     >
       <div
-        className="relative overflow-hidden rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4 backdrop-blur-xl transition-all duration-300 hover:border-[#5de0e6]/20 sm:p-5"
+        className="trip-panel-card relative overflow-hidden rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4 backdrop-blur-xl transition-all duration-300 hover:border-[#5de0e6]/20 sm:p-5"
       >
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-px bg-gradient-to-r from-transparent via-[#5de0e6]/30 to-transparent" />
 
@@ -4029,13 +4324,13 @@ function FlightsSection({
   return (
     <section id="flights" className="py-12 px-4">
       <div className="max-w-6xl mx-auto">
-        <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="flex items-center justify-between mb-6">
+        <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="trip-panel-heading flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#5de0e6] to-[#004aad] flex items-center justify-center">
+            <div className="trip-panel-heading-icon w-10 h-10 rounded-xl bg-gradient-to-br from-[#5de0e6] to-[#004aad] flex items-center justify-center">
               <Plane className="w-5 h-5 text-white" />
             </div>
             <div>
-              <h2 className="text-xl font-semibold text-white">Passagens</h2>
+              <h2 className="trip-panel-heading-title text-xl font-semibold text-white">Passagens</h2>
               <p className="text-sm text-white/40">{structuredFlightsCount > 0 ? `${structuredFlightsCount} voo(s) salvo(s)` : `${flights.length + ticketDocuments.length} passagem(ns) anexada(s)`}</p>
             </div>
           </div>
@@ -4077,7 +4372,7 @@ function FlightsSection({
             />
           ))}
           {ticketDocuments.map((document: any) => (
-            <div key={document.id} className="rounded-3xl border border-white/[0.06] bg-white/[0.02] p-5">
+            <div key={document.id} className="trip-panel-card rounded-3xl border border-white/[0.06] bg-white/[0.02] p-5">
               <p className="text-sm font-medium text-white">{document.name}</p>
               <p className="mt-2 text-xs text-white/40">Passagem anexada. Estamos extraindo as informações.</p>
               <p className="mt-1 text-xs text-white/30">{document.mimeType || "Não informado"}</p>
@@ -4297,7 +4592,7 @@ function AddFlightModal({ open, onClose, onSave, tripId, ownerUserId, agencyId, 
           />
         </div>
 
-        <label className={cn("block rounded-xl border-2 border-dashed border-white/10 p-8 text-center transition-colors", uploading ? "cursor-not-allowed opacity-70" : "cursor-pointer hover:border-[#5de0e6]/30")}>
+        <label className={cn("trip-upload-dropzone block rounded-xl border-2 border-dashed border-white/10 p-8 text-center transition-colors", uploading ? "cursor-not-allowed opacity-70" : "cursor-pointer hover:border-[#5de0e6]/30")}>
           {uploading ? (
             <div className="flex flex-col items-center gap-3">
               <div className="w-8 h-8 border-2 border-white/30 border-t-[#5de0e6] rounded-full animate-spin" />
@@ -4371,13 +4666,13 @@ function HotelSection({
   return (
     <section id="hotel" className="py-12 px-4">
       <div className="max-w-6xl mx-auto">
-        <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="flex items-center justify-between mb-6">
+        <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="trip-panel-heading flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#004aad] to-[#5de0e6] flex items-center justify-center">
+            <div className="trip-panel-heading-icon w-10 h-10 rounded-xl bg-gradient-to-br from-[#004aad] to-[#5de0e6] flex items-center justify-center">
               <Hotel className="w-5 h-5 text-white" />
             </div>
             <div>
-              <h2 className="text-xl font-semibold text-white">Hospedagem</h2>
+              <h2 className="trip-panel-heading-title text-xl font-semibold text-white">Hospedagem</h2>
               <p className="text-sm text-white/40">{hotels.length > 0 ? `${hotels.length} hospedagem${hotels.length > 1 ? "s" : ""} cadastrada${hotels.length > 1 ? "s" : ""}` : "Nenhuma hospedagem cadastrada"}</p>
             </div>
           </div>
@@ -4433,7 +4728,7 @@ function HotelSection({
                   initial={{ opacity: 0, y: 20 }}
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true }}
-                  className="relative rounded-3xl overflow-hidden bg-white/[0.02] backdrop-blur-xl border border-white/[0.06]"
+                  className="trip-panel-card relative rounded-3xl overflow-hidden bg-white/[0.02] backdrop-blur-xl border border-white/[0.06]"
                 >
                   <div className="grid gap-0 sm:grid-cols-[132px_minmax(0,1fr)]">
                     <div className="relative flex min-h-[132px] items-center justify-center bg-gradient-to-br from-slate-100 via-white to-slate-50">
@@ -4805,7 +5100,7 @@ function UploadExistingItineraryModal({
           />
         </div>
 
-        <label className={cn("block rounded-xl border-2 border-dashed border-white/10 p-8 text-center transition-colors", uploading ? "cursor-not-allowed opacity-70" : "cursor-pointer hover:border-[#5de0e6]/30")}>
+        <label className={cn("trip-upload-dropzone block rounded-xl border-2 border-dashed border-white/10 p-8 text-center transition-colors", uploading ? "cursor-not-allowed opacity-70" : "cursor-pointer hover:border-[#5de0e6]/30")}>
           {uploading ? (
             <div className="flex flex-col items-center gap-3">
               <div className="w-8 h-8 border-2 border-white/30 border-t-[#5de0e6] rounded-full animate-spin" />
@@ -4991,13 +5286,13 @@ function ItinerarySection({
   return (
     <section id="itinerary" className="py-12 px-4">
       <div className="max-w-6xl mx-auto">
-        <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="flex flex-col gap-4 mb-6 sm:flex-row sm:items-center sm:justify-between">
+        <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="trip-panel-heading flex flex-col gap-4 mb-6 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#5de0e6] to-[#004aad] flex items-center justify-center">
+            <div className="trip-panel-heading-icon w-10 h-10 rounded-xl bg-gradient-to-br from-[#5de0e6] to-[#004aad] flex items-center justify-center">
               <MapPin className="w-5 h-5 text-white" />
             </div>
             <div>
-              <h2 className="text-xl font-semibold text-white">Roteiro</h2>
+              <h2 className="trip-panel-heading-title text-xl font-semibold text-white">Roteiro</h2>
               <p className="text-sm text-white/40">
                 {plannedDaysLabel}
               </p>
@@ -5036,7 +5331,7 @@ function ItinerarySection({
             </div>
           </div>
         ) : !simpleRecord && documentRecords.length === 0 && !hasGenerating ? (
-          <div className="rounded-3xl border border-white/[0.06] bg-white/[0.02] p-6 text-sm text-white/50">
+          <div className="trip-panel-card rounded-3xl border border-white/[0.06] bg-white/[0.02] p-6 text-sm text-white/50">
             Nenhum roteiro criado.
           </div>
         ) : null}
@@ -5526,6 +5821,7 @@ function DocumentsSection({
       case "insurance": return "🛡️"
       case "voucher": return "🎫"
       case "ticket": return "🎟️"
+      case "admission_ticket": return "🎫"
       default: return "📄"
     }
   }
@@ -5537,13 +5833,13 @@ function DocumentsSection({
   return (
     <section id="documents" className="py-12 px-4">
       <div className="max-w-6xl mx-auto">
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35 }} className="flex items-center justify-between gap-3 mb-6">
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35 }} className="trip-panel-heading flex items-center justify-between gap-3 mb-6">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#004aad] to-[#5de0e6] flex items-center justify-center">
+            <div className="trip-panel-heading-icon w-10 h-10 rounded-xl bg-gradient-to-br from-[#004aad] to-[#5de0e6] flex items-center justify-center">
               <FileText className="w-5 h-5 text-white" />
             </div>
             <div>
-              <h2 className="text-xl font-semibold text-white">Documentos</h2>
+              <h2 className="trip-panel-heading-title text-xl font-semibold text-white">Documentos</h2>
               <p className="text-sm text-white/40">{documents.length} arquivos</p>
             </div>
           </div>
@@ -5566,7 +5862,7 @@ function DocumentsSection({
             ))}
           </div>
         ) : documents.length === 0 ? (
-          <div className="rounded-3xl border border-white/[0.06] bg-white/[0.02] p-6 text-sm text-white/50">
+          <div className="trip-panel-card rounded-3xl border border-white/[0.06] bg-white/[0.02] p-6 text-sm text-white/50">
             {isAdmin ? "Nenhum documento adicionado." : "Nenhum documento público adicionado."}
           </div>
         ) : (
@@ -5580,7 +5876,7 @@ function DocumentsSection({
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               onClick={() => setViewingDoc(doc)}
-              className="cursor-pointer p-4 rounded-xl bg-white/[0.02] border border-white/[0.06] hover:border-[#5de0e6]/30 transition-all duration-300 text-left min-h-[112px]"
+              className="trip-panel-card cursor-pointer p-4 rounded-xl bg-white/[0.02] border border-white/[0.06] hover:border-[#5de0e6]/30 transition-all duration-300 text-left min-h-[112px]"
               role="button"
               tabIndex={0}
               onKeyDown={(event) => {
@@ -5612,7 +5908,7 @@ function DocumentsSection({
         )}
 
         {isAdmin && privateDocs.length > 0 && (
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35 }} className="p-5 rounded-2xl bg-gradient-to-br from-white/[0.02] to-transparent border border-white/[0.06]">
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35 }} className="trip-panel-card p-5 rounded-2xl bg-gradient-to-br from-white/[0.02] to-transparent border border-white/[0.06]">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-lg bg-[#004aad]/30 flex items-center justify-center">
@@ -5648,7 +5944,7 @@ function DocumentsSection({
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: i * 0.1 }}
                         onClick={() => setViewingDoc(doc)}
-                        className="cursor-pointer p-3 rounded-xl bg-[#004aad]/10 border border-[#004aad]/30 hover:border-[#5de0e6]/50 transition-all duration-300 text-left min-h-[104px]"
+                        className="trip-panel-card cursor-pointer p-3 rounded-xl bg-[#004aad]/10 border border-[#004aad]/30 hover:border-[#5de0e6]/50 transition-all duration-300 text-left min-h-[104px]"
                         role="button"
                         tabIndex={0}
                         onKeyDown={(event) => {
@@ -6487,7 +6783,7 @@ function AddDocumentModal({ open, onClose, onSave, tripId, ownerUserId, agencyId
   return (
     <Modal open={open} onClose={onClose} title="Adicionar Documento">
       <div className="space-y-4">
-        <label className={cn("block rounded-xl border-2 border-dashed border-white/10 p-8 text-center transition-colors", uploading ? "cursor-not-allowed opacity-70" : "cursor-pointer hover:border-[#5de0e6]/30")}>
+        <label className={cn("trip-upload-dropzone block rounded-xl border-2 border-dashed border-white/10 p-8 text-center transition-colors", uploading ? "cursor-not-allowed opacity-70" : "cursor-pointer hover:border-[#5de0e6]/30")}>
           {uploading ? (
             <div className="flex flex-col items-center gap-3">
               <div className="w-8 h-8 border-2 border-white/30 border-t-[#5de0e6] rounded-full animate-spin" />
@@ -6515,12 +6811,11 @@ function AddDocumentModal({ open, onClose, onSave, tripId, ownerUserId, agencyId
         </div>
 
         <div>
-          <label className="text-xs text-white/50 uppercase tracking-wider">Tipo</label>
+          <label className="text-xs text-white/50 uppercase tracking-wider">Tipo de documento</label>
           <select
             value={formData.type}
             onChange={(e) => setFormData({ ...formData, type: e.target.value })}
-            className="w-full mt-1 px-4 py-3 rounded-xl bg-[#0a0a0a] border border-white/[0.08] text-white focus:outline-none focus:border-[#5de0e6]/50 appearance-none"
-            style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='rgba(255,255,255,0.4)'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center', backgroundSize: '16px' }}
+            className="trip-document-type-select mt-1 w-full appearance-none rounded-xl border border-white/[0.08] bg-[#0a0a0a] px-4 py-3 text-white focus:border-[#5de0e6]/50 focus:outline-none"
           >
             {DOCUMENT_UPLOAD_TYPE_OPTIONS.map((option) => (
               <option key={option.value} value={option.value} className="bg-[#0a0a0a] text-white">
@@ -6739,17 +7034,17 @@ function ConciergeSection({
   return (
     <section id="concierge" className="py-12 px-4">
       <div className="max-w-6xl mx-auto">
-        <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="flex items-center gap-3 mb-6">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#5de0e6] to-[#004aad] flex items-center justify-center">
+        <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="trip-panel-heading flex items-center gap-3 mb-6">
+          <div className="trip-panel-heading-icon w-10 h-10 rounded-xl bg-gradient-to-br from-[#5de0e6] to-[#004aad] flex items-center justify-center">
             <Sparkles className="w-5 h-5 text-white" />
           </div>
           <div>
-            <h2 className="text-xl font-semibold text-white">Concierge IA</h2>
+            <h2 className="trip-panel-heading-title text-xl font-semibold text-white">Concierge IA</h2>
             <p className="text-sm text-white/40">Tire dúvidas sobre sua viagem</p>
           </div>
         </motion.div>
 
-        <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="rounded-2xl bg-white/[0.02] backdrop-blur-xl border border-white/[0.06] overflow-hidden">
+        <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="trip-panel-card rounded-2xl bg-white/[0.02] backdrop-blur-xl border border-white/[0.06] overflow-hidden">
           {offlineReadOnly ? (
             <div className="border-b border-white/[0.06] bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
               Indisponível offline.
@@ -7508,17 +7803,17 @@ function OfflineSection({
   return (
     <section id="offline" className="py-12 px-4">
       <div className="max-w-6xl mx-auto">
-        <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="flex items-center gap-3 mb-6">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#004aad] to-[#5de0e6] flex items-center justify-center">
+        <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="trip-panel-heading flex items-center gap-3 mb-6">
+          <div className="trip-panel-heading-icon w-10 h-10 rounded-xl bg-gradient-to-br from-[#004aad] to-[#5de0e6] flex items-center justify-center">
             <WifiOff className="w-5 h-5 text-white" />
           </div>
           <div>
-            <h2 className="text-xl font-semibold text-white">Acesso Offline</h2>
+            <h2 className="trip-panel-heading-title text-xl font-semibold text-white">Acesso Offline</h2>
             <p className="text-sm text-white/40">Salve sua viagem para acessar sem internet</p>
           </div>
         </motion.div>
 
-        <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="p-6 rounded-2xl bg-gradient-to-br from-white/[0.03] to-transparent border border-white/[0.06]">
+        <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="trip-panel-card p-6 rounded-2xl bg-gradient-to-br from-white/[0.03] to-transparent border border-white/[0.06]">
           <div className="flex flex-col sm:flex-row items-center gap-6">
             <div className="flex-1 text-center sm:text-left">
               <h3 className="text-lg font-medium text-white mb-2">
