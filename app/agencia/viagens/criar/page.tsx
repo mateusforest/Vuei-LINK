@@ -3,7 +3,7 @@
 import { Suspense, useState, useEffect, useMemo, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import Link from "next/link"
-import { useRouter, useSearchParams } from "next/navigation"
+import { useSearchParams } from "next/navigation"
 import {
   ArrowLeft,
   ArrowRight,
@@ -17,6 +17,7 @@ import {
   Copy,
   MessageSquare,
   ExternalLink,
+  Lock,
 } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -34,6 +35,7 @@ import {
   type DestinationOption,
 } from "@/lib/destinations/catalog"
 import { TripDatePickerField } from "@/components/trip/trip-date-picker-field"
+import { TripPinDialog } from "@/components/trip/trip-pin-dialog"
 
 const steps = [
   { id: 1, title: "Cliente", icon: User },
@@ -66,11 +68,10 @@ function getClientSecondaryInfo(client: { email: string; phone: string }) {
 }
 
 function CreateTripPageContent() {
-  const router = useRouter()
   const searchParams = useSearchParams()
   const clientIdParam = searchParams.get("clientId")
   
-  const { clients, addTrip, getClientById, setupIncomplete, workspaceError } = useAgency()
+  const { clients, addTrip, getClientById, setupIncomplete, workspaceError, refreshAgencyWorkspace } = useAgency()
   const [currentStep, setCurrentStep] = useState(1)
   const [completed, setCompleted] = useState(false)
   const [createdTrip, setCreatedTrip] = useState<AgencyTrip | null>(null)
@@ -78,6 +79,8 @@ function CreateTripPageContent() {
   const [copiedShare, setCopiedShare] = useState(false)
   const [submitError, setSubmitError] = useState("")
   const [isCreating, setIsCreating] = useState(false)
+  const [pinDialogOpen, setPinDialogOpen] = useState(false)
+  const [pinConfigured, setPinConfigured] = useState(false)
   const [activeDateField, setActiveDateField] = useState<"start" | "end" | null>(null)
   const [destinationMenuOpen, setDestinationMenuOpen] = useState(false)
   const [selectedDestinationId, setSelectedDestinationId] = useState<string | null>(null)
@@ -358,6 +361,40 @@ function CreateTripPageContent() {
               </CardContent>
             </Card>
 
+            <Card className={pinConfigured ? "border-emerald-500/20 bg-emerald-500/5" : "border-primary/20 bg-primary/5"}>
+              <CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-start gap-3">
+                  <div className={`rounded-xl p-2.5 ${pinConfigured ? "bg-emerald-500/10" : "bg-primary/10"}`}>
+                    {pinConfigured ? (
+                      <Check className="h-5 w-5 text-emerald-600" />
+                    ) : (
+                      <Lock className="h-5 w-5 text-primary" />
+                    )}
+                  </div>
+                  <div>
+                    <p className={`text-xs font-semibold uppercase tracking-wide ${pinConfigured ? "text-emerald-600" : "text-primary"}`}>
+                      {pinConfigured ? "Proteção configurada" : "Próximo passo recomendado"}
+                    </p>
+                    <p className="mt-1 font-semibold text-foreground">
+                      {pinConfigured ? "PIN da viagem criado" : "Proteja as informações da viagem com um PIN"}
+                    </p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      {pinConfigured
+                        ? "O viajante já pode usar o código para acessar as áreas protegidas."
+                        : "Crie um código de 4 dígitos antes de compartilhar o link com o viajante."}
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  variant={pinConfigured ? "outline" : "default"}
+                  className={pinConfigured ? "w-full shrink-0 sm:w-auto" : "w-full shrink-0 bg-gradient-to-r from-primary to-accent text-white sm:w-auto"}
+                  onClick={() => setPinDialogOpen(true)}
+                >
+                  {pinConfigured ? "Alterar PIN" : "Criar PIN agora"}
+                </Button>
+              </CardContent>
+            </Card>
+
             {/* Quick Actions */}
             <div className="grid grid-cols-3 gap-3 pt-4">
               <Link href="/agencia/concierge">
@@ -396,6 +433,15 @@ function CreateTripPageContent() {
             </div>
           </div>
         </motion.div>
+        <TripPinDialog
+          open={pinDialogOpen}
+          tripId={createdTrip.id}
+          onOpenChange={setPinDialogOpen}
+          onSaved={async () => {
+            setPinConfigured(true)
+            await refreshAgencyWorkspace()
+          }}
+        />
       </div>
     )
   }
