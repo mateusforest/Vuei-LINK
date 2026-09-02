@@ -45,7 +45,7 @@ import {
 } from "@/lib/auth/quick-access"
 import {
   Plane, Hotel, MapPin, FileText, MessageCircle, Share2, WifiOff, 
-  ChevronRight, Calendar, Clock, Users, Sun, Cloud, Thermometer,
+  ChevronRight, Calendar, Clock, Users, Sun, Moon, Cloud, Thermometer,
   Shield, Lock, Fingerprint, Download, Copy, Check, Send, Sparkles,
   Globe, Phone, AlertCircle, CreditCard, QrCode, Navigation,
   ChevronDown, Play, Pause, Volume2, Star, Heart, ExternalLink,
@@ -403,7 +403,7 @@ function Modal({
                 ) : null}
               </div>
             )}
-            <div className={cn("p-5 pb-[calc(env(safe-area-inset-bottom)+20px)]", resolvedTone === "light" ? "trip-link-light-shell" : "")}>{children}</div>
+            <div className={cn("p-5 pb-[calc(env(safe-area-inset-bottom)+20px)]", resolvedTone === "light" ? "trip-link-light-shell" : "trip-link-dark-shell")}>{children}</div>
           </motion.div>
         </>
       )}
@@ -481,7 +481,7 @@ function BottomSheet({
                 </div>
               )}
             </div>
-            <div className={cn("px-4 pb-[calc(env(safe-area-inset-bottom)+20px)] sm:px-5", resolvedTone === "light" ? "trip-link-light-shell" : "")}>{children}</div>
+            <div className={cn("px-4 pb-[calc(env(safe-area-inset-bottom)+20px)] sm:px-5", resolvedTone === "light" ? "trip-link-light-shell" : "trip-link-dark-shell")}>{children}</div>
           </motion.div>
         </>
       )}
@@ -2364,13 +2364,609 @@ function QuickAccessCards({ tripData, itineraryRecords, onNavigate }: { tripData
 
 type TravelerPublicPanel = "flights" | "hotel" | "itinerary" | "documents" | "concierge" | "offline" | null
 
-function TripLinkLightThemeStyles() {
+type TripLinkTheme = "light" | "dark"
+
+const TRIP_LINK_THEME_STORAGE_KEY = "vuei_trip_link_theme"
+
+function TripLinkThemeStyles() {
   return (
     <style jsx global>{`
-      html,
-      body {
-        background: #f4f1ea;
-        color: #0f172a;
+      .trip-link-page {
+        --trip-page-bg: #f4f0e8;
+        --trip-shell-bg: rgba(250, 248, 243, 0.74);
+        --trip-text: #10203a;
+        --trip-muted: #647086;
+        --trip-faint: #8f98a8;
+        --trip-accent: #1769ef;
+        --trip-accent-soft: rgba(23, 105, 239, 0.1);
+        --trip-status: #2775eb;
+        --trip-surface: rgba(255, 255, 255, 0.58);
+        --trip-surface-hover: rgba(255, 255, 255, 0.78);
+        --trip-icon-surface: linear-gradient(145deg, rgba(255,255,255,0.92), rgba(239,242,247,0.68));
+        --trip-border: rgba(255, 255, 255, 0.82);
+        --trip-border-soft: rgba(122, 137, 160, 0.2);
+        --trip-divider: rgba(112, 126, 148, 0.2);
+        --trip-shadow: 0 24px 70px rgba(47, 57, 76, 0.13), inset 0 1px 0 rgba(255,255,255,0.9);
+        --trip-soft-shadow: 0 14px 34px rgba(58, 68, 88, 0.1), inset 0 1px 0 rgba(255,255,255,0.86);
+        --trip-nav-bg: rgba(248, 246, 241, 0.76);
+        min-height: 100vh;
+        background:
+          radial-gradient(circle at 9% 4%, rgba(255,255,255,0.96) 0, rgba(255,255,255,0) 30%),
+          radial-gradient(circle at 93% 42%, rgba(225,209,191,0.5) 0, rgba(225,209,191,0) 35%),
+          linear-gradient(145deg, #f7f5f0 0%, #eee9e1 100%);
+        color: var(--trip-text);
+        transition: background 360ms ease, color 260ms ease;
+      }
+      .trip-link-page[data-theme="dark"] {
+        --trip-page-bg: #07101a;
+        --trip-shell-bg: rgba(8, 16, 26, 0.78);
+        --trip-text: #f7f4ef;
+        --trip-muted: #a7adb8;
+        --trip-faint: #7d8795;
+        --trip-accent: #efbd72;
+        --trip-accent-soft: rgba(239, 189, 114, 0.12);
+        --trip-status: #a8c4ff;
+        --trip-surface: rgba(255, 255, 255, 0.055);
+        --trip-surface-hover: rgba(255, 255, 255, 0.085);
+        --trip-icon-surface: linear-gradient(145deg, rgba(255,255,255,0.11), rgba(255,255,255,0.035));
+        --trip-border: rgba(255, 255, 255, 0.2);
+        --trip-border-soft: rgba(255, 255, 255, 0.1);
+        --trip-divider: rgba(255, 255, 255, 0.1);
+        --trip-shadow: 0 28px 80px rgba(0, 0, 0, 0.38), inset 0 1px 0 rgba(255,255,255,0.1);
+        --trip-soft-shadow: 0 16px 40px rgba(0, 0, 0, 0.26), inset 0 1px 0 rgba(255,255,255,0.08);
+        --trip-nav-bg: rgba(15, 22, 31, 0.82);
+        background:
+          radial-gradient(circle at 87% 5%, rgba(114,73,31,0.24) 0, rgba(114,73,31,0) 27%),
+          radial-gradient(circle at 3% 48%, rgba(18,54,87,0.22) 0, rgba(18,54,87,0) 34%),
+          linear-gradient(145deg, #08121d 0%, #050a11 100%);
+      }
+      .traveler-public-shell {
+        position: relative;
+        isolation: isolate;
+        margin: 0 auto;
+        display: flex;
+        min-height: 100vh;
+        width: 100%;
+        max-width: 520px;
+        flex-direction: column;
+        overflow: hidden;
+        color: var(--trip-text);
+        background: var(--trip-shell-bg);
+        transition: background 360ms ease, color 260ms ease;
+      }
+      .traveler-public-shell::before,
+      .traveler-public-shell::after {
+        position: absolute;
+        z-index: -1;
+        border-radius: 999px;
+        content: "";
+        pointer-events: none;
+        filter: blur(54px);
+      }
+      .traveler-public-shell::before {
+        left: -18%;
+        top: 2%;
+        height: 270px;
+        width: 270px;
+        background: rgba(255,255,255,0.44);
+      }
+      .traveler-public-shell::after {
+        right: -24%;
+        top: 42%;
+        height: 310px;
+        width: 310px;
+        background: rgba(220,199,176,0.24);
+      }
+      .trip-link-page[data-theme="dark"] .traveler-public-shell::before {
+        background: rgba(25, 72, 111, 0.18);
+      }
+      .trip-link-page[data-theme="dark"] .traveler-public-shell::after {
+        background: rgba(120, 76, 31, 0.14);
+      }
+      .trip-shell-inner {
+        position: relative;
+        display: flex;
+        min-height: 100vh;
+        flex: 1;
+        flex-direction: column;
+        padding: calc(env(safe-area-inset-top) + 16px) 16px calc(env(safe-area-inset-bottom) + 90px);
+      }
+      .trip-top-header {
+        display: flex;
+        min-height: 46px;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+      }
+      .trip-brand-badge,
+      .trip-round-action,
+      .trip-avatar-action,
+      .trip-summary-panel,
+      .trip-offline-card,
+      .trip-bottom-nav {
+        border: 1px solid var(--trip-border);
+        background: var(--trip-surface);
+        box-shadow: var(--trip-soft-shadow);
+        -webkit-backdrop-filter: blur(18px) saturate(140%);
+        backdrop-filter: blur(18px) saturate(140%);
+        transition: background 260ms ease, border-color 260ms ease, color 260ms ease, box-shadow 260ms ease;
+      }
+      .trip-brand-badge {
+        display: flex;
+        min-width: 0;
+        max-width: 272px;
+        align-items: center;
+        gap: 10px;
+        border-radius: 999px;
+        padding: 9px 13px;
+      }
+      .trip-brand-logo {
+        height: 28px;
+        width: auto;
+        max-width: 116px;
+        flex-shrink: 0;
+        object-fit: contain;
+      }
+      .trip-brand-divider {
+        height: 24px;
+        width: 1px;
+        flex-shrink: 0;
+        background: var(--trip-divider);
+      }
+      .trip-brand-credit {
+        min-width: 0;
+        color: var(--trip-muted);
+        font-size: 0.7rem;
+        font-weight: 450;
+        line-height: 1.15;
+      }
+      .trip-brand-credit strong {
+        color: var(--trip-text);
+        font-weight: 650;
+      }
+      .trip-header-actions {
+        display: flex;
+        flex-shrink: 0;
+        align-items: center;
+        gap: 7px;
+      }
+      .trip-round-action,
+      .trip-avatar-action {
+        display: flex;
+        height: 44px;
+        width: 44px;
+        flex-shrink: 0;
+        align-items: center;
+        justify-content: center;
+        border-radius: 999px;
+      }
+      .trip-round-action {
+        color: var(--trip-text);
+      }
+      .trip-round-action:hover {
+        background: var(--trip-surface-hover);
+        transform: translateY(-1px);
+      }
+      .trip-avatar-action {
+        border-color: color-mix(in srgb, var(--trip-accent) 42%, transparent);
+        color: white;
+        font-size: 1rem;
+        font-weight: 650;
+        background: linear-gradient(145deg, #347be2, #163d85);
+        box-shadow: 0 12px 30px rgba(29, 78, 165, 0.28), inset 0 1px 0 rgba(255,255,255,0.35);
+      }
+      .trip-link-page[data-theme="dark"] .trip-avatar-action {
+        color: var(--trip-accent);
+        background: linear-gradient(145deg, rgba(255,255,255,0.1), rgba(255,255,255,0.02));
+        box-shadow: 0 14px 32px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.1);
+      }
+      .trip-hero-card {
+        position: relative;
+        margin-top: 14px;
+        aspect-ratio: 1.68 / 1;
+        min-height: 250px;
+        overflow: hidden;
+        border: 1px solid rgba(255,255,255,0.7);
+        border-radius: 29px;
+        box-shadow: 0 26px 54px rgba(35, 45, 61, 0.2), inset 0 1px 0 rgba(255,255,255,0.55);
+      }
+      .trip-link-page[data-theme="dark"] .trip-hero-card {
+        border-color: rgba(255,255,255,0.5);
+        box-shadow: 0 28px 62px rgba(0,0,0,0.48), inset 0 1px 0 rgba(255,255,255,0.2);
+      }
+      .trip-hero-overlay {
+        position: absolute;
+        inset: 0;
+        background:
+          linear-gradient(90deg, rgba(5,14,27,0.76) 0%, rgba(5,14,27,0.38) 52%, rgba(5,14,27,0.04) 82%),
+          linear-gradient(0deg, rgba(5,12,22,0.78) 0%, rgba(5,12,22,0.04) 58%);
+      }
+      .trip-link-page[data-theme="dark"] .trip-hero-overlay {
+        background:
+          linear-gradient(90deg, rgba(3,10,19,0.84) 0%, rgba(3,10,19,0.46) 54%, rgba(3,10,19,0.08) 82%),
+          linear-gradient(0deg, rgba(2,8,15,0.9) 0%, rgba(2,8,15,0.05) 58%);
+      }
+      .trip-hero-content {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        max-width: 78%;
+        flex-direction: column;
+        justify-content: flex-end;
+        padding: 24px 23px;
+        color: #fff;
+      }
+      .trip-display-title,
+      .trip-section-title,
+      .trip-summary-title,
+      .trip-offline-title {
+        font-family: Georgia, "Times New Roman", serif;
+      }
+      .trip-display-title {
+        font-size: clamp(3rem, 13vw, 4.2rem);
+        font-weight: 400;
+        line-height: 0.9;
+        letter-spacing: -0.055em;
+        text-wrap: balance;
+      }
+      .trip-hero-country {
+        margin-top: 13px;
+        display: flex;
+        min-width: 0;
+        align-items: center;
+        gap: 9px;
+        color: rgba(255,255,255,0.82);
+        font-size: 1rem;
+      }
+      .trip-hero-rule {
+        margin: 15px 0 14px;
+        height: 1px;
+        width: 26px;
+        background: rgba(255,255,255,0.8);
+      }
+      .trip-date-pill {
+        display: inline-flex;
+        max-width: max-content;
+        align-items: center;
+        gap: 10px;
+        border: 1px solid rgba(255,255,255,0.5);
+        border-radius: 999px;
+        padding: 11px 16px;
+        background: rgba(10,20,34,0.26);
+        box-shadow: inset 0 1px 0 rgba(255,255,255,0.2);
+        -webkit-backdrop-filter: blur(12px);
+        backdrop-filter: blur(12px);
+        font-size: 0.92rem;
+        font-weight: 520;
+        white-space: nowrap;
+      }
+      .trip-section-title {
+        margin: 18px 4px 8px;
+        color: var(--trip-text);
+        font-size: 1.58rem;
+        font-weight: 500;
+        letter-spacing: -0.035em;
+      }
+      .trip-summary-panel {
+        overflow: hidden;
+        border-radius: 26px;
+        padding: 0 17px;
+        box-shadow: var(--trip-shadow);
+      }
+      .trip-summary-row {
+        display: grid;
+        min-height: 76px;
+        grid-template-columns: 52px minmax(0, 1fr) auto 16px;
+        align-items: center;
+        gap: 13px;
+        width: 100%;
+        color: var(--trip-text);
+        text-align: left;
+      }
+      .trip-summary-row + .trip-summary-row {
+        border-top: 1px solid var(--trip-divider);
+      }
+      .trip-summary-row:hover {
+        background: linear-gradient(90deg, transparent, var(--trip-accent-soft), transparent);
+      }
+      .trip-summary-icon {
+        display: flex;
+        height: 48px;
+        width: 48px;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid var(--trip-border);
+        border-radius: 17px;
+        color: var(--trip-accent);
+        background: var(--trip-icon-surface);
+        box-shadow: var(--trip-soft-shadow);
+      }
+      .trip-summary-copy {
+        min-width: 0;
+      }
+      .trip-summary-title {
+        overflow: hidden;
+        color: var(--trip-text);
+        font-size: 1.12rem;
+        font-weight: 500;
+        line-height: 1.15;
+        letter-spacing: -0.025em;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .trip-summary-text,
+      .trip-summary-detail {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .trip-summary-text {
+        margin-top: 3px;
+        color: var(--trip-muted);
+        font-size: 0.84rem;
+      }
+      .trip-summary-detail {
+        margin-top: 2px;
+        color: var(--trip-accent);
+        font-size: 0.79rem;
+        font-weight: 520;
+      }
+      .trip-summary-status {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        color: var(--trip-status);
+        font-size: 0.76rem;
+        font-weight: 500;
+        white-space: nowrap;
+      }
+      .trip-summary-status[data-status="confirmado"],
+      .trip-summary-status[data-status="pronto"] {
+        color: #3aa675;
+      }
+      .trip-status-dot {
+        height: 6px;
+        width: 6px;
+        border-radius: 999px;
+        background: currentColor;
+        box-shadow: 0 0 12px color-mix(in srgb, currentColor 55%, transparent);
+      }
+      .trip-summary-chevron {
+        color: var(--trip-muted);
+      }
+      .trip-offline-card {
+        margin-top: 12px;
+        display: grid;
+        grid-template-columns: 48px minmax(0,1fr) auto;
+        align-items: center;
+        gap: 14px;
+        width: 100%;
+        border-radius: 26px;
+        padding: 11px 16px;
+        color: var(--trip-text);
+      }
+      .trip-offline-title {
+        color: var(--trip-text);
+        font-size: 1.04rem;
+        font-weight: 500;
+      }
+      .trip-offline-subtitle {
+        margin-top: 3px;
+        color: var(--trip-muted);
+        font-size: 0.78rem;
+      }
+      .trip-download-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        border: 1px solid color-mix(in srgb, var(--trip-accent) 70%, transparent);
+        border-radius: 999px;
+        padding: 9px 13px;
+        color: var(--trip-accent);
+        background: color-mix(in srgb, var(--trip-surface-hover) 88%, transparent);
+        box-shadow: 0 10px 24px color-mix(in srgb, var(--trip-accent) 12%, transparent);
+        font-size: 0.78rem;
+        font-weight: 600;
+        white-space: nowrap;
+      }
+      .trip-offline-banner {
+        margin-top: 12px;
+        border: 1px solid rgba(217, 155, 53, 0.28);
+        border-radius: 20px;
+        padding: 10px 14px;
+        color: #9a6b1f;
+        background: rgba(255, 244, 217, 0.72);
+        font-size: 0.78rem;
+      }
+      .trip-link-page[data-theme="dark"] .trip-offline-banner {
+        color: #efbd72;
+        background: rgba(120,76,31,0.13);
+      }
+      .trip-bottom-nav {
+        position: fixed;
+        z-index: 40;
+        left: 50%;
+        bottom: max(10px, env(safe-area-inset-bottom));
+        width: min(calc(100% - 24px), 488px);
+        transform: translateX(-50%);
+        border-radius: 30px;
+        padding: 7px 8px 6px;
+        background: var(--trip-nav-bg);
+        box-shadow: var(--trip-shadow);
+      }
+      .trip-bottom-grid {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: 2px;
+      }
+      .trip-bottom-item {
+        position: relative;
+        display: flex;
+        min-width: 0;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 3px;
+        border-radius: 21px;
+        padding: 6px 2px 4px;
+        color: var(--trip-muted);
+        text-align: center;
+      }
+      .trip-bottom-item[data-active="true"] {
+        color: var(--trip-accent);
+        background: linear-gradient(135deg, var(--trip-accent-soft), transparent);
+      }
+      .trip-bottom-item[data-active="true"]::after {
+        position: absolute;
+        bottom: -6px;
+        height: 2px;
+        width: 34px;
+        border-radius: 999px;
+        background: var(--trip-accent);
+        content: "";
+      }
+      .trip-bottom-icon {
+        position: relative;
+        display: flex;
+        height: 30px;
+        width: 30px;
+        align-items: center;
+        justify-content: center;
+      }
+      .trip-bottom-badge {
+        position: absolute;
+        right: -6px;
+        top: -5px;
+        border: 1px solid var(--trip-border);
+        border-radius: 999px;
+        padding: 2px 5px;
+        color: var(--trip-text);
+        background: var(--trip-nav-bg);
+        box-shadow: var(--trip-soft-shadow);
+        font-size: 8px;
+        font-weight: 650;
+      }
+      .trip-bottom-label {
+        overflow: hidden;
+        max-width: 100%;
+        font-size: 0.66rem;
+        font-weight: 520;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .trip-claim-notice {
+        border-color: var(--trip-border) !important;
+        color: var(--trip-text);
+        background: var(--trip-surface) !important;
+        box-shadow: var(--trip-soft-shadow) !important;
+        backdrop-filter: blur(18px);
+      }
+      .trip-claim-notice [class*="text-slate-9"] {
+        color: var(--trip-text) !important;
+      }
+      .trip-claim-notice [class*="text-slate-6"] {
+        color: var(--trip-muted) !important;
+      }
+      @media (min-width: 640px) {
+        .traveler-public-shell {
+          margin-block: 20px;
+          min-height: calc(100vh - 40px);
+          border: 1px solid var(--trip-border-soft);
+          border-radius: 42px;
+          box-shadow: var(--trip-shadow);
+        }
+        .trip-shell-inner {
+          min-height: calc(100vh - 40px);
+          padding-inline: 24px;
+        }
+      }
+      @media (max-width: 430px) {
+        .trip-shell-inner {
+          padding-inline: 12px;
+        }
+        .trip-brand-badge {
+          max-width: 205px;
+          gap: 7px;
+          padding-inline: 10px;
+        }
+        .trip-brand-logo {
+          max-width: 86px;
+        }
+        .trip-brand-credit {
+          font-size: 0.61rem;
+        }
+        .trip-header-actions {
+          gap: 5px;
+        }
+        .trip-round-action,
+        .trip-avatar-action {
+          height: 39px;
+          width: 39px;
+        }
+        .trip-hero-card {
+          min-height: 244px;
+          border-radius: 27px;
+        }
+        .trip-hero-content {
+          max-width: 86%;
+          padding: 21px 20px;
+        }
+        .trip-display-title {
+          font-size: clamp(3rem, 16vw, 4.1rem);
+        }
+        .trip-summary-panel {
+          padding-inline: 13px;
+        }
+        .trip-summary-row {
+          grid-template-columns: 48px minmax(0, 1fr) auto 14px;
+          gap: 10px;
+        }
+        .trip-summary-icon {
+          height: 44px;
+          width: 44px;
+        }
+        .trip-summary-status {
+          font-size: 0.7rem;
+        }
+        .trip-offline-card {
+          grid-template-columns: 44px minmax(0,1fr) auto;
+          gap: 10px;
+          padding-inline: 13px;
+        }
+        .trip-download-pill {
+          padding-inline: 10px;
+        }
+      }
+      @media (max-width: 360px) {
+        .trip-brand-credit,
+        .trip-summary-status span:last-child,
+        .trip-download-pill span {
+          display: none;
+        }
+        .trip-brand-badge {
+          max-width: 122px;
+        }
+        .trip-summary-row {
+          grid-template-columns: 44px minmax(0, 1fr) 8px 14px;
+        }
+        .trip-download-pill {
+          height: 38px;
+          width: 38px;
+          justify-content: center;
+          padding: 0;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .trip-link-page,
+        .traveler-public-shell,
+        .trip-brand-badge,
+        .trip-round-action,
+        .trip-avatar-action,
+        .trip-summary-panel,
+        .trip-offline-card,
+        .trip-bottom-nav {
+          transition: none;
+        }
       }
       .trip-link-light-shell section[id] {
         padding: 0 !important;
@@ -2424,6 +3020,47 @@ function TripLinkLightThemeStyles() {
       .trip-link-light-shell [class*="text-slate-5"],
       .trip-link-light-shell [class*="text-slate-6"] {
         color: #64748b !important;
+      }
+      .trip-link-dark-shell [class*="text-slate-8"],
+      .trip-link-dark-shell [class*="text-slate-9"],
+      .trip-link-dark-shell [class*="text-black"] {
+        color: #f7f4ef !important;
+      }
+      .trip-link-dark-shell [class*="text-slate-4"],
+      .trip-link-dark-shell [class*="text-slate-5"],
+      .trip-link-dark-shell [class*="text-slate-6"],
+      .trip-link-dark-shell [class*="text-slate-7"],
+      .trip-link-dark-shell .text-muted-foreground {
+        color: #a7adb8 !important;
+      }
+      .trip-link-dark-shell [class*="text-[#2563eb]"],
+      .trip-link-dark-shell [class*="text-[#5de0e6]"] {
+        color: #efbd72 !important;
+      }
+      .trip-link-dark-shell [class*="bg-white"],
+      .trip-link-dark-shell [class*="bg-[#eef4ff]"],
+      .trip-link-dark-shell [class*="bg-[#eff6ff]"],
+      .trip-link-dark-shell [class*="bg-[linear-gradient(180deg,#ffffff"] {
+        background: rgba(255, 255, 255, 0.055) !important;
+      }
+      .trip-link-dark-shell [class*="border-slate"],
+      .trip-link-dark-shell [class*="border-[#dbe5f4]"] {
+        border-color: rgba(255, 255, 255, 0.1) !important;
+      }
+      .trip-link-dark-shell input,
+      .trip-link-dark-shell textarea,
+      .trip-link-dark-shell select {
+        background: rgba(255, 255, 255, 0.055) !important;
+        color: #f7f4ef !important;
+        border-color: rgba(255, 255, 255, 0.12) !important;
+      }
+      .trip-link-dark-shell input::placeholder,
+      .trip-link-dark-shell textarea::placeholder {
+        color: #7d8795 !important;
+      }
+      .trip-link-dark-shell option {
+        background: #111923 !important;
+        color: #f7f4ef !important;
       }
     `}</style>
   )
@@ -2569,6 +3206,8 @@ function TravelerPublicShell({
   agencyBranding,
   offlineModeEnabled,
   offlinePackageStatus,
+  theme,
+  onToggleTheme,
   onOpenShare,
   onOpenMenu,
   onOpenPanel,
@@ -2578,6 +3217,8 @@ function TravelerPublicShell({
   agencyBranding: { name: string | null; logoUrl: string | null; isAgency: boolean }
   offlineModeEnabled: boolean
   offlinePackageStatus: OfflineTripPackageStatus | null
+  theme: TripLinkTheme
+  onToggleTheme: () => void
   onOpenShare: () => void
   onOpenMenu: () => void
   onOpenPanel: (panel: Exclude<TravelerPublicPanel, null> | "more" | "home") => void
@@ -2596,49 +3237,60 @@ function TravelerPublicShell({
       data-ui-version="traveler-link-v2"
       data-route-mode="public-b2c"
       data-render-file="app/viagem/[id]/page.tsx"
-      className="relative mx-auto flex min-h-screen w-full max-w-[460px] flex-col overflow-hidden bg-[#fbfaf7] md:my-5 md:min-h-[868px] md:rounded-[38px] md:border md:border-black/5 md:shadow-[0_32px_90px_rgba(15,23,42,0.12)]"
+      data-theme={theme}
+      className="traveler-public-shell"
     >
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.98),_rgba(247,243,235,0.94)_48%,_rgba(241,237,230,0.92)_100%)]" />
-      <div className="absolute inset-x-0 top-0 h-80 bg-[linear-gradient(180deg,rgba(255,255,255,0.95),rgba(255,255,255,0))]" />
-      <div className="relative flex flex-1 flex-col px-4 pb-[calc(env(safe-area-inset-bottom)+108px)] pt-[calc(env(safe-area-inset-top)+11px)]">
-        <header className="flex items-center justify-between gap-3">
-          <div className="flex min-w-0 items-center gap-3">
+      <div className="trip-shell-inner">
+        <header className="trip-top-header">
+          <div className="min-w-0">
             {showAgencyBranding ? (
-              <div className="flex min-w-0 items-center gap-3 rounded-[22px] bg-white/88 px-3.5 py-2.5 shadow-[0_16px_40px_rgba(15,23,42,0.08)] ring-1 ring-black/5 backdrop-blur-sm">
+              <div className="trip-brand-badge">
                 {agencyBranding.logoUrl ? (
                   <Image
                     src={agencyBranding.logoUrl}
                     alt={agencyBranding.name || "Agência"}
                     width={156}
                     height={46}
-                    className="h-7 w-auto max-w-[124px] shrink-0 object-contain sm:h-8 sm:max-w-[144px]"
+                    className="trip-brand-logo"
                   />
                 ) : (
-                  <span className="truncate text-base font-semibold tracking-[-0.03em] text-slate-900">
+                  <span className="truncate text-sm font-semibold tracking-[-0.03em] text-[var(--trip-text)]">
                     {agencyBranding.name}
                   </span>
                 )}
-                <span aria-hidden="true" className="h-6 w-px shrink-0 bg-slate-200" />
-                <span className="min-w-0 text-[0.7rem] font-medium leading-tight text-slate-400 sm:text-xs">
-                  Desenvolvido por Vuei
+                <span aria-hidden="true" className="trip-brand-divider" />
+                <span className="trip-brand-credit">
+                  Desenvolvido por <strong>Vuei</strong>
                 </span>
               </div>
             ) : (
-              <Image src="/vuei-logo.png" alt="Vuei" width={160} height={46} className="h-[42px] w-auto object-contain" priority />
+              <div className="trip-brand-badge w-fit">
+                <Image src="/vuei-logo.png" alt="Vuei" width={160} height={46} className="trip-brand-logo" priority />
+              </div>
             )}
           </div>
 
-          <div className="flex items-center gap-2.5">
+          <div className="trip-header-actions">
             <button
               onClick={onOpenShare}
-              className="flex h-[42px] w-[42px] items-center justify-center rounded-full bg-white/88 text-slate-700 shadow-[0_12px_30px_rgba(15,23,42,0.08)] ring-1 ring-black/5 transition hover:bg-white"
+              className="trip-round-action"
               aria-label="Compartilhar viagem"
             >
               <Share2 className="h-5 w-5" />
             </button>
             <button
+              type="button"
+              onClick={onToggleTheme}
+              className="trip-round-action"
+              aria-label={theme === "dark" ? "Ativar tema claro" : "Ativar tema escuro"}
+              aria-pressed={theme === "dark"}
+              title={theme === "dark" ? "Tema claro" : "Tema escuro"}
+            >
+              {theme === "dark" ? <Sun className="h-4.5 w-4.5" /> : <Moon className="h-4.5 w-4.5" />}
+            </button>
+            <button
               onClick={onOpenMenu}
-              className="flex h-[42px] w-[42px] items-center justify-center rounded-full bg-[linear-gradient(135deg,#3b82f6,#1d4ed8)] text-sm font-semibold text-white shadow-[0_16px_30px_rgba(37,99,235,0.24)]"
+              className="trip-avatar-action"
               aria-label="Abrir menu"
             >
               {avatarLetter}
@@ -2646,80 +3298,79 @@ function TravelerPublicShell({
           </div>
         </header>
 
-        <section className="relative mt-2.5 min-h-[252px] overflow-hidden rounded-[36px] px-0 pb-1 pt-2">
-          <div className="absolute inset-0">
-            <div className="absolute left-0 top-0 z-[1] h-full w-[58%] bg-[linear-gradient(90deg,rgba(251,250,247,0.99)_0%,rgba(251,250,247,0.955)_34%,rgba(251,250,247,0.36)_70%,rgba(251,250,247,0.04)_100%)]" />
-            <div className="absolute inset-x-0 top-0 z-[1] h-16 bg-[linear-gradient(180deg,rgba(251,250,247,0.88)_0%,rgba(251,250,247,0)_100%)]" />
-            <div className="absolute inset-x-0 bottom-0 z-[1] h-20 bg-[linear-gradient(180deg,rgba(251,250,247,0)_0%,rgba(251,250,247,0.9)_62%,rgba(251,250,247,0.98)_100%)]" />
-            <ImageWithFallback
-              src={tripData.heroImage}
-              fallbackSrc={DEFAULT_HERO_IMAGE}
-              alt={tripData.destination}
-              fill
-              className="object-cover object-[68%_56%] opacity-[0.99] scale-[1.02]"
-              priority
-            />
-            </div>
-
-          <div className="relative z-10 max-w-[58%] px-4 pt-8">
-            <h1 className="text-[3.45rem] font-semibold leading-[0.88] tracking-[-0.07em] text-slate-950">
-              {parsedDestination.city}
-            </h1>
-            <div className="mt-1.5 flex items-center gap-2 text-[1.12rem] text-slate-500">
-              <span className="text-[1.6rem]">{tripData.countryFlag}</span>
+        <motion.section
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, ease: "easeOut" }}
+          className="trip-hero-card"
+        >
+          <ImageWithFallback
+            src={tripData.heroImage}
+            fallbackSrc={DEFAULT_HERO_IMAGE}
+            alt={tripData.destination}
+            fill
+            className="object-cover object-center"
+            priority
+          />
+          <div className="trip-hero-overlay" />
+          <div className="trip-hero-content">
+            <h1 className="trip-display-title">{parsedDestination.city}</h1>
+            <div className="trip-hero-country">
+              <Globe className="h-5 w-5 shrink-0" />
               <span className="truncate">{countryLabel}</span>
             </div>
-            <div className="mt-4 inline-flex max-w-full items-center justify-center gap-2 overflow-hidden rounded-full bg-white/94 px-3.5 py-2 text-[0.84rem] font-medium text-slate-600 shadow-[0_12px_28px_rgba(15,23,42,0.08)] ring-1 ring-black/5">
-              <Calendar className="h-3.5 w-3.5 shrink-0 text-slate-500" />
-              <span className="block max-w-full overflow-hidden text-ellipsis whitespace-nowrap">{heroDateLabel}</span>
+            <div className="trip-hero-rule" />
+            <div className="trip-date-pill">
+              <Calendar className="h-5 w-5 shrink-0" />
+              <span className="overflow-hidden text-ellipsis">{heroDateLabel}</span>
             </div>
+          </div>
+        </motion.section>
+
+        <section>
+          <h2 className="trip-section-title">Sua viagem</h2>
+          <div className="trip-summary-panel">
+            {cards.map((card) => (
+              <button key={card.id} onClick={() => onOpenPanel(card.id)} className="trip-summary-row">
+                <div className="trip-summary-icon">
+                  <card.icon className="h-5 w-5" strokeWidth={1.8} />
+                </div>
+                <div className="trip-summary-copy">
+                  <p className="trip-summary-title">{card.title}</p>
+                  <p className="trip-summary-text">{card.summary}</p>
+                  <p className="trip-summary-detail">{card.detail}</p>
+                </div>
+                <div className="trip-summary-status" data-status={card.status.toLowerCase()}>
+                  <span className="trip-status-dot" />
+                  <span>{card.status}</span>
+                </div>
+                <ChevronRight className="trip-summary-chevron h-5 w-5 shrink-0" />
+              </button>
+            ))}
           </div>
         </section>
 
-        <section className="mt-1 space-y-1.5">
-          {cards.map((card) => (
-            <button
-              key={card.id}
-              onClick={() => onOpenPanel(card.id)}
-              className="flex w-full items-center gap-3 rounded-[24px] bg-white/94 px-3.5 py-2 text-left shadow-[0_14px_32px_rgba(148,163,184,0.11)] ring-1 ring-black/5 transition hover:bg-white"
-            >
-              <div className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-[15px] bg-[linear-gradient(180deg,#f3f7ff,#e9eefb)] text-[#2563eb]">
-                <card.icon className="h-[18px] w-[18px]" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center justify-between gap-3">
-                  <p className="truncate text-[1rem] font-semibold tracking-[-0.03em] text-slate-950">{card.title}</p>
-                  <span className={cn("shrink-0 text-[0.85rem] font-medium", card.statusClassName)}>{card.status}</span>
-                </div>
-                <p className="truncate text-[0.9rem] text-slate-600">{card.summary}</p>
-                <p className="truncate text-[0.8rem] leading-[1.1] text-slate-400">{card.detail}</p>
-              </div>
-              <ChevronRight className="h-4 w-4 shrink-0 text-slate-400" />
-            </button>
-          ))}
-        </section>
-
-        <section className="mt-3">
+        <section>
           <button
             onClick={() => onOpenPanel("offline")}
-            className="flex w-full items-center gap-3 rounded-[24px] bg-white/92 px-3.5 py-2.5 shadow-[0_14px_32px_rgba(148,163,184,0.11)] ring-1 ring-black/5 transition hover:bg-white"
+            className="trip-offline-card"
           >
-            <div className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px]", offlineReady ? "bg-[#edf8ef] text-emerald-600" : "bg-[#f1f5f9] text-slate-500")}>
-              {offlineReady ? <CheckCircle2 className="h-4.5 w-4.5" /> : <Download className="h-4.5 w-4.5" />}
+            <div className="trip-summary-icon h-11 w-11 rounded-2xl">
+              {offlineReady ? <CheckCircle2 className="h-5 w-5" /> : <Download className="h-5 w-5" />}
             </div>
-            <div className="min-w-0 flex-1 text-left">
-              <p className="truncate text-[0.96rem] font-semibold tracking-[-0.03em] text-slate-950">Disponível offline</p>
-              <p className="truncate text-[0.84rem] text-slate-500">{offlineReady ? "Baixado neste dispositivo" : "Baixe os documentos"}</p>
+            <div className="min-w-0 text-left">
+              <p className="trip-offline-title truncate">Disponível offline</p>
+              <p className="trip-offline-subtitle truncate">{offlineReady ? "Baixado neste dispositivo" : "Baixe os documentos"}</p>
             </div>
-            <div className="flex shrink-0 items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[0.82rem] font-medium text-[#2563eb] shadow-[0_8px_20px_rgba(148,163,184,0.12)]">
-              <Download className="h-3.5 w-3.5" />
+            <div className="trip-download-pill">
+              <Download className="h-4 w-4" />
               <span className="whitespace-nowrap">Baixar docs</span>
             </div>
           </button>
         </section>
 
         {offlineModeEnabled && offlinePackageStatus ? (
-          <div className="mt-2.5 rounded-[20px] border border-amber-200 bg-amber-50 px-4 py-2.5 text-[0.82rem] text-amber-800">
+          <div className="trip-offline-banner">
             {offlinePackageStatus === "partial"
               ? "Modo offline ativo com disponibilidade parcial."
               : offlinePackageStatus === "legacy_snapshot"
@@ -2729,8 +3380,8 @@ function TravelerPublicShell({
         ) : null}
       </div>
 
-      <nav className="absolute inset-x-0 bottom-0 z-20 border-t border-black/5 bg-[rgba(255,255,255,0.84)] px-3 pb-[calc(env(safe-area-inset-bottom)+8px)] pt-2 backdrop-blur-xl">
-        <div className="grid grid-cols-5 gap-1">
+      <nav className="trip-bottom-nav" aria-label="Navegação da viagem">
+        <div className="trip-bottom-grid">
           {[
             { id: "home", label: "Viagem", icon: Briefcase },
             { id: "itinerary", label: "Roteiro", icon: MapPin },
@@ -2741,20 +3392,16 @@ function TravelerPublicShell({
             <button
               key={item.id}
               onClick={() => onOpenPanel(item.id as Exclude<TravelerPublicPanel, null> | "more" | "home")}
-              className={cn(
-                "relative flex flex-col items-center justify-center gap-0.5 rounded-[20px] px-2 py-1 text-center transition",
-                item.id === "home" ? "text-[#2563eb]" : "text-slate-500 hover:text-slate-700",
-              )}
+              className="trip-bottom-item"
+              data-active={item.id === "home"}
             >
-              <div className={cn("relative flex h-9 w-9 items-center justify-center rounded-full", item.id === "home" ? "bg-[#eff6ff]" : "bg-transparent")}>
-                <item.icon className="h-4.5 w-4.5" />
+              <div className="trip-bottom-icon">
+                <item.icon className="h-5 w-5" strokeWidth={1.8} />
                 {item.badge ? (
-                  <span className="absolute -right-1 top-0 rounded-full bg-white px-1.5 py-0.5 text-[9px] font-semibold text-slate-700 shadow-sm ring-1 ring-black/5">
-                    {item.badge}
-                  </span>
+                  <span className="trip-bottom-badge">{item.badge}</span>
                 ) : null}
               </div>
-              <span className="text-[10px] font-medium">{item.label}</span>
+              <span className="trip-bottom-label">{item.label}</span>
             </button>
           ))}
         </div>
@@ -6276,6 +6923,7 @@ function MenuModal({
   onOpenSecurity,
   onOpenCredits,
   publicView = false,
+  tone,
   showCredits = true,
   onOpenEditTrip,
   onOpenShare,
@@ -6288,12 +6936,14 @@ function MenuModal({
   onOpenSecurity: () => void
   onOpenCredits: () => void
   publicView?: boolean
+  tone?: TripLinkTheme
   showCredits?: boolean
   onOpenEditTrip?: () => void
   onOpenShare?: () => void
   onOpenOffline?: () => void
 }) {
   const { isAdmin } = useContext(PermissionContext)
+  const publicViewIsLight = publicView && tone !== "dark"
   const menuItems = [
     ...(isAdmin ? [
       ...(onOpenEditTrip ? [{ icon: Edit3, label: "Editar viagem", action: onOpenEditTrip }] : []),
@@ -6308,7 +6958,7 @@ function MenuModal({
   ]
 
   return (
-    <BottomSheet tone={publicView ? "light" : "dark"} open={open} onClose={onClose} title="Menu da Viagem">
+    <BottomSheet tone={publicView ? tone ?? "light" : "dark"} open={open} onClose={onClose} title="Menu da Viagem">
       <div className="space-y-2">
         {((isAdmin ? menuItems.slice(0, -1) : menuItems).filter((item) => showCredits || item.action !== onOpenCredits)).map((item, i) => (
           <button
@@ -6316,15 +6966,15 @@ function MenuModal({
             onClick={() => { item.action(); onClose() }}
             className={cn(
               "w-full flex items-center gap-4 rounded-xl p-4 text-left transition-colors",
-              publicView
+              publicViewIsLight
                 ? "border border-slate-200/80 bg-white/90 hover:bg-white"
                 : "border border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.05]"
             )}
           >
-            <div className={cn("flex h-10 w-10 items-center justify-center rounded-xl", publicView ? "bg-[#eef4ff]" : "bg-white/[0.05]")}>
-              <item.icon className={cn("h-5 w-5", publicView ? "text-[#2563eb]" : "text-white/60")} />
+            <div className={cn("flex h-10 w-10 items-center justify-center rounded-xl", publicViewIsLight ? "bg-[#eef4ff]" : "bg-white/[0.05]")}>
+              <item.icon className={cn("h-5 w-5", publicViewIsLight ? "text-[#2563eb]" : "text-[#efbd72]")} />
             </div>
-            <span className={cn("font-medium", publicView ? "text-slate-900" : "text-white")}>{item.label}</span>
+            <span className={cn("font-medium", publicViewIsLight ? "text-slate-900" : "text-white")}>{item.label}</span>
           </button>
         ))}
       </div>
@@ -7037,10 +7687,12 @@ function TravelerPublicCreditsModal({
   open,
   onClose,
   credits,
+  tone,
 }: {
   open: boolean
   onClose: () => void
   credits: TripTravelerCreditsPayload | null
+  tone?: TripLinkTheme
 }) {
   const balance = Math.max(credits?.balance ?? 0, 0)
   const planCredits = Math.max(credits?.planCreditsAvailable ?? 0, 0)
@@ -7050,7 +7702,7 @@ function TravelerPublicCreditsModal({
   const usagePercentage = monthlyCredits > 0 ? Math.min((planCreditsUsed / monthlyCredits) * 100, 100) : 0
 
   return (
-    <Modal tone="light" open={open} onClose={onClose} title="Créditos">
+    <Modal tone={tone} open={open} onClose={onClose} title="Créditos">
       <div className="space-y-5">
         {!credits ? (
           <div className="rounded-2xl border border-slate-200 bg-white/92 p-4 text-sm text-slate-600">
@@ -7108,10 +7760,12 @@ function LinkCreditsSummaryModal({
   open,
   onClose,
   credits,
+  tone,
 }: {
   open: boolean
   onClose: () => void
   credits: TripTravelerCreditsPayload | null
+  tone?: TripLinkTheme
 }) {
   const balance = Math.max(credits?.balance ?? 0, 0)
   const planCredits = Math.max(credits?.planCreditsAvailable ?? 0, 0)
@@ -7121,7 +7775,7 @@ function LinkCreditsSummaryModal({
   const usagePercentage = monthlyCredits > 0 ? Math.min((planCreditsUsed / monthlyCredits) * 100, 100) : 0
 
   return (
-    <Modal tone="light" open={open} onClose={onClose} title="Créditos">
+    <Modal tone={tone} open={open} onClose={onClose} title="Créditos">
       <div className="space-y-5">
         {!credits ? (
           <div className="rounded-2xl border border-slate-200 bg-white/92 p-4 text-sm text-slate-600">
@@ -7570,6 +8224,7 @@ export default function TripPage() {
         : initialTripData.id
   const searchParamsKey = searchParams?.toString() ?? ""
   const [tripData, setTripData] = useState(() => normalizeTripViewData(initialTripData))
+  const [tripLinkTheme, setTripLinkTheme] = useState<TripLinkTheme>("light")
   const [isAdmin, setIsAdmin] = useState(false)
   const [canWrite, setCanWrite] = useState(false)
   const [isLoadingTrip, setIsLoadingTrip] = useState(true)
@@ -8369,6 +9024,31 @@ export default function TripPage() {
   }, [adminRouteActive, params?.id, params?.slug, pathname, searchParamsKey, authLoading, user?.id, profile?.role, profile?.agencyId, sensitiveAccessGranted])
 
   useEffect(() => {
+    if (!isTripLinkRoute || typeof window === "undefined") return
+
+    try {
+      const storedTheme = window.localStorage.getItem(TRIP_LINK_THEME_STORAGE_KEY)
+      if (storedTheme === "light" || storedTheme === "dark") {
+        setTripLinkTheme(storedTheme)
+      }
+    } catch {
+      // Mantém o tema claro quando a persistência local estiver indisponível.
+    }
+  }, [isTripLinkRoute])
+
+  const handleToggleTripLinkTheme = () => {
+    setTripLinkTheme((currentTheme) => {
+      const nextTheme: TripLinkTheme = currentTheme === "light" ? "dark" : "light"
+      try {
+        window.localStorage.setItem(TRIP_LINK_THEME_STORAGE_KEY, nextTheme)
+      } catch {
+        // A troca continua funcionando mesmo quando o navegador bloqueia o storage.
+      }
+      return nextTheme
+    })
+  }
+
+  useEffect(() => {
     if (typeof document === "undefined") return
 
     const themeColorMeta = document.querySelector('meta[name="theme-color"]')
@@ -8388,26 +9068,25 @@ export default function TripPage() {
     const previousViewport = viewportMeta?.getAttribute("content")
     const previousAppleCapable = appleCapableMeta?.getAttribute("content")
     const previousAppleStatusBar = appleStatusBarMeta?.getAttribute("content")
-    const isTripLinkLightView = (pathname?.startsWith("/viagem/") ?? false) || (pathname?.startsWith("/v/") ?? false)
     const previousHtmlBackground = document.documentElement.style.backgroundColor
     const previousBodyBackground = document.body.style.backgroundColor
     const previousBodyColor = document.body.style.color
 
-    if (themeColorMeta) {
-      themeColorMeta.setAttribute("content", isTripLinkLightView ? "#f4f1ea" : "#050505")
-    }
+    if (isTripLinkRoute) {
+      const backgroundColor = tripLinkTheme === "dark" ? "#07101a" : "#f4f0e8"
+      const foregroundColor = tripLinkTheme === "dark" ? "#f7f4ef" : "#10203a"
 
-    if (isTripLinkLightView) {
+      themeColorMeta?.setAttribute("content", backgroundColor)
       viewportMeta?.setAttribute("content", "width=device-width, initial-scale=1, viewport-fit=cover")
       appleCapableMeta?.setAttribute("content", "yes")
-      appleStatusBarMeta?.setAttribute("content", "default")
-      document.documentElement.setAttribute("data-trip-public-theme", "light")
-      document.body.setAttribute("data-trip-public-theme", "light")
-      document.documentElement.setAttribute("data-trip-link-theme", "light")
-      document.body.setAttribute("data-trip-link-theme", "light")
-      document.documentElement.style.backgroundColor = "#f4f1ea"
-      document.body.style.backgroundColor = "#f4f1ea"
-      document.body.style.color = "#0f172a"
+      appleStatusBarMeta?.setAttribute("content", tripLinkTheme === "dark" ? "black-translucent" : "default")
+      document.documentElement.setAttribute("data-trip-public-theme", tripLinkTheme)
+      document.body.setAttribute("data-trip-public-theme", tripLinkTheme)
+      document.documentElement.setAttribute("data-trip-link-theme", tripLinkTheme)
+      document.body.setAttribute("data-trip-link-theme", tripLinkTheme)
+      document.documentElement.style.backgroundColor = backgroundColor
+      document.body.style.backgroundColor = backgroundColor
+      document.body.style.color = foregroundColor
     } else {
       document.documentElement.removeAttribute("data-trip-public-theme")
       document.body.removeAttribute("data-trip-public-theme")
@@ -8436,7 +9115,7 @@ export default function TripPage() {
       document.body.style.backgroundColor = previousBodyBackground
       document.body.style.color = previousBodyColor
     }
-  }, [adminRouteActive])
+  }, [isTripLinkRoute, tripLinkTheme])
 
   const showToast = (message: string, type: "success" | "error" | "info" = "success") => {
     setToast({ message, type })
@@ -9548,7 +10227,8 @@ export default function TripPage() {
 
   if (adminRouteActive && !sensitiveAccessGranted) {
     return (
-      <main className="min-h-screen bg-[#f4f1ea] text-slate-900 flex items-center justify-center px-4">
+      <main className="trip-link-page flex min-h-screen items-center justify-center px-4" data-theme={tripLinkTheme}>
+        <TripLinkThemeStyles />
         <PortalPinUnlockModal
           open
           onClose={handleDismissAdminUnlockModal}
@@ -9559,7 +10239,7 @@ export default function TripPage() {
           accessMode="admin"
           title="Desbloquear viagem"
           configuredDescription="Digite o PIN de 4 dígitos para acessar e editar esta viagem."
-          tone="light"
+          tone={tripLinkTheme}
           onSuccess={(status) => {
             if (status?.adminToken) {
               setTripAdminToken(status.adminToken)
@@ -9611,11 +10291,11 @@ export default function TripPage() {
     return (
         <PermissionContext.Provider value={{ isAdmin, canWrite, setIsAdmin }}>
           <ToastContext.Provider value={{ showToast }}>
-            <main className="min-h-screen bg-[#f4f1ea] text-slate-900">
-              <TripLinkLightThemeStyles />
+            <main className="trip-link-page min-h-screen" data-theme={tripLinkTheme}>
+              <TripLinkThemeStyles />
             {hasTemporaryClaimAccess && !temporaryClaimNoticeDismissed && !tripOwnerUserId ? (
               <div className="px-4 pt-4 sm:px-6">
-                <div className="mx-auto flex w-full max-w-5xl flex-col gap-4 rounded-[28px] border border-[#0b56d8]/10 bg-[#f8fbff] p-4 shadow-[0_18px_40px_-28px_rgba(16,26,44,0.35)] sm:flex-row sm:items-center sm:justify-between sm:gap-6 sm:p-5">
+                <div className="trip-claim-notice mx-auto flex w-full max-w-5xl flex-col gap-4 rounded-[28px] border border-[#0b56d8]/10 bg-[#f8fbff] p-4 shadow-[0_18px_40px_-28px_rgba(16,26,44,0.35)] sm:flex-row sm:items-center sm:justify-between sm:gap-6 sm:p-5">
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-semibold text-slate-950">Guarde esta viagem na sua Bolsa.</p>
                     <p className="mt-1 text-sm leading-6 text-slate-600">
@@ -9710,12 +10390,14 @@ export default function TripPage() {
               agencyBranding={agencyBranding}
               offlineModeEnabled={offlineModeEnabled}
               offlinePackageStatus={offlinePackageStatus}
+              theme={tripLinkTheme}
+              onToggleTheme={handleToggleTripLinkTheme}
               onOpenShare={() => setShareOpen(true)}
               onOpenMenu={() => setMenuOpen(true)}
               onOpenPanel={handleOpenTravelerPanel}
             />
 
-            <BottomSheet tone="light" open={travelerPanel === "flights"} onClose={() => setTravelerPanel(null)} title="Passagens">
+            <BottomSheet tone={tripLinkTheme} open={travelerPanel === "flights"} onClose={() => setTravelerPanel(null)} title="Passagens">
               {travelerPanel === "flights" ? (
                 <FlightsSection
                   loading={sectionsLoading.flights}
@@ -9738,10 +10420,10 @@ export default function TripPage() {
                 />
               ) : null}
             </BottomSheet>
-            <BottomSheet tone="light" open={travelerPanel === "hotel"} onClose={() => setTravelerPanel(null)} title="Hospedagem">
+            <BottomSheet tone={tripLinkTheme} open={travelerPanel === "hotel"} onClose={() => setTravelerPanel(null)} title="Hospedagem">
               {travelerPanel === "hotel" ? <HotelSection loading={sectionsLoading.hotels} tripData={tripData} onSaveHotel={handleSaveHotel} onDeleteHotel={handleDeleteHotel} routeSlug={routeSlug} tripAdminToken={tripAdminToken} tripPublicToken={tripPublicToken} /> : null}
             </BottomSheet>
-            <BottomSheet tone="light" open={travelerPanel === "itinerary"} onClose={() => setTravelerPanel(null)} title="Roteiro">
+            <BottomSheet tone={tripLinkTheme} open={travelerPanel === "itinerary"} onClose={() => setTravelerPanel(null)} title="Roteiro">
               {travelerPanel === "itinerary" ? (
                 <ItinerarySection
                   loading={sectionsLoading.itineraries}
@@ -9765,7 +10447,7 @@ export default function TripPage() {
                 />
               ) : null}
             </BottomSheet>
-            <BottomSheet tone="light" open={travelerPanel === "documents"} onClose={() => setTravelerPanel(null)} title="Documentos">
+            <BottomSheet tone={tripLinkTheme} open={travelerPanel === "documents"} onClose={() => setTravelerPanel(null)} title="Documentos">
               {travelerPanel === "documents" ? (
                 <DocumentsSection
                   loading={sectionsLoading.documents}
@@ -9786,7 +10468,7 @@ export default function TripPage() {
                 />
               ) : null}
             </BottomSheet>
-            <BottomSheet tone="light" open={travelerPanel === "concierge"} onClose={() => setTravelerPanel(null)} title="Concierge">
+            <BottomSheet tone={tripLinkTheme} open={travelerPanel === "concierge"} onClose={() => setTravelerPanel(null)} title="Concierge">
               {travelerPanel === "concierge" ? (
                 <ConciergeSection
                   tripData={tripData}
@@ -9804,7 +10486,7 @@ export default function TripPage() {
                 />
               ) : null}
             </BottomSheet>
-            <BottomSheet tone="light" open={travelerPanel === "offline"} onClose={() => setTravelerPanel(null)} title="Offline">
+            <BottomSheet tone={tripLinkTheme} open={travelerPanel === "offline"} onClose={() => setTravelerPanel(null)} title="Offline">
               {travelerPanel === "offline" ? (
                 <OfflineSection
                   tripData={tripData}
@@ -9829,7 +10511,7 @@ export default function TripPage() {
               accessMode={securityAccessMode}
               title="Desbloquear viagem"
               configuredDescription="Digite o PIN de 4 dígitos para acessar e editar esta viagem."
-              tone="light"
+              tone={tripLinkTheme}
               onSuccess={(status) => {
                 if (status?.adminToken) {
                   setTripAdminToken(status.adminToken)
@@ -9852,6 +10534,7 @@ export default function TripPage() {
               open={menuOpen}
               onClose={() => setMenuOpen(false)}
               publicView
+              tone={tripLinkTheme}
               showCredits={!isAgencyTrip}
               onOpenTravelers={() => {
                 setMenuOpen(false)
@@ -9884,7 +10567,7 @@ export default function TripPage() {
             />
             <TripSettingsModal open={tripSettingsOpen} onClose={() => setTripSettingsOpen(false)} tripData={tripData} onSave={handleSaveTripSettings} />
             <LinkSecurityInfoModal open={securitySettingsOpen} onClose={() => setSecuritySettingsOpen(false)} tripId={tripData.id} tripSlug={routeSlug} adminToken={tripAdminToken} publicToken={tripPublicToken} accessMode={authenticatedAdminEligible ? "admin" : "public"} />
-            {!isAgencyTrip ? <TravelerPublicCreditsModal open={creditsOpen} onClose={() => setCreditsOpen(false)} credits={travelerCredits} /> : null}
+            {!isAgencyTrip ? <TravelerPublicCreditsModal open={creditsOpen} onClose={() => setCreditsOpen(false)} credits={travelerCredits} tone={tripLinkTheme} /> : null}
             <Modal open={premiumGateModalOpen} onClose={() => setPremiumGateModalOpen(false)} title="Disponível no Premium">
               <div className="space-y-5">
                 <p className="text-sm text-white/60">
@@ -9915,20 +10598,22 @@ export default function TripPage() {
     return (
       <PermissionContext.Provider value={{ isAdmin, canWrite, setIsAdmin }}>
         <ToastContext.Provider value={{ showToast }}>
-          <main className="min-h-screen bg-[#f4f1ea] text-slate-900">
-            <TripLinkLightThemeStyles />
+          <main className="trip-link-page min-h-screen" data-theme={tripLinkTheme}>
+            <TripLinkThemeStyles />
             <TravelerPublicShell
               tripData={tripData}
               itineraryRecords={tripItineraryRecords}
               agencyBranding={agencyBranding}
               offlineModeEnabled={offlineModeEnabled}
               offlinePackageStatus={offlinePackageStatus}
+              theme={tripLinkTheme}
+              onToggleTheme={handleToggleTripLinkTheme}
               onOpenShare={() => setShareOpen(true)}
               onOpenMenu={() => setMenuOpen(true)}
               onOpenPanel={handleOpenTravelerPanel}
             />
 
-            <BottomSheet tone="light" open={travelerPanel === "flights"} onClose={() => setTravelerPanel(null)} title="Passagens">
+            <BottomSheet tone={tripLinkTheme} open={travelerPanel === "flights"} onClose={() => setTravelerPanel(null)} title="Passagens">
               {travelerPanel === "flights" ? (
                 <FlightsSection
                   loading={sectionsLoading.flights}
@@ -9951,10 +10636,10 @@ export default function TripPage() {
                 />
               ) : null}
             </BottomSheet>
-            <BottomSheet tone="light" open={travelerPanel === "hotel"} onClose={() => setTravelerPanel(null)} title="Hospedagem">
+            <BottomSheet tone={tripLinkTheme} open={travelerPanel === "hotel"} onClose={() => setTravelerPanel(null)} title="Hospedagem">
               {travelerPanel === "hotel" ? <HotelSection loading={sectionsLoading.hotels} tripData={tripData} onSaveHotel={handleSaveHotel} onDeleteHotel={handleDeleteHotel} routeSlug={routeSlug} tripAdminToken={tripAdminToken} tripPublicToken={tripPublicToken} /> : null}
             </BottomSheet>
-            <BottomSheet tone="light" open={travelerPanel === "itinerary"} onClose={() => setTravelerPanel(null)} title="Roteiro">
+            <BottomSheet tone={tripLinkTheme} open={travelerPanel === "itinerary"} onClose={() => setTravelerPanel(null)} title="Roteiro">
               {travelerPanel === "itinerary" ? (
                 <ItinerarySection
                   loading={sectionsLoading.itineraries}
@@ -9978,7 +10663,7 @@ export default function TripPage() {
                 />
               ) : null}
             </BottomSheet>
-            <BottomSheet tone="light" open={travelerPanel === "documents"} onClose={() => setTravelerPanel(null)} title="Documentos">
+            <BottomSheet tone={tripLinkTheme} open={travelerPanel === "documents"} onClose={() => setTravelerPanel(null)} title="Documentos">
               {travelerPanel === "documents" ? (
                 <DocumentsSection
                   loading={sectionsLoading.documents}
@@ -9999,7 +10684,7 @@ export default function TripPage() {
                 />
               ) : null}
             </BottomSheet>
-            <BottomSheet tone="light" open={travelerPanel === "concierge"} onClose={() => setTravelerPanel(null)} title="Concierge">
+            <BottomSheet tone={tripLinkTheme} open={travelerPanel === "concierge"} onClose={() => setTravelerPanel(null)} title="Concierge">
               {travelerPanel === "concierge" ? (
                 <ConciergeSection
                   tripData={tripData}
@@ -10017,7 +10702,7 @@ export default function TripPage() {
                 />
               ) : null}
             </BottomSheet>
-            <BottomSheet tone="light" open={travelerPanel === "offline"} onClose={() => setTravelerPanel(null)} title="Offline">
+            <BottomSheet tone={tripLinkTheme} open={travelerPanel === "offline"} onClose={() => setTravelerPanel(null)} title="Offline">
               {travelerPanel === "offline" ? (
                 <OfflineSection
                   tripData={tripData}
@@ -10042,6 +10727,7 @@ export default function TripPage() {
               accessMode="admin"
               title="Desbloquear viagem"
               configuredDescription="Digite o PIN de 4 dígitos para acessar e editar esta viagem."
+              tone={tripLinkTheme}
               onSuccess={(status) => {
                 if (status?.adminToken) {
                   setTripAdminToken(status.adminToken)
@@ -10059,6 +10745,7 @@ export default function TripPage() {
               open={menuOpen}
               onClose={() => setMenuOpen(false)}
               publicView
+              tone={tripLinkTheme}
               showCredits={!isAgencyTrip}
               onOpenEditTrip={() => {
                 setMenuOpen(false)
@@ -10103,7 +10790,7 @@ export default function TripPage() {
             />
             <TripSettingsModal open={tripSettingsOpen} onClose={() => setTripSettingsOpen(false)} tripData={tripData} onSave={handleSaveTripSettings} />
             <LinkSecurityInfoModal open={securitySettingsOpen} onClose={() => setSecuritySettingsOpen(false)} tripId={tripData.id} tripSlug={routeSlug} adminToken={tripAdminToken} publicToken={tripPublicToken} accessMode="admin" />
-            {!isAgencyTrip ? <LinkCreditsSummaryModal open={creditsOpen} onClose={() => setCreditsOpen(false)} credits={travelerCredits} /> : null}
+            {!isAgencyTrip ? <LinkCreditsSummaryModal open={creditsOpen} onClose={() => setCreditsOpen(false)} credits={travelerCredits} tone={tripLinkTheme} /> : null}
             <Modal open={premiumGateModalOpen} onClose={() => setPremiumGateModalOpen(false)} title="Disponível no Premium">
               <div className="space-y-5">
                 <p className="text-sm text-slate-600">
