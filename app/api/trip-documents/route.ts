@@ -3,6 +3,7 @@ import { createSupabaseAdminClient, hasSupabaseAdminEnv, isMissingSupabaseAdminE
 import { resolveTripLinkAccess as resolveTripLinkRequest } from "@/lib/security/trip-link-access"
 import { createSupabaseServerClient } from "@/lib/supabase/server"
 import type { Database } from "@/lib/supabase/types"
+import { parseHttpByteRange } from "@/lib/files/http-byte-range"
 
 export const runtime = "nodejs"
 
@@ -12,6 +13,7 @@ type TripRow = Database["public"]["Tables"]["trips"]["Row"]
 type ProfileRow = Database["public"]["Tables"]["profiles"]["Row"]
 type AgencyMemberRow = Database["public"]["Tables"]["agency_members"]["Row"]
 type DocumentRow = Database["public"]["Tables"]["documents"]["Row"]
+type ItineraryRow = Database["public"]["Tables"]["trip_itineraries"]["Row"]
 
 type AccessMode = "admin" | "public"
 
@@ -122,6 +124,38 @@ async function resolveDocument(
   return { document: data as DocumentRow, error: null }
 }
 
+async function resolveItinerary(
+  supabase: ReturnType<typeof createSupabaseAdminClient>,
+  tripId: string,
+  itineraryId: string,
+) {
+  const { data, error } = await supabase
+    .from("trip_itineraries")
+    .select("*")
+    .eq("trip_id", tripId)
+    .eq("id", itineraryId)
+    .maybeSingle()
+
+  if (error) {
+    return { itinerary: null as ItineraryRow | null, error: error.message }
+  }
+
+  if (!data) {
+    return { itinerary: null as ItineraryRow | null, error: "Roteiro não encontrado." }
+  }
+
+  return { itinerary: data as ItineraryRow, error: null }
+}
+
+function resolveMimeTypeFromPath(path: string) {
+  const normalizedPath = path.toLowerCase().split("?")[0]
+  if (normalizedPath.endsWith(".pdf")) return "application/pdf"
+  if (normalizedPath.endsWith(".png")) return "image/png"
+  if (normalizedPath.endsWith(".jpg") || normalizedPath.endsWith(".jpeg")) return "image/jpeg"
+  if (normalizedPath.endsWith(".webp")) return "image/webp"
+  return "application/octet-stream"
+}
+
 function buildDisposition(filename: string, mode: "inline" | "download") {
   const encodedName = encodeURIComponent(filename)
   return `${mode === "download" ? "attachment" : "inline"}; filename*=UTF-8''${encodedName}`
@@ -155,12 +189,13 @@ export async function GET(request: NextRequest) {
     const tripId = url.searchParams.get("tripId")
     const tripSlug = url.searchParams.get("tripSlug")
     const documentId = url.searchParams.get("documentId")
+    const itineraryId = url.searchParams.get("itineraryId")
     const adminToken = url.searchParams.get("adminToken")
     const publicToken = url.searchParams.get("publicToken") || url.searchParams.get("token")
     const accessMode = (url.searchParams.get("accessMode") === "admin" ? "admin" : "public") as AccessMode
     const dispositionMode = url.searchParams.get("disposition") === "download" ? "download" : "inline"
 
-    if (!documentId) {
+    if (!documentId && !itineraryId) {
       return buildErrorResponse("Documento inv?lido.", 400, dispositionMode)
     }
 
@@ -213,39 +248,102 @@ export async function GET(request: NextRequest) {
       return buildErrorResponse("N?o foi poss?vel validar este documento.", 403, dispositionMode)
     }
 
-    const documentResult = await resolveDocument(adminClient, trip.id, documentId)
-    if (!documentResult.document) {
-      return buildErrorResponse(documentResult.error ?? "Documento n?o ?ncontrado.", 404, dispositionMode)
+    let filePath: string | null = null
+    let fileName = "documento"
+    let mimeType = "application/octet-stream"
+
+    if (documentId) {
+      const documentResult = await resolveDocument(adminClient, trip.id, documentId)
+      if (!documentResult.document) {
+        return buildErrorResponse(documentResult.error ?? "Documento n?o ?ncontrado.", 404, dispositionMode)
+      }
+
+      const document = documentResult.document
+      const isPrivateDocument =
+        document.is_private === true ||
+        document.visibility === "private" ||
+        document.visibility === "agency_only"
+
+      if (accessMode === "public" && isPrivateDocument) {
+        return buildErrorResponse("Este documento n?o ?sta dispon?vel no link publico.", 403, dispositionMode)
+      }
+
+      filePath = document.file_path
+      fileName = document.name || fileName
+      mimeType = document.mime_type || (filePath ? resolveMimeTypeFromPath(filePath) : mimeType)
+    } else if (itineraryId) {
+      const itineraryResult = await resolveItinerary(adminClient, trip.id, itineraryId)
+      if (!itineraryResult.itinerary) {
+        return buildErrorResponse(itineraryResult.error ?? "Roteiro n?o ?ncontrado.", 404, dispositionMode)
+      }
+
+      const itinerary = itineraryResult.itinerary
+      if (itinerary.mode === "simple" || !["completed", "uploaded"].includes(itinerary.status)) {
+        return buildErrorResponse("Arquivo indispon?vel para este roteiro.", 400, dispositionMode)
+      }
+
+      if (itinerary.document_id) {
+        const documentResult = await resolveDocument(adminClient, trip.id, itinerary.document_id)
+        if (documentResult.document) {
+          const document = documentResult.document
+          const isPrivateDocument =
+            document.is_private === true ||
+            document.visibility === "private" ||
+            document.visibility === "agency_only"
+
+          if (accessMode === "public" && isPrivateDocument) {
+            return buildErrorResponse("Este roteiro n?o ?sta dispon?vel no link publico.", 403, dispositionMode)
+          }
+
+          filePath = document.file_path
+          fileName = document.name || itinerary.title || "roteiro"
+          mimeType = document.mime_type || (filePath ? resolveMimeTypeFromPath(filePath) : mimeType)
+        }
+      }
+
+      if (!filePath && itinerary.pdf_url) {
+        filePath = itinerary.pdf_url
+        fileName = itinerary.title || "roteiro"
+        mimeType = resolveMimeTypeFromPath(filePath)
+      }
     }
 
-    const document = documentResult.document
-    const isPrivateDocument =
-      document.is_private === true ||
-      document.visibility === "private" ||
-      document.visibility === "agency_only"
-
-    if (accessMode === "public" && isPrivateDocument) {
-      return buildErrorResponse("Este documento n?o ?sta dispon?vel no link publico.", 403, dispositionMode)
-    }
-
-    if (!document.file_path) {
+    if (!filePath) {
       return buildErrorResponse("Arquivo indispon?vel para este documento.", 400, dispositionMode)
     }
 
-    const fileResult = await adminClient.storage.from(DOCUMENTS_BUCKET).download(document.file_path)
+    const fileResult = await adminClient.storage.from(DOCUMENTS_BUCKET).download(filePath)
     if (fileResult.error || !fileResult.data) {
       return buildErrorResponse(fileResult.error?.message || "N?o foi poss?vel abrir este documento agora.", 400, dispositionMode)
     }
 
     const arrayBuffer = await fileResult.data.arrayBuffer()
-    const fileName = document.name || "documento"
+    const byteRange = parseHttpByteRange(request.headers.get("range"), arrayBuffer.byteLength)
+    const responseHeaders = {
+      "Content-Type": mimeType,
+      "Content-Disposition": buildDisposition(fileName, dispositionMode),
+      "Cache-Control": "private, max-age=60",
+      "Accept-Ranges": "bytes",
+      "X-Content-Type-Options": "nosniff",
+    }
+
+    if (byteRange) {
+      const body = arrayBuffer.slice(byteRange.start, byteRange.end + 1)
+      return new NextResponse(body, {
+        status: 206,
+        headers: {
+          ...responseHeaders,
+          "Content-Length": String(body.byteLength),
+          "Content-Range": `bytes ${byteRange.start}-${byteRange.end}/${arrayBuffer.byteLength}`,
+        },
+      })
+    }
 
     return new NextResponse(arrayBuffer, {
       status: 200,
       headers: {
-        "Content-Type": document.mime_type || "application/octet-stream",
-        "Content-Disposition": buildDisposition(fileName, dispositionMode),
-        "Cache-Control": "private, max-age=60",
+        ...responseHeaders,
+        "Content-Length": String(arrayBuffer.byteLength),
       },
     })
   } catch (error) {

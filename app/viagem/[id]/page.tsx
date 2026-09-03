@@ -9,7 +9,7 @@ import { extractTripsStoragePayload } from "@/lib/mappers/trip-mappers"
 import { shouldUseSupabase } from "@/lib/data-source"
 import { DOCUMENT_UPLOAD_TYPE_OPTIONS } from "@/lib/constants/document-upload-types"
 import { getTripByAdminToken, getTripByPublicToken, getTripBySlug, updateTrip as updateTripRepository } from "@/lib/repositories/trips-repository"
-import { createDocumentMetadata, deleteDocument, deleteDocumentFile, getSignedDocumentUrl, listDocumentsByTrip, listPublicTripDocuments, uploadDocumentFile } from "@/lib/repositories/documents-repository"
+import { createDocumentMetadata, deleteDocument, deleteDocumentFile, listDocumentsByTrip, listPublicTripDocuments, uploadDocumentFile } from "@/lib/repositories/documents-repository"
 import { deleteTripFlight, listPublicTripFlights, listTripFlights, requestTripFlightExtraction, upsertTripFlight } from "@/lib/repositories/trip-flights-repository"
 import { createTripHotel, deleteTripHotel, listTripHotels, updateTripHotel } from "@/lib/repositories/trip-hotels-repository"
 import { deleteTripItinerary, listTripItineraries, requestAiItineraryGeneration, upsertTripItinerary } from "@/lib/repositories/trip-itineraries-repository"
@@ -58,6 +58,17 @@ import { Label } from "@/components/ui/label"
 import { cn } from "@/lib/utils"
 import { devLog, startPerfMeasure } from "@/lib/dev/perf"
 import { CREDIT_BALANCE_CHANGED_EVENT, dispatchCreditBalanceChanged } from "@/lib/credits/credit-events"
+import {
+  buildTripDocumentAccessHref,
+  buildTripSectionsAccessHref,
+  findTripDocument,
+  getContentTripDocuments,
+  getPublicTripDocuments,
+  getTicketTripDocuments,
+  getTripDocumentCounts,
+  getTripDocuments,
+  isPrivateTripDocument,
+} from "@/lib/trips/trip-document-view"
 
 const TRIPS_STORAGE_KEY = "vuei_trips"
 const AGENCY_STORAGE_KEY = "vuei_agency"
@@ -1948,34 +1959,6 @@ function resolvePublicTripErrorMessage(error?: string | null) {
   return error || "Não foi possível concluir a operação."
 }
 
-function buildTripDocumentAccessHref(params: {
-  tripId: string
-  documentId: string
-  tripSlug: string
-  accessMode: "admin" | "public"
-  adminToken?: string | null
-  publicToken?: string | null
-  disposition?: "inline" | "download"
-}) {
-  const searchParams = new URLSearchParams({
-    tripId: params.tripId,
-    documentId: params.documentId,
-    tripSlug: params.tripSlug,
-    accessMode: params.accessMode,
-    disposition: params.disposition ?? "inline",
-  })
-
-  if (params.adminToken) {
-    searchParams.set("adminToken", params.adminToken)
-  }
-
-  if (params.publicToken) {
-    searchParams.set("publicToken", params.publicToken)
-  }
-
-  return `/api/trip-documents?${searchParams.toString()}`
-}
-
 function logTripDocumentsDev(stage: string, details?: Record<string, unknown>) {
   if (process.env.NODE_ENV !== "development") return
   console.log("[TRIP][DOCUMENTS]", stage, details ?? {})
@@ -1995,17 +1978,8 @@ function getSafeDocumentDebugRows(documents: any[]) {
 }
 
 function getDocumentDebugCounts(documents: any[]) {
-  const isPrivate = (document: any) =>
-    document?.private === true || document?.isPrivate === true || document?.is_private === true || document?.visibility === "private"
-
-  return {
-    total: documents.length,
-    public: documents.filter((document) => !isPrivate(document)).length,
-    private: documents.filter((document) => isPrivate(document)).length,
-    tickets: documents.filter((document) => document?.type === "ticket").length,
-    itineraries: documents.filter((document) => document?.type === "itinerary").length,
-    general: documents.filter((document) => !["ticket", "itinerary"].includes(document?.type ?? "")).length,
-  }
+  const counts = getTripDocumentCounts(documents)
+  return { ...counts, general: documents.filter((document) => !["ticket", "itinerary"].includes(document?.type ?? "")).length }
 }
 
 const iconMap: Record<string, any> = {
@@ -3361,7 +3335,7 @@ function TripLinkThemeStyles() {
 function buildTravelerCardSummaries(tripData: any, itineraryRecords?: TripItineraryRecord[]) {
   const flights = Array.isArray(tripData?.flights) ? tripData.flights : []
   const hotels = Array.isArray(tripData?.hotels) ? tripData.hotels : tripData?.hotel ? [tripData.hotel] : []
-  const documents = Array.isArray(tripData?.documents) ? tripData.documents.filter((document: any) => document?.type !== "itinerary") : []
+  const documents = getContentTripDocuments(getTripDocuments<any>(tripData))
   const itinerary = Array.isArray(tripData?.itinerary) ? tripData.itinerary : []
   const flight = getPreferredStructuredFlight(flights)
   const rawHotel = hotels[0]
@@ -3388,8 +3362,8 @@ function buildTravelerCardSummaries(tripData: any, itineraryRecords?: TripItiner
       title: "Passagens",
       summary: flight
         ? `${flight.origin?.city || "---"} -> ${flight.destination?.city || "---"}`
-        : documents.filter((document: any) => document.type === "ticket").length > 0
-          ? `${documents.filter((document: any) => document.type === "ticket").length} bilhete(s)`
+        : getTicketTripDocuments(documents).length > 0
+          ? `${getTicketTripDocuments(documents).length} bilhete(s)`
           : "Nenhuma passagem",
       detail: flight
         ? `${flight.date || "Data pendente"}${flight.origin?.time ? ` • ${flight.origin.time}` : ""}${flight.destination?.time ? ` - ${flight.destination.time || "Horário não informado"}` : ""}`
@@ -3434,7 +3408,7 @@ function buildTravelerCardSummariesClean(tripData: any, itineraryRecords?: TripI
   const hotels = sortHotelsForDisplay(Array.isArray(tripData?.hotels) ? tripData.hotels : tripData?.hotel ? [tripData.hotel] : []).map(
     normalizeHotelForDisplay,
   )
-  const documents = Array.isArray(tripData?.documents) ? tripData.documents.filter((document: any) => document?.type !== "itinerary") : []
+  const documents = getContentTripDocuments(getTripDocuments<any>(tripData))
   const itinerary = Array.isArray(tripData?.itinerary) ? tripData.itinerary : []
   const flight = getPreferredStructuredFlight(flights)
   const hotel = hotels[0] ?? null
@@ -3453,8 +3427,8 @@ function buildTravelerCardSummariesClean(tripData: any, itineraryRecords?: TripI
       title: "Passagens",
       summary: flight
         ? `${flight.origin?.city || "---"} -> ${flight.destination?.city || "---"}`
-        : documents.filter((document: any) => document.type === "ticket").length > 0
-          ? `${documents.filter((document: any) => document.type === "ticket").length} bilhete(s)`
+        : getTicketTripDocuments(documents).length > 0
+          ? `${getTicketTripDocuments(documents).length} bilhete(s)`
           : "Nenhuma passagem",
       detail: flight
         ? `${flight.date || "Data pendente"}${flight.origin?.time ? ` • ${flight.origin.time}` : ""}${flight.destination?.time ? ` - ${flight.destination.time || "Horário não informado"}` : ""}`
@@ -4284,7 +4258,9 @@ function FlightsSection({
   const { showToast } = useToast()
   const flights = Array.isArray(tripData.flights) ? tripData.flights : []
   const structuredFlightsCount = flights.filter((flight: any) => flight?.hasStructuredCardData !== false).length
-  const ticketDocuments = Array.isArray(tripData.documents) ? tripData.documents.filter((document: any) => document.type === "ticket" && !flights.some((flight: any) => flight.document?.id === document.id)) : []
+  const ticketDocuments = getTicketTripDocuments(getTripDocuments<any>(tripData)).filter(
+    (document: any) => !flights.some((flight: any) => flight.document?.id === document.id),
+  )
 
   const handleSaveFlight = async (data: any) => {
     const success = await onUpdateFlight(data.id, data)
@@ -4318,7 +4294,7 @@ function FlightsSection({
       disposition: "inline",
     })
 
-    window.open(href, "_blank", "noopener,noreferrer")
+    window.location.assign(href)
   }
 
   return (
@@ -4774,7 +4750,7 @@ function HotelSection({
                           size="sm"
                           variant="ghost"
                           className="text-[#5de0e6] hover:bg-[#5de0e6]/10"
-                          onClick={() => window.open(linkedVoucherHref, "_blank", "noopener,noreferrer")}
+                          onClick={() => window.location.assign(linkedVoucherHref)}
                         >
                           <FileText className="mr-2 h-4 w-4" />
                           Abrir voucher
@@ -5241,7 +5217,7 @@ function ItinerarySection({
   }
 
   const handleOpenItineraryDocument = async (record: TripItineraryRecord) => {
-    const document = Array.isArray(tripData.documents) ? tripData.documents.find((entry: any) => entry.id === record.documentId) : null
+    const document = findTripDocument(getTripDocuments<any>(tripData), record.documentId)
 
     if (offlineReadOnly) {
       await openOfflineDocumentFromPackage({
@@ -5257,30 +5233,17 @@ function ItinerarySection({
       return
     }
 
-    if (document?.id) {
-      const href = buildTripDocumentAccessHref({
-        tripId,
-        documentId: document.id,
-        tripSlug: routeSlug,
-        adminToken: tripAdminToken,
-        publicToken: tripPublicToken,
-        accessMode: canWrite ? "admin" : "public",
-        disposition: "inline",
-      })
-      window.open(href, "_blank", "noopener,noreferrer")
-      return
-    }
+    const href = buildTripDocumentAccessHref({
+      tripId,
+      itineraryId: record.id,
+      tripSlug: routeSlug,
+      adminToken: tripAdminToken,
+      publicToken: tripPublicToken,
+      accessMode: canWrite ? "admin" : "public",
+      disposition: "inline",
+    })
 
-    const resolvedUrl = record.pdfUrl
-      ? await getSignedDocumentUrl(record.pdfUrl)
-      : { data: null, error: "Arquivo indisponível para visualização." }
-
-    if (resolvedUrl.error || !resolvedUrl.data) {
-      showToast("Não foi possível abrir o roteiro neste dispositivo.", "error")
-      return
-    }
-
-    window.open(resolvedUrl.data, "_blank", "noopener,noreferrer")
+    window.location.assign(href)
   }
 
   return (
@@ -5492,7 +5455,7 @@ function ItinerarySection({
                   <p className="mt-3 text-sm text-white/55">Gerando roteiro e vinculando arquivo real no backend...</p>
                 ) : null}
                 <div className="mt-4 flex flex-wrap gap-2">
-                  {record.documentId ? (
+                  {record.documentId || record.pdfUrl ? (
                     <Button size="sm" variant="outline" className="border-white/10 text-white/80" onClick={() => void handleOpenItineraryDocument(record)}>
                       <ExternalLink className="mr-2 h-4 w-4" />
                       Abrir
@@ -5793,12 +5756,9 @@ function DocumentsSection({
   const { isAdmin, canWrite } = useContext(PermissionContext)
   const { showToast } = useToast()
 
-  const documents = Array.isArray(tripData.documents) ? tripData.documents.filter((document: any) => document?.type !== "itinerary") : []
-  const isPrivateDocument = (document: any) =>
-    document?.private === true || document?.isPrivate === true || document?.visibility === "private"
-
-  const publicDocs = documents.filter((d: any) => !isPrivateDocument(d))
-  const privateDocs = documents.filter((d: any) => isPrivateDocument(d))
+  const documents = getContentTripDocuments(getTripDocuments<any>(tripData))
+  const publicDocs = getPublicTripDocuments(documents)
+  const privateDocs = documents.filter(isPrivateTripDocument)
 
   useEffect(() => {
     if (process.env.NODE_ENV !== "development") return
@@ -6660,7 +6620,7 @@ function ViewDocumentModal({
             <>
               {documentOpenHref ? (
                 <Button asChild className="flex-1 bg-gradient-to-r from-[#5de0e6] to-[#004aad] hover:opacity-90 text-white border-0">
-                  <a href={documentOpenHref} target="_blank" rel="noopener noreferrer">
+                  <a href={documentOpenHref}>
                     <ExternalLink className="w-4 h-4 mr-2" />
                     Abrir documento
                   </a>
@@ -6668,7 +6628,7 @@ function ViewDocumentModal({
               ) : null}
               {documentDownloadHref ? (
                 <Button asChild variant="outline" className="flex-1 border-white/[0.08] bg-white/[0.02] text-white hover:bg-white/10">
-                  <a href={documentDownloadHref} download target="_blank" rel="noopener noreferrer">
+                  <a href={documentDownloadHref} download>
                     <Download className="w-4 h-4 mr-2" />
                     Baixar
                   </a>
@@ -9072,39 +9032,41 @@ export default function TripPage() {
           void (async () => {
             const sectionsPerf = startPerfMeasure("trip.sections")
             const resolvedAdminToken = resolvedTrip.adminToken ?? adminToken ?? null
-            const adminSectionsQuery = new URLSearchParams({
+            const resolvedPublicToken = resolvedTrip.publicToken ?? publicToken ?? null
+            const sectionsAccessMode = canWriteTrip ? "admin" : "public"
+            const sectionsHref = buildTripSectionsAccessHref({
               tripId: resolvedTrip.id,
               tripSlug: routeSlug,
+              accessMode: sectionsAccessMode,
+              adminToken: resolvedAdminToken,
+              publicToken: resolvedPublicToken,
             })
-            if (resolvedAdminToken) {
-              adminSectionsQuery.set("adminToken", resolvedAdminToken)
-            }
-            const adminSectionsPromise = canWriteTrip && shouldUseSupabase()
-              ? fetch(`/api/trip-admin?${adminSectionsQuery.toString()}`).then(async (response) => {
+            const sectionsPromise = shouldUseSupabase()
+              ? fetch(sectionsHref).then(async (response) => {
                   const data = await response.json().catch(() => null)
                   if (!response.ok) {
-                    throw new Error(data?.error || "Falha ao carregar dados administrativos da viagem.")
+                    throw new Error(data?.error || "Falha ao carregar as seções da viagem.")
                   }
                   return data
                 })
               : null
 
             const [documentsSettled, flightsSettled, itinerariesSettled, hotelsSettled, agencySettled, travelersSettled] = await Promise.allSettled([
-              adminSectionsPromise
-                ? adminSectionsPromise.then((data: any) => ({ source: "admin-api" as const, data: data?.documents ?? [], error: null }))
+              sectionsPromise
+                ? sectionsPromise.then((data: any) => ({ source: "sections-api" as const, data: data?.documents ?? [], error: null }))
                 : (canWriteTrip ? listDocumentsByTrip(resolvedTrip.id) : listPublicTripDocuments(resolvedTrip.id)),
-              adminSectionsPromise
-                ? adminSectionsPromise.then((data: any) => ({ source: "admin-api" as const, data: data?.flights ?? [], error: null }))
+              sectionsPromise
+                ? sectionsPromise.then((data: any) => ({ source: "sections-api" as const, data: data?.flights ?? [], error: null }))
                 : (canWriteTrip ? listTripFlights(resolvedTrip.id) : listPublicTripFlights(resolvedTrip.id)),
-              adminSectionsPromise
-                ? adminSectionsPromise.then((data: any) => ({ source: "admin-api" as const, data: data?.itineraries ?? [], error: null }))
+              sectionsPromise
+                ? sectionsPromise.then((data: any) => ({ source: "sections-api" as const, data: data?.itineraries ?? [], error: null }))
                 : listTripItineraries(resolvedTrip.id),
-              adminSectionsPromise
-                ? adminSectionsPromise.then((data: any) => ({ source: "admin-api" as const, data: data?.hotels ?? [], error: null }))
+              sectionsPromise
+                ? sectionsPromise.then((data: any) => ({ source: "sections-api" as const, data: data?.hotels ?? [], error: null }))
                 : listTripHotels(resolvedTrip.id),
               Promise.resolve(preloadedAgencyBranding),
-              adminSectionsPromise
-                ? adminSectionsPromise.then((data: any) => ({ source: "admin-api" as const, data: data?.travelers ?? [], error: null }))
+              sectionsPromise
+                ? sectionsPromise.then((data: any) => ({ source: "sections-api" as const, data: data?.travelers ?? [], error: null }))
                 : Promise.resolve({ source: "hidden" as const, data: [] as PersistedTravelerPayload[], error: null }),
             ])
 
