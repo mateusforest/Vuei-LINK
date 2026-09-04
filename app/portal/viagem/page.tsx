@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { motion } from "framer-motion"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
@@ -19,7 +19,10 @@ import {
   Link2,
   Check,
   Plane,
-  Clock
+  Clock,
+  Archive,
+  LockKeyhole,
+  Crown,
 } from "lucide-react"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -34,6 +37,7 @@ import {
 import { resolveTripHeroImage } from "@/lib/trip-destination"
 import { ImageWithFallback } from "@/components/system/image-with-fallback"
 import { CreateTripButton } from "@/components/portal/create-trip-button"
+import { getTravelerVueiPlusStatus } from "@/lib/repositories/traveler-billing-repository"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -82,6 +86,20 @@ export default function ViagemListPage() {
   const [feedback, setFeedback] = useState<{ message: string; tone: "success" | "error" } | null>(null)
   const [filter, setFilter] = useState<"all" | "upcoming" | "ongoing" | "completed">("all")
   const [activatingTripId, setActivatingTripId] = useState<string | null>(null)
+  const [canAccessArchive, setCanAccessArchive] = useState(false)
+  const [archiveAccessLoaded, setArchiveAccessLoaded] = useState(false)
+
+  useEffect(() => {
+    let active = true
+    const loadMembership = async () => {
+      const result = await getTravelerVueiPlusStatus()
+      if (!active) return
+      setCanAccessArchive(Boolean(result.data?.canAccessArchivedTrips))
+      setArchiveAccessLoaded(true)
+    }
+    void loadMembership()
+    return () => { active = false }
+  }, [])
 
   const copyLink = async (link: string, type: string) => {
     try {
@@ -224,7 +242,9 @@ export default function ViagemListPage() {
     return Math.ceil((date.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
   }
 
+  const archivedTrips = trips.filter((trip) => getTripLinkLifecycle(trip) === "ended")
   const filteredTrips = trips.filter(trip => {
+    if (getTripLinkLifecycle(trip) === "ended") return false
     if (filter === "all") return true
     return trip.status === filter
   })
@@ -450,11 +470,15 @@ export default function ViagemListPage() {
               <Plane size={28} className="text-primary" />
             </div>
             <h3 className="text-lg font-semibold mb-2">
-              {filter === "all" ? "Nenhuma viagem ainda" : `Nenhuma viagem ${getStatusLabel(filter).toLowerCase()}`}
+              {filter === "all"
+                ? archivedTrips.length > 0 ? "Nenhuma viagem em andamento" : "Nenhuma viagem ainda"
+                : `Nenhuma viagem ${getStatusLabel(filter).toLowerCase()}`}
             </h3>
             <p className="text-muted-foreground text-sm mb-6">
-              {filter === "all" 
-                ? "Crie sua primeira viagem e organize tudo em um único link."
+              {filter === "all"
+                ? archivedTrips.length > 0
+                  ? "Suas viagens encerradas continuam disponíveis no arquivo abaixo."
+                  : "Crie sua primeira viagem e organize tudo em um único link."
                 : "Altere o filtro ou crie uma nova viagem."}
             </p>
             <CreateTripButton 
@@ -466,6 +490,61 @@ export default function ViagemListPage() {
           </Card>
         </motion.div>
       )}
+
+      {archivedTrips.length > 0 ? (
+        <motion.section variants={fadeInUp} className="space-y-3">
+          <div className="flex items-end justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <Archive size={19} className="text-primary" />
+                <h2 className="text-xl font-semibold">Viagens arquivadas</h2>
+              </div>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Seus dados continuam preservados depois que o link publico encerra.
+              </p>
+            </div>
+            {!canAccessArchive && archiveAccessLoaded ? (
+              <Button variant="outline" onClick={() => router.push("/portal/planos")}>
+                <Crown size={15} className="mr-2 text-amber-400" />Conhecer Vuei+
+              </Button>
+            ) : null}
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            {archivedTrips.map((trip) => (
+              <Card key={trip.id} className="border-border/50 bg-card/50 p-4 vuei-glass">
+                <div className="flex items-start gap-3">
+                  <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-xl">
+                    <ImageWithFallback
+                      src={trip.coverImage}
+                      fallbackSrc={resolveTripHeroImage({ destination: trip.destination, city: trip.city, country: trip.country })}
+                      alt={trip.destination}
+                      fill
+                      className="object-cover"
+                    />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="truncate font-semibold">{trip.name}</p>
+                      {canAccessArchive ? <Archive size={15} className="text-primary" /> : <LockKeyhole size={15} className="text-muted-foreground" />}
+                    </div>
+                    <p className="truncate text-xs text-muted-foreground">{trip.destination}</p>
+                    <Button
+                      size="sm"
+                      variant={canAccessArchive ? "outline" : "ghost"}
+                      className="mt-3 h-8"
+                      onClick={() => router.push(canAccessArchive ? `/portal/viagem/arquivo/${trip.id}` : "/portal/planos")}
+                      disabled={!archiveAccessLoaded}
+                    >
+                      {canAccessArchive ? "Abrir arquivo" : "Desbloquear com Vuei+"}
+                    </Button>
+                  </div>
+                </div>
+              </Card>
+            ))}
+          </div>
+        </motion.section>
+      ) : null}
 
       <Toast message={feedback?.message ?? "Link copiado!"} visible={Boolean(copiedLink || feedback)} tone={feedback?.tone ?? "success"} />
     </motion.div>

@@ -1,6 +1,9 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 import type { Database } from "@/lib/supabase/types"
 import { hasAgencyMutationAccess } from "@/lib/security/trip-link-access"
+import { resolveTripLinkLifecycle } from "@/lib/security/trip-link-lifecycle"
+import { createSupabaseAdminClient } from "@/lib/supabase/admin"
+import { getTravelerMembershipStatus } from "@/lib/billing/traveler-billing"
 
 type ServerClient = SupabaseClient<Database>
 type TripRow = Database["public"]["Tables"]["trips"]["Row"]
@@ -74,7 +77,37 @@ export async function resolveAuthenticatedTripAccess(
     }
   }
 
-  if (profileResult.data.role === "master" || trip.owner_user_id === userId) {
+  if (profileResult.data.role === "master") {
+    return {
+      trip,
+      membership: null as AgencyMemberRow | null,
+      profile: profileResult.data,
+      error: null as string | null,
+    }
+  }
+
+  if (trip.owner_user_id === userId) {
+    const lifecycle = resolveTripLinkLifecycle({
+      ownerType: trip.owner_type,
+      visibility: trip.visibility,
+      status: trip.status,
+      endDate: trip.end_date,
+      linkActivatedAt: trip.link_activated_at,
+      linkAccessUntil: trip.link_access_until,
+    })
+
+    if (trip.owner_type === "traveler" && lifecycle === "ended") {
+      const membershipResult = await getTravelerMembershipStatus(createSupabaseAdminClient(), userId)
+      if (membershipResult.error || !membershipResult.data?.canAccessArchivedTrips) {
+        return {
+          trip: null as TripRow | null,
+          membership: null as AgencyMemberRow | null,
+          profile: profileResult.data,
+          error: membershipResult.error ?? "Assine o Vuei+ para acessar o conteudo desta viagem arquivada.",
+        }
+      }
+    }
+
     return {
       trip,
       membership: null as AgencyMemberRow | null,
@@ -118,7 +151,8 @@ export async function resolveAuthenticatedTripAccess(
     }
   }
 
-  if (params.requireMutationRole && !hasAgencyMutationAccess(membershipResult.data.role)) {
+  const agencyMembership = membershipResult.data as AgencyMemberRow
+  if (params.requireMutationRole && !hasAgencyMutationAccess(agencyMembership.role)) {
     return {
       trip: null as TripRow | null,
       membership: null as AgencyMemberRow | null,
@@ -129,7 +163,7 @@ export async function resolveAuthenticatedTripAccess(
 
   return {
     trip,
-    membership: membershipResult.data as AgencyMemberRow,
+    membership: agencyMembership,
     profile: profileResult.data,
     error: null as string | null,
   }

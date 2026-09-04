@@ -60,6 +60,26 @@ export interface Plan {
 
 export type TravelerPlanCode = "free" | "premium"
 export type TravelerSubscriptionStatus = "free" | "incomplete" | "trialing" | "active" | "past_due" | "canceled" | "unpaid"
+export type VueiPlusSubscriptionStatus = "none" | Exclude<TravelerSubscriptionStatus, "free">
+export type TravelerMembershipState = "NONE" | "VUEI_PLUS_ACTIVE" | "PREMIUM_LEGACY"
+
+export interface TravelerMembershipCapabilities {
+  hasVueiPlus: boolean
+  isPremiumLegacy: boolean
+  canAccessArchivedTrips: boolean
+  canAccessArchivedDocuments: boolean
+}
+
+export interface TravelerMembershipStatusSummary extends TravelerMembershipCapabilities {
+  state: TravelerMembershipState
+  vueiPlusStatus: VueiPlusSubscriptionStatus
+  vueiPlusCurrentPeriodEnd: string | null
+  vueiPlusCancelAtPeriodEnd: boolean
+  vueiPlusStripeSubscriptionId: string | null
+  stripeCustomerId: string | null
+  legacyPlanCode: TravelerPlanCode
+  legacySubscriptionStatus: TravelerSubscriptionStatus
+}
 
 export interface TravelerCreditBalanceSummary {
   planCreditsAvailable: number

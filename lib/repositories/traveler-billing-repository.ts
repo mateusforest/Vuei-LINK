@@ -1,4 +1,4 @@
-import type { TravelerBillingStatusSummary } from "@/types"
+import type { TravelerBillingStatusSummary, TravelerMembershipStatusSummary } from "@/types"
 import { shouldUseSupabase } from "@/lib/data-source"
 
 interface BillingRedirectResponse {
@@ -43,6 +43,34 @@ export async function createTravelerPremiumCheckout() {
   return {
     data,
     error: response.ok ? null : data?.error ?? "Nao foi possivel iniciar o checkout Premium.",
+  }
+}
+
+export async function getTravelerVueiPlusStatus() {
+  if (!shouldUseSupabase()) {
+    return { source: "local" as const, data: null as TravelerMembershipStatusSummary | null, error: null }
+  }
+
+  const response = await fetch("/api/billing/traveler/vuei-plus/status", {
+    method: "GET",
+    cache: "no-store",
+  })
+  const data = await parseJson<TravelerMembershipStatusSummary & { error?: string }>(response)
+
+  return {
+    source: "api" as const,
+    data: response.ok && data ? data : null,
+    error: response.ok ? null : data?.error ?? "Nao foi possivel carregar o Vuei+.",
+  }
+}
+
+export async function createTravelerVueiPlusCheckout() {
+  const response = await fetch("/api/billing/traveler/vuei-plus/checkout", { method: "POST" })
+  const data = await parseJson<BillingRedirectResponse>(response)
+
+  return {
+    data,
+    error: response.ok ? null : data?.error ?? "Nao foi possivel iniciar o checkout Vuei+.",
   }
 }
 

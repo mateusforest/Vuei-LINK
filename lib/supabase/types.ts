@@ -690,6 +690,12 @@ export interface Database {
           current_period_start: string | null
           current_period_end: string | null
           cancel_at_period_end: boolean
+          vuei_plus_status: "none" | "incomplete" | "trialing" | "active" | "past_due" | "canceled" | "unpaid"
+          vuei_plus_stripe_subscription_id: string | null
+          vuei_plus_stripe_price_id: string | null
+          vuei_plus_current_period_start: string | null
+          vuei_plus_current_period_end: string | null
+          vuei_plus_cancel_at_period_end: boolean
           created_at: string
           updated_at: string
         }
@@ -704,6 +710,12 @@ export interface Database {
           current_period_start?: string | null
           current_period_end?: string | null
           cancel_at_period_end?: boolean
+          vuei_plus_status?: "none" | "incomplete" | "trialing" | "active" | "past_due" | "canceled" | "unpaid"
+          vuei_plus_stripe_subscription_id?: string | null
+          vuei_plus_stripe_price_id?: string | null
+          vuei_plus_current_period_start?: string | null
+          vuei_plus_current_period_end?: string | null
+          vuei_plus_cancel_at_period_end?: boolean
           created_at?: string
           updated_at?: string
         }
@@ -717,6 +729,12 @@ export interface Database {
           current_period_start?: string | null
           current_period_end?: string | null
           cancel_at_period_end?: boolean
+          vuei_plus_status?: "none" | "incomplete" | "trialing" | "active" | "past_due" | "canceled" | "unpaid"
+          vuei_plus_stripe_subscription_id?: string | null
+          vuei_plus_stripe_price_id?: string | null
+          vuei_plus_current_period_start?: string | null
+          vuei_plus_current_period_end?: string | null
+          vuei_plus_cancel_at_period_end?: boolean
           updated_at?: string
         }
       }

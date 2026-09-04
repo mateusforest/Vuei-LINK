@@ -1,10 +1,10 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useSearchParams } from "next/navigation"
 import { motion } from "framer-motion"
 import Link from "next/link"
-import { ChevronLeft, Check, Crown, Coins, Loader2 } from "lucide-react"
+import { Archive, ChevronLeft, Check, Crown, Coins, FileClock, Loader2, ShieldCheck } from "lucide-react"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -14,8 +14,10 @@ import { TRAVELER_CREDIT_PACKAGES, TRAVELER_PLAN_DEFINITIONS } from "@/lib/billi
 import {
   createTravelerCreditsCheckout,
   createTravelerCustomerPortal,
-  createTravelerPremiumCheckout,
+  createTravelerVueiPlusCheckout,
+  getTravelerVueiPlusStatus,
 } from "@/lib/repositories/traveler-billing-repository"
+import type { TravelerMembershipStatusSummary } from "@/types"
 
 const fadeInUp = {
   initial: { opacity: 0, y: 20 },
@@ -26,23 +28,37 @@ const fadeInUp = {
 export default function PortalPlanosPage() {
   const { subscription } = useTrips()
   const searchParams = useSearchParams()
-  const [premiumLoading, setPremiumLoading] = useState(false)
+  const [vueiPlusLoading, setVueiPlusLoading] = useState(false)
   const [portalLoading, setPortalLoading] = useState(false)
   const [packageLoading, setPackageLoading] = useState<string | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
-  const freePlan = TRAVELER_PLAN_DEFINITIONS.free
+  const [membership, setMembership] = useState<TravelerMembershipStatusSummary | null>(null)
   const premiumPlan = TRAVELER_PLAN_DEFINITIONS.premium
   const checkoutStatus = searchParams.get("checkout")
-  const canManageSubscription = Boolean(subscription.stripeCustomerId || subscription.isPremium)
+  const canManageSubscription = Boolean(membership?.stripeCustomerId || subscription.stripeCustomerId || subscription.isPremium)
+  const hasManageableVueiPlus = Boolean(
+    membership?.vueiPlusStripeSubscriptionId &&
+    !["none", "canceled"].includes(membership.vueiPlusStatus),
+  )
 
-  const handlePremiumCheckout = async () => {
+  useEffect(() => {
+    let active = true
+    const loadMembership = async () => {
+      const result = await getTravelerVueiPlusStatus()
+      if (active && result.data) setMembership(result.data)
+    }
+    void loadMembership()
+    return () => { active = false }
+  }, [checkoutStatus])
+
+  const handleVueiPlusCheckout = async () => {
     setActionError(null)
-    setPremiumLoading(true)
+    setVueiPlusLoading(true)
 
-    const result = await createTravelerPremiumCheckout()
+    const result = await createTravelerVueiPlusCheckout()
     if (result.error || !result.data?.url) {
-      setActionError(result.error ?? "Não foi possível iniciar o checkout do Premium.")
-      setPremiumLoading(false)
+      setActionError(result.error ?? "Não foi possível iniciar o checkout do Vuei+.")
+      setVueiPlusLoading(false)
       return
     }
 
@@ -89,9 +105,7 @@ export default function PortalPlanosPage() {
 
         <div>
           <h1 className="text-3xl font-bold">Planos e créditos</h1>
-          <p className="text-sm text-muted-foreground">
-            Escolha o plano ideal para suas viagens e acompanhe seu consumo de créditos.
-          </p>
+          <p className="text-sm text-muted-foreground">Viagens compradas e Vuei+ são independentes. Assine apenas se quiser manter seu arquivo histórico acessível.</p>
         </div>
 
         <div className="flex flex-wrap gap-3">
@@ -102,22 +116,22 @@ export default function PortalPlanosPage() {
             </Button>
           ) : null}
 
-          {subscription.currentPeriodEnd ? (
+          {membership?.vueiPlusCurrentPeriodEnd ? (
             <Badge variant="secondary" className="border-border/50 bg-card/60 text-muted-foreground">
-              Ciclo atual até {new Date(subscription.currentPeriodEnd).toLocaleDateString("pt-BR")}
+              Vuei+ até {new Date(membership.vueiPlusCurrentPeriodEnd).toLocaleDateString("pt-BR")}
             </Badge>
           ) : null}
         </div>
 
-        {checkoutStatus === "success" ? (
+        {checkoutStatus === "vuei-plus-success" ? (
           <Card className="border-emerald-500/20 bg-emerald-500/10 p-4 text-sm text-emerald-300">
-            Checkout concluído. A assinatura só é atualizada quando o webhook do Stripe confirma o pagamento.
+            Checkout concluído. O Vuei+ será liberado assim que o webhook do Stripe confirmar o pagamento.
           </Card>
         ) : null}
 
-        {checkoutStatus === "canceled" ? (
+        {checkoutStatus === "vuei-plus-canceled" ? (
           <Card className="border-amber-500/20 bg-amber-500/10 p-4 text-sm text-amber-300">
-            Checkout cancelado. Nenhuma alteração foi aplicada à assinatura.
+            Checkout cancelado. Nenhuma alteração foi aplicada ao Vuei+.
           </Card>
         ) : null}
 
@@ -132,61 +146,90 @@ export default function PortalPlanosPage() {
         <Card className="flex min-h-[31rem] flex-col border-border/50 bg-card/50 p-6 vuei-glass">
           <div className="flex min-h-[5rem] items-start justify-between gap-4">
             <div>
-              <p className="text-sm text-muted-foreground">Plano Free</p>
-              <h2 className="mt-2 text-[2rem] font-bold leading-none">{freePlan.priceLabel}</h2>
+              <p className="text-sm text-muted-foreground">Uso sem assinatura</p>
+              <h2 className="mt-2 text-[2rem] font-bold leading-none">Viagens avulsas</h2>
             </div>
-            {subscription.code === "free" ? <Badge className="bg-primary/15 text-primary border-primary/20">Plano Atual</Badge> : null}
+            <Badge className="bg-primary/15 text-primary border-primary/20">Sempre disponível</Badge>
           </div>
 
           <div className="mt-6 min-h-[11rem] space-y-3">
-            {freePlan.features.map((feature) => (
+            {[
+              "Crie rascunhos sem consumir Link",
+              "Ative uma viagem com 1 crédito trip_link",
+              "Compre pacotes de 1, 5 ou 10 viagens",
+              "O link permanece público até o fim da viagem + 7 dias",
+              "Seus dados não são apagados ao encerrar",
+            ].map((feature) => (
               <div key={feature} className="flex items-start gap-3 text-sm">
                 <Check size={16} className="mt-0.5 shrink-0 text-emerald-400" />
                 <span>{feature}</span>
               </div>
             ))}
-            {freePlan.limitations.map((feature) => (
-              <div key={feature} className="flex items-start gap-3 text-sm text-muted-foreground">
-                <span className="mt-0.5 shrink-0 text-red-400">x</span>
-                <span>{feature}</span>
-              </div>
-            ))}
           </div>
 
-          <Button disabled={subscription.code === "free"} className="mt-auto w-full rounded-xl bg-muted/50 text-foreground hover:bg-muted">
-            Começar grátis
-          </Button>
+          <Button asChild className="mt-auto w-full rounded-xl"><Link href="/portal/viagens/comprar">Comprar viagens</Link></Button>
         </Card>
 
         <Card className="relative flex min-h-[31rem] flex-col overflow-hidden border-amber-500/30 bg-gradient-to-br from-amber-500/10 via-card/70 to-secondary/10 p-6 vuei-glass">
           <div className="absolute right-0 top-0 h-32 w-32 rounded-full bg-amber-500/15 blur-3xl" />
           <div className="relative flex min-h-[5rem] items-start justify-between gap-4">
             <div>
-              <p className="text-sm text-muted-foreground">Plano Premium</p>
-              <h2 className="mt-2 text-[2rem] font-bold leading-none">{premiumPlan.priceLabel}</h2>
+              <p className="text-sm text-muted-foreground">Assinatura opcional</p>
+              <h2 className="mt-2 text-[2rem] font-bold leading-none">Vuei+</h2>
+              <p className="mt-2 text-sm text-muted-foreground">Valor e periodicidade exibidos no checkout seguro.</p>
             </div>
-            <Badge className="bg-amber-500 text-black">{premiumPlan.badge}</Badge>
+            <Badge className="bg-amber-500 text-black">
+              {membership?.state === "VUEI_PLUS_ACTIVE" ? "Ativo" : "Arquivo premium"}
+            </Badge>
           </div>
 
-          <div className="mt-6 min-h-[11rem] space-y-3">
-            {premiumPlan.features.map((feature) => (
-              <div key={feature} className="flex items-start gap-3 text-sm">
-                <Check size={16} className="mt-0.5 shrink-0 text-emerald-400" />
-                <span>{feature}</span>
+          <div className="mt-6 min-h-[11rem] space-y-4">
+            {[
+              { icon: Archive, text: "Acesso autenticado às viagens encerradas" },
+              { icon: FileClock, text: "Documentos, passagens, hospedagens e roteiros preservados" },
+              { icon: ShieldCheck, text: "Histórico privado sem reabrir o link público" },
+              { icon: Crown, text: "Base para benefícios recorrentes futuros" },
+            ].map(({ icon: Icon, text }) => (
+              <div key={text} className="flex items-start gap-3 text-sm">
+                <Icon size={17} className="mt-0.5 shrink-0 text-amber-400" />
+                <span>{text}</span>
               </div>
             ))}
           </div>
 
           <Button
             className="mt-auto w-full rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 text-black font-semibold"
-            onClick={handlePremiumCheckout}
-            disabled={premiumLoading}
+            onClick={membership?.canAccessArchivedTrips || hasManageableVueiPlus ? handleOpenPortal : handleVueiPlusCheckout}
+            disabled={vueiPlusLoading || portalLoading || membership === null}
           >
-            {premiumLoading ? <Loader2 size={16} className="mr-2 animate-spin" /> : null}
-            Assinar Premium
+            {vueiPlusLoading || portalLoading ? <Loader2 size={16} className="mr-2 animate-spin" /> : null}
+            {membership?.state === "PREMIUM_LEGACY"
+              ? "Gerenciar Premium legado"
+              : membership?.canAccessArchivedTrips || hasManageableVueiPlus
+                ? "Gerenciar Vuei+"
+                : "Assinar Vuei+"}
           </Button>
         </Card>
       </motion.div>
+
+      {subscription.isPremium ? (
+        <motion.div {...fadeInUp}>
+          <Card className="border-primary/20 bg-primary/5 p-6 vuei-glass">
+            <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+              <div>
+                <div className="flex items-center gap-2">
+                  <Crown size={18} className="text-amber-400" />
+                  <h2 className="font-semibold">Premium legado preservado</h2>
+                </div>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  Seus créditos de IA, roteiros e demais benefícios atuais continuam no plano {premiumPlan.name}. O acesso ao arquivo também permanece liberado.
+                </p>
+              </div>
+              <Badge variant="secondary" className="w-fit">{premiumPlan.priceLabel}</Badge>
+            </div>
+          </Card>
+        </motion.div>
+      ) : null}
 
       <motion.div {...fadeInUp}>
         <Card className="border-border/50 bg-card/50 p-6 vuei-glass">
@@ -195,9 +238,9 @@ export default function PortalPlanosPage() {
               <Coins size={20} className="text-primary" />
             </div>
             <div>
-              <h2 className="text-xl font-semibold">Precisa de mais créditos?</h2>
+              <h2 className="text-xl font-semibold">Créditos de IA adicionais</h2>
               <p className="text-sm text-muted-foreground">
-                Compre créditos adicionais e use quando precisar.
+                Saldo separado das viagens e do Vuei+, usado somente nos recursos de inteligência artificial.
               </p>
             </div>
           </div>
@@ -232,9 +275,9 @@ export default function PortalPlanosPage() {
           <h2 className="text-xl font-semibold">FAQ</h2>
           <Accordion type="single" collapsible className="mt-4">
             <AccordionItem value="credits">
-              <AccordionTrigger>O que são créditos?</AccordionTrigger>
+              <AccordionTrigger>O que são créditos de IA?</AccordionTrigger>
               <AccordionContent>
-                Créditos são usados em recursos que consomem inteligência artificial.
+                Créditos de IA são usados em recursos inteligentes e nunca ativam um link de viagem.
               </AccordionContent>
             </AccordionItem>
             <AccordionItem value="consumption">

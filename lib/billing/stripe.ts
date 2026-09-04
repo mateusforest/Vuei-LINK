@@ -25,6 +25,10 @@ export function getStripePriceIdForTravelerPremium() {
   return getRequiredEnv("STRIPE_PRICE_TRAVELER_PREMIUM_MONTHLY")
 }
 
+export function getStripePriceIdForTravelerVueiPlus() {
+  return getRequiredEnv("STRIPE_PRICE_TRAVELER_VUEI_PLUS")
+}
+
 export function getStripePriceIdForCreditPackage(code: "starter" | "popular" | "pro") {
   if (code === "starter") return getRequiredEnv("STRIPE_PRICE_CREDITS_STARTER")
   if (code === "popular") return getRequiredEnv("STRIPE_PRICE_CREDITS_POPULAR")

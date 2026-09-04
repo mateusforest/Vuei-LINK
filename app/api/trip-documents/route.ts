@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createSupabaseAdminClient, hasSupabaseAdminEnv, isMissingSupabaseAdminEnvError } from "@/lib/supabase/admin"
 import { resolveTripLinkAccess as resolveTripLinkRequest } from "@/lib/security/trip-link-access"
+import { resolveAuthenticatedTripAccess } from "@/lib/security/trip-authenticated-access"
 import { createSupabaseServerClient } from "@/lib/supabase/server"
 import type { Database } from "@/lib/supabase/types"
 import { parseHttpByteRange } from "@/lib/files/http-byte-range"
@@ -10,73 +11,10 @@ export const runtime = "nodejs"
 const DOCUMENTS_BUCKET = "vuei-documents"
 
 type TripRow = Database["public"]["Tables"]["trips"]["Row"]
-type ProfileRow = Database["public"]["Tables"]["profiles"]["Row"]
-type AgencyMemberRow = Database["public"]["Tables"]["agency_members"]["Row"]
 type DocumentRow = Database["public"]["Tables"]["documents"]["Row"]
 type ItineraryRow = Database["public"]["Tables"]["trip_itineraries"]["Row"]
 
 type AccessMode = "admin" | "public"
-
-async function getProfile(
-  client: NonNullable<Awaited<ReturnType<typeof createSupabaseServerClient>>>,
-  userId: string,
-) {
-  const { data, error } = await client
-    .from("profiles")
-    .select("id, role, agency_id")
-    .eq("id", userId)
-    .maybeSingle()
-
-  if (error) {
-    return { data: null as ProfileRow | null, error: error.message }
-  }
-
-  return { data: data as ProfileRow | null, error: null }
-}
-
-async function getAccessibleTrip(
-  client: NonNullable<Awaited<ReturnType<typeof createSupabaseServerClient>>>,
-  userId: string,
-  tripId: string,
-  profile: ProfileRow | null,
-) {
-  const tripResult = await client.from("trips").select("*").eq("id", tripId).maybeSingle()
-
-  if (tripResult.error) {
-    return { trip: null as TripRow | null, membership: null as AgencyMemberRow | null, error: tripResult.error.message }
-  }
-
-  const trip = tripResult.data as TripRow | null
-  if (!trip) {
-    return { trip: null as TripRow | null, membership: null as AgencyMemberRow | null, error: "Viagem n?o ?ncontrada." }
-  }
-
-  if (profile?.role === "master" || trip.owner_user_id === userId) {
-    return { trip, membership: null as AgencyMemberRow | null, error: null }
-  }
-
-  if (!trip.agency_id) {
-    return { trip: null as TripRow | null, membership: null as AgencyMemberRow | null, error: "Voc? n?o tem permiss?o para acessar este documento." }
-  }
-
-  const membershipResult = await client
-    .from("agency_members")
-    .select("*")
-    .eq("agency_id", trip.agency_id)
-    .eq("profile_id", userId)
-    .eq("status", "active")
-    .maybeSingle()
-
-  if (membershipResult.error) {
-    return { trip: null as TripRow | null, membership: null as AgencyMemberRow | null, error: membershipResult.error.message }
-  }
-
-  if (!membershipResult.data) {
-    return { trip: null as TripRow | null, membership: null as AgencyMemberRow | null, error: "Voc? n?o tem permiss?o para acessar este documento." }
-  }
-
-  return { trip, membership: membershipResult.data as AgencyMemberRow, error: null }
-}
 
 async function resolveTripByLinkAccess(params: {
   tripId?: string | null
@@ -207,12 +145,7 @@ export async function GET(request: NextRequest) {
     const sessionUser = authResult?.data.user ?? null
 
     if (serverClient && sessionUser && tripId && accessMode !== "public") {
-      const profileResult = await getProfile(serverClient, sessionUser.id)
-      if (!profileResult.data) {
-        return buildErrorResponse(profileResult.error ?? "Perfil do usuario n?o ?ncontrado.", 403, dispositionMode)
-      }
-
-      const accessResult = await getAccessibleTrip(serverClient, sessionUser.id, tripId, profileResult.data)
+      const accessResult = await resolveAuthenticatedTripAccess(serverClient, sessionUser.id, { tripId })
       if (!accessResult.trip) {
         return buildErrorResponse(accessResult.error ?? "Voc? n?o tem permiss?o para acessar este documento.", 403, dispositionMode)
       }

@@ -13,7 +13,8 @@ import type { Document } from "@/types/document"
 import type { TripItineraryRecord, TripItineraryContent } from "@/types/itinerary"
 import { consumeTravelerCredits, getTravelerCreditBalance } from "@/lib/billing/traveler-billing"
 import { consumeAgencyCredits, getAgencyCreditBalance } from "@/lib/billing/agency-billing"
-import { hasAgencyMutationAccess, resolveTripLinkAccess } from "@/lib/security/trip-link-access"
+import { resolveTripLinkAccess } from "@/lib/security/trip-link-access"
+import { resolveAuthenticatedTripAccess } from "@/lib/security/trip-authenticated-access"
 
 export const runtime = "nodejs"
 export const maxDuration = 60
@@ -136,41 +137,9 @@ async function getAccessibleTrip(
   tripId: string,
   profile: ProfileRow | null,
 ) {
-  const tripResult = await client.from("trips").select("*").eq("id", tripId).maybeSingle()
-  if (tripResult.error) {
-    return { trip: null as TripRow | null, membership: null as AgencyMemberRow | null, error: tripResult.error.message }
-  }
-
-  const trip = tripResult.data as TripRow | null
-  if (!trip) {
-    return { trip: null as TripRow | null, membership: null as AgencyMemberRow | null, error: "Viagem n?o ?ncontrada." }
-  }
-
-  if (profile?.role === "master" || trip.owner_user_id === userId) {
-    return { trip, membership: null as AgencyMemberRow | null, error: null }
-  }
-
-  if (!trip.agency_id) {
-    return { trip: null as TripRow | null, membership: null as AgencyMemberRow | null, error: "Voc? n?o tem permiss?o para gerar roteiros desta viagem." }
-  }
-
-  const membershipResult = await client
-    .from("agency_members")
-    .select("*")
-    .eq("agency_id", trip.agency_id)
-    .eq("profile_id", userId)
-    .eq("status", "active")
-    .maybeSingle()
-
-  if (membershipResult.error) {
-    return { trip: null as TripRow | null, membership: null as AgencyMemberRow | null, error: membershipResult.error.message }
-  }
-
-  if (!membershipResult.data || !hasAgencyMutationAccess(membershipResult.data.role)) {
-    return { trip: null as TripRow | null, membership: null as AgencyMemberRow | null, error: "Voc? n?o tem permiss?o para gerar roteiros desta viagem." }
-  }
-
-  return { trip, membership: membershipResult.data as AgencyMemberRow, error: null }
+  void profile
+  const result = await resolveAuthenticatedTripAccess(client, userId, { tripId, requireMutationRole: true })
+  return { trip: result.trip, membership: result.membership, error: result.error }
 }
 
 async function getCreditsBalance(

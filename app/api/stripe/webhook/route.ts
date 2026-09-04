@@ -5,14 +5,18 @@ import {
   getStripeClient,
   getStripeWebhookSecret,
   getStripePriceIdForTravelerPremium,
+  getStripePriceIdForTravelerVueiPlus,
   getStripePriceIdForAgencyPlan,
 } from "@/lib/billing/stripe"
 import {
   findTravelerSubscriptionByCustomerId,
+  findTravelerSubscriptionByVueiPlusSubscriptionId,
   grantTravelerPlanCycleFromInvoice,
   updateTravelerStripeCustomerId,
   upsertTravelerSubscriptionFromStripe,
+  upsertTravelerVueiPlusSubscriptionFromStripe,
 } from "@/lib/billing/traveler-billing"
+import { TRAVELER_VUEI_PLUS_BILLING_SCOPE } from "@/lib/billing/traveler-membership"
 import { getTravelerCreditPackage } from "@/lib/billing/traveler-plans"
 import {
   createAgencyPlanCreditCycleFromInvoice,
@@ -51,7 +55,7 @@ function safePrice(getter: () => string) {
 
 function logUnknownStripePriceId(params: {
   eventType: string
-  billingScope: "traveler" | "agency"
+  billingScope: "traveler" | "agency" | "traveler_vuei_plus"
   priceId: string | null | undefined
   subscriptionId?: string | null
   customerId?: string | null
@@ -67,6 +71,14 @@ function logUnknownStripePriceId(params: {
 
 function resolveTravelerPlanFromPriceId(priceId: string | null | undefined) {
   return priceId === safePrice(getStripePriceIdForTravelerPremium) ? "premium" : null
+}
+
+function isTravelerVueiPlusSubscription(subscription: Stripe.Subscription) {
+  const priceId = subscription.items.data[0]?.price?.id ?? null
+  return (
+    getMetadataValue(subscription.metadata, "billing_scope") === TRAVELER_VUEI_PLUS_BILLING_SCOPE ||
+    priceId === safePrice(getStripePriceIdForTravelerVueiPlus)
+  )
 }
 
 function resolveAgencyPlanFromPriceId(priceId: string | null | undefined) {
@@ -170,6 +182,57 @@ async function upsertTravelerSubscriptionFromStripeObject(subscription: Stripe.S
     error: result.error,
     userId,
   }
+}
+
+async function upsertTravelerVueiPlusFromStripeObject(
+  subscription: Stripe.Subscription,
+  fallbackUserId?: string | null,
+) {
+  const adminClient = createSupabaseAdminClient()
+  const priceId = subscription.items.data[0]?.price?.id ?? null
+  const expectedPriceId = safePrice(getStripePriceIdForTravelerVueiPlus)
+  let userId = fallbackUserId ?? getMetadataValue(subscription.metadata, "user_id")
+
+  if (!userId) {
+    const bySubscription = await findTravelerSubscriptionByVueiPlusSubscriptionId(adminClient, subscription.id)
+    if (bySubscription.error) return { data: null, error: bySubscription.error, userId: null }
+    userId = bySubscription.data?.user_id ?? null
+  }
+
+  if (!userId && typeof subscription.customer === "string") {
+    const byCustomer = await findTravelerSubscriptionByCustomerId(adminClient, subscription.customer)
+    if (byCustomer.error) return { data: null, error: byCustomer.error, userId: null }
+    userId = byCustomer.data?.user_id ?? null
+  }
+
+  if (!userId) {
+    return { data: null, error: "Nao foi possivel identificar o traveler desta assinatura Vuei+.", userId: null }
+  }
+
+  if (!expectedPriceId || priceId !== expectedPriceId) {
+    logUnknownStripePriceId({
+      eventType: "customer.subscription.vuei_plus",
+      billingScope: "traveler_vuei_plus",
+      priceId,
+      subscriptionId: subscription.id,
+      customerId: typeof subscription.customer === "string" ? subscription.customer : null,
+    })
+    return { data: null, error: "Price ID da assinatura Vuei+ nao reconhecido.", userId }
+  }
+
+  const period = getStripeSubscriptionPeriod(subscription)
+  const result = await upsertTravelerVueiPlusSubscriptionFromStripe(adminClient, {
+    userId,
+    status: mapStripeSubscriptionStatus(subscription.status),
+    stripeCustomerId: typeof subscription.customer === "string" ? subscription.customer : null,
+    stripeSubscriptionId: subscription.id,
+    stripePriceId: priceId,
+    currentPeriodStart: period.currentPeriodStart,
+    currentPeriodEnd: period.currentPeriodEnd,
+    cancelAtPeriodEnd: subscription.cancel_at_period_end,
+  })
+
+  return { data: result.data, error: result.error, userId }
 }
 
 async function upsertAgencySubscriptionFromStripeObject(subscription: Stripe.Subscription, fallbackAgencyId?: string | null) {
@@ -397,10 +460,13 @@ async function handleAgencyCreditPackageCheckoutCompleted(session: Stripe.Checko
   return grantResult.error ?? null
 }
 
-async function handleSubscriptionCheckoutCompleted(session: Stripe.Checkout.Session, billingScope: "traveler" | "agency") {
+async function handleSubscriptionCheckoutCompleted(
+  session: Stripe.Checkout.Session,
+  billingScope: "traveler" | "agency" | "traveler_vuei_plus",
+) {
   const adminClient = createSupabaseAdminClient()
 
-  if (billingScope === "traveler") {
+  if (billingScope === "traveler" || billingScope === "traveler_vuei_plus") {
     const userId = getMetadataValue(session.metadata, "user_id")
 
     if (typeof session.customer === "string" && userId) {
@@ -413,6 +479,10 @@ async function handleSubscriptionCheckoutCompleted(session: Stripe.Checkout.Sess
     if (typeof session.subscription === "string") {
       const stripe = getStripeClient()
       const subscription = await stripe.subscriptions.retrieve(session.subscription)
+      if (billingScope === "traveler_vuei_plus") {
+        const updateResult = await upsertTravelerVueiPlusFromStripeObject(subscription, userId)
+        return updateResult.error ?? null
+      }
       const updateResult = await upsertTravelerSubscriptionFromStripeObject(subscription, userId)
       return updateResult.error ?? null
     }
@@ -532,6 +602,11 @@ async function handleInvoicePaid(invoice: Stripe.Invoice) {
     return handleAgencyInvoicePaid(invoice, subscription)
   }
 
+  if (isTravelerVueiPlusSubscription(subscription)) {
+    const result = await upsertTravelerVueiPlusFromStripeObject(subscription)
+    return result.error ?? null
+  }
+
   return handleTravelerInvoicePaid(invoice, subscription)
 }
 
@@ -550,6 +625,11 @@ async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
     return result.error ?? null
   }
 
+  if (isTravelerVueiPlusSubscription(subscription)) {
+    const result = await upsertTravelerVueiPlusFromStripeObject(subscription)
+    return result.error ?? null
+  }
+
   const result = await upsertTravelerSubscriptionFromStripeObject(subscription)
   return result.error ?? null
 }
@@ -559,6 +639,11 @@ async function handleSubscriptionLifecycleEvent(subscription: Stripe.Subscriptio
 
   if (billingScope === "agency") {
     const result = await upsertAgencySubscriptionFromStripeObject(subscription)
+    return result.error ?? null
+  }
+
+  if (isTravelerVueiPlusSubscription(subscription)) {
+    const result = await upsertTravelerVueiPlusFromStripeObject(subscription)
     return result.error ?? null
   }
 
@@ -618,6 +703,8 @@ export async function POST(request: Request) {
             processingError = await handleTravelerCreditPackageCheckoutCompleted(session)
           } else if (checkoutType === "subscription" && billingScope === "agency") {
             processingError = await handleSubscriptionCheckoutCompleted(session, "agency")
+          } else if (checkoutType === "subscription" && billingScope === TRAVELER_VUEI_PLUS_BILLING_SCOPE) {
+            processingError = await handleSubscriptionCheckoutCompleted(session, "traveler_vuei_plus")
           } else if (checkoutType === "subscription") {
             processingError = await handleSubscriptionCheckoutCompleted(session, "traveler")
           }

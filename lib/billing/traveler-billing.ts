@@ -2,9 +2,16 @@ import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
 import type { Database } from "@/lib/supabase/types"
-import type { TravelerBillingStatusSummary, TravelerPlanCode, TravelerSubscriptionStatus } from "@/types"
+import type {
+  TravelerBillingStatusSummary,
+  TravelerMembershipStatusSummary,
+  TravelerPlanCode,
+  TravelerSubscriptionStatus,
+  VueiPlusSubscriptionStatus,
+} from "@/types"
 import { TRAVELER_PLAN_DEFINITIONS } from "@/lib/billing/traveler-plans"
 import { getAccountLimitOverrideQuantity } from "@/lib/billing/account-limit-overrides"
+import { resolveTravelerMembership } from "@/lib/billing/traveler-membership"
 
 type SupabaseDbClient = SupabaseClient<Database>
 type TravelerSubscriptionRow = Database["public"]["Tables"]["traveler_subscriptions"]["Row"]
@@ -589,6 +596,81 @@ export async function upsertTravelerSubscriptionFromStripe(
   return { data: (updateResult.data as TravelerSubscriptionRow | null) ?? null, error: updateResult.error?.message ?? null }
 }
 
+export async function getTravelerMembershipStatus(
+  client: SupabaseDbClient,
+  userId: string,
+): Promise<{ data: TravelerMembershipStatusSummary | null; error: string | null }> {
+  const subscriptionResult = await ensureTravelerSubscriptionRow(client, userId)
+  if (subscriptionResult.error || !subscriptionResult.data) {
+    return {
+      data: null,
+      error: subscriptionResult.error ?? "Nao foi possivel carregar a assinatura do traveler.",
+    }
+  }
+
+  const row = subscriptionResult.data
+  return {
+    data: resolveTravelerMembership({
+      planCode: row.plan_code,
+      legacyStatus: row.status,
+      legacyCurrentPeriodEnd: row.current_period_end,
+      vueiPlusStatus: row.vuei_plus_status,
+      vueiPlusCurrentPeriodEnd: row.vuei_plus_current_period_end,
+      vueiPlusCancelAtPeriodEnd: row.vuei_plus_cancel_at_period_end,
+      vueiPlusStripeSubscriptionId: row.vuei_plus_stripe_subscription_id,
+      stripeCustomerId: row.stripe_customer_id,
+    }),
+    error: null,
+  }
+}
+
+export async function upsertTravelerVueiPlusSubscriptionFromStripe(
+  client: SupabaseDbClient,
+  payload: {
+    userId: string
+    status: VueiPlusSubscriptionStatus
+    stripeCustomerId?: string | null
+    stripeSubscriptionId?: string | null
+    stripePriceId?: string | null
+    currentPeriodStart?: string | null
+    currentPeriodEnd?: string | null
+    cancelAtPeriodEnd?: boolean
+  },
+) {
+  const existing = await ensureTravelerSubscriptionRow(client, payload.userId)
+  if (existing.error || !existing.data) {
+    return {
+      data: null as TravelerSubscriptionRow | null,
+      error: existing.error ?? "Nao foi possivel carregar a assinatura traveler.",
+    }
+  }
+
+  const updateResult = await (client
+    .from("traveler_subscriptions" as any) as any)
+    .update({
+      stripe_customer_id: payload.stripeCustomerId ?? existing.data.stripe_customer_id,
+      vuei_plus_status: payload.status,
+      vuei_plus_stripe_subscription_id:
+        payload.stripeSubscriptionId ?? existing.data.vuei_plus_stripe_subscription_id,
+      vuei_plus_stripe_price_id: payload.stripePriceId ?? existing.data.vuei_plus_stripe_price_id,
+      vuei_plus_current_period_start:
+        payload.currentPeriodStart ?? existing.data.vuei_plus_current_period_start,
+      vuei_plus_current_period_end:
+        payload.currentPeriodEnd ?? existing.data.vuei_plus_current_period_end,
+      vuei_plus_cancel_at_period_end:
+        payload.cancelAtPeriodEnd ?? existing.data.vuei_plus_cancel_at_period_end,
+      updated_at: new Date().toISOString(),
+    } as any)
+    .eq("id", existing.data.id)
+    .select("*")
+    .single()
+
+  return {
+    data: (updateResult.data as TravelerSubscriptionRow | null) ?? null,
+    error: updateResult.error?.message ?? null,
+  }
+}
+
 export async function findTravelerSubscriptionByCustomerId(client: SupabaseDbClient, stripeCustomerId: string) {
   const { data, error } = await (client
     .from("traveler_subscriptions" as any) as any)
@@ -607,6 +689,22 @@ export async function findTravelerSubscriptionByStripeSubscriptionId(client: Sup
     .maybeSingle()
 
   return { data: (data as TravelerSubscriptionRow | null) ?? null, error: error?.message ?? null }
+}
+
+export async function findTravelerSubscriptionByVueiPlusSubscriptionId(
+  client: SupabaseDbClient,
+  stripeSubscriptionId: string,
+) {
+  const { data, error } = await (client
+    .from("traveler_subscriptions" as any) as any)
+    .select("*")
+    .eq("vuei_plus_stripe_subscription_id", stripeSubscriptionId)
+    .maybeSingle()
+
+  return {
+    data: (data as TravelerSubscriptionRow | null) ?? null,
+    error: error?.message ?? null,
+  }
 }
 
 export async function updateTravelerStripeCustomerId(client: SupabaseDbClient, userId: string, stripeCustomerId: string) {
