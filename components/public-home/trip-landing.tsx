@@ -522,14 +522,13 @@ export function TripLanding() {
           <h1 className="text-balance text-[2.45rem] font-semibold leading-[1.05] tracking-tight text-foreground md:text-[3.25rem]">
             Sua viagem começa <span className="text-brand-gradient">aqui.</span>
           </h1>
-          <p className="mt-3 text-pretty text-lg text-muted-foreground">Um único link para organizar tudo.</p>
-          <p className="mt-2 text-pretty text-sm font-medium text-foreground/72 sm:text-base">
-            Comece grátis. Ative sua viagem quando estiver pronta.
+          <p className="mt-3 max-w-md text-pretty text-base leading-6 text-muted-foreground sm:text-lg">
+            Organize tudo em um único link. Comece grátis e ative quando estiver pronta.
           </p>
 
           <div
             className={cn(
-              "mt-8 flex flex-col gap-2.5 transition-[opacity,transform,max-height] duration-500 [transition-timing-function:var(--ease-out-soft)]",
+              "mt-7 flex flex-col gap-2.5 transition-[opacity,transform,max-height] duration-500 [transition-timing-function:var(--ease-out-soft)]",
               hasPendingCreatedTrip && "max-h-0 -translate-y-3 overflow-hidden opacity-0 pointer-events-none",
             )}
           >

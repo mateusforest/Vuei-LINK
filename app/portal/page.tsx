@@ -3,11 +3,9 @@
 import { useState } from "react"
 import { motion } from "framer-motion"
 import { useRouter } from "next/navigation"
-import Image from "next/image"
 import {
   Plane,
   Calendar,
-  MapPin,
   ExternalLink,
   Plus,
   Copy,
@@ -240,7 +238,7 @@ export default function PortalHomePage() {
             <p className="text-sm text-muted-foreground">Carregando viagens...</p>
           </Card>
         ) : activeTrip ? (
-          <Card className="relative overflow-hidden border-border/50 bg-card/50">
+          <Card className="relative min-h-[238px] overflow-hidden border-border/60 bg-card shadow-[0_18px_48px_-34px_rgba(15,23,42,0.28)]">
             <div className="absolute inset-0">
               <ImageWithFallback
                 src={activeTrip.coverImage}
@@ -251,54 +249,40 @@ export default function PortalHomePage() {
                 })}
                 alt={activeTrip.destination}
                 fill
-                className="object-cover opacity-30"
+                className="object-cover opacity-[0.85]"
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-background via-background/80 to-transparent" />
+              <div className="absolute inset-0 bg-gradient-to-r from-background/95 via-background/72 to-background/10" />
+              <div className="absolute inset-0 bg-gradient-to-t from-background/64 via-transparent to-background/5" />
             </div>
 
-            <div className="relative p-6">
-              <div className="mb-4 flex items-start justify-between gap-4">
-                <div>
-                  <Badge variant="secondary" className="mb-2 border-0 bg-primary/20 text-primary">
+            <div className="relative flex min-h-[238px] max-w-2xl flex-col justify-between p-5 sm:p-6">
+              <div>
+                <div className="mb-3 flex flex-wrap items-center gap-2">
+                  <Badge variant="secondary" className="border border-primary/10 bg-primary/12 text-primary shadow-sm backdrop-blur-md">
                     {getLinkLifecycleLabel(activeTrip)}
                   </Badge>
-                  <h2 className="text-xl font-bold">{activeTrip.name}</h2>
-                  <p className="mt-1 flex items-center gap-1 text-muted-foreground">
-                    <MapPin size={14} />
-                    {activeTrip.destination}
-                  </p>
+                  <span className="text-xs font-medium text-foreground/64">{getLinkAccessLabel(activeTrip)}</span>
                 </div>
-                <CreateTripButton
-                  variant="outline"
-                  className="border-border/50"
-                >
-                  <Plus size={16} className="mr-2" />
-                  Criar nova viagem
-                </CreateTripButton>
-              </div>
-
-              <div className="mb-5 flex items-center gap-4 text-sm text-muted-foreground">
-                <span className="flex items-center gap-1">
-                  <Calendar size={14} />
-                  {formatDate(activeTrip.startDate)} - {formatDate(activeTrip.endDate)}
-                </span>
-              </div>
-
-              <div className="mb-5 grid gap-3 md:grid-cols-2">
-                <div className="rounded-xl border border-border/50 bg-background/40 p-4">
-                  <div className="mb-2 flex items-center gap-2">
-                    <Link2 size={16} className="text-primary" />
-                    <p className="text-sm font-medium">
-                      {activeTrip.linkActivatedAt ? "Link da Viagem" : "Rascunho privado"}
-                    </p>
-                  </div>
-                  <p className="truncate text-xs text-muted-foreground">{getLinkAccessLabel(activeTrip)}</p>
+                <h2 className="text-balance text-2xl font-semibold tracking-[-0.025em] sm:text-3xl">
+                  {activeTrip.destination}
+                </h2>
+                <p className="mt-1 text-sm font-medium text-foreground/72">{activeTrip.name}</p>
+                <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-foreground/70">
+                  <span className="flex items-center gap-1.5">
+                    <Calendar size={15} className="text-primary" />
+                    {formatDate(activeTrip.startDate)} – {formatDate(activeTrip.endDate)}
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <Link2 size={15} className="text-primary" />
+                    {activeTrip.linkActivatedAt ? "Link da viagem" : "Rascunho privado"}
+                  </span>
                 </div>
               </div>
 
-              <div className="flex flex-wrap gap-3">
+              <div className="mt-6 flex flex-wrap gap-2.5">
                 <Button
-                  className="border-0 bg-gradient-to-r from-[#5de0e6] to-[#004aad] text-white"
+                  size="sm"
+                  className="h-9 rounded-xl border-0 bg-gradient-to-r from-[#37beff] to-[#0b56d8] px-4 text-white shadow-[0_12px_26px_-14px_rgba(11,86,216,0.7)]"
                   onClick={() => handlePrimaryTripAction(activeTrip)}
                   disabled={activatingTripId === activeTrip.id || getLinkLifecycle(activeTrip) === "ended"}
                 >
@@ -306,8 +290,9 @@ export default function PortalHomePage() {
                   {activatingTripId === activeTrip.id ? "Ativando..." : isLinkActive(activeTrip) ? "Abrir link" : getLinkLifecycle(activeTrip) === "ended" ? "Viagem encerrada" : activeTrip.linkActivatedAt ? "Reabrir link" : "Ativar viagem (1 crédito)"}
                 </Button>
                 <Button
+                  size="sm"
                   variant="outline"
-                  className="border-border/50"
+                  className="h-9 rounded-xl border-border/60 bg-background/70 px-3 backdrop-blur-md"
                   onClick={() => void copyLink(activeTrip.shareLink, "admin")}
                   disabled={!isLinkActive(activeTrip)}
                 >
@@ -315,8 +300,9 @@ export default function PortalHomePage() {
                   Copiar link
                 </Button>
                 <Button
+                  size="sm"
                   variant="outline"
-                  className="border-border/50"
+                  className="h-9 rounded-xl border-border/60 bg-background/70 px-3 backdrop-blur-md"
                   onClick={() => void shareTrip(activeTrip.shareLink)}
                   disabled={!isLinkActive(activeTrip)}
                 >
@@ -347,10 +333,6 @@ export default function PortalHomePage() {
         <motion.div variants={fadeInUp}>
           <div className="mb-4 flex items-center justify-between">
             <h2 className="text-lg font-semibold">Viagens criadas</h2>
-            <CreateTripButton variant="ghost" size="sm">
-              <Plus size={16} className="mr-1" />
-              Criar nova viagem
-            </CreateTripButton>
           </div>
 
           <div className="space-y-3">

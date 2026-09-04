@@ -140,11 +140,11 @@ export function TripsPopup({
 
         {(emptyStateMode !== "guest-bag" || trips.length > 0) && walletBalanceLabel != null && onOpenWalletAction ? (
           <div className="px-4 pb-3">
-            <div className="rounded-2xl border border-border/60 bg-background/60 p-3.5 shadow-[0_2px_10px_-6px_rgba(20,60,120,0.15)]">
+            <div className="rounded-2xl border border-border/55 bg-background/55 p-3 shadow-[0_8px_24px_-20px_rgba(20,60,120,0.3)]">
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">Viagens disponíveis</p>
-                  <p className="mt-1 text-xl font-semibold text-foreground">
+                  <p className="mt-0.5 text-lg font-semibold text-foreground">
                     {walletBalanceLabel ?? "0"}
                   </p>
                 </div>
@@ -161,7 +161,7 @@ export function TripsPopup({
           </div>
         ) : null}
 
-        <div className="flex-1 overflow-y-auto px-4 pb-2">
+        <div className="flex-1 overflow-y-auto px-4 pb-3">
           {loading ? (
             <div className="flex flex-col items-center gap-3 px-6 py-14 text-center">
               <Loader2 className="size-6 animate-spin text-muted-foreground" />
@@ -188,7 +188,7 @@ export function TripsPopup({
               )}
             </div>
           ) : (
-            <ul className="flex flex-col gap-2">
+            <ul className="flex flex-col gap-2.5">
               {trips.map((trip, index) => (
                 <li key={trip.id} className="vuei-rise" style={{ animationDelay: `${Math.min(index, 6) * 55}ms` }}>
                   <TripCard
@@ -265,17 +265,17 @@ function TripCard({
   return (
     <div
       className={cn(
-        "group rounded-2xl border border-border/60 bg-background/55 p-3.5 shadow-[0_2px_10px_-6px_rgba(20,60,120,0.15)] transition-[border-color,box-shadow] duration-300 [transition-timing-function:var(--ease-out-soft)] hover:border-border hover:shadow-[0_12px_36px_-22px_rgba(20,60,120,0.4)]",
+        "group rounded-[1.25rem] border border-border/55 bg-background/58 p-4 shadow-[0_8px_28px_-24px_rgba(20,60,120,0.34)] transition-[border-color,box-shadow] duration-300 [transition-timing-function:var(--ease-out-soft)] hover:border-border hover:shadow-[0_14px_38px_-24px_rgba(20,60,120,0.42)]",
         highlighted && "border-brand/40 shadow-[0_18px_44px_-20px_rgba(20,60,120,0.42)]",
       )}
     >
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex flex-col gap-3">
         <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <span className="truncate text-[1.02rem] font-semibold tracking-tight text-foreground">{trip.destination}</span>
+          <div className="flex items-start justify-between gap-3">
+            <span className="min-w-0 truncate text-[1.04rem] font-semibold tracking-tight text-foreground">{trip.destination}</span>
             <span
               className={cn(
-                "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[0.68rem] font-medium",
+                "inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[0.68rem] font-medium",
                 trip.lifecycle === "active"
                   ? "bg-emerald-500/12 text-emerald-700"
                   : trip.lifecycle === "post_trip"
@@ -301,22 +301,22 @@ function TripCard({
           <p className="mt-1 text-[0.8rem] text-muted-foreground">
             {range ? range : "Datas a definir"} · {trip.travelersCount ?? 1} {(trip.travelersCount ?? 1) === 1 ? "pessoa" : "pessoas"}
           </p>
-          <p className="mt-1.5 truncate text-[0.75rem] text-muted-foreground">
+          <p className="mt-1.5 text-[0.75rem] leading-5 text-muted-foreground">
             {trip.isActivated
-              ? trip.url
+              ? trip.lifecycle === "post_trip" ? "Link ativo no período pós-viagem" : "Link ativo e pronto para compartilhar"
               : trip.lifecycle === "ended"
                 ? "Link público encerrado"
               : trip.isPending
-                ? "Rascunho privado neste navegador"
+                ? "Rascunho privado · entre para vincular e ativar"
                 : "Rascunho privado na sua Bolsa"}
           </p>
         </div>
-        <div className="flex shrink-0 gap-1.5">
+        <div className="flex items-center gap-1.5 border-t border-border/45 pt-2.5">
           <Button
             size="sm"
             variant="ghost"
             onClick={() => onOpen(trip)}
-            className="h-8 rounded-xl px-2.5 text-[0.78rem] text-muted-foreground transition-colors hover:bg-foreground/5 hover:text-foreground"
+            className="h-8 rounded-xl px-2.5 text-[0.78rem] font-medium text-foreground/78 transition-colors hover:bg-foreground/5 hover:text-foreground"
           >
             <ExternalLink className="size-3.5" />
             {trip.isActivated
@@ -324,7 +324,7 @@ function TripCard({
               : trip.lifecycle === "ended"
                 ? canAccessArchive ? "Abrir arquivo" : "Conhecer Vuei+"
                 : trip.isPending
-                  ? "Continuar"
+                  ? "Ativar viagem"
                   : "Ativar viagem"}
           </Button>
           {trip.isActivated ? (

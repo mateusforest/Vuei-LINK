@@ -228,31 +228,28 @@ function PortalLayoutInner({ children }: { children: React.ReactNode }) {
               </div>
             </nav>
 
-            <div className="space-y-3 px-4 pb-4">
-              <div className={cn("rounded-2xl border border-border/60 bg-white/90 p-4 shadow-sm", sidebarCollapsed && "px-2 py-3")}>
-                <div className={cn("flex items-start gap-3", sidebarCollapsed && "flex-col items-center gap-2 text-center")}>
-                  <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-[#37beff]/18 to-[#0b56d8]/14 text-[#0b56d8]">
-                    <Coins size={18} />
+            <div className="space-y-2.5 px-4 pb-4">
+              <div className={cn("rounded-2xl border border-border/55 bg-white/78 p-3 shadow-[0_10px_28px_-24px_rgba(15,23,42,0.34)]", sidebarCollapsed && "px-2 py-2.5")}>
+                <div className={cn("flex items-center gap-2.5", sidebarCollapsed && "flex-col justify-center gap-1.5 text-center")}>
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#37beff]/14 to-[#0b56d8]/10 text-[#0b56d8]">
+                    <Coins size={15} />
                   </div>
                   <div className="min-w-0 flex-1">
-                    {!sidebarCollapsed && <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">Créditos de IA</p>}
-                    <div className={cn("mt-1 flex items-end gap-2", sidebarCollapsed && "mt-0 flex-col items-center gap-1")}>
-                      <span className="text-2xl font-semibold leading-none text-foreground">{credits.balance}</span>
+                    {!sidebarCollapsed && <p className="text-[0.68rem] font-medium uppercase tracking-[0.13em] text-muted-foreground">Créditos de IA</p>}
+                    <div className={cn("mt-0.5 flex items-baseline gap-2", sidebarCollapsed && "mt-0 flex-col items-center gap-0.5")}>
+                      <span className="text-xl font-semibold leading-none text-foreground">{credits.balance}</span>
                       {!sidebarCollapsed && (
-                        <span className="text-xs text-muted-foreground">
+                        <span className="text-[0.68rem] text-muted-foreground">
                           {subscription.isPremium ? "Premium legado" : "Saldo disponível"}
                         </span>
                       )}
                     </div>
                   </div>
                 </div>
-                {!sidebarCollapsed ? (
-                  <p className="mt-3 text-xs text-muted-foreground">Saldo de IA: {credits.balance} créditos</p>
-                ) : null}
                 <Link
                   href={travelerCreditsActionHref}
                   className={cn(
-                    "mt-4 flex w-full items-center justify-center rounded-xl border border-[#0b56d8]/15 bg-[#0b56d8]/5 px-3 py-2 text-sm font-medium text-[#0b56d8] transition-colors hover:bg-[#0b56d8]/10",
+                    "mt-2.5 flex w-full items-center justify-center rounded-lg border border-[#0b56d8]/12 bg-[#0b56d8]/[0.035] px-3 py-1.5 text-xs font-medium text-[#0b56d8] transition-colors hover:bg-[#0b56d8]/[0.08]",
                     sidebarCollapsed && "px-2 text-xs"
                   )}
                   aria-label={travelerCreditsActionLabel}
@@ -260,22 +257,22 @@ function PortalLayoutInner({ children }: { children: React.ReactNode }) {
                   {sidebarCollapsed ? <ChevronRight size={16} /> : travelerCreditsActionLabel}
                 </Link>
               </div>
-              <div className={cn("rounded-2xl border border-[#0b56d8]/12 bg-white/90 p-4 shadow-sm", sidebarCollapsed && "px-2 py-3")}>
-                <div className={cn("flex items-center gap-3", sidebarCollapsed && "justify-center")}>
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-[#37beff]/18 to-[#0b56d8]/14 text-[#0b56d8]">
-                    <Luggage size={18} />
+              <div className={cn("rounded-2xl border border-[#0b56d8]/10 bg-white/78 p-3 shadow-[0_10px_28px_-24px_rgba(15,23,42,0.34)]", sidebarCollapsed && "px-2 py-2.5")}>
+                <div className={cn("flex items-center gap-2.5", sidebarCollapsed && "justify-center")}>
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#37beff]/14 to-[#0b56d8]/10 text-[#0b56d8]">
+                    <Luggage size={15} />
                   </div>
                   {!sidebarCollapsed ? (
                     <div className="min-w-0 flex-1">
-                      <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">Viagens disponíveis</p>
-                      <p className="mt-1 text-2xl font-semibold leading-none text-foreground">{tripLinkBalance ?? "—"}</p>
+                      <p className="text-[0.68rem] font-medium uppercase tracking-[0.13em] text-muted-foreground">Viagens disponíveis</p>
+                      <p className="mt-0.5 text-xl font-semibold leading-none text-foreground">{tripLinkBalance ?? "—"}</p>
                     </div>
                   ) : null}
                 </div>
                 <Link
                   href="/portal/viagens/comprar"
                   className={cn(
-                    "mt-4 flex w-full items-center justify-center rounded-xl border border-[#0b56d8]/15 bg-[#0b56d8]/5 px-3 py-2 text-sm font-medium text-[#0b56d8] transition-colors hover:bg-[#0b56d8]/10",
+                    "mt-2.5 flex w-full items-center justify-center rounded-lg border border-[#0b56d8]/12 bg-[#0b56d8]/[0.035] px-3 py-1.5 text-xs font-medium text-[#0b56d8] transition-colors hover:bg-[#0b56d8]/[0.08]",
                     sidebarCollapsed && "px-2",
                   )}
                   aria-label="Comprar viagens"

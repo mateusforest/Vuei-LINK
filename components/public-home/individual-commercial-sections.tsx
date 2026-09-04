@@ -137,10 +137,10 @@ export function IndividualCommercialSections() {
   }
 
   return (
-    <div className="relative overflow-hidden bg-[linear-gradient(180deg,#fbfaf7_0%,#f7f9fc_44%,#f5f7fb_100%)] text-slate-950">
+    <div className="relative z-20 -mt-8 overflow-hidden rounded-t-[2.5rem] border-t border-white/75 bg-[linear-gradient(180deg,#fbfaf7_0%,#f7f9fc_44%,#f5f7fb_100%)] text-slate-950 shadow-[0_-24px_70px_-54px_rgba(15,23,42,0.35)] sm:-mt-10 sm:rounded-t-[3.25rem]">
       <div className="pointer-events-none absolute inset-x-0 top-0 h-[34rem] bg-[radial-gradient(52%_70%_at_16%_10%,rgba(55,190,255,0.13),transparent_72%),radial-gradient(45%_65%_at_88%_24%,rgba(255,196,116,0.14),transparent_75%)]" />
 
-      <section className="relative mx-auto max-w-6xl px-6 py-24 md:px-10 md:py-32" aria-labelledby="como-funciona-title">
+      <section className="relative mx-auto max-w-6xl px-6 pb-20 pt-14 md:px-10 md:pb-24 md:pt-20" aria-labelledby="como-funciona-title">
         <div className="max-w-2xl">
           <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#0b56d8]">Do primeiro plano à lembrança</p>
           <h2 id="como-funciona-title" className="mt-4 text-balance text-4xl font-semibold tracking-[-0.04em] md:text-6xl">
@@ -151,7 +151,7 @@ export function IndividualCommercialSections() {
           </p>
         </div>
 
-        <div className="mt-16 grid gap-0 md:grid-cols-4">
+        <div className="mt-12 grid gap-0 md:mt-14 md:grid-cols-4">
           {journeySteps.map((step, index) => (
             <div key={step.title} className="group relative border-l border-slate-200 py-5 pl-6 pr-6 md:border-l-0 md:border-t md:pb-0 md:pl-0 md:pr-8 md:pt-8">
               <span className="absolute -left-[5px] top-7 size-2.5 rounded-full border-2 border-white bg-[#0b56d8] shadow-[0_0_0_4px_rgba(11,86,216,0.08)] md:-top-[5px] md:left-0" />
