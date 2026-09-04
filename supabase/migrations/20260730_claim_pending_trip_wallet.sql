@@ -1,3 +1,4 @@
+-- Unique migration version: requires the 20260729 wallet infrastructure migration.
 create or replace function public.claim_pending_trip_with_wallet(
   p_claim_token_hash text,
   p_user_id uuid

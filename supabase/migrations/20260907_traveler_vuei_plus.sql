@@ -1,4 +1,4 @@
--- Vuei+ is deliberately stored beside, not inside, the legacy traveler plan.
+-- Vuei+ is deliberately stored beside, not inside, the legacy traveler plan. Version follows trip-link expiration.
 -- This keeps Premium plan credits and its Stripe subscription untouched.
 alter table public.traveler_subscriptions
   add column if not exists vuei_plus_status text not null default 'none',

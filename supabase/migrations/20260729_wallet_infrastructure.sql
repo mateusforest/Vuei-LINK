@@ -1,3 +1,4 @@
+-- Unique migration version: wallet infrastructure follows the already-applied legacy RPC and precedes claim/lifecycle.
 create table if not exists public.wallets (
   id uuid primary key default gen_random_uuid(),
   owner_type text not null,

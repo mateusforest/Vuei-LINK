@@ -1,4 +1,4 @@
--- Traveler public-link expiration.
+-- Traveler public-link expiration. Version follows activation and product seeding.
 --
 -- Individual links remain public through the trip end date plus seven complete
 -- calendar days. Agency trips deliberately keep their existing behavior.

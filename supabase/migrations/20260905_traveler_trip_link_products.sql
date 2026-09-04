@@ -1,3 +1,4 @@
+-- Unique migration version: seed products after traveler trip-link activation.
 insert into public.wallet_products (
   code,
   name,
