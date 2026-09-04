@@ -260,7 +260,13 @@ function TripCard({
           <p className="mt-1 text-[0.8rem] text-muted-foreground">
             {range ? range : "Datas a definir"} · {trip.travelersCount ?? 1} {(trip.travelersCount ?? 1) === 1 ? "pessoa" : "pessoas"}
           </p>
-          <p className="mt-1.5 truncate font-mono text-[0.75rem] text-brand/90">{trip.url}</p>
+          <p className="mt-1.5 truncate text-[0.75rem] text-muted-foreground">
+            {trip.isActivated
+              ? trip.url
+              : trip.isPending
+                ? "Rascunho privado neste navegador"
+                : "Rascunho privado na sua Bolsa"}
+          </p>
         </div>
         <div className="flex shrink-0 gap-1.5">
           <Button
@@ -270,7 +276,7 @@ function TripCard({
             className="h-8 rounded-xl px-2.5 text-[0.78rem] text-muted-foreground transition-colors hover:bg-foreground/5 hover:text-foreground"
           >
             <ExternalLink className="size-3.5" />
-            {trip.isActivated ? "Abrir" : "Continuar"}
+            {trip.isActivated ? "Abrir" : trip.isPending ? "Continuar" : "Ativar viagem"}
           </Button>
           {trip.isActivated ? (
             <Button

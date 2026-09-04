@@ -3,18 +3,51 @@ import { mapStoredTripToTrip, slugifyTripBase, buildUniqueTripSlug } from "@/lib
 import { createSupabaseAdminClient, hasSupabaseAdminEnv, isMissingSupabaseAdminEnvError } from "@/lib/supabase/admin"
 import { ensureTripTravelersPersistedWithClient } from "@/lib/repositories/trip-travelers-repository"
 import { buildAdminTripUrl, buildPublicTripUrl, generateSecureToken } from "@/lib/security/link-tokens"
-import { buildPendingTripClaimExpiresAt, generatePendingTripClaimToken, hashPendingTripClaimToken } from "@/lib/server/pending-trip-claim"
+import {
+  buildPendingTripClaimExpiresAt,
+  generatePendingTripClaimToken,
+  hashPendingTripClaimToken,
+  isPendingTripClaimExpired,
+} from "@/lib/server/pending-trip-claim"
 import { buildTripInsertPayload } from "@/lib/trips/trip-record"
 import { CREATE_TRIP_ERROR_MESSAGE } from "@/lib/trips/trip-policies"
 import { isTripSlugConflict, listExistingTripSlugs } from "@/lib/trips/trip-slug"
 import { checkRateLimit, getRequestIp } from "@/lib/server/request-rate-limit"
+import type { Database } from "@/lib/supabase/types"
 
 const MAX_TRIP_SLUG_ATTEMPTS = 5
 const ANONYMOUS_CREATE_LIMIT = 5
 const ANONYMOUS_CREATE_WINDOW_MS = 15 * 60 * 1000
+const ANONYMOUS_RETRY_LIMIT = 12
+const PENDING_REQUEST_TOKEN_PATTERN = /^[a-f0-9]{64}$/
+
+type TripRow = Database["public"]["Tables"]["trips"]["Row"]
 
 function badRequest(error: string) {
   return NextResponse.json({ error }, { status: 400 })
+}
+
+function pendingTripResponse(trip: TripRow, claimToken: string) {
+  return NextResponse.json({
+    trip: {
+      id: trip.id,
+      slug: trip.slug,
+      title: trip.title,
+      destination: trip.destination,
+      startDate: trip.start_date,
+      endDate: trip.end_date,
+      travelersCount: trip.travelers_count,
+      status: "draft" as const,
+      visibility: "private" as const,
+      publicLink: buildPublicTripUrl(trip.slug),
+    },
+    claimToken,
+    claimExpiresAt: trip.claim_token_expires_at,
+  })
+}
+
+function pendingRequestConflict(error: string, code: string) {
+  return NextResponse.json({ error, code }, { status: 409 })
 }
 
 export async function POST(request: Request) {
@@ -29,6 +62,7 @@ export async function POST(request: Request) {
     endDate?: string | null
     style?: string | null
     travelersCount?: number
+    requestToken?: string
   }
 
   try {
@@ -42,13 +76,18 @@ export async function POST(request: Request) {
     return badRequest("Destino obrigatorio.")
   }
 
+  const requestToken = body.requestToken?.trim().toLowerCase() || null
+  if (requestToken && !PENDING_REQUEST_TOKEN_PATTERN.test(requestToken)) {
+    return badRequest("Chave de criacao invalida.")
+  }
+
   const ip = getRequestIp(request)
-  const rateLimit = checkRateLimit(`pending-trip:${ip}`, {
-    limit: ANONYMOUS_CREATE_LIMIT,
+  const retryRateLimit = checkRateLimit(`pending-trip-request:${ip}`, {
+    limit: ANONYMOUS_RETRY_LIMIT,
     windowMs: ANONYMOUS_CREATE_WINDOW_MS,
   })
 
-  if (!rateLimit.allowed) {
+  if (!retryRateLimit.allowed) {
     return NextResponse.json(
       {
         error: "Muitas tentativas. Aguarde alguns minutos antes de criar outra viagem.",
@@ -57,7 +96,7 @@ export async function POST(request: Request) {
       {
         status: 429,
         headers: {
-          "Retry-After": String(Math.max(Math.ceil((rateLimit.resetAt - Date.now()) / 1000), 1)),
+          "Retry-After": String(Math.max(Math.ceil((retryRateLimit.resetAt - Date.now()) / 1000), 1)),
         },
       },
     )
@@ -65,6 +104,54 @@ export async function POST(request: Request) {
 
   try {
     const supabase = createSupabaseAdminClient()
+    const claimToken = requestToken ?? generatePendingTripClaimToken()
+    const claimTokenHash = hashPendingTripClaimToken(claimToken)
+
+    if (requestToken) {
+      const { data: existingTrip, error: existingTripError } = await supabase
+        .from("trips")
+        .select("*")
+        .eq("claim_token_hash", claimTokenHash)
+        .eq("owner_type", "traveler")
+        .maybeSingle()
+
+      if (existingTripError) {
+        console.error("[TRIP] pending idempotency lookup error", existingTripError)
+        return NextResponse.json({ error: CREATE_TRIP_ERROR_MESSAGE }, { status: 500 })
+      }
+
+      const existingTripRow = existingTrip as TripRow | null
+      if (existingTripRow) {
+        if (existingTripRow.owner_user_id || existingTripRow.claim_token_claimed_at) {
+          return pendingRequestConflict("Este rascunho ja foi vinculado a uma conta.", "pending_request_claimed")
+        }
+        if (isPendingTripClaimExpired(existingTripRow.claim_token_expires_at)) {
+          return pendingRequestConflict("A tentativa anterior expirou. Inicie uma nova viagem.", "pending_request_expired")
+        }
+        return pendingTripResponse(existingTripRow, claimToken)
+      }
+    }
+
+    const createRateLimit = checkRateLimit(`pending-trip:${ip}`, {
+      limit: ANONYMOUS_CREATE_LIMIT,
+      windowMs: ANONYMOUS_CREATE_WINDOW_MS,
+    })
+
+    if (!createRateLimit.allowed) {
+      return NextResponse.json(
+        {
+          error: "Muitas tentativas. Aguarde alguns minutos antes de criar outra viagem.",
+          code: "rate_limit_exceeded",
+        },
+        {
+          status: 429,
+          headers: {
+            "Retry-After": String(Math.max(Math.ceil((createRateLimit.resetAt - Date.now()) / 1000), 1)),
+          },
+        },
+      )
+    }
+
     const baseSlug = slugifyTripBase(body.title, destination)
     const knownSlugs = new Set(await listExistingTripSlugs(supabase, baseSlug))
 
@@ -72,8 +159,6 @@ export async function POST(request: Request) {
       const slug = buildUniqueTripSlug(baseSlug, [...knownSlugs])
       knownSlugs.add(slug)
 
-      const claimToken = generatePendingTripClaimToken()
-      const claimTokenHash = hashPendingTripClaimToken(claimToken)
       const claimTokenExpiresAt = buildPendingTripClaimExpiresAt()
       const adminToken = generateSecureToken()
       const publicToken = generateSecureToken()
@@ -114,11 +199,12 @@ export async function POST(request: Request) {
         },
       )
 
-      const { data, error } = await supabase.from("trips").insert(insertPayload).select("*").single()
+      const { data, error } = await supabase.from("trips").insert(insertPayload as never).select("*").single()
+      const insertedTrip = data as TripRow | null
 
-      if (!error && data) {
+      if (!error && insertedTrip) {
         const travelersResult = await ensureTripTravelersPersistedWithClient(supabase, {
-          tripId: data.id,
+          tripId: insertedTrip.id,
           travelersCount: trip.travelersCount,
         })
 
@@ -126,16 +212,23 @@ export async function POST(request: Request) {
           console.error("[TRIP] pending travelers placeholder error", travelersResult.error)
         }
 
-        return NextResponse.json({
-          trip: {
-            id: data.id,
-            slug: data.slug,
-            title: data.title,
-            destination: data.destination,
-            publicLink: buildPublicTripUrl(data.slug),
-          },
-          claimToken,
-        })
+        return pendingTripResponse(insertedTrip, claimToken)
+      }
+
+      if (requestToken) {
+        const { data: retryTrip } = await supabase
+          .from("trips")
+          .select("*")
+          .eq("claim_token_hash", claimTokenHash)
+          .eq("owner_type", "traveler")
+          .is("owner_user_id", null)
+          .is("claim_token_claimed_at", null)
+          .maybeSingle()
+
+        const retryTripRow = retryTrip as TripRow | null
+        if (retryTripRow && !isPendingTripClaimExpired(retryTripRow.claim_token_expires_at)) {
+          return pendingTripResponse(retryTripRow, claimToken)
+        }
       }
 
       if (isTripSlugConflict(error) && attempt < MAX_TRIP_SLUG_ATTEMPTS - 1) {

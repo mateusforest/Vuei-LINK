@@ -1,6 +1,6 @@
 "use client"
 
-import { ArrowRight, Calendar, Check, Copy, ExternalLink, Link2, Loader2, LogIn, MapPin, Minus, Plus, Share2, ShoppingBag, Users } from "lucide-react"
+import { ArrowRight, Calendar, Check, ExternalLink, Link2, Loader2, LogIn, MapPin, Minus, Plus, ShoppingBag, Users } from "lucide-react"
 import { useEffect, useMemo, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
@@ -13,11 +13,16 @@ import { TripBag } from "@/components/public-home/trip-bag"
 import { TripsPopup, mapLegacyTripToBagItem, type PublicBagTripItem } from "@/components/public-home/trips-popup"
 import { VueiWordmark } from "@/components/public-home/vuei-mark"
 import {
+  PENDING_TRIP_CLAIMS_CHANGED_EVENT,
   clearClaimedTripBagFocus,
+  clearPendingTripCreateRequest,
   clearPendingTripClaimSession,
+  getOrCreatePendingTripRequestToken,
   isPendingTripClaimSessionActive,
   readClaimedTripBagFocus,
   readPendingTripClaimSession,
+  readPendingTripClaimSessions,
+  selectPendingTripClaimSession,
   writePendingTripClaimSession,
   type PendingTripClaimSession,
 } from "@/lib/pending-trip-claim"
@@ -32,6 +37,9 @@ type PendingTripSnapshot = {
   slug: string
   title: string
   destination: string
+  startDate: string | null
+  endDate: string | null
+  travelersCount: number
   publicLink: string
 }
 
@@ -54,13 +62,13 @@ function buildSameOriginPath(url: string) {
 function toPendingBagItem(session: PendingTripClaimSession): PublicBagTripItem {
   return {
     id: session.tripId,
-    title: "Link da Viagem",
-    destination: session.tripSlug.replace(/-/g, " "),
-    startDate: null,
-    endDate: null,
-    travelersCount: null,
+    title: session.title || "Rascunho de viagem",
+    destination: session.destination || session.tripSlug.replace(/-/g, " "),
+    startDate: session.startDate ?? null,
+    endDate: session.endDate ?? null,
+    travelersCount: session.travelersCount ?? null,
     url: session.shareLink,
-    statusLabel: "Pendente",
+    statusLabel: "Rascunho",
     isActivated: false,
     isPending: true,
   }
@@ -68,13 +76,14 @@ function toPendingBagItem(session: PendingTripClaimSession): PublicBagTripItem {
 
 export function TripLanding() {
   const router = useRouter()
-  const { user, initialized, loading } = useAuth()
+  const { user } = useAuth()
   const { trips, loadingTrips, syncTripFromBackend, setActiveTrip } = useTrips()
   const destinationStepRef = useRef<HTMLDivElement>(null)
   const datesStepRef = useRef<HTMLDivElement>(null)
   const travelersStepRef = useRef<HTMLDivElement>(null)
   const createButtonRef = useRef<HTMLButtonElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  const pendingBagHydratedRef = useRef(false)
   const autoClaimTokenRef = useRef<string | null>(null)
 
   const [destination, setDestination] = useState("")
@@ -87,9 +96,9 @@ export function TripLanding() {
   const [claiming, setClaiming] = useState(false)
   const [createdTrip, setCreatedTrip] = useState<PendingTripSnapshot | null>(null)
   const [pendingSession, setPendingSession] = useState<PendingTripClaimSession | null>(null)
+  const [pendingSessions, setPendingSessions] = useState<PendingTripClaimSession[]>([])
   const [creationError, setCreationError] = useState<string | null>(null)
   const [claimError, setClaimError] = useState<string | null>(null)
-  const [copied, setCopied] = useState(false)
   const [popupOpen, setPopupOpen] = useState(false)
   const [showBalloon, setShowBalloon] = useState(false)
   const [highlightTripId, setHighlightTripId] = useState<string | null>(null)
@@ -98,26 +107,39 @@ export function TripLanding() {
   const [loginChoiceOpen, setLoginChoiceOpen] = useState(false)
 
   useEffect(() => {
-    const session = readPendingTripClaimSession()
-    if (!isPendingTripClaimSessionActive(session)) {
-      if (session) {
-        clearPendingTripClaimSession()
+    const syncPendingBag = () => {
+      const sessions = readPendingTripClaimSessions()
+      const current = readPendingTripClaimSession()
+      const activeSession = current && sessions.some((session) => session.tripId === current.tripId)
+        ? current
+        : sessions[0] ?? null
+
+      setPendingSessions(sessions)
+      setPendingSession(activeSession)
+
+      if (activeSession && !pendingBagHydratedRef.current) {
+        setCreatedTrip({
+          id: activeSession.tripId,
+          slug: activeSession.tripSlug,
+          title: activeSession.title || "Rascunho de viagem",
+          destination: activeSession.destination || activeSession.tripSlug.replace(/-/g, " "),
+          startDate: activeSession.startDate ?? null,
+          endDate: activeSession.endDate ?? null,
+          travelersCount: activeSession.travelersCount ?? 1,
+          publicLink: activeSession.shareLink,
+        })
+        setActive(null)
       }
-      return
+      pendingBagHydratedRef.current = true
     }
 
-    const activeSession = session
-    if (!activeSession) return
-
-    setPendingSession(activeSession)
-    setCreatedTrip({
-      id: activeSession.tripId,
-      slug: activeSession.tripSlug,
-      title: "Link da Viagem",
-      destination: activeSession.tripSlug.replace(/-/g, " "),
-      publicLink: activeSession.shareLink,
-    })
-    setActive(null)
+    syncPendingBag()
+    window.addEventListener(PENDING_TRIP_CLAIMS_CHANGED_EVENT, syncPendingBag)
+    window.addEventListener("storage", syncPendingBag)
+    return () => {
+      window.removeEventListener(PENDING_TRIP_CLAIMS_CHANGED_EVENT, syncPendingBag)
+      window.removeEventListener("storage", syncPendingBag)
+    }
   }, [])
 
   useEffect(() => {
@@ -125,9 +147,16 @@ export function TripLanding() {
       autoClaimTokenRef.current = null
       return
     }
-
     setPendingNoticeDismissed(false)
   }, [pendingSession?.claimToken])
+
+  useEffect(() => {
+    if (!user || loadingTrips || !pendingSession || claiming) return
+    if (autoClaimTokenRef.current === pendingSession.claimToken) return
+
+    autoClaimTokenRef.current = pendingSession.claimToken
+    void executePendingClaim()
+  }, [claiming, loadingTrips, pendingSession?.claimToken, user?.id])
 
   useEffect(() => {
     if (!showBalloon) return
@@ -196,31 +225,24 @@ export function TripLanding() {
   )
   const bagTrips = useMemo(() => {
     const items = [...realTrips]
-    if (pendingSession && !items.some((trip) => trip.id === pendingSession.tripId)) {
-      items.unshift(toPendingBagItem(pendingSession))
+    for (const session of pendingSessions) {
+      if (!items.some((trip) => trip.id === session.tripId)) {
+        items.push(toPendingBagItem(session))
+      }
     }
-    return items
-  }, [pendingSession, realTrips])
+    return items.sort((left, right) => Number(right.isPending) - Number(left.isPending))
+  }, [pendingSessions, realTrips])
 
   const hasPendingCreatedTrip = Boolean(createdTrip && pendingSession)
   const canCreate = destination.trim().length > 1 && Boolean(startDate)
   const glow = bagTrips.length > 0 && !hasPendingCreatedTrip
 
   useEffect(() => {
-    if (pendingSession) return
     if (!ownedCreatedTrip) return
+    if (pendingSession?.tripId === createdTrip?.id) return
 
     setCreatedTrip(null)
-  }, [ownedCreatedTrip, pendingSession])
-
-  useEffect(() => {
-    if (!user || !initialized || loading) return
-    if (!pendingSession || claiming) return
-    if (autoClaimTokenRef.current === pendingSession.claimToken) return
-
-    autoClaimTokenRef.current = pendingSession.claimToken
-    void executePendingClaim()
-  }, [claiming, initialized, loading, pendingSession, user])
+  }, [createdTrip?.id, ownedCreatedTrip, pendingSession?.tripId])
 
   useEffect(() => {
     const focusedTripId = readClaimedTripBagFocus()
@@ -233,15 +255,6 @@ export function TripLanding() {
     setShowBalloon(true)
   }, [bagTrips])
 
-  useEffect(() => {
-    const activeSession = readPendingTripClaimSession()
-    if (isPendingTripClaimSessionActive(activeSession)) return
-
-    if (pendingSession) {
-      setPendingSession(null)
-    }
-  }, [pendingSession, realTrips])
-
   function resetWizard() {
     setDestination("")
     setSelectedDestination(null)
@@ -252,7 +265,7 @@ export function TripLanding() {
     setCreationError(null)
     setClaimError(null)
     setCreatedTrip(null)
-    setCopied(false)
+    clearPendingTripCreateRequest()
   }
 
   function openTravelerSignup() {
@@ -273,19 +286,29 @@ export function TripLanding() {
     setCreating(true)
     setCreationError(null)
     setClaimError(null)
-    setCopied(false)
 
     try {
       const resolvedDestination = resolveDestinationInput(destination, selectedDestination?.id ?? null)
+      const requestFingerprint = JSON.stringify({
+        destination: resolvedDestination.label,
+        startDate,
+        endDate,
+        travelers,
+      })
+      const requestToken = getOrCreatePendingTripRequestToken(requestFingerprint)
       const result = await createPendingTripClaim({
         title: resolvedDestination.label,
         destination: resolvedDestination.label,
         startDate,
         endDate,
         travelersCount: travelers,
+        requestToken,
       })
 
       if (!result.data) {
+        if (result.code === "pending_request_claimed" || result.code === "pending_request_expired") {
+          clearPendingTripCreateRequest(requestToken)
+        }
         setCreationError(result.error ?? "Nao foi possivel criar a viagem agora.")
         return
       }
@@ -296,16 +319,26 @@ export function TripLanding() {
         claimToken: result.data.claimToken,
         shareLink: result.data.trip.publicLink,
         createdAt: new Date().toISOString(),
-        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+        expiresAt: result.data.claimExpiresAt,
+        title: result.data.trip.title,
+        destination: result.data.trip.destination,
+        startDate: result.data.trip.startDate,
+        endDate: result.data.trip.endDate,
+        travelersCount: result.data.trip.travelersCount,
       }
 
       writePendingTripClaimSession(nextSession)
+      clearPendingTripCreateRequest(requestToken)
       setPendingSession(nextSession)
+      setPendingSessions((current) => [nextSession, ...current.filter((session) => session.tripId !== nextSession.tripId)])
       setCreatedTrip({
         id: result.data.trip.id,
         slug: result.data.trip.slug,
         title: result.data.trip.title,
         destination: result.data.trip.destination,
+        startDate: result.data.trip.startDate,
+        endDate: result.data.trip.endDate,
+        travelersCount: result.data.trip.travelersCount,
         publicLink: result.data.trip.publicLink,
       })
       setHighlightTripId(result.data.trip.id)
@@ -314,38 +347,6 @@ export function TripLanding() {
     } finally {
       setCreating(false)
     }
-  }
-
-  async function handleCopyLink() {
-    const url = createdTrip?.publicLink ?? pendingSession?.shareLink
-    if (!url || typeof navigator === "undefined" || !navigator.clipboard) return
-
-    try {
-      await navigator.clipboard.writeText(url)
-      setCopied(true)
-      window.setTimeout(() => setCopied(false), 1800)
-    } catch {
-      // Mantem fallback silencioso.
-    }
-  }
-
-  async function handleShareLink() {
-    const url = createdTrip?.publicLink ?? pendingSession?.shareLink
-    if (!url) return
-
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: "Minha viagem no Vuei",
-          url,
-        })
-        return
-      } catch {
-        // Usa fallback abaixo.
-      }
-    }
-
-    await handleCopyLink()
   }
 
   function handleOpenTrip(url?: string | null) {
@@ -360,6 +361,19 @@ export function TripLanding() {
       return
     }
 
+    if (trip.isPending) {
+      const session = selectPendingTripClaimSession(trip.id)
+      if (!session || !isPendingTripClaimSessionActive(session)) {
+        clearPendingTripClaimSession(trip.id)
+        setCreationError("O acesso temporario deste rascunho expirou.")
+        return
+      }
+
+      setPendingSession(session)
+      handleOpenTrip(session.shareLink)
+      return
+    }
+
     if (user) {
       setActiveTrip(trip.id)
       router.push("/portal")
@@ -367,6 +381,11 @@ export function TripLanding() {
     }
 
     openTravelerSignup()
+  }
+
+  function handleOpenPendingDraft() {
+    if (!pendingSession) return
+    handleBagTripOpen(toPendingBagItem(pendingSession))
   }
 
   async function executePendingClaim() {
@@ -383,7 +402,8 @@ export function TripLanding() {
 
       if (result.data && "ownerType" in result.data) {
         const trip = syncTripFromBackend(result.data as CanonicalTrip)
-        clearPendingTripClaimSession()
+        clearPendingTripClaimSession(pendingSession.tripId)
+        setPendingSessions((current) => current.filter((session) => session.tripId !== pendingSession.tripId))
         setPendingSession(null)
         setCreatedTrip(null)
         setHighlightTripId(trip.id)
@@ -393,7 +413,8 @@ export function TripLanding() {
       }
 
       if (isDefinitiveError) {
-        clearPendingTripClaimSession()
+        clearPendingTripClaimSession(pendingSession.tripId)
+        setPendingSessions((current) => current.filter((session) => session.tripId !== pendingSession.tripId))
         setPendingSession(null)
       }
 
@@ -423,7 +444,6 @@ export function TripLanding() {
   }
 
   const bagInteractionBlocked = popupOpen
-  const finalLinkValue = createdTrip?.publicLink.replace(/^https?:\/\//, "") ?? ""
 
   return (
     <main className="landing-shell relative flex h-[100dvh] w-full flex-col overflow-hidden overscroll-none text-foreground">
@@ -612,7 +632,7 @@ export function TripLanding() {
                       </span>
                     </div>
                     <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                      Guarde a viagem na sua Bolsa para editar e ativar o link quando quiser compartilhar.
+                      Ela já está salva na Bolsa deste navegador. Abra para revisar e entre quando quiser ativar o link.
                     </p>
                   </div>
                 </div>
@@ -620,37 +640,35 @@ export function TripLanding() {
                 <div className="mt-4 flex flex-col gap-2.5">
                   {pendingSession ? (
                     user ? (
-                      claimError ? (
-                        <Button
-                          size="lg"
-                          variant="outline"
-                          onClick={() => void executePendingClaim()}
-                          className="h-11 w-full rounded-2xl border-border/70 bg-background/88 px-4 text-[0.9rem] text-foreground shadow-[0_10px_28px_-18px_rgba(20,60,120,0.28)] sm:w-auto sm:self-start"
-                        >
-                          <ShoppingBag className="size-4" />
-                          Guardar na Bolsa
-                        </Button>
-                      ) : (
-                        <Button
-                          size="lg"
-                          variant="outline"
-                          disabled
-                          className="h-11 w-full rounded-2xl border-border/70 bg-background/88 px-4 text-[0.9rem] text-foreground shadow-[0_10px_28px_-18px_rgba(20,60,120,0.28)] sm:w-auto sm:self-start"
-                        >
-                          {claiming ? <Loader2 className="size-4 animate-spin" /> : <ShoppingBag className="size-4" />}
-                          Adicionando esta viagem à sua Bolsa...
-                        </Button>
-                      )
-                    ) : (
                       <Button
                         size="lg"
                         variant="outline"
-                        onClick={handleCreateMyBag}
+                        onClick={() => void executePendingClaim()}
+                        disabled={claiming || loadingTrips}
                         className="h-11 w-full rounded-2xl border-border/70 bg-background/88 px-4 text-[0.9rem] text-foreground shadow-[0_10px_28px_-18px_rgba(20,60,120,0.28)] sm:w-auto sm:self-start"
                       >
-                        <ShoppingBag className="size-4" />
-                        Guardar na Bolsa
+                        {claiming || loadingTrips ? <Loader2 className="size-4 animate-spin" /> : <ShoppingBag className="size-4" />}
+                        {claiming || loadingTrips ? "Adicionando à sua Bolsa..." : "Vincular à minha Bolsa"}
                       </Button>
+                    ) : (
+                      <div className="flex flex-col gap-2 sm:flex-row">
+                        <Button
+                          size="lg"
+                          onClick={handleOpenPendingDraft}
+                          className="h-11 rounded-2xl bg-foreground px-5 text-[0.9rem] text-background"
+                        >
+                          <ExternalLink className="size-4" />
+                          Continuar rascunho
+                        </Button>
+                        <Button
+                          size="lg"
+                          variant="outline"
+                          onClick={handleCreateMyBag}
+                          className="h-11 rounded-2xl border-border/70 bg-background/88 px-4 text-[0.9rem] text-foreground"
+                        >
+                          Criar conta para ativar
+                        </Button>
+                      </div>
                     )
                   ) : (
                     <Button
@@ -697,135 +715,7 @@ export function TripLanding() {
             </div>
           ) : null}
 
-          {createdTrip && !ownedCreatedTrip && !pendingNoticeDismissed && false ? (
-            <div className="mt-6 flex flex-col gap-4">
-              <div className="vuei-celebrate">
-                <StepRow
-                  index={4}
-                  done
-                  active={false}
-                  onOpen={() => undefined}
-                  icon={<Link2 className="size-[1.15rem] text-brand" />}
-                  title="Guarde esta viagem na sua Bolsa."
-                  subtitle={
-                    user && pendingSession && !claimError
-                      ? "Adicionando esta viagem à sua Bolsa..."
-                      : "Crie um acesso ou entre na sua Bolsa para editar, anexar documentos, configurar um PIN e acessar esta viagem em qualquer dispositivo."
-                  }
-                  value={createdTrip.publicLink.replace(/^https?:\/\//, "")}
-                  valueIcon={<Check className="size-4 text-emerald-600" />}
-                  static
-                  highlight
-                />
-              </div>
-
-              <div className="vuei-rise rounded-[1.75rem] border border-border/60 bg-background/72 p-3 shadow-[0_18px_48px_-28px_rgba(20,60,120,0.35)] backdrop-blur-xl md:bg-transparent md:p-0 md:shadow-none md:backdrop-blur-0">
-                <div className="flex flex-col gap-2.5 md:flex-row md:flex-wrap md:items-center md:gap-2">
-                  <Button
-                    size="lg"
-                    onClick={() => handleOpenTrip(createdTrip.publicLink)}
-                    className="h-12 w-full rounded-2xl bg-foreground px-6 text-[0.95rem] text-background shadow-[0_14px_40px_-16px_var(--brand)] ring-1 ring-inset ring-white/10 transition-transform duration-300 [transition-timing-function:var(--ease-out-soft)] hover:bg-foreground/90 active:scale-[0.98] md:w-auto"
-                  >
-                    <ExternalLink className="size-4" />
-                    Abrir viagem
-                  </Button>
-
-                  <div className="grid grid-cols-2 gap-2 md:flex md:items-center">
-                    <Button
-                      size="lg"
-                      variant="ghost"
-                      onClick={handleShareLink}
-                      className="h-12 rounded-2xl border border-border/60 bg-background/70 px-4 text-[0.9rem] text-muted-foreground transition-colors hover:bg-foreground/5 hover:text-foreground md:border-0 md:bg-transparent"
-                    >
-                      <Share2 className="size-4" />
-                      Compartilhar
-                    </Button>
-                    <Button
-                      size="lg"
-                      variant="ghost"
-                      onClick={handleCopyLink}
-                      className="h-12 rounded-2xl border border-border/60 bg-background/70 px-4 text-[0.9rem] text-muted-foreground transition-colors hover:bg-foreground/5 hover:text-foreground md:border-0 md:bg-transparent"
-                    >
-                      {copied ? <Check className="size-4 text-emerald-600" /> : <Copy className="size-4" />}
-                      {copied ? "Copiado" : "Copiar"}
-                    </Button>
-                  </div>
-
-                  {pendingSession ? (
-                    user ? (
-                      claimError ? (
-                        <Button
-                          size="lg"
-                          variant="outline"
-                          onClick={() => void executePendingClaim()}
-                          className="h-12 w-full rounded-2xl border-border/70 bg-background/88 px-4 text-[0.92rem] shadow-[0_10px_28px_-18px_rgba(20,60,120,0.28)] md:w-auto md:bg-transparent md:shadow-none"
-                        >
-                          <ShoppingBag className="size-4" />
-                          Tentar novamente
-                        </Button>
-                      ) : (
-                        <Button
-                          size="lg"
-                          variant="outline"
-                          disabled
-                          className="h-12 w-full rounded-2xl border-border/70 bg-background/88 px-4 text-[0.92rem] shadow-[0_10px_28px_-18px_rgba(20,60,120,0.28)] md:w-auto md:bg-transparent md:shadow-none"
-                        >
-                          {claiming ? <Loader2 className="size-4 animate-spin" /> : <ShoppingBag className="size-4" />}
-                          Adicionando esta viagem à sua Bolsa...
-                        </Button>
-                      )
-                    ) : (
-                      <>
-                        <Button
-                          size="lg"
-                          onClick={handleCreateMyBag}
-                          className="h-12 w-full rounded-2xl bg-foreground px-6 text-[0.95rem] text-background shadow-[0_14px_40px_-16px_var(--brand)] ring-1 ring-inset ring-white/10 transition-transform duration-300 [transition-timing-function:var(--ease-out-soft)] hover:bg-foreground/90 active:scale-[0.98] md:w-auto"
-                        >
-                          <ShoppingBag className="size-4" />
-                          Criar minha Bolsa
-                        </Button>
-                        <Button
-                          size="lg"
-                          variant="outline"
-                          onClick={handleIAlreadyHaveBag}
-                          className="h-12 w-full rounded-2xl border-border/70 bg-background/88 px-4 text-[0.92rem] shadow-[0_10px_28px_-18px_rgba(20,60,120,0.28)] md:w-auto md:bg-transparent md:shadow-none"
-                        >
-                          <LogIn className="size-4" />
-                          Já tenho uma Bolsa
-                        </Button>
-                        <Button
-                          size="lg"
-                          variant="ghost"
-                          onClick={() => setPendingNoticeDismissed(true)}
-                          className="h-12 w-full rounded-2xl border border-border/60 bg-background/70 px-4 text-[0.9rem] text-muted-foreground transition-colors hover:bg-foreground/5 hover:text-foreground md:w-auto md:border-0 md:bg-transparent"
-                        >
-                          Agora não
-                        </Button>
-                      </>
-                    )
-                  ) : (
-                    <Button
-                      size="lg"
-                      variant="ghost"
-                      onClick={() => setPopupOpen(true)}
-                      className="h-12 w-full rounded-2xl border-border/70 bg-background/88 px-4 text-[0.92rem] shadow-[0_10px_28px_-18px_rgba(20,60,120,0.28)] md:w-auto md:bg-transparent md:shadow-none"
-                    >
-                      <ShoppingBag className="size-4" />
-                      Ver na Bolsa
-                    </Button>
-                  )}
-
-                  <button
-                    type="button"
-                    onClick={resetWizard}
-                    className="h-10 rounded-2xl px-2 text-center text-[0.82rem] text-muted-foreground/80 underline-offset-4 transition-colors hover:text-foreground hover:underline md:ml-auto"
-                  >
-                    Criar outra viagem
-                  </button>
-                </div>
-              </div>
-            </div>
-          ) : (
+          {!createdTrip || ownedCreatedTrip || pendingNoticeDismissed ? (
             <div className="mt-7">
               <Button
                 ref={createButtonRef}
@@ -847,7 +737,7 @@ export function TripLanding() {
                 )}
               </Button>
             </div>
-          )}
+          ) : null}
 
           {creationError ? <p className="mt-3 max-w-md text-sm text-red-600">{creationError}</p> : null}
           {claimError ? <p className="mt-3 max-w-md text-sm text-red-600">{claimError}</p> : null}

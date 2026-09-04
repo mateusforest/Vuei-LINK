@@ -29,7 +29,12 @@ import { useAuth } from "@/contexts/auth-context"
 import { buildAdminTripUrl, buildPublicTripUrl, isAdminLinkMode } from "@/lib/security/link-tokens"
 import { isTripPublicLinkActive } from "@/lib/security/trip-link-lifecycle"
 import { resolveTravelerPlan, resolveTravelerPlanFromBillingStatus } from "@/lib/billing/traveler-plans"
-import { isPendingTripClaimSessionActive, readPendingTripClaimSession } from "@/lib/pending-trip-claim"
+import {
+  clearPendingTripClaimSession,
+  findPendingTripClaimSession,
+  isPendingTripClaimSessionActive,
+} from "@/lib/pending-trip-claim"
+import { getPendingTripDraft } from "@/lib/repositories/pending-trip-claim-repository"
 import { ImageWithFallback } from "@/components/system/image-with-fallback"
 import { getTravelerBillingStatus } from "@/lib/repositories/traveler-billing-repository"
 import type { TripFlightRecord } from "@/types/flight"
@@ -3479,6 +3484,7 @@ function TravelerPublicShell({
   offlinePackageStatus,
   theme,
   onToggleTheme,
+  canShare = true,
   onOpenShare,
   onOpenMenu,
   onOpenPanel,
@@ -3490,6 +3496,7 @@ function TravelerPublicShell({
   offlinePackageStatus: OfflineTripPackageStatus | null
   theme: TripLinkTheme
   onToggleTheme: () => void
+  canShare?: boolean
   onOpenShare: () => void
   onOpenMenu: () => void
   onOpenPanel: (panel: Exclude<TravelerPublicPanel, null> | "more" | "home") => void
@@ -3542,13 +3549,15 @@ function TravelerPublicShell({
           </div>
 
           <div className="trip-header-actions">
-            <button
-              onClick={onOpenShare}
-              className="trip-round-action"
-              aria-label="Compartilhar viagem"
-            >
-              <Share2 className="h-5 w-5" />
-            </button>
+            {canShare ? (
+              <button
+                onClick={onOpenShare}
+                className="trip-round-action"
+                aria-label="Compartilhar viagem"
+              >
+                <Share2 className="h-5 w-5" />
+              </button>
+            ) : null}
             <button
               type="button"
               onClick={onToggleTheme}
@@ -8600,7 +8609,10 @@ export default function TripPage() {
       return
     }
 
-    const pendingClaimSession = readPendingTripClaimSession()
+    const pendingClaimSession = findPendingTripClaimSession({
+      tripId: tripData.id,
+      tripSlug: routeSlug,
+    })
     const hasMatchingTemporaryClaim =
       Boolean(pendingClaimSession) &&
       pendingClaimSession?.tripId === tripData.id &&
@@ -8871,6 +8883,29 @@ export default function TripPage() {
       }
 
       try {
+        const matchingPendingClaim = !isAdminRoute
+          ? findPendingTripClaimSession({ tripSlug: routeSlug })
+          : null
+        const pendingDraftResult = matchingPendingClaim
+          ? await getPendingTripDraft({
+              tripId: matchingPendingClaim.tripId,
+              tripSlug: matchingPendingClaim.tripSlug,
+              claimToken: matchingPendingClaim.claimToken,
+            })
+          : null
+        const pendingDraftTrip = pendingDraftResult?.data ?? null
+        const hasVerifiedPendingDraftAccess = Boolean(pendingDraftTrip && matchingPendingClaim)
+
+        if (
+          matchingPendingClaim &&
+          !pendingDraftTrip &&
+          (pendingDraftResult?.code === "pending_access_invalid" ||
+            pendingDraftResult?.code === "pending_access_expired" ||
+            pendingDraftResult?.code === "pending_access_claimed")
+        ) {
+          clearPendingTripClaimSession(matchingPendingClaim.tripId)
+        }
+
         const repositoryTripPromise = isTripLinkRoute
           ? getTripBySlug(routeSlug)
           : adminToken
@@ -8913,7 +8948,7 @@ export default function TripPage() {
           repositoryTrip = await repositoryTripPromise
         }
 
-        if (!repositoryTrip.data && useSupabase && isTripLinkRoute) {
+        if (!pendingDraftTrip && !repositoryTrip.data && useSupabase && isTripLinkRoute) {
           const pinStatusResult = await loadTripPinStatus({
             tripSlug: routeSlug,
             adminToken,
@@ -8929,7 +8964,7 @@ export default function TripPage() {
           }
         }
 
-        const resolvedTrip = repositoryTrip.data ?? fallbackTrip
+        const resolvedTrip = pendingDraftTrip ?? repositoryTrip.data ?? fallbackTrip
 
         if (resolvedTrip) {
           if (loadRequestRef.current !== requestId) return
@@ -8943,13 +8978,15 @@ export default function TripPage() {
             setOfflineDocumentContext(null)
           }
           const resolvedAgencyId = resolveTripAgencyId(resolvedTrip)
-          const preloadedAgencyBranding = await fetchTripAgencyBranding({
-            tripId: resolvedTrip.id,
-            tripSlug: resolvedTrip.slug ?? routeSlug,
-            adminToken: resolvedTrip.adminToken ?? adminToken ?? null,
-            publicToken: resolvedTrip.publicToken ?? publicToken ?? null,
-            accessMode: isAdminRoute ? "admin" : "public",
-          })
+          const preloadedAgencyBranding = hasVerifiedPendingDraftAccess
+            ? null
+            : await fetchTripAgencyBranding({
+                tripId: resolvedTrip.id,
+                tripSlug: resolvedTrip.slug ?? routeSlug,
+                adminToken: resolvedTrip.adminToken ?? adminToken ?? null,
+                publicToken: resolvedTrip.publicToken ?? publicToken ?? null,
+                accessMode: isAdminRoute ? "admin" : "public",
+              })
           const preloadedAgencyLogo = resolveAgencyBrandLogo(
             preloadedAgencyBranding?.linkLogoUrl,
             preloadedAgencyBranding?.logoUrl,
@@ -8965,6 +9002,7 @@ export default function TripPage() {
           })
 
           setTripOwnerUserId(resolvedTrip.ownerUserId ?? null)
+          setHasTemporaryClaimAccess(hasVerifiedPendingDraftAccess)
           setTripAdminToken(resolvedTrip.adminToken ?? adminToken ?? null)
           setTripPublicToken(resolvedTrip.publicToken ?? publicToken ?? null)
           const isOwner = Boolean(user?.id && resolvedTrip.ownerUserId && user.id === resolvedTrip.ownerUserId)
@@ -8995,7 +9033,7 @@ export default function TripPage() {
             authenticatedAdminAccess,
           })
 
-          if (isPublicLinkRequest && !isTripPublicLinkActive({
+          if (isPublicLinkRequest && !hasVerifiedPendingDraftAccess && !isTripPublicLinkActive({
             ownerType: resolvedTrip.ownerType,
             visibility: resolvedTrip.visibility,
             linkActivatedAt: resolvedTrip.linkActivatedAt,
@@ -9038,6 +9076,17 @@ export default function TripPage() {
           )
           setIsLoadingTrip(false)
           tripPerf.end({ tripId: resolvedTrip.id })
+
+          if (hasVerifiedPendingDraftAccess) {
+            setTripItineraryRecords([])
+            setSectionsLoading({
+              flights: false,
+              hotels: false,
+              itineraries: false,
+              documents: false,
+            })
+            return
+          }
 
           void (async () => {
             const sectionsPerf = startPerfMeasure("trip.sections")
@@ -10564,35 +10613,10 @@ export default function TripPage() {
               <div className="px-4 pt-4 sm:px-6">
                 <div className="trip-claim-notice mx-auto flex w-full max-w-5xl flex-col gap-4 rounded-[28px] border border-[#0b56d8]/10 bg-[#f8fbff] p-4 shadow-[0_18px_40px_-28px_rgba(16,26,44,0.35)] sm:flex-row sm:items-center sm:justify-between sm:gap-6 sm:p-5">
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-semibold text-slate-950">Guarde esta viagem na sua Bolsa.</p>
+                    <p className="text-sm font-semibold text-slate-950">Rascunho privado neste navegador.</p>
                     <p className="mt-1 text-sm leading-6 text-slate-600">
-                      Crie um acesso ou entre na sua Bolsa para editar, anexar documentos, configurar um PIN e acessar esta viagem em qualquer dispositivo.
+                      Entre ou crie sua conta para vincular o rascunho à Bolsa e ativar a viagem. Nenhum Link é consumido antes da ativação.
                     </p>
-                  </div>
-                  <div className="hidden shrink-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
-                    <Button
-                      size="sm"
-                      className="h-10 rounded-full bg-[#0f172a] px-4 text-white hover:bg-[#111f35]"
-                      onClick={() => router.push(`/signup?redirect=${encodeURIComponent("/")}`)}
-                    >
-                      Criar minha Bolsa
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="h-10 rounded-full border-slate-200 bg-white px-4 text-slate-700 hover:bg-slate-50"
-                      onClick={() => router.push(`/login?redirect=${encodeURIComponent("/")}`)}
-                    >
-                      JÃ¡ tenho uma Bolsa
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="rounded-full px-5 text-slate-600 hover:text-slate-950"
-                      onClick={() => setTemporaryClaimNoticeDismissed(true)}
-                    >
-                      Agora nÃ£o
-                    </Button>
                   </div>
                   <div className="flex shrink-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
                     <Button
@@ -10600,7 +10624,7 @@ export default function TripPage() {
                       className="h-10 rounded-full bg-[#0f172a] px-4 text-white hover:bg-[#111f35]"
                       onClick={() => router.push(`/signup?redirect=${encodeURIComponent("/")}`)}
                     >
-                      Criar minha Bolsa
+                      Criar conta para ativar
                     </Button>
                     <Button
                       size="sm"
@@ -10608,7 +10632,7 @@ export default function TripPage() {
                       className="h-10 rounded-full border-slate-200 bg-white px-4 text-slate-700 hover:bg-slate-50"
                       onClick={() => router.push(`/login?redirect=${encodeURIComponent("/")}`)}
                     >
-                      Já tenho uma Bolsa
+                      Entrar para ativar
                     </Button>
                     <Button
                       size="sm"
@@ -10659,6 +10683,7 @@ export default function TripPage() {
               offlinePackageStatus={offlinePackageStatus}
               theme={tripLinkTheme}
               onToggleTheme={handleToggleTripLinkTheme}
+              canShare={!hasTemporaryClaimAccess}
               onOpenShare={() => setShareOpen(true)}
               onOpenMenu={() => setMenuOpen(true)}
               onOpenPanel={handleOpenTravelerPanel}

@@ -8,7 +8,11 @@ import { claimPendingTrip } from "@/lib/repositories/pending-trip-claim-reposito
 import { shouldUseSupabase } from "@/lib/data-source"
 import { withTimeout } from "@/lib/async/with-timeout"
 import { clearPendingTrip, readPendingTrip, setPendingTripRedirectToShare, shouldRedirectPendingTripToShare } from "@/lib/pending-trip"
-import { clearPendingTripClaimSession, readPendingTripClaimSession, writeClaimedTripBagFocus } from "@/lib/pending-trip-claim"
+import {
+  clearPendingTripClaimSession,
+  readPendingTripClaimSessions,
+  writeClaimedTripBagFocus,
+} from "@/lib/pending-trip-claim"
 import { buildAdminTripUrl, buildPublicTripUrl } from "@/lib/security/link-tokens"
 import {
   buildUniqueTripSlug,
@@ -466,8 +470,10 @@ export function TripsProvider({ children }: { children: ReactNode }) {
           return remoteTrips[0] ?? null
         })
 
-        const pendingClaimSession = readPendingTripClaimSession()
-        if (pendingClaimSession) {
+        const pendingClaimSessions = readPendingTripClaimSessions()
+        let claimedTripToFocus: Trip | null = null
+
+        for (const pendingClaimSession of pendingClaimSessions) {
           const claimResult = await claimPendingTrip(pendingClaimSession.claimToken)
           const isDefinitiveClaimError =
             claimResult.code === "claim_invalid" ||
@@ -481,16 +487,20 @@ export function TripsProvider({ children }: { children: ReactNode }) {
             )
 
             setTrips((prev) => [nextTrip, ...prev.filter((trip) => trip.id !== nextTrip.id)])
-            setActiveTripState(nextTrip)
-            clearPendingTripClaimSession()
-            writeClaimedTripBagFocus(nextTrip.id)
-            return
+            claimedTripToFocus ??= nextTrip
+            clearPendingTripClaimSession(pendingClaimSession.tripId)
+            continue
           }
 
           console.error("[TRIPS] pending claim error", claimResult.error)
           if (isDefinitiveClaimError) {
-            clearPendingTripClaimSession()
+            clearPendingTripClaimSession(pendingClaimSession.tripId)
           }
+        }
+
+        if (claimedTripToFocus) {
+          setActiveTripState(claimedTripToFocus)
+          writeClaimedTripBagFocus(claimedTripToFocus.id)
         }
 
         const pendingTrip = readPendingTrip()

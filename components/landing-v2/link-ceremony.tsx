@@ -90,9 +90,13 @@ export function LinkCeremony({
               <Check className="size-7" aria-hidden="true" />
             </div>
             <h1 className="mt-8 text-balance text-4xl font-bold leading-[1.05] tracking-tight text-foreground sm:text-5xl">
-              Seu link já está pronto.
+              {needsClaim ? "Seu rascunho está pronto." : "Viagem criada."}
             </h1>
-            <p className="mt-5 text-lg leading-8 text-muted-foreground">Você já pode abrir, visualizar e compartilhar sua viagem.</p>
+            <p className="mt-5 text-lg leading-8 text-muted-foreground">
+              {needsClaim
+                ? "Ele está privado e salvo neste navegador. Entre para ativar e compartilhar depois."
+                : "Continue pela sua Bolsa para revisar e ativar a viagem."}
+            </p>
 
             <div className="mt-8 rounded-[28px] border border-border/60 bg-card/90 p-5 text-left shadow-[0_18px_50px_-28px_rgba(16,26,44,0.32)]">
               <p className="text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground">Link da viagem</p>
@@ -105,17 +109,19 @@ export function LinkCeremony({
                 onClick={onOpenTrip}
                 className="flex w-full items-center justify-center gap-2 rounded-full bg-primary px-6 py-4 text-base font-semibold text-primary-foreground shadow-[0_24px_60px_-20px_rgba(27,92,240,0.7)] transition-colors hover:bg-primary/90"
               >
-                Abrir viagem
+                {needsClaim ? "Continuar rascunho" : "Abrir viagem"}
                 <ExternalLink className="size-5" aria-hidden="true" />
               </button>
-              <button
-                type="button"
-                onClick={() => void onCopyLink()}
-                className="flex w-full items-center justify-center gap-2 rounded-full border border-border/70 bg-white px-6 py-4 text-base font-semibold text-foreground transition-colors hover:bg-muted/40"
-              >
-                Copiar link
-                <Copy className="size-5" aria-hidden="true" />
-              </button>
+              {!needsClaim ? (
+                <button
+                  type="button"
+                  onClick={() => void onCopyLink()}
+                  className="flex w-full items-center justify-center gap-2 rounded-full border border-border/70 bg-white px-6 py-4 text-base font-semibold text-foreground transition-colors hover:bg-muted/40"
+                >
+                  Copiar link
+                  <Copy className="size-5" aria-hidden="true" />
+                </button>
+              ) : null}
             </div>
 
             {needsClaim ? (
@@ -128,8 +134,8 @@ export function LinkCeremony({
                 <div className="mt-8 rounded-[28px] border border-[#0b56d8]/10 bg-[#f8fbff] p-5 text-left shadow-[0_18px_40px_-30px_rgba(37,99,235,0.25)]">
                   <div className="space-y-3 text-sm">
                     {[
-                      { label: "Compartilhar sua viagem", active: true },
-                      { label: "Acompanhar tudo em um único link", active: true },
+                      { label: "Reabrir o rascunho neste navegador", active: true },
+                      { label: "Ativar e compartilhar o link", active: false },
                       { label: "Editar informações", active: false },
                       { label: "Anexar documentos e passagens", active: false },
                       { label: "Gerar roteiros com IA", active: false },

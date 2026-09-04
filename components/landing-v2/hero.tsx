@@ -7,7 +7,11 @@ import { ArrowRight, MapPin, Sparkles } from "lucide-react"
 import { LinkCeremony } from "@/components/landing-v2/link-ceremony"
 import { PrepareTrip } from "@/components/landing-v2/prepare-trip"
 import { useAuth } from "@/contexts/auth-context"
-import { writePendingTripClaimSession } from "@/lib/pending-trip-claim"
+import {
+  clearPendingTripCreateRequest,
+  getOrCreatePendingTripRequestToken,
+  writePendingTripClaimSession,
+} from "@/lib/pending-trip-claim"
 import { createPendingTripClaim } from "@/lib/repositories/pending-trip-claim-repository"
 import { createTrip } from "@/lib/repositories/trips-repository"
 
@@ -76,14 +80,14 @@ export function Hero({
         ownerType: "traveler",
         ownerUserId: user.id,
         status: "draft",
-        visibility: "public",
+        visibility: "private",
         creditsSummary: { balance: null, used: null, total: null },
       })
 
       setIsCreatingTrip(false)
 
-      if (result.data?.publicLink) {
-        setCreatedTripUrl(result.data.publicLink)
+      if (result.data) {
+        window.location.assign("/portal")
         return
       }
 
@@ -91,29 +95,45 @@ export function Hero({
       return
     }
 
+    const requestFingerprint = JSON.stringify({
+      destination: destination.trim(),
+      startDate: nextStartDate || null,
+      endDate: nextEndDate || null,
+      travelersCount: 1,
+    })
+    const requestToken = getOrCreatePendingTripRequestToken(requestFingerprint)
     const pendingResult = await createPendingTripClaim({
       title: destination.trim(),
       destination: destination.trim(),
       startDate: nextStartDate || undefined,
       endDate: nextEndDate || undefined,
+      requestToken,
     })
 
     setIsCreatingTrip(false)
 
     if (pendingResult.data) {
-      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
       writePendingTripClaimSession({
         tripId: pendingResult.data.trip.id,
         tripSlug: pendingResult.data.trip.slug,
         claimToken: pendingResult.data.claimToken,
         shareLink: pendingResult.data.trip.publicLink,
         createdAt: new Date().toISOString(),
-        expiresAt,
+        expiresAt: pendingResult.data.claimExpiresAt,
+        title: pendingResult.data.trip.title,
+        destination: pendingResult.data.trip.destination,
+        startDate: pendingResult.data.trip.startDate,
+        endDate: pendingResult.data.trip.endDate,
+        travelersCount: pendingResult.data.trip.travelersCount,
       })
+      clearPendingTripCreateRequest(requestToken)
       setCreatedTripUrl(pendingResult.data.trip.publicLink)
       return
     }
 
+    if (pendingResult.code === "pending_request_claimed" || pendingResult.code === "pending_request_expired") {
+      clearPendingTripCreateRequest(requestToken)
+    }
     setCreationError(pendingResult.error ?? "Não foi possível criar a viagem agora.")
   }
 

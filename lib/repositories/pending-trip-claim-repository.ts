@@ -8,19 +8,26 @@ interface CreatePendingTripPayload {
   endDate?: string | null
   style?: string | null
   travelersCount?: number
+  requestToken?: string
 }
 
-interface PendingTripCreationSnapshot {
+export interface PendingTripCreationSnapshot {
   id: string
   slug: string
   title: string
   destination: string
+  startDate: string | null
+  endDate: string | null
+  travelersCount: number
+  status: "draft"
+  visibility: "private"
   publicLink: string
 }
 
 interface PendingTripCreateApiResponse {
   trip?: PendingTripCreationSnapshot | null
   claimToken?: string | null
+  claimExpiresAt?: string | null
   error?: string | null
   code?: string | null
 }
@@ -28,6 +35,12 @@ interface PendingTripCreateApiResponse {
 interface PendingTripClaimApiResponse {
   trip?: Trip | null
   claimToken?: string | null
+  error?: string | null
+  code?: string | null
+}
+
+interface PendingTripDraftApiResponse {
+  trip?: Trip | null
   error?: string | null
   code?: string | null
 }
@@ -52,10 +65,36 @@ export async function createPendingTripClaim(payload: CreatePendingTripPayload) 
   const data = await parseJson<PendingTripCreateApiResponse>(response)
 
   return {
-    data: response.ok && data?.trip && data?.claimToken
-      ? { trip: data.trip, claimToken: data.claimToken }
+    data: response.ok && data?.trip && data?.claimToken && data?.claimExpiresAt
+      ? { trip: data.trip, claimToken: data.claimToken, claimExpiresAt: data.claimExpiresAt }
       : null,
     error: response.ok ? null : data?.error ?? "Não foi possível criar a viagem agora.",
+    code: data?.code ?? null,
+  }
+}
+
+export async function getPendingTripDraft(params: {
+  tripId: string
+  tripSlug: string
+  claimToken: string
+}) {
+  if (!shouldUseSupabase()) {
+    return { data: null as Trip | null, error: "Acesso ao rascunho exige Supabase configurado.", code: null as string | null }
+  }
+
+  const response = await fetch("/api/trips/pending/access", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(params),
+  })
+
+  const data = await parseJson<PendingTripDraftApiResponse>(response)
+
+  return {
+    data: response.ok && data?.trip ? data.trip : null,
+    error: response.ok ? null : data?.error ?? "Nao foi possivel abrir o rascunho neste navegador.",
     code: data?.code ?? null,
   }
 }
