@@ -27,6 +27,7 @@ import { getOfflineDocumentBlob, getOfflineImageBlob, loadTripOfflinePackage } f
 import { isOfflineModeActive } from "@/lib/offline/offline-mode"
 import { useAuth } from "@/contexts/auth-context"
 import { buildAdminTripUrl, buildPublicTripUrl, isAdminLinkMode } from "@/lib/security/link-tokens"
+import { isTripPublicLinkActive } from "@/lib/security/trip-link-lifecycle"
 import { resolveTravelerPlan, resolveTravelerPlanFromBillingStatus } from "@/lib/billing/traveler-plans"
 import { isPendingTripClaimSessionActive, readPendingTripClaimSession } from "@/lib/pending-trip-claim"
 import { ImageWithFallback } from "@/components/system/image-with-fallback"
@@ -109,6 +110,8 @@ type TripPinStatusPayload = {
     agencyId: string | null
     clientId: string | null
     visibility: "private" | "public"
+    linkActivatedAt: string | null
+    linkAccessUntil: string | null
     travelersCount: number
     coverImage: string | null
     adminLink: string | null
@@ -284,6 +287,8 @@ function mapTripPinSnapshotToStoredTrip(snapshot: NonNullable<TripPinStatusPaylo
     agencyId: snapshot.agencyId,
     clientId: snapshot.clientId,
     visibility: snapshot.visibility,
+    linkActivatedAt: snapshot.linkActivatedAt,
+    linkAccessUntil: snapshot.linkAccessUntil,
     travelersCount: snapshot.travelersCount,
     coverImage: snapshot.coverImage,
     adminToken: tokens.adminToken ?? null,
@@ -8990,7 +8995,12 @@ export default function TripPage() {
             authenticatedAdminAccess,
           })
 
-          if (isPublicLinkRequest && resolvedTrip.visibility !== "public") {
+          if (isPublicLinkRequest && !isTripPublicLinkActive({
+            ownerType: resolvedTrip.ownerType,
+            visibility: resolvedTrip.visibility,
+            linkActivatedAt: resolvedTrip.linkActivatedAt,
+            linkAccessUntil: resolvedTrip.linkAccessUntil,
+          })) {
             console.error("[TRIP] erro ao carregar link", "Esta viagem não está publicada para acesso público.")
             setLoadError("Esta viagem não está disponível publicamente.")
             setIsLoadingTrip(false)

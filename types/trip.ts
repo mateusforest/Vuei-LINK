@@ -6,6 +6,17 @@ export type TripOwnerType = "traveler" | "agency"
 
 export type TripVisibility = "private" | "public"
 
+export type TripActivationStatus = "activated" | "already_activated"
+
+export interface TripActivationResult {
+  status: TripActivationStatus
+  tripId: string
+  transactionId: string | null
+  linkActivatedAt: string
+  linkAccessUntil: string | null
+  balance: number
+}
+
 export interface TripTraveler {
   id: string
   name: string
@@ -109,6 +120,9 @@ export interface Trip {
   publicLink: string
   coverImage: string | null
   visibility: TripVisibility
+  linkActivatedAt: string | null
+  linkAccessUntil: string | null
+  linkActivationTransactionId: string | null
   travelersCount: number
   travelers: TripTraveler[]
   flights: TripFlight[]
@@ -140,6 +154,9 @@ export interface TripCardData {
   publicLink: string
   startDate: string | null
   endDate: string | null
+  visibility: TripVisibility
+  linkActivatedAt: string | null
+  linkAccessUntil: string | null
 }
 
 export interface TripLinkPageData {
@@ -156,6 +173,9 @@ export interface TripLinkPageData {
   travelersCount: number
   adminLink: string
   publicLink: string
+  visibility: TripVisibility
+  linkActivatedAt: string | null
+  linkAccessUntil: string | null
 }
 
 export interface TripPublicView {
@@ -170,6 +190,8 @@ export interface TripPublicView {
   status: TripStatus
   coverImage: string | null
   visibility: TripVisibility
+  linkActivatedAt: string | null
+  linkAccessUntil: string | null
   travelers: Array<Pick<TripTraveler, "id" | "name" | "isPrimary">>
   itinerary: TripItineraryItem[]
   accommodations: TripAccommodation[]

@@ -94,7 +94,7 @@ export async function POST(request: Request) {
         publicToken,
         adminLink,
         publicLink,
-        visibility: "public",
+        visibility: "private",
         travelersCount: typeof body.travelersCount === "number" && body.travelersCount > 0 ? body.travelersCount : 1,
         status: "draft",
       })

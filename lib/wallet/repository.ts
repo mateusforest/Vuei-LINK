@@ -22,6 +22,7 @@ type WalletTransactionRow = Database["public"]["Tables"]["wallet_transactions"][
 type WalletProductRow = Database["public"]["Tables"]["wallet_products"]["Row"]
 type UntypedSupabaseClient = {
   from: (table: string) => any
+  rpc: (functionName: string, args?: Record<string, unknown>) => Promise<{ data: unknown; error: { message?: string } | null }>
 }
 
 function mapWalletRow(row: WalletRow): Wallet {
@@ -196,6 +197,18 @@ export async function findWalletTransactionByIdempotencyKey(client: SupabaseDbCl
 
   return {
     data: data ? mapWalletTransactionRow(data as WalletTransactionRow) : null,
+    error: error?.message ?? null,
+  }
+}
+
+export async function activateTravelerTripWithWalletRpc(client: SupabaseDbClient, tripId: string) {
+  const db = client as unknown as UntypedSupabaseClient
+  const { data, error } = await db.rpc("activate_traveler_trip_with_wallet", {
+    p_trip_id: tripId,
+  })
+
+  return {
+    data,
     error: error?.message ?? null,
   }
 }

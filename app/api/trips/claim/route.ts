@@ -4,7 +4,6 @@ import { createSupabaseAdminClient, hasSupabaseAdminEnv, isMissingSupabaseAdminE
 import { createSupabaseServerClient } from "@/lib/supabase/server"
 import { hashPendingTripClaimToken } from "@/lib/server/pending-trip-claim"
 import { mapTripRowToTrip } from "@/lib/trips/trip-record"
-import { TRIP_LINK_REQUIRED_ERROR_MESSAGE } from "@/lib/trips/trip-policies"
 import { createWalletService } from "@/lib/wallet"
 
 function unauthorized(error: string) {
@@ -52,7 +51,13 @@ export async function POST(request: Request) {
   }
 
   try {
-    await ensureProfile(user, serverClient)
+    const profile = await ensureProfile(user, serverClient)
+    if (!profile || profile.role !== "traveler") {
+      return NextResponse.json(
+        { error: "Esta rota esta disponivel apenas para viajantes." },
+        { status: 403 },
+      )
+    }
 
     const supabase = createSupabaseAdminClient()
     const walletService = createWalletService(supabase)
@@ -71,13 +76,6 @@ export async function POST(request: Request) {
 
     if (claimResult.status === "already_claimed") {
       return definitiveClaimError("Esta viagem ja foi reivindicada.", "claim_already_claimed")
-    }
-
-    if (claimResult.status === "insufficient_balance") {
-      return NextResponse.json(
-        { error: TRIP_LINK_REQUIRED_ERROR_MESSAGE, code: "wallet_insufficient_balance" },
-        { status: 409 },
-      )
     }
 
     if (claimResult.status !== "claimed" || !claimResult.tripId) {

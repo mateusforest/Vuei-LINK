@@ -18,8 +18,15 @@ interface PendingTripCreationSnapshot {
   publicLink: string
 }
 
-interface PendingTripApiResponse {
-  trip?: Trip | PendingTripCreationSnapshot | null
+interface PendingTripCreateApiResponse {
+  trip?: PendingTripCreationSnapshot | null
+  claimToken?: string | null
+  error?: string | null
+  code?: string | null
+}
+
+interface PendingTripClaimApiResponse {
+  trip?: Trip | null
   claimToken?: string | null
   error?: string | null
   code?: string | null
@@ -42,11 +49,11 @@ export async function createPendingTripClaim(payload: CreatePendingTripPayload) 
     body: JSON.stringify(payload),
   })
 
-  const data = await parseJson<PendingTripApiResponse>(response)
+  const data = await parseJson<PendingTripCreateApiResponse>(response)
 
   return {
     data: response.ok && data?.trip && data?.claimToken
-      ? { trip: data.trip as PendingTripCreationSnapshot, claimToken: data.claimToken }
+      ? { trip: data.trip, claimToken: data.claimToken }
       : null,
     error: response.ok ? null : data?.error ?? "Não foi possível criar a viagem agora.",
     code: data?.code ?? null,
@@ -66,7 +73,7 @@ export async function claimPendingTrip(claimToken: string) {
     body: JSON.stringify({ claimToken }),
   })
 
-  const data = await parseJson<PendingTripApiResponse>(response)
+  const data = await parseJson<PendingTripClaimApiResponse>(response)
 
   return {
     data: response.ok && data?.trip ? data.trip : null,

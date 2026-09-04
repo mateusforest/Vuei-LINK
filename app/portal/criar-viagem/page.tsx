@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useMemo, useRef, useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { useRouter } from "next/navigation"
 import { 
@@ -31,10 +31,9 @@ import { Input } from "@/components/ui/input"
 import { Progress } from "@/components/ui/progress"
 import { useTrips, type Trip } from "@/contexts/trips-context"
 import { useAuth } from "@/contexts/auth-context"
-import { createTrip as createTripInRepository } from "@/lib/repositories/trips-repository"
+import { activateTravelerTrip, createTrip as createTripInRepository } from "@/lib/repositories/trips-repository"
 import { shouldUseSupabase } from "@/lib/data-source"
 import { writePendingTrip } from "@/lib/pending-trip"
-import { PortalActionDialog } from "@/components/portal/portal-action-dialog"
 import { calculateTripDays, isValidTripDate } from "@/lib/trip-date"
 import {
   resolveDestinationInput,
@@ -83,7 +82,7 @@ function Toast({ message, visible }: { message: string; visible: boolean }) {
 
 export default function CriarViagemPage() {
   const router = useRouter()
-  const { addTrip, syncTripFromBackend, canCreateMoreTrips, subscription } = useTrips()
+  const { addTrip, syncTripFromBackend, updateTrip } = useTrips()
   const { user } = useAuth()
   const [step, setStep] = useState(1)
   const [formData, setFormData] = useState({
@@ -99,7 +98,8 @@ export default function CriarViagemPage() {
   const [createdTrip, setCreatedTrip] = useState<Trip | null>(null)
   const [copiedLink, setCopiedLink] = useState<string | null>(null)
   const [errorMessage, setErrorMessage] = useState("")
-  const [showLimitDialog, setShowLimitDialog] = useState(false)
+  const [isActivating, setIsActivating] = useState(false)
+  const [activationError, setActivationError] = useState("")
   const [activeDateField, setActiveDateField] = useState<"start" | "end" | null>(null)
   const [destinationMenuOpen, setDestinationMenuOpen] = useState(false)
   const [selectedDestinationId, setSelectedDestinationId] = useState<string | null>(null)
@@ -107,14 +107,6 @@ export default function CriarViagemPage() {
 
   const totalSteps = 5
   const progress = (step / totalSteps) * 100
-  const blockedByFreePlan = subscription.code === "free" && !canCreateMoreTrips
-
-  useEffect(() => {
-    if (blockedByFreePlan) {
-      setShowLimitDialog(true)
-    }
-  }, [blockedByFreePlan])
-
   const destinationSuggestions = useMemo(
     () => searchDestinationOptions(formData.destination, 5),
     [formData.destination]
@@ -209,11 +201,6 @@ export default function CriarViagemPage() {
       return
     }
 
-    if (blockedByFreePlan) {
-      setShowLimitDialog(true)
-      return
-    }
-
     createTripRequestRef.current = true
     setIsCreating(true)
     setErrorMessage("")
@@ -233,7 +220,7 @@ export default function CriarViagemPage() {
             endDate: formData.endDate,
             style: formData.style,
             status: "draft",
-            visibility: "public",
+            visibility: "private",
             ownerType: "traveler",
             ownerUserId: user.id,
             travelersCount: companionTypes.find(c => c.id === formData.companions)?.count || 1,
@@ -276,7 +263,7 @@ export default function CriarViagemPage() {
           style: formData.style,
           companions: formData.companions,
           passengersCount: companionTypes.find(c => c.id === formData.companions)?.count || 1,
-          status: "upcoming",
+          status: "draft",
         })
       }
       
@@ -290,6 +277,37 @@ export default function CriarViagemPage() {
       createTripRequestRef.current = false
       setIsCreating(false)
     }
+  }
+
+  const activateCreatedTrip = async () => {
+    if (
+      !createdTrip ||
+      isActivating ||
+      (createdTrip.linkActivatedAt && createdTrip.visibility === "public")
+    ) {
+      return
+    }
+
+    setIsActivating(true)
+    setActivationError("")
+
+    const result = await activateTravelerTrip(createdTrip.id)
+    if (!result.data) {
+      setActivationError(result.error || "Nao foi possivel ativar o Link da Viagem.")
+      setIsActivating(false)
+      return
+    }
+
+    const lifecycle = {
+      visibility: "public" as const,
+      linkActivatedAt: result.data.linkActivatedAt,
+      linkAccessUntil: result.data.linkAccessUntil,
+      linkActivationTransactionId: result.data.transactionId,
+    }
+
+    updateTrip(createdTrip.id, lifecycle)
+    setCreatedTrip((current) => current ? { ...current, ...lifecycle } : current)
+    setIsActivating(false)
   }
 
   const copyLink = (link: string, type: string) => {
@@ -597,54 +615,51 @@ export default function CriarViagemPage() {
                 </div>
               </div>
 
-              {false && (
-              <Card className="p-5 bg-card/50 border-border/50">
-                <div className="flex items-start gap-3 mb-3">
-                  <Shield size={20} className="text-amber-400" />
-                  <div className="flex-1">
-                    <h3 className="font-semibold">Link da Viagem</h3>
-                    <p className="text-xs text-muted-foreground">Guarde com seguranca - acesso completo</p>
+              {createdTrip.visibility === "public" && createdTrip.linkActivatedAt ? (
+                <Card className="p-5 bg-primary/5 border-primary/20">
+                  <div className="flex items-start gap-3 mb-3">
+                    <Share2 size={20} className="text-primary" />
+                    <div className="flex-1">
+                      <h3 className="font-semibold">Link da Viagem ativo</h3>
+                      <p className="text-xs text-muted-foreground">Pronto para compartilhar com família e amigos</p>
+                    </div>
+                    <Badge className="bg-emerald-500/20 text-emerald-500 border-0 text-xs">
+                      Ativo
+                    </Badge>
                   </div>
-                  <Badge className="bg-amber-500/20 text-amber-400 border-0 text-xs">
-                    Privado
-                  </Badge>
-                </div>
-                <div className="flex items-center gap-2 p-3 rounded-xl bg-muted/30 border border-border/50">
-                  <code className="flex-1 text-sm truncate">{createdTrip.adminLink}</code>
-                  <Button 
-                    variant="ghost" 
-                    size="sm"
-                    onClick={() => copyLink(createdTrip.adminLink, "admin")}
-                  >
-                    {copiedLink === "admin" ? <Check size={16} className="text-emerald-400" /> : <Copy size={16} />}
-                  </Button>
-                </div>
-              </Card>
+                  <div className="flex items-center gap-2 p-3 rounded-xl bg-background/50 border border-primary/20">
+                    <Link2 size={16} className="text-primary shrink-0" />
+                    <code className="flex-1 text-sm truncate">{createdTrip.shareLink}</code>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => copyLink(createdTrip.shareLink, "share")}
+                    >
+                      {copiedLink === "share" ? <Check size={16} className="text-emerald-400" /> : <Copy size={16} />}
+                    </Button>
+                  </div>
+                </Card>
+              ) : (
+                <Card className="p-5 bg-amber-500/5 border-amber-500/20">
+                  <div className="flex items-start gap-3">
+                    <Shield size={20} className="text-amber-500" />
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between gap-3">
+                        <h3 className="font-semibold">Rascunho privado</h3>
+                        <Badge className="bg-amber-500/15 text-amber-500 border-0 text-xs">
+                          Não publicado
+                        </Badge>
+                      </div>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Você pode editar esta viagem sem consumir saldo. Ativar o link usa 1 Link da Viagem.
+                      </p>
+                    </div>
+                  </div>
+                  {activationError ? (
+                    <p className="mt-4 text-sm text-red-400" role="alert">{activationError}</p>
+                  ) : null}
+                </Card>
               )}
-
-              <Card className="p-5 bg-primary/5 border-primary/20">
-                <div className="flex items-start gap-3 mb-3">
-                  <Share2 size={20} className="text-primary" />
-                  <div className="flex-1">
-                    <h3 className="font-semibold">Link da Viagem</h3>
-                    <p className="text-xs text-muted-foreground">Compartilhe um único link com família e amigos</p>
-                  </div>
-                  <Badge className="bg-primary/20 text-primary border-0 text-xs">
-                    Único
-                  </Badge>
-                </div>
-                <div className="flex items-center gap-2 p-3 rounded-xl bg-background/50 border border-primary/20">
-                  <Link2 size={16} className="text-primary shrink-0" />
-                  <code className="flex-1 text-sm truncate">{createdTrip.shareLink}</code>
-                  <Button 
-                    variant="ghost" 
-                    size="sm"
-                    onClick={() => copyLink(createdTrip.shareLink, "share")}
-                  >
-                    {copiedLink === "share" ? <Check size={16} className="text-emerald-400" /> : <Copy size={16} />}
-                  </Button>
-                </div>
-              </Card>
 
               {/* Action Buttons */}
               <div className="flex gap-3 pt-4">
@@ -655,13 +670,24 @@ export default function CriarViagemPage() {
                 >
                   Ir para Inicio
                 </Button>
-                <Button 
-                  className="flex-1 rounded-xl bg-gradient-to-r from-[#5de0e6] to-[#004aad] text-white border-0"
-                  onClick={() => router.push(createdTrip.shareLink.replace(/^https?:\/\/[^/]+/, ""))}
-                >
-                  <ExternalLink size={16} className="mr-2" />
-                  Ver Viagem
-                </Button>
+                {createdTrip.visibility === "public" && createdTrip.linkActivatedAt ? (
+                  <Button
+                    className="flex-1 rounded-xl bg-gradient-to-r from-[#5de0e6] to-[#004aad] text-white border-0"
+                    onClick={() => router.push(createdTrip.shareLink.replace(/^https?:\/\/[^/]+/, ""))}
+                  >
+                    <ExternalLink size={16} className="mr-2" />
+                    Ver Viagem
+                  </Button>
+                ) : (
+                  <Button
+                    className="flex-1 rounded-xl bg-gradient-to-r from-[#5de0e6] to-[#004aad] text-white border-0"
+                    onClick={() => void activateCreatedTrip()}
+                    disabled={isActivating}
+                  >
+                    <Link2 size={16} className="mr-2" />
+                    {isActivating ? "Ativando..." : "Ativar link (1 Link)"}
+                  </Button>
+                )}
               </div>
             </motion.div>
           )}
@@ -693,14 +719,6 @@ export default function CriarViagemPage() {
       )}
 
       <Toast message="Link da viagem copiado!" visible={!!copiedLink} />
-      <PortalActionDialog
-        open={showLimitDialog}
-        onOpenChange={setShowLimitDialog}
-        title="Limite do plano gratuito atingido"
-        description="Seu plano Free permite 1 viagem ativa. Para criar novas viagens, finalize uma viagem existente ou faça upgrade."
-        actionLabel="Conhecer Premium"
-        actionHref="/portal/planos"
-      />
     </div>
   )
 }

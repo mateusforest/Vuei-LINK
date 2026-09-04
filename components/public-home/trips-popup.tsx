@@ -17,10 +17,13 @@ export interface PublicBagTripItem {
   travelersCount: number | null
   url: string
   statusLabel: string
+  isActivated: boolean
   isPending?: boolean
 }
 
 export function mapLegacyTripToBagItem(trip: LegacyTrip): PublicBagTripItem {
+  const isActivated = Boolean(trip.linkActivatedAt && trip.visibility === "public")
+
   return {
     id: trip.id,
     title: trip.name,
@@ -29,7 +32,8 @@ export function mapLegacyTripToBagItem(trip: LegacyTrip): PublicBagTripItem {
     endDate: trip.endDate || null,
     travelersCount: trip.passengersCount,
     url: trip.shareLink,
-    statusLabel: "Guardada",
+    statusLabel: isActivated ? "Ativa" : "Rascunho",
+    isActivated,
     isPending: false,
   }
 }
@@ -56,7 +60,7 @@ export function TripsPopup({
   emptyStateMode?: "default" | "guest-bag"
   onClose: () => void
   onNewTrip: () => void
-  onOpenTrip: (url: string) => void
+  onOpenTrip: (trip: PublicBagTripItem) => void
   onOpenWalletAction?: () => void
   onEmptyPrimaryAction?: () => void
   onEmptySecondaryAction?: () => void
@@ -111,7 +115,7 @@ export function TripsPopup({
           </button>
         </div>
 
-        {emptyStateMode !== "guest-bag" || trips.length > 0 ? (
+        {(emptyStateMode !== "guest-bag" || trips.length > 0) && walletBalanceLabel != null && onOpenWalletAction ? (
           <div className="px-4 pb-3">
             <div className="rounded-2xl border border-border/60 bg-background/60 p-3.5 shadow-[0_2px_10px_-6px_rgba(20,60,120,0.15)]">
               <div className="flex items-start justify-between gap-3">
@@ -217,7 +221,7 @@ function TripCard({
 }: {
   trip: PublicBagTripItem
   highlighted?: boolean
-  onOpen: (url: string) => void
+  onOpen: (trip: PublicBagTripItem) => void
 }) {
   const [copied, setCopied] = useState(false)
   const range = formatRange(trip.startDate, trip.endDate)
@@ -246,10 +250,10 @@ function TripCard({
             <span
               className={cn(
                 "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[0.68rem] font-medium",
-                trip.isPending ? "bg-amber-500/12 text-amber-700" : "bg-emerald-500/12 text-emerald-700",
+                trip.isActivated ? "bg-emerald-500/12 text-emerald-700" : "bg-amber-500/12 text-amber-700",
               )}
             >
-              <span className={cn("size-1.5 rounded-full", trip.isPending ? "bg-amber-500" : "bg-emerald-500")} />
+              <span className={cn("size-1.5 rounded-full", trip.isActivated ? "bg-emerald-500" : "bg-amber-500")} />
               {trip.statusLabel}
             </span>
           </div>
@@ -262,21 +266,23 @@ function TripCard({
           <Button
             size="sm"
             variant="ghost"
-            onClick={() => onOpen(trip.url)}
+            onClick={() => onOpen(trip)}
             className="h-8 rounded-xl px-2.5 text-[0.78rem] text-muted-foreground transition-colors hover:bg-foreground/5 hover:text-foreground"
           >
             <ExternalLink className="size-3.5" />
-            Abrir
+            {trip.isActivated ? "Abrir" : "Continuar"}
           </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={handleCopy}
-            className="h-8 rounded-xl px-2.5 text-[0.78rem] text-muted-foreground transition-colors hover:bg-foreground/5 hover:text-foreground"
-          >
-            {copied ? <Check className="size-3.5 text-emerald-600" /> : <Copy className="size-3.5" />}
-            {copied ? "Copiado" : "Copiar"}
-          </Button>
+          {trip.isActivated ? (
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={handleCopy}
+              className="h-8 rounded-xl px-2.5 text-[0.78rem] text-muted-foreground transition-colors hover:bg-foreground/5 hover:text-foreground"
+            >
+              {copied ? <Check className="size-3.5 text-emerald-600" /> : <Copy className="size-3.5" />}
+              {copied ? "Copiado" : "Copiar"}
+            </Button>
+          ) : null}
         </div>
       </div>
     </div>

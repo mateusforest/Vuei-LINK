@@ -18,11 +18,11 @@ import {
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { useTrips } from "@/contexts/trips-context"
+import { useTrips, type Trip } from "@/contexts/trips-context"
 import { resolveTripHeroImage } from "@/lib/trip-destination"
 import { ImageWithFallback } from "@/components/system/image-with-fallback"
 import { useAuth } from "@/contexts/auth-context"
-import { ensureTripIsPublic } from "@/lib/repositories/trips-repository"
+import { activateTravelerTrip } from "@/lib/repositories/trips-repository"
 import { CreateTripButton } from "@/components/portal/create-trip-button"
 
 const fadeInUp = {
@@ -74,7 +74,7 @@ function NoTripModal({ open, onClose }: { open: boolean; onClose: () => void }) 
   )
 }
 
-function Toast({ message, visible }: { message: string; visible: boolean }) {
+function Toast({ message, visible, tone = "success" }: { message: string; visible: boolean; tone?: "success" | "error" }) {
   if (!visible) return null
 
   return (
@@ -82,7 +82,11 @@ function Toast({ message, visible }: { message: string; visible: boolean }) {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: 20 }}
-      className="fixed bottom-24 left-1/2 z-50 flex -translate-x-1/2 items-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/20 px-4 py-2 text-sm text-emerald-400"
+      className={`fixed bottom-24 left-1/2 z-50 flex -translate-x-1/2 items-center gap-2 rounded-xl border px-4 py-2 text-sm ${
+        tone === "error"
+          ? "border-red-500/30 bg-red-500/20 text-red-300"
+          : "border-emerald-500/30 bg-emerald-500/20 text-emerald-400"
+      }`}
     >
       <Check size={16} />
       {message}
@@ -92,38 +96,66 @@ function Toast({ message, visible }: { message: string; visible: boolean }) {
 
 export default function PortalHomePage() {
   const router = useRouter()
-  const { trips, activeTrip, loadingTrips } = useTrips()
+  const { trips, activeTrip, loadingTrips, updateTrip } = useTrips()
   const { profile, loading } = useAuth()
   const [showNoTripModal, setShowNoTripModal] = useState(false)
   const [copiedLink, setCopiedLink] = useState<string | null>(null)
+  const [feedback, setFeedback] = useState<{ message: string; tone: "success" | "error" } | null>(null)
+  const [activatingTripId, setActivatingTripId] = useState<string | null>(null)
   const firstName = profile?.name?.trim().split(" ")[0]
 
-  const copyLink = (link: string, type: string) => {
-    navigator.clipboard.writeText(link)
-    setCopiedLink(type)
-    setTimeout(() => setCopiedLink(null), 2000)
-  }
+  const isLinkActive = (trip: Trip) => Boolean(trip.linkActivatedAt && trip.visibility === "public")
 
-  const ensureTripShareIsPublic = async (tripId: string) => {
-    const result = await ensureTripIsPublic(tripId)
-    if (result.error) {
-      console.error("[TRIP] publish before share error", result.error)
-      return false
+  const copyLink = async (link: string, type: string) => {
+    try {
+      await navigator.clipboard.writeText(link)
+      setCopiedLink(type)
+      window.setTimeout(() => setCopiedLink(null), 2000)
+    } catch {
+      setFeedback({ message: "Não foi possível copiar o link neste navegador.", tone: "error" })
+      window.setTimeout(() => setFeedback(null), 3500)
     }
-    return true
   }
 
-  const shareTrip = async (tripId: string, link: string) => {
-    const isPublished = await ensureTripShareIsPublic(tripId)
-    if (!isPublished) return
+  const activateTrip = async (trip: Trip) => {
+    if (activatingTripId) return
 
-    const url = link
+    setActivatingTripId(trip.id)
+    const result = await activateTravelerTrip(trip.id)
+    if (!result.data) {
+      console.error("[TRIP] activation before public access error", result.error)
+      setFeedback({ message: result.error || "Nao foi possivel ativar o link da viagem.", tone: "error" })
+      window.setTimeout(() => setFeedback(null), 3500)
+      setActivatingTripId(null)
+      return
+    }
 
+    updateTrip(trip.id, {
+      visibility: "public",
+      linkActivatedAt: result.data.linkActivatedAt,
+      linkAccessUntil: result.data.linkAccessUntil,
+      linkActivationTransactionId: result.data.transactionId,
+    })
+    setFeedback({ message: "Link ativado. Agora você pode abrir, copiar ou compartilhar.", tone: "success" })
+    window.setTimeout(() => setFeedback(null), 3500)
+    setActivatingTripId(null)
+  }
+
+  const handlePrimaryTripAction = (trip: Trip) => {
+    if (isLinkActive(trip)) {
+      router.push(trip.shareLink.replace(/^https?:\/\/[^/]+/, ""))
+      return
+    }
+
+    void activateTrip(trip)
+  }
+
+  const shareTrip = async (link: string) => {
     if (navigator.share) {
       try {
         await navigator.share({
           title: "Link da viagem Vuei",
-          url,
+          url: link,
         })
         return
       } catch {
@@ -131,7 +163,7 @@ export default function PortalHomePage() {
       }
     }
 
-    copyLink(link, "share")
+    await copyLink(link, "share")
   }
 
   const formatDate = (dateStr: string) => {
@@ -150,7 +182,7 @@ export default function PortalHomePage() {
           {loading || !firstName ? "Olá" : <>Olá, <span className="vuei-gradient-text">{firstName}</span></>}
         </h1>
         <p className="text-muted-foreground">
-          {loadingTrips ? "Carregando suas viagens..." : trips.length > 0 ? "Seu link de viagem está pronto para abrir, copiar e compartilhar." : "Crie sua primeira viagem para começar."}
+          {loadingTrips ? "Carregando suas viagens..." : trips.length > 0 ? "Gerencie seus rascunhos e links de viagem em um só lugar." : "Crie sua primeira viagem para começar."}
         </p>
       </motion.div>
 
@@ -180,7 +212,7 @@ export default function PortalHomePage() {
               <div className="mb-4 flex items-start justify-between gap-4">
                 <div>
                   <Badge variant="secondary" className="mb-2 border-0 bg-primary/20 text-primary">
-                    {activeTrip.status === "upcoming" ? "Próxima viagem" : activeTrip.status === "ongoing" ? "Em andamento" : "Concluída"}
+                    {isLinkActive(activeTrip) ? "Link ativo" : activeTrip.status === "draft" ? "Rascunho" : activeTrip.status === "upcoming" ? "Próxima viagem" : activeTrip.status === "ongoing" ? "Em andamento" : "Concluída"}
                   </Badge>
                   <h2 className="text-xl font-bold">{activeTrip.name}</h2>
                   <p className="mt-1 flex items-center gap-1 text-muted-foreground">
@@ -208,7 +240,9 @@ export default function PortalHomePage() {
                 <div className="rounded-xl border border-border/50 bg-background/40 p-4">
                   <div className="mb-2 flex items-center gap-2">
                     <Link2 size={16} className="text-primary" />
-                    <p className="text-sm font-medium">Link da Viagem</p>
+                    <p className="text-sm font-medium">
+                      {activeTrip.linkActivatedAt ? "Link da Viagem" : "Rascunho privado"}
+                    </p>
                   </div>
                   <p className="truncate text-xs text-muted-foreground">{activeTrip.shareLink}</p>
                 </div>
@@ -217,15 +251,17 @@ export default function PortalHomePage() {
               <div className="flex flex-wrap gap-3">
                 <Button
                   className="border-0 bg-gradient-to-r from-[#5de0e6] to-[#004aad] text-white"
-                  onClick={() => router.push(activeTrip.shareLink.replace(/^https?:\/\/[^/]+/, ""))}
+                  onClick={() => handlePrimaryTripAction(activeTrip)}
+                  disabled={activatingTripId === activeTrip.id}
                 >
                   <ExternalLink size={16} className="mr-2" />
-                  Abrir link
+                  {activatingTripId === activeTrip.id ? "Ativando..." : isLinkActive(activeTrip) ? "Abrir link" : "Ativar link (1 Link)"}
                 </Button>
                 <Button
                   variant="outline"
                   className="border-border/50"
-                  onClick={() => copyLink(activeTrip.shareLink, "admin")}
+                  onClick={() => void copyLink(activeTrip.shareLink, "admin")}
+                  disabled={!isLinkActive(activeTrip)}
                 >
                   <Copy size={16} className="mr-2" />
                   Copiar link
@@ -233,7 +269,8 @@ export default function PortalHomePage() {
                 <Button
                   variant="outline"
                   className="border-border/50"
-                  onClick={() => shareTrip(activeTrip.id, activeTrip.shareLink)}
+                  onClick={() => void shareTrip(activeTrip.shareLink)}
+                  disabled={!isLinkActive(activeTrip)}
                 >
                   <Share2 size={16} className="mr-2" />
                   Compartilhar
@@ -273,8 +310,10 @@ export default function PortalHomePage() {
               <Card key={trip.id} className="border-border/50 bg-card/50 p-4">
                 <div className="flex flex-col gap-4 md:flex-row md:items-center">
                   <div
-                    className="relative h-20 w-full overflow-hidden rounded-xl md:h-16 md:w-24 md:shrink-0"
-                    onClick={() => router.push(trip.shareLink.replace(/^https?:\/\/[^/]+/, ""))}
+                    className={`relative h-20 w-full overflow-hidden rounded-xl md:h-16 md:w-24 md:shrink-0 ${isLinkActive(trip) ? "cursor-pointer" : ""}`}
+                    onClick={() => {
+                      if (isLinkActive(trip)) handlePrimaryTripAction(trip)
+                    }}
                   >
                     <ImageWithFallback
                       src={trip.coverImage}
@@ -296,13 +335,13 @@ export default function PortalHomePage() {
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    <Button variant="outline" className="border-border/50" onClick={() => router.push(trip.shareLink.replace(/^https?:\/\/[^/]+/, ""))}>
-                      Abrir link
+                    <Button variant="outline" className="border-border/50" onClick={() => handlePrimaryTripAction(trip)} disabled={activatingTripId === trip.id}>
+                      {activatingTripId === trip.id ? "Ativando..." : isLinkActive(trip) ? "Abrir link" : "Ativar link (1 Link)"}
                     </Button>
-                    <Button variant="outline" className="border-border/50" onClick={() => copyLink(trip.shareLink, "admin")}>
+                    <Button variant="outline" className="border-border/50" onClick={() => void copyLink(trip.shareLink, "admin")} disabled={!isLinkActive(trip)}>
                       Copiar link
                     </Button>
-                    <Button variant="outline" className="border-border/50" onClick={() => shareTrip(trip.id, trip.shareLink)}>
+                    <Button variant="outline" className="border-border/50" onClick={() => void shareTrip(trip.shareLink)} disabled={!isLinkActive(trip)}>
                       Compartilhar
                     </Button>
                   </div>
@@ -321,8 +360,9 @@ export default function PortalHomePage() {
 
       <NoTripModal open={showNoTripModal} onClose={() => setShowNoTripModal(false)} />
       <Toast
-        message="Link da viagem copiado!"
-        visible={!!copiedLink}
+        message={feedback?.message ?? "Link da viagem copiado!"}
+        visible={Boolean(copiedLink || feedback)}
+        tone={feedback?.tone ?? "success"}
       />
     </motion.div>
   )

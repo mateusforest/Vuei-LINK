@@ -2,6 +2,7 @@ import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
 import type { Database } from "@/lib/supabase/types"
+import { isTripPublicLinkActive } from "@/lib/security/trip-link-lifecycle"
 
 export type TripLinkAccessMode = "admin" | "public"
 export type TripRow = Database["public"]["Tables"]["trips"]["Row"]
@@ -59,7 +60,12 @@ export async function resolveTripLinkAccess(
   const tokenMatches = Boolean(params.publicToken && trip.public_token === params.publicToken)
   const slugMatches = Boolean(params.tripSlug && trip.slug === params.tripSlug && trip.visibility === "public")
 
-  if (trip.visibility !== "public") {
+  if (!isTripPublicLinkActive({
+    ownerType: trip.owner_type,
+    visibility: trip.visibility,
+    linkActivatedAt: trip.link_activated_at,
+    linkAccessUntil: trip.link_access_until,
+  })) {
     return { trip: null as TripRow | null, error: "Esta viagem não está disponível publicamente." }
   }
 

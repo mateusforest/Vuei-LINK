@@ -3,6 +3,7 @@ import { createSupabaseAdminClient, hasSupabaseAdminEnv, isMissingSupabaseAdminE
 import { createSupabaseServerClient } from "@/lib/supabase/server"
 import { verifyStoredQuickAccessPin } from "@/lib/auth/quick-access"
 import { resolveAuthenticatedTripAccess } from "@/lib/security/trip-authenticated-access"
+import { isTripPublicLinkActive } from "@/lib/security/trip-link-lifecycle"
 import type { Database } from "@/lib/supabase/types"
 import type { ProfileQuickAccessSettings } from "@/types"
 
@@ -31,6 +32,8 @@ type TripLinkSnapshot = {
   status: TripRow["status"]
   ownerType: TripRow["owner_type"]
   visibility: TripRow["visibility"]
+  linkActivatedAt: string | null
+  linkAccessUntil: string | null
   travelersCount: number
   coverImage: string | null
 }
@@ -71,6 +74,8 @@ function mapTripSnapshot(trip: TripRow): TripLinkSnapshot {
     status: trip.status,
     ownerType: trip.owner_type,
     visibility: trip.visibility,
+    linkActivatedAt: trip.link_activated_at,
+    linkAccessUntil: trip.link_access_until,
     travelersCount: trip.travelers_count,
     coverImage: trip.cover_image,
   }
@@ -139,7 +144,12 @@ async function findTripForPin(
   const tokenMatches = Boolean(params.publicToken && trip.public_token === params.publicToken)
   const slugMatches = Boolean(params.tripSlug && trip.slug === params.tripSlug && trip.visibility === "public")
 
-  if (trip.visibility !== "public") {
+  if (!isTripPublicLinkActive({
+    ownerType: trip.owner_type,
+    visibility: trip.visibility,
+    linkActivatedAt: trip.link_activated_at,
+    linkAccessUntil: trip.link_access_until,
+  })) {
     return { trip: null as TripRow | null, error: "Esta viagem nao esta disponivel publicamente." }
   }
 

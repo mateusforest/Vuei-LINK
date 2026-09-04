@@ -31,7 +31,7 @@ import { resolveTripHeroImage } from "@/lib/trip-destination"
 import { listCreditTransactions } from "@/lib/repositories/credits-repository"
 import { CREDIT_BALANCE_CHANGED_EVENT } from "@/lib/credits/credit-events"
 
-export interface Trip extends Pick<CanonicalTrip, "id" | "slug" | "destination" | "country" | "city" | "startDate" | "endDate" | "coverImage" | "createdAt"> {
+export interface Trip extends Pick<CanonicalTrip, "id" | "slug" | "destination" | "country" | "city" | "startDate" | "endDate" | "coverImage" | "visibility" | "linkActivatedAt" | "linkAccessUntil" | "linkActivationTransactionId" | "createdAt"> {
   id: string
   slug: string
   name: string
@@ -43,11 +43,28 @@ export interface Trip extends Pick<CanonicalTrip, "id" | "slug" | "destination" 
   style: string
   companions: string
   passengersCount: number
-  status: Extract<TripStatus, "upcoming" | "ongoing" | "completed">
+  status: Extract<TripStatus, "draft" | "upcoming" | "ongoing" | "completed">
   coverImage: string
   adminLink: string
   shareLink: string
   createdAt: string
+}
+
+type NewTripInput = Omit<
+  Trip,
+  | "id"
+  | "slug"
+  | "adminLink"
+  | "shareLink"
+  | "createdAt"
+  | "coverImage"
+  | "visibility"
+  | "linkActivatedAt"
+  | "linkAccessUntil"
+  | "linkActivationTransactionId"
+> & {
+  coverImage?: string | null
+  visibility?: CanonicalTrip["visibility"]
 }
 
 interface TripsContextCredits {
@@ -65,7 +82,7 @@ interface TripsContextType {
   loadingTrips: boolean
   credits: TripsContextCredits
   subscription: TravelerPlanSnapshot
-  addTrip: (trip: Omit<Trip, "id" | "slug" | "adminLink" | "shareLink" | "createdAt" | "coverImage"> & { coverImage?: string | null }) => Trip
+  addTrip: (trip: NewTripInput) => Trip
   syncTripFromBackend: (trip: CanonicalTrip) => Trip
   updateTrip: (id: string, data: Partial<Trip>) => void
   deleteTrip: (id: string) => Promise<{ success: boolean; error?: string | null }>
@@ -194,7 +211,7 @@ function mapCanonicalTripToLegacyTrip(trip: CanonicalTrip, companions = "sozinho
     style: trip.style || "",
     companions,
     passengersCount: trip.travelersCount,
-    status: trip.status === "ongoing" || trip.status === "completed" ? trip.status : "upcoming",
+    status: trip.status === "draft" || trip.status === "ongoing" || trip.status === "completed" ? trip.status : "upcoming",
     coverImage: resolveTripHeroImage({
       coverImage: trip.coverImage,
       destination: trip.destination,
@@ -203,6 +220,10 @@ function mapCanonicalTripToLegacyTrip(trip: CanonicalTrip, companions = "sozinho
     }),
     adminLink: trip.adminLink,
     shareLink: trip.publicLink,
+    visibility: trip.visibility,
+    linkActivatedAt: trip.linkActivatedAt,
+    linkAccessUntil: trip.linkAccessUntil,
+    linkActivationTransactionId: trip.linkActivationTransactionId,
     createdAt: trip.createdAt,
   }
 }
@@ -248,8 +269,7 @@ export function TripsProvider({ children }: { children: ReactNode }) {
   const [loadingTrips, setLoadingTrips] = useState(false)
   const [subscription, setSubscription] = useState<TravelerPlanSnapshot>(() => resolveTravelerPlan(profile))
   const activeTripsCount = trips.filter((trip) => isActiveTripStatus(trip.status)).length
-  const maxActiveTrips = subscription.definition.limits.maxActiveTrips
-  const canCreateMoreTrips = maxActiveTrips === null || activeTripsCount < maxActiveTrips
+  const canCreateMoreTrips = true
 
   useEffect(() => {
     if (typeof window === "undefined") return
@@ -486,7 +506,7 @@ export function TripsProvider({ children }: { children: ReactNode }) {
           ownerType: "traveler",
           ownerUserId: user.id,
           status: "draft",
-          visibility: "public",
+          visibility: "private",
           creditsSummary: { balance: null, used: null, total: null },
         })
 
@@ -495,7 +515,7 @@ export function TripsProvider({ children }: { children: ReactNode }) {
             pendingResult.data,
             inferCompanionsFromCount(pendingResult.data.travelersCount)
           )
-          const shouldRedirectToShare = shouldRedirectPendingTripToShare()
+          const shouldReturnToPortal = shouldRedirectPendingTripToShare()
 
           setTrips((prev) => [nextTrip, ...prev.filter((trip) => trip.id !== nextTrip.id)])
           setActiveTripState(nextTrip)
@@ -504,8 +524,8 @@ export function TripsProvider({ children }: { children: ReactNode }) {
           console.log("[TRIPS] loaded trips", remoteTrips.length + 1)
           console.log("[BOOT] trips loaded", remoteTrips.length + 1)
 
-          if (shouldRedirectToShare && typeof window !== "undefined") {
-            window.location.replace(nextTrip.shareLink)
+          if (shouldReturnToPortal && typeof window !== "undefined") {
+            window.location.replace("/portal")
           }
         }
       } catch (error) {
@@ -526,7 +546,7 @@ export function TripsProvider({ children }: { children: ReactNode }) {
     }
   }, [isLoaded, loading, user])
 
-  const addTrip = useCallback((tripData: Omit<Trip, "id" | "slug" | "adminLink" | "shareLink" | "createdAt" | "coverImage"> & { coverImage?: string | null }) => {
+  const addTrip = useCallback((tripData: NewTripInput) => {
     const parsedDestination = parseDestination(tripData.destination)
     const city = tripData.city || parsedDestination.city
     const country = tripData.country || parsedDestination.country
@@ -549,6 +569,10 @@ export function TripsProvider({ children }: { children: ReactNode }) {
       }),
       adminLink: buildAdminTripUrl(slug),
       shareLink: buildPublicTripUrl(slug),
+      visibility: tripData.visibility ?? "private",
+      linkActivatedAt: null,
+      linkAccessUntil: null,
+      linkActivationTransactionId: null,
       createdAt: new Date().toISOString(),
     }
 

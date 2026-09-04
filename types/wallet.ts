@@ -95,6 +95,36 @@ export interface WalletConsumeTripLinkParams {
   idempotencyKey?: string | null
 }
 
+export type WalletActivateTravelerTripStatus = "activated" | "already_activated"
+
+export interface WalletActivateTravelerTripParams {
+  tripId: string
+}
+
+export interface WalletActivateTravelerTripResult {
+  status: WalletActivateTravelerTripStatus
+  tripId: string
+  transactionId: string | null
+  linkActivatedAt: string
+  linkAccessUntil: string | null
+  balance: number
+}
+
+export type WalletActivateTravelerTripErrorCode =
+  | "invalid_trip_id"
+  | "unauthorized"
+  | "traveler_required"
+  | "trip_not_found"
+  | "trip_activation_forbidden"
+  | "trip_owner_type_invalid"
+  | "trip_activation_status_invalid"
+  | "trip_activation_idempotency_conflict"
+  | "trip_activation_transaction_invalid"
+  | "wallet_inactive"
+  | "wallet_insufficient_balance"
+  | "trip_activation_failed"
+  | "supabase_unavailable"
+
 export interface WalletGrantPurchaseParams {
   walletId: string
   assetType: WalletAssetType
@@ -163,6 +193,5 @@ export interface WalletClaimPendingTripResult {
     | "invalid"
     | "expired"
     | "already_claimed"
-    | "insufficient_balance"
   tripId: string | null
 }

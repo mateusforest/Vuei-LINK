@@ -1017,6 +1017,29 @@ export interface Database {
           updated_at?: string
         }
       }
+      traveler_trip_request_idempotency: {
+        Row: {
+          operation: "create" | "claim"
+          owner_user_id: string
+          idempotency_key: string
+          trip_id: string
+          created_at: string
+        }
+        Insert: {
+          operation: "create" | "claim"
+          owner_user_id: string
+          idempotency_key: string
+          trip_id: string
+          created_at?: string
+        }
+        Update: {
+          operation?: "create" | "claim"
+          owner_user_id?: string
+          idempotency_key?: string
+          trip_id?: string
+          created_at?: string
+        }
+      }
       trips: {
         Row: {
           id: string
@@ -1047,6 +1070,9 @@ export interface Database {
           claim_token_hash: string | null
           claim_token_expires_at: string | null
           claim_token_claimed_at: string | null
+          link_activated_at: string | null
+          link_access_until: string | null
+          link_activation_transaction_id: string | null
           created_at: string
           updated_at: string
         }
@@ -1079,6 +1105,9 @@ export interface Database {
           claim_token_hash?: string | null
           claim_token_expires_at?: string | null
           claim_token_claimed_at?: string | null
+          link_activated_at?: string | null
+          link_access_until?: string | null
+          link_activation_transaction_id?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -1110,8 +1139,19 @@ export interface Database {
           claim_token_hash?: string | null
           claim_token_expires_at?: string | null
           claim_token_claimed_at?: string | null
+          link_activated_at?: string | null
+          link_access_until?: string | null
+          link_activation_transaction_id?: string | null
           updated_at?: string
         }
+      }
+    }
+    Functions: {
+      activate_traveler_trip_with_wallet: {
+        Args: {
+          p_trip_id: string
+        }
+        Returns: Json
       }
     }
   }

@@ -40,6 +40,9 @@ export interface LegacyStoredTrip {
   adminToken?: string | null
   publicToken?: string | null
   visibility?: TripVisibility
+  linkActivatedAt?: string | null
+  linkAccessUntil?: string | null
+  linkActivationTransactionId?: string | null
 }
 
 export interface LegacyAgencyTrip extends LegacyStoredTrip {
@@ -174,6 +177,9 @@ export function mapStoredTripToTrip(trip: LegacyStoredTrip): Trip {
     publicLink: links.publicLink,
     coverImage: trip.coverImage || null,
     visibility: normalizeVisibility(trip),
+    linkActivatedAt: trip.linkActivatedAt ?? null,
+    linkAccessUntil: trip.linkAccessUntil ?? null,
+    linkActivationTransactionId: trip.linkActivationTransactionId ?? null,
     travelersCount: resolveTravelersCount(trip),
     travelers: [],
     flights: [],
@@ -230,6 +236,9 @@ export function mapTripToTripCard(trip: Trip): TripCardData {
     publicLink: trip.publicLink,
     startDate: trip.startDate,
     endDate: trip.endDate,
+    visibility: trip.visibility,
+    linkActivatedAt: trip.linkActivatedAt,
+    linkAccessUntil: trip.linkAccessUntil,
   }
 }
 
@@ -248,6 +257,9 @@ export function mapTripToLinkPageData(trip: Trip): TripLinkPageData {
     travelersCount: trip.travelersCount,
     adminLink: trip.adminLink,
     publicLink: trip.publicLink,
+    visibility: trip.visibility,
+    linkActivatedAt: trip.linkActivatedAt,
+    linkAccessUntil: trip.linkAccessUntil,
   }
 }
 

@@ -4,6 +4,8 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import type { Database } from "@/lib/supabase/types"
 import type {
   Wallet,
+  WalletActivateTravelerTripParams,
+  WalletActivateTravelerTripResult,
   WalletAssetType,
   WalletBalance,
   WalletBalanceLookup,
@@ -21,6 +23,7 @@ import type {
   WalletTransactionListParams,
 } from "@/types"
 import {
+  activateTravelerTripWithWalletRpc,
   createWallet,
   findWalletBalance,
   findWalletByOwner,
@@ -48,6 +51,44 @@ interface WalletRpcStatusPayload {
 }
 
 type TripRow = Database["public"]["Tables"]["trips"]["Row"]
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value)
+}
+
+function mapActivateTravelerTripPayload(payload: unknown): WalletActivateTravelerTripResult {
+  if (!isRecord(payload)) {
+    throw new Error("Resposta invalida ao ativar o Link da Viagem.")
+  }
+
+  const status = payload.status
+  const tripId = payload.trip_id
+  const transactionId = payload.transaction_id
+  const linkActivatedAt = payload.link_activated_at
+  const linkAccessUntil = payload.link_access_until
+  const balance = payload.balance
+
+  if (
+    (status !== "activated" && status !== "already_activated") ||
+    typeof tripId !== "string" ||
+    (transactionId !== null && typeof transactionId !== "string") ||
+    typeof linkActivatedAt !== "string" ||
+    (linkAccessUntil !== null && typeof linkAccessUntil !== "string") ||
+    typeof balance !== "number" ||
+    !Number.isFinite(balance)
+  ) {
+    throw new Error("Resposta invalida ao ativar o Link da Viagem.")
+  }
+
+  return {
+    status,
+    tripId,
+    transactionId,
+    linkActivatedAt,
+    linkAccessUntil,
+    balance,
+  }
+}
 
 function mapRpcBalancePayload(payload: WalletRpcStatusPayload): WalletBalance {
   const nowIso = new Date().toISOString()
@@ -183,6 +224,17 @@ export class WalletService {
     return transactionResult.data
   }
 
+  async activateTravelerTripWithWallet(
+    params: WalletActivateTravelerTripParams,
+  ): Promise<WalletActivateTravelerTripResult> {
+    const result = await activateTravelerTripWithWalletRpc(this.client, params.tripId)
+    if (result.error || !result.data) {
+      throw new Error(result.error ?? "Nao foi possivel ativar o Link da Viagem.")
+    }
+
+    return mapActivateTravelerTripPayload(result.data)
+  }
+
   async createAuthenticatedTravelerTripWithWallet(
     params: WalletCreateAuthenticatedTravelerTripParams,
   ): Promise<TripRow> {
@@ -203,7 +255,7 @@ export class WalletService {
       p_admin_link: params.adminLink,
       p_public_link: params.publicLink,
       p_cover_image: params.coverImage ?? null,
-      p_visibility: params.visibility ?? "public",
+      p_visibility: params.visibility ?? "private",
       p_travelers_count: params.travelersCount ?? 1,
       p_permissions: params.permissions ?? {},
       p_credits_summary: params.creditsSummary ?? {},
@@ -239,8 +291,7 @@ export class WalletService {
         payload.status === "claimed" ||
         payload.status === "invalid" ||
         payload.status === "expired" ||
-        payload.status === "already_claimed" ||
-        payload.status === "insufficient_balance"
+        payload.status === "already_claimed"
           ? payload.status
           : "invalid",
       tripId: typeof payload.trip_id === "string" ? payload.trip_id : null,

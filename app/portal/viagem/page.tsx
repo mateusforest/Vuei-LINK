@@ -24,7 +24,7 @@ import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { useTrips } from "@/contexts/trips-context"
-import { ensureTripIsPublic } from "@/lib/repositories/trips-repository"
+import { activateTravelerTrip } from "@/lib/repositories/trips-repository"
 import { resolveTripHeroImage } from "@/lib/trip-destination"
 import { ImageWithFallback } from "@/components/system/image-with-fallback"
 import { CreateTripButton } from "@/components/portal/create-trip-button"
@@ -71,15 +71,28 @@ function Toast({ message, visible, tone = "success" }: { message: string; visibl
 
 export default function ViagemListPage() {
   const router = useRouter()
-  const { trips, deleteTrip, setActiveTrip } = useTrips()
+  const { trips, deleteTrip, setActiveTrip, updateTrip } = useTrips()
   const [copiedLink, setCopiedLink] = useState<string | null>(null)
   const [feedback, setFeedback] = useState<{ message: string; tone: "success" | "error" } | null>(null)
   const [filter, setFilter] = useState<"all" | "upcoming" | "ongoing" | "completed">("all")
+  const [activatingTripId, setActivatingTripId] = useState<string | null>(null)
 
-  const copyLink = (link: string, type: string) => {
-    navigator.clipboard.writeText(link)
-    setCopiedLink(type)
-    setTimeout(() => setCopiedLink(null), 2000)
+  const copyLink = async (link: string, type: string) => {
+    try {
+      if (!navigator.clipboard) {
+        throw new Error("Clipboard API unavailable")
+      }
+
+      await navigator.clipboard.writeText(link)
+      setCopiedLink(type)
+      window.setTimeout(() => setCopiedLink(null), 2000)
+      return true
+    } catch (error) {
+      console.error("[TRIP] copy link error", error)
+      setFeedback({ message: "Não foi possível copiar o link.", tone: "error" })
+      window.setTimeout(() => setFeedback(null), 2500)
+      return false
+    }
   }
 
   const handleDeleteTrip = async (tripId: string) => {
@@ -94,13 +107,58 @@ export default function ViagemListPage() {
     window.setTimeout(() => setFeedback(null), 2500)
   }
 
-  const copyShareLink = async (tripId: string, link: string, type: string) => {
-    const result = await ensureTripIsPublic(tripId)
-    if (result.error) {
-      console.error("[TRIP] publish before share error", result.error)
+  const activateForPublicAccess = async (tripId: string) => {
+    if (activatingTripId !== null) return
+
+    setActivatingTripId(tripId)
+    setFeedback(null)
+
+    try {
+      const result = await activateTravelerTrip(tripId)
+      if (!result.data) {
+        console.error("[TRIP] explicit link activation error", result.error)
+        setFeedback({ message: result.error || "Não foi possível ativar o link da viagem.", tone: "error" })
+        window.setTimeout(() => setFeedback(null), 3500)
+        return
+      }
+
+      updateTrip(tripId, {
+        visibility: "public",
+        linkActivatedAt: result.data.linkActivatedAt,
+        linkAccessUntil: result.data.linkAccessUntil,
+        linkActivationTransactionId: result.data.transactionId,
+      })
+      setFeedback({ message: "Link da viagem ativado.", tone: "success" })
+      window.setTimeout(() => setFeedback(null), 2500)
+    } catch (error) {
+      console.error("[TRIP] explicit link activation error", error)
+      setFeedback({ message: "Não foi possível ativar o link da viagem.", tone: "error" })
+      window.setTimeout(() => setFeedback(null), 3500)
+    } finally {
+      setActivatingTripId(null)
+    }
+  }
+
+  const isTripLinkActive = (trip: { visibility: "private" | "public"; linkActivatedAt: string | null }) => {
+    return trip.visibility === "public" && Boolean(trip.linkActivatedAt)
+  }
+
+  const openShareLink = (link: string) => {
+    router.push(link.replace(/^https?:\/\/[^/]+/, ""))
+  }
+
+  const shareTripLink = (link: string, tripName: string, copyType: string) => {
+    if (typeof navigator.share === "function") {
+      void navigator.share({ title: tripName, url: link }).catch((error: unknown) => {
+        if (error instanceof DOMException && error.name === "AbortError") return
+        console.error("[TRIP] share link error", error)
+        setFeedback({ message: "Não foi possível compartilhar o link.", tone: "error" })
+        window.setTimeout(() => setFeedback(null), 2500)
+      })
       return
     }
-    copyLink(link, type)
+
+    void copyLink(link, copyType)
   }
 
   const formatDate = (dateStr: string) => {
@@ -120,6 +178,7 @@ export default function ViagemListPage() {
 
   const getStatusLabel = (status: string) => {
     switch (status) {
+      case "draft": return "Rascunho"
       case "upcoming": return "Próxima"
       case "ongoing": return "Em andamento"
       case "completed": return "Concluída"
@@ -129,6 +188,7 @@ export default function ViagemListPage() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
+      case "draft": return "bg-amber-500/20 text-amber-500"
       case "upcoming": return "bg-primary/20 text-primary"
       case "ongoing": return "bg-emerald-500/20 text-emerald-400"
       case "completed": return "bg-white/10 text-white/60"
@@ -196,8 +256,8 @@ export default function ViagemListPage() {
                     className="object-cover"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent md:bg-gradient-to-r" />
-                  <Badge className={`absolute top-3 left-3 ${getStatusColor(trip.status)} border-0`}>
-                    {getStatusLabel(trip.status)}
+                  <Badge className={`absolute top-3 left-3 ${isTripLinkActive(trip) ? "bg-emerald-500/20 text-emerald-400" : getStatusColor(trip.status)} border-0`}>
+                    {isTripLinkActive(trip) ? "Link ativo" : getStatusLabel(trip.status)}
                   </Badge>
                 </div>
 
@@ -238,7 +298,7 @@ export default function ViagemListPage() {
                       </div>
                       <div className="flex items-center gap-2">
                         <code className="text-xs truncate flex-1">{trip.adminLink}</code>
-                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => copyLink(trip.adminLink, `admin-${trip.id}`)}>
+                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => void copyLink(trip.adminLink, `admin-${trip.id}`)}>
                           {copiedLink === `admin-${trip.id}` ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
                         </Button>
                       </div>
@@ -251,7 +311,13 @@ export default function ViagemListPage() {
                       </div>
                       <div className="flex items-center gap-2">
                         <code className="text-xs truncate flex-1">{trip.shareLink}</code>
-                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => void copyShareLink(trip.id, trip.shareLink, `share-${trip.id}`)}>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6"
+                          onClick={() => void copyLink(trip.shareLink, `share-${trip.id}`)}
+                          disabled={!isTripLinkActive(trip)}
+                        >
                           {copiedLink === `share-${trip.id}` ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
                         </Button>
                       </div>
@@ -261,15 +327,28 @@ export default function ViagemListPage() {
                   <div className="flex gap-3">
                     <Button 
                       className="flex-1 bg-gradient-to-r from-[#5de0e6] to-[#004aad] text-white border-0"
-                      onClick={() => router.push(trip.shareLink.replace(/^https?:\/\/[^/]+/, ""))}
+                      onClick={() => {
+                        if (isTripLinkActive(trip)) {
+                          openShareLink(trip.shareLink)
+                          return
+                        }
+
+                        void activateForPublicAccess(trip.id)
+                      }}
+                      disabled={!isTripLinkActive(trip) && activatingTripId !== null}
                     >
-                      <ExternalLink size={16} className="mr-2" />
-                      Abrir link
+                      {isTripLinkActive(trip) ? <ExternalLink size={16} className="mr-2" /> : <Link2 size={16} className="mr-2" />}
+                      {isTripLinkActive(trip)
+                        ? "Abrir link"
+                        : activatingTripId === trip.id
+                          ? "Ativando..."
+                          : "Ativar link (1 Link)"}
                     </Button>
                     <Button 
                       variant="outline" 
                       className="border-border/50"
-                      onClick={() => void copyShareLink(trip.id, trip.shareLink, `share-${trip.id}`)}
+                      onClick={() => void copyLink(trip.shareLink, `share-${trip.id}`)}
+                      disabled={!isTripLinkActive(trip)}
                     >
                       <Copy size={16} className="mr-2" />
                       Copiar link
@@ -285,7 +364,11 @@ export default function ViagemListPage() {
                           <Plane size={14} className="mr-2" />
                           Definir como ativa
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => void copyShareLink(trip.id, trip.shareLink, `share-${trip.id}`)} className="cursor-pointer">
+                        <DropdownMenuItem
+                          onClick={() => shareTripLink(trip.shareLink, trip.name, `share-${trip.id}`)}
+                          disabled={!isTripLinkActive(trip)}
+                          className="cursor-pointer"
+                        >
                           <Share2 size={14} className="mr-2" />
                           Compartilhar
                         </DropdownMenuItem>

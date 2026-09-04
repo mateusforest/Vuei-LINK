@@ -54,6 +54,9 @@ export function mapTripRowToTrip(row: Database["public"]["Tables"]["trips"]["Row
       country: row.country,
     }),
     visibility: row.visibility,
+    linkActivatedAt: row.link_activated_at,
+    linkAccessUntil: row.link_access_until,
+    linkActivationTransactionId: row.link_activation_transaction_id,
     travelersCount: row.travelers_count,
     travelers: [],
     flights: [],
@@ -145,5 +148,8 @@ export function buildTripInsertPayload(
     claim_token_hash: options?.claimTokenHash ?? null,
     claim_token_expires_at: options?.claimTokenExpiresAt ?? null,
     claim_token_claimed_at: options?.claimTokenClaimedAt ?? null,
+    link_activated_at: null,
+    link_access_until: null,
+    link_activation_transaction_id: null,
   }
 }

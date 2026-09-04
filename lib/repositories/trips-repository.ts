@@ -1,4 +1,4 @@
-import type { Trip, TripOwnerType } from "@/types"
+import type { Trip, TripActivationResult, TripOwnerType } from "@/types"
 import { shouldUseSupabase } from "@/lib/data-source"
 import { ensureProfile } from "@/lib/auth/ensure-profile"
 import { normalizeLegacyAgencyTrips, normalizeLegacyTrips } from "@/lib/local-storage-migration"
@@ -8,14 +8,11 @@ import { buildUniqueTripSlug, extractTripsStoragePayload, mapStoredTripToTrip, s
 import { buildAdminTripUrl, buildPublicTripUrl, generateSecureToken } from "@/lib/security/link-tokens"
 import type { Database } from "@/lib/supabase/types"
 import { ensureTripTravelersPersistedWithClient } from "@/lib/repositories/trip-travelers-repository"
-import { getTravelerBillingStatus } from "@/lib/repositories/traveler-billing-repository"
 import { AGENCY_PLAN_LIMIT_ERROR } from "@/lib/billing/agency-plans"
 import { countActiveAgencyTripsForClient, getAgencyBillingStatusForClient } from "@/lib/billing/agency-billing"
 import { buildTripInsertPayload, mapTripRowToTrip, parseDestinationParts } from "@/lib/trips/trip-record"
 import {
   CREATE_TRIP_ERROR_MESSAGE,
-  FREE_PLAN_TRIP_LIMIT_ERROR_MESSAGE,
-  TRIP_LINK_REQUIRED_ERROR_MESSAGE,
 } from "@/lib/trips/trip-policies"
 import { isTripSlugConflict, listExistingTripSlugs } from "@/lib/trips/trip-slug"
 
@@ -45,11 +42,49 @@ function stripSensitiveTripTokens<T extends Trip | null>(trip: T): T {
     ...trip,
     adminToken: null,
     publicToken: null,
+    linkActivationTransactionId: null,
     adminLink: buildAdminTripUrl(trip.slug),
   } as T
 }
 
 const MAX_TRIP_SLUG_ATTEMPTS = 5
+const ACTIVATE_TRIP_ERROR_MESSAGE = "Nao foi possivel ativar o Link da Viagem."
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value)
+}
+
+function mapTripActivationResponse(value: unknown): TripActivationResult | null {
+  if (!isRecord(value)) return null
+
+  const status = value.status
+  const tripId = value.tripId
+  const transactionId = value.transactionId
+  const linkActivatedAt = value.linkActivatedAt
+  const linkAccessUntil = value.linkAccessUntil
+  const balance = value.balance
+
+  if (
+    (status !== "activated" && status !== "already_activated") ||
+    typeof tripId !== "string" ||
+    (transactionId !== null && typeof transactionId !== "string") ||
+    typeof linkActivatedAt !== "string" ||
+    (linkAccessUntil !== null && typeof linkAccessUntil !== "string") ||
+    typeof balance !== "number" ||
+    !Number.isFinite(balance)
+  ) {
+    return null
+  }
+
+  return {
+    status,
+    tripId,
+    transactionId,
+    linkActivatedAt,
+    linkAccessUntil,
+    balance,
+  }
+}
 
 async function createAuthenticatedTravelerTripWithBackend(payload: CreateTripPayload): Promise<RepositoryTripResult | null> {
   if (typeof window === "undefined") {
@@ -69,8 +104,8 @@ async function createAuthenticatedTravelerTripWithBackend(payload: CreateTripPay
       startDate: payload.startDate ?? null,
       endDate: payload.endDate ?? null,
       style: payload.style ?? null,
-      status: payload.status ?? "draft",
-      visibility: payload.visibility ?? "public",
+      status: "draft",
+      visibility: "private",
       travelersCount: payload.travelersCount ?? 1,
       creditsSummary: payload.creditsSummary ?? { balance: null, used: null, total: null },
       permissions: payload.permissions ?? {},
@@ -89,7 +124,7 @@ async function createAuthenticatedTravelerTripWithBackend(payload: CreateTripPay
       source: "supabase",
       config: createSupabaseBrowserClientPlaceholder(),
       data: null,
-      error: body?.error ?? (response.status === 409 ? TRIP_LINK_REQUIRED_ERROR_MESSAGE : CREATE_TRIP_ERROR_MESSAGE),
+      error: body?.error ?? CREATE_TRIP_ERROR_MESSAGE,
     }
   }
 
@@ -146,6 +181,9 @@ function writeLocalTrips(nextTrips: Trip[]) {
       adminToken: trip.adminToken,
       publicToken: trip.publicToken,
       visibility: trip.visibility,
+      linkActivatedAt: trip.linkActivatedAt,
+      linkAccessUntil: trip.linkAccessUntil,
+      linkActivationTransactionId: trip.linkActivationTransactionId,
       createdAt: trip.createdAt,
       updatedAt: trip.updatedAt,
     })),
@@ -234,6 +272,7 @@ function buildTrip(payload: CreateTripPayload, existingTrips: Trip[], slugOverri
     typeof payload.travelersCount === "number" && Number.isFinite(payload.travelersCount) && payload.travelersCount >= 1
       ? payload.travelersCount
       : 1
+  const ownerType = payload.ownerType ?? "traveler"
 
   return mapStoredTripToTrip({
     id: `trip-${Date.now()}`,
@@ -244,17 +283,20 @@ function buildTrip(payload: CreateTripPayload, existingTrips: Trip[], slugOverri
     startDate: payload.startDate ?? undefined,
     endDate: payload.endDate ?? undefined,
     style: payload.style ?? undefined,
-    ownerType: payload.ownerType ?? "traveler",
+    ownerType,
     ownerUserId: payload.ownerUserId ?? null,
     agencyId: payload.agencyId ?? null,
     clientId: payload.clientId ?? null,
     slug,
-    status: payload.status ?? "draft",
+    status: ownerType === "traveler" ? "draft" : payload.status ?? "draft",
     coverImage: payload.coverImage ?? undefined,
     travelersCount,
     adminToken: payload.adminToken ?? null,
     publicToken: payload.publicToken ?? null,
-    visibility: payload.visibility ?? "public",
+    visibility: ownerType === "traveler" ? "private" : payload.visibility ?? "public",
+    linkActivatedAt: null,
+    linkAccessUntil: null,
+    linkActivationTransactionId: null,
     adminLink: payload.adminLink,
     publicLink: payload.publicLink,
     createdAt: now,
@@ -501,44 +543,6 @@ export async function createTrip(payload: CreateTripPayload) {
         }
       }
 
-      if (payload.ownerType === "traveler" && payload.ownerUserId) {
-        const billingStatus = await getTravelerBillingStatus()
-        if (billingStatus.error) {
-          return {
-            source: "supabase" as const,
-            config: createSupabaseBrowserClientPlaceholder(),
-            data: null,
-            error: billingStatus.error,
-          }
-        }
-
-        const { count, error: activeTripsError } = await supabase
-          .from("trips")
-          .select("id", { count: "exact", head: true })
-          .eq("owner_user_id", payload.ownerUserId)
-          .eq("owner_type", "traveler")
-          .in("status", ["draft", "upcoming", "ongoing"])
-
-        if (activeTripsError) {
-          console.error("[TRIP] active trips check error", activeTripsError)
-          return {
-            source: "supabase" as const,
-            config: createSupabaseBrowserClientPlaceholder(),
-            data: null,
-            error: CREATE_TRIP_ERROR_MESSAGE,
-          }
-        }
-
-        if (billingStatus.data?.currentPlan !== "premium" && (count ?? 0) >= 1) {
-          return {
-            source: "supabase" as const,
-            config: createSupabaseBrowserClientPlaceholder(),
-            data: null,
-            error: FREE_PLAN_TRIP_LIMIT_ERROR_MESSAGE,
-          }
-        }
-      }
-
       const baseSlug = slugifyTripBase(payload.title, payload.destination)
       const knownSlugs = new Set(currentTrips.map((storedTrip) => storedTrip.slug).filter(Boolean))
 
@@ -750,8 +754,73 @@ export async function updateTrip(id: string, payload: Partial<Trip>) {
   return { source: "local" as const, data: updatedTrip }
 }
 
-export async function ensureTripIsPublic(id: string) {
-  return updateTrip(id, { visibility: "public" })
+export async function activateTravelerTrip(id: string) {
+  const config = createSupabaseBrowserClientPlaceholder()
+  const tripId = id.trim()
+
+  if (!tripId) {
+    return {
+      source: "supabase" as const,
+      config,
+      data: null as TripActivationResult | null,
+      error: "Identificador da viagem invalido.",
+      code: "invalid_trip_id",
+    }
+  }
+
+  if (typeof window === "undefined") {
+    return {
+      source: "supabase-placeholder" as const,
+      config,
+      data: null as TripActivationResult | null,
+      error: ACTIVATE_TRIP_ERROR_MESSAGE,
+      code: "activation_unavailable",
+    }
+  }
+
+  try {
+    const response = await fetch(`/api/trips/${encodeURIComponent(tripId)}/activate`, {
+      method: "POST",
+    })
+    const body = await response.json().catch(() => null) as unknown
+
+    if (!response.ok) {
+      return {
+        source: "supabase" as const,
+        config,
+        data: null as TripActivationResult | null,
+        error: isRecord(body) && typeof body.error === "string" ? body.error : ACTIVATE_TRIP_ERROR_MESSAGE,
+        code: isRecord(body) && typeof body.code === "string" ? body.code : "trip_activation_failed",
+      }
+    }
+
+    const activation = mapTripActivationResponse(body)
+    if (!activation) {
+      return {
+        source: "supabase" as const,
+        config,
+        data: null as TripActivationResult | null,
+        error: ACTIVATE_TRIP_ERROR_MESSAGE,
+        code: "invalid_activation_response",
+      }
+    }
+
+    return {
+      source: "supabase" as const,
+      config,
+      data: activation,
+      error: null as string | null,
+      code: null as string | null,
+    }
+  } catch (error) {
+    return {
+      source: "supabase" as const,
+      config,
+      data: null as TripActivationResult | null,
+      error: error instanceof Error && error.message ? error.message : ACTIVATE_TRIP_ERROR_MESSAGE,
+      code: "trip_activation_failed",
+    }
+  }
 }
 
 export async function deleteTrip(id: string) {

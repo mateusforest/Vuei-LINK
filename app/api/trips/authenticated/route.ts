@@ -6,7 +6,7 @@ import { ensureTripTravelersPersistedWithClient } from "@/lib/repositories/trip-
 import { buildAdminTripUrl, buildPublicTripUrl, generateSecureToken } from "@/lib/security/link-tokens"
 import { buildUniqueTripSlug, slugifyTripBase } from "@/lib/mappers/trip-mappers"
 import { mapTripRowToTrip, parseDestinationParts } from "@/lib/trips/trip-record"
-import { CREATE_TRIP_ERROR_MESSAGE, TRIP_LINK_REQUIRED_ERROR_MESSAGE } from "@/lib/trips/trip-policies"
+import { CREATE_TRIP_ERROR_MESSAGE } from "@/lib/trips/trip-policies"
 import { listExistingTripSlugs } from "@/lib/trips/trip-slug"
 import { createWalletService } from "@/lib/wallet"
 
@@ -38,14 +38,6 @@ function unauthorized(error: string) {
 
 function badRequest(error: string) {
   return NextResponse.json({ error }, { status: 400 })
-}
-
-function conflict(error: string, code: string) {
-  return NextResponse.json({ error, code }, { status: 409 })
-}
-
-function isWalletInsufficientBalanceError(message: string) {
-  return message.includes("Saldo insuficiente para consumo na wallet.")
 }
 
 function isTripSlugConflictMessage(message: string) {
@@ -91,7 +83,13 @@ export async function POST(request: Request) {
       : 1
 
   try {
-    await ensureProfile(user, serverClient)
+    const profile = await ensureProfile(user, serverClient)
+    if (!profile || profile.role !== "traveler") {
+      return NextResponse.json(
+        { error: "Esta rota esta disponivel apenas para viajantes." },
+        { status: 403 },
+      )
+    }
 
     const supabase = createSupabaseAdminClient()
     const walletService = createWalletService(supabase)
@@ -118,14 +116,14 @@ export async function POST(request: Request) {
           city: body.city ?? destinationParts.city,
           startDate: body.startDate ?? null,
           endDate: body.endDate ?? null,
-          status: body.status ?? "draft",
+          status: "draft",
           style: body.style ?? null,
           adminToken,
           publicToken,
           adminLink,
           publicLink,
           coverImage: null,
-          visibility: body.visibility ?? "public",
+          visibility: "private",
           travelersCount,
           permissions: body.permissions ?? {},
           creditsSummary: body.creditsSummary ?? {},
@@ -166,10 +164,6 @@ export async function POST(request: Request) {
     }
 
     const message = error instanceof Error ? error.message : CREATE_TRIP_ERROR_MESSAGE
-    if (isWalletInsufficientBalanceError(message)) {
-      return conflict(TRIP_LINK_REQUIRED_ERROR_MESSAGE, "wallet_insufficient_balance")
-    }
-
     console.error("[TRIP] authenticated route error", message)
     return NextResponse.json({ error: CREATE_TRIP_ERROR_MESSAGE }, { status: 500 })
   }

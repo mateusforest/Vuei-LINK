@@ -36,6 +36,8 @@ export function mapTripToPublicView(trip: Trip): TripPublicView {
     status: trip.status,
     coverImage: trip.coverImage,
     visibility: trip.visibility,
+    linkActivatedAt: trip.linkActivatedAt,
+    linkAccessUntil: trip.linkAccessUntil,
     travelers: trip.travelers.map((traveler) => ({
       id: traveler.id,
       name: traveler.name,

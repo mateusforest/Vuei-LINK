@@ -35,8 +35,6 @@ type PendingTripSnapshot = {
   publicLink: string
 }
 
-const BUY_LINKS_PLACEHOLDER_ROUTE = "/portal/creditos"
-
 const companionOptions = [
   { id: 1, label: "1 pessoa" },
   { id: 2, label: "2 pessoas" },
@@ -63,6 +61,7 @@ function toPendingBagItem(session: PendingTripClaimSession): PublicBagTripItem {
     travelersCount: null,
     url: session.shareLink,
     statusLabel: "Pendente",
+    isActivated: false,
     isPending: true,
   }
 }
@@ -70,7 +69,7 @@ function toPendingBagItem(session: PendingTripClaimSession): PublicBagTripItem {
 export function TripLanding() {
   const router = useRouter()
   const { user, initialized, loading } = useAuth()
-  const { trips, loadingTrips, syncTripFromBackend, credits } = useTrips()
+  const { trips, loadingTrips, syncTripFromBackend, setActiveTrip } = useTrips()
   const destinationStepRef = useRef<HTMLDivElement>(null)
   const datesStepRef = useRef<HTMLDivElement>(null)
   const travelersStepRef = useRef<HTMLDivElement>(null)
@@ -268,10 +267,6 @@ export function TripLanding() {
     router.push(`/login?redirect=${encodeURIComponent("/agencia")}`)
   }
 
-  function openBuyLinks() {
-    router.push(BUY_LINKS_PLACEHOLDER_ROUTE)
-  }
-
   async function handleCreate() {
     if (!canCreate || creating) return
 
@@ -358,6 +353,22 @@ export function TripLanding() {
     window.location.assign(buildSameOriginPath(url))
   }
 
+  function handleBagTripOpen(trip: PublicBagTripItem) {
+    setPopupOpen(false)
+    if (trip.isActivated) {
+      handleOpenTrip(trip.url)
+      return
+    }
+
+    if (user) {
+      setActiveTrip(trip.id)
+      router.push("/portal")
+      return
+    }
+
+    openTravelerSignup()
+  }
+
   async function executePendingClaim() {
     if (!pendingSession || claiming || !user) return
     setClaiming(true)
@@ -413,7 +424,6 @@ export function TripLanding() {
 
   const bagInteractionBlocked = popupOpen
   const finalLinkValue = createdTrip?.publicLink.replace(/^https?:\/\//, "") ?? ""
-  const walletBalanceLabel = String(credits.balance ?? 0)
 
   return (
     <main className="landing-shell relative flex h-[100dvh] w-full flex-col overflow-hidden overscroll-none text-foreground">
@@ -595,52 +605,19 @@ export function TripLanding() {
                   </span>
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <p className="text-lg font-semibold leading-tight text-foreground sm:text-[1.15rem]">Seu Link está pronto.</p>
-                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/12 px-2.5 py-1 text-[0.72rem] font-medium text-emerald-700">
+                      <p className="text-lg font-semibold leading-tight text-foreground sm:text-[1.15rem]">Seu rascunho está pronto.</p>
+                      <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/12 px-2.5 py-1 text-[0.72rem] font-medium text-amber-700">
                         <Check className="size-3.5" />
-                        Pronto para abrir
+                        Privado
                       </span>
                     </div>
-                    <p className="mt-1 text-sm leading-6 text-muted-foreground">Sua viagem já pode ser aberta e compartilhada.</p>
-                    <div className="mt-3 rounded-2xl border border-border/60 bg-background/72 px-3 py-2.5">
-                      <p className="truncate font-mono text-[0.78rem] text-brand/90 sm:text-[0.82rem]">{finalLinkValue}</p>
-                    </div>
+                    <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                      Guarde a viagem na sua Bolsa para editar e ativar o link quando quiser compartilhar.
+                    </p>
                   </div>
                 </div>
 
                 <div className="mt-4 flex flex-col gap-2.5">
-                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
-                    <Button
-                      size="lg"
-                      onClick={() => handleOpenTrip(createdTrip.publicLink)}
-                      className="h-11 w-full rounded-2xl bg-foreground px-5 text-[0.92rem] text-background shadow-[0_14px_40px_-16px_var(--brand)] ring-1 ring-inset ring-white/10 transition-transform duration-300 [transition-timing-function:var(--ease-out-soft)] hover:bg-foreground/90 active:scale-[0.98]"
-                    >
-                      <ExternalLink className="size-4" />
-                      Abrir viagem
-                    </Button>
-
-                    <div className="grid grid-cols-2 gap-2">
-                      <Button
-                        size="lg"
-                        variant="outline"
-                        onClick={handleShareLink}
-                        className="h-11 rounded-2xl border-border/70 bg-background/88 px-3 text-[0.88rem] text-foreground shadow-[0_10px_28px_-18px_rgba(20,60,120,0.28)]"
-                      >
-                        <Share2 className="size-4" />
-                        Compartilhar
-                      </Button>
-                      <Button
-                        size="lg"
-                        variant="outline"
-                        onClick={handleCopyLink}
-                        className="h-11 rounded-2xl border-border/70 bg-background/88 px-3 text-[0.88rem] text-foreground shadow-[0_10px_28px_-18px_rgba(20,60,120,0.28)]"
-                      >
-                        {copied ? <Check className="size-4 text-emerald-600" /> : <Copy className="size-4" />}
-                        {copied ? "Copiado" : "Copiar"}
-                      </Button>
-                    </div>
-                  </div>
-
                   {pendingSession ? (
                     user ? (
                       claimError ? (
@@ -892,15 +869,13 @@ export function TripLanding() {
         loading={Boolean(user) && loadingTrips}
         trips={bagTrips}
         highlightTripId={highlightTripId}
-        walletBalanceLabel={walletBalanceLabel}
         emptyStateMode={!user && bagTrips.length === 0 ? "guest-bag" : "default"}
         onClose={() => setPopupOpen(false)}
         onNewTrip={() => {
           setPopupOpen(false)
           openStart()
         }}
-        onOpenTrip={(url) => handleOpenTrip(url)}
-        onOpenWalletAction={openBuyLinks}
+        onOpenTrip={handleBagTripOpen}
         onEmptyPrimaryAction={openStart}
         onEmptySecondaryAction={handleIAlreadyHaveBag}
       />

@@ -24,7 +24,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
 import { useTrips } from "@/contexts/trips-context"
-import { ensureTripIsPublic } from "@/lib/repositories/trips-repository"
+import { activateTravelerTrip } from "@/lib/repositories/trips-repository"
 import { CreateTripButton } from "@/components/portal/create-trip-button"
 
 const fadeInUp = {
@@ -42,10 +42,11 @@ const staggerContainer = {
 }
 
 export default function CompartilharPage() {
-  const { activeTrip, trips } = useTrips()
+  const { activeTrip, trips, updateTrip } = useTrips()
   const [adminCopied, setAdminCopied] = useState(false)
   const [shareCopied, setShareCopied] = useState(false)
   const [shareFeedback, setShareFeedback] = useState("")
+  const [isActivating, setIsActivating] = useState(false)
   const [shareSettings, setShareSettings] = useState({
     roteiro: true,
     hospedagem: true,
@@ -54,27 +55,57 @@ export default function CompartilharPage() {
     concierge: false
   })
 
-  const copyToClipboard = (text: string, type: 'admin' | 'share') => {
-    navigator.clipboard.writeText(text)
-    if (type === 'admin') {
-      setAdminCopied(true)
-      setShareFeedback("Link da viagem copiado.")
-      setTimeout(() => setAdminCopied(false), 2000)
-    } else {
-      setShareCopied(true)
-      setShareFeedback("Link da viagem copiado.")
-      setTimeout(() => setShareCopied(false), 2000)
+  const copyToClipboard = async (text: string, type: 'admin' | 'share') => {
+    try {
+      if (!navigator.clipboard) {
+        throw new Error("Clipboard API unavailable")
+      }
+
+      await navigator.clipboard.writeText(text)
+      if (type === 'admin') {
+        setAdminCopied(true)
+        setShareFeedback("Link da viagem copiado.")
+        window.setTimeout(() => setAdminCopied(false), 2000)
+      } else {
+        setShareCopied(true)
+        setShareFeedback("Link da viagem copiado.")
+        window.setTimeout(() => setShareCopied(false), 2000)
+      }
+      return true
+    } catch (error) {
+      console.error("[TRIP] copy link error", error)
+      setShareFeedback("Não foi possível copiar o link.")
+      return false
     }
   }
 
-  const ensureActiveTripIsPublic = async () => {
-    const result = await ensureTripIsPublic(trip.id)
-    if (result.error) {
-      console.error("[TRIP] publish before share error", result.error)
-      setShareFeedback("Não foi possível publicar a viagem para compartilhamento.")
-      return false
+  const activateTripLink = async () => {
+    if (isActivating) return
+
+    setIsActivating(true)
+    setShareFeedback("")
+
+    try {
+      const result = await activateTravelerTrip(trip.id)
+      if (!result.data) {
+        console.error("[TRIP] explicit link activation error", result.error)
+        setShareFeedback(result.error || "Não foi possível ativar o link para compartilhamento.")
+        return
+      }
+
+      updateTrip(trip.id, {
+        visibility: "public",
+        linkActivatedAt: result.data.linkActivatedAt,
+        linkAccessUntil: result.data.linkAccessUntil,
+        linkActivationTransactionId: result.data.transactionId,
+      })
+      setShareFeedback("Link da viagem ativado.")
+    } catch (error) {
+      console.error("[TRIP] explicit link activation error", error)
+      setShareFeedback("Não foi possível ativar o link para compartilhamento.")
+    } finally {
+      setIsActivating(false)
     }
-    return true
   }
 
   // Se n?o tem viagem, mostra tela para criar
@@ -114,30 +145,29 @@ export default function CompartilharPage() {
 
   const trip = activeTrip || trips[0]
   const shareUrl = trip.shareLink
+  const linkIsActive = trip.visibility === "public" && Boolean(trip.linkActivatedAt)
 
   const handleShareAction = (channel: "qr" | "whatsapp" | "email") => {
-    void (async () => {
-      const isPublished = await ensureActiveTripIsPublic()
-      if (!isPublished) return
+    if (!linkIsActive) return
 
-      const encodedUrl = encodeURIComponent(shareUrl)
-      const encodedText = encodeURIComponent(`Acompanhe a viagem ${trip.name}: ${shareUrl}`)
+    const encodedText = encodeURIComponent(`Acompanhe a viagem ${trip.name}: ${shareUrl}`)
 
-      if (channel === "qr") {
-        copyToClipboard(trip.shareLink, "share")
-        setShareFeedback("Link copiado para gerar QR Code.")
-        return
-      }
+    if (channel === "qr") {
+      void (async () => {
+        const copied = await copyToClipboard(trip.shareLink, "share")
+        if (copied) setShareFeedback("Link copiado para gerar QR Code.")
+      })()
+      return
+    }
 
-      if (channel === "whatsapp") {
-        window.open(`https://wa.me/?text=${encodedText}`, "_blank", "noopener,noreferrer")
-        setShareFeedback("Compartilhamento via WhatsApp iniciado.")
-        return
-      }
+    if (channel === "whatsapp") {
+      window.open(`https://wa.me/?text=${encodedText}`, "_blank", "noopener,noreferrer")
+      setShareFeedback("Compartilhamento via WhatsApp iniciado.")
+      return
+    }
 
-      window.location.href = `mailto:?subject=${encodeURIComponent(`Viagem ${trip.name}`)}&body=${encodedText}`
-      setShareFeedback("Compartilhamento por e-mail iniciado.")
-    })()
+    window.location.href = `mailto:?subject=${encodeURIComponent(`Viagem ${trip.name}`)}&body=${encodedText}`
+    setShareFeedback("Compartilhamento por e-mail iniciado.")
   }
 
   return (
@@ -179,7 +209,7 @@ export default function CompartilharPage() {
             <Button 
               variant="ghost" 
               size="sm"
-              onClick={() => copyToClipboard(trip.adminLink, 'admin')}
+              onClick={() => void copyToClipboard(trip.adminLink, 'admin')}
               className="shrink-0"
             >
               {adminCopied ? (
@@ -202,8 +232,8 @@ export default function CompartilharPage() {
             <div className="flex-1">
               <div className="flex items-center gap-2 mb-1">
                 <h3 className="font-semibold">Link da Viagem</h3>
-                <Badge className="bg-primary/20 text-primary border-0 text-xs">
-                  Único
+                <Badge className={linkIsActive ? "bg-emerald-500/20 text-emerald-500 border-0 text-xs" : "bg-amber-500/20 text-amber-500 border-0 text-xs"}>
+                  {linkIsActive ? "Ativo" : "Rascunho"}
                 </Badge>
               </div>
               <p className="text-sm text-muted-foreground">
@@ -218,13 +248,8 @@ export default function CompartilharPage() {
             <Button 
               variant="ghost" 
               size="sm"
-              onClick={() => {
-                void (async () => {
-                  const isPublished = await ensureActiveTripIsPublic()
-                  if (!isPublished) return
-                  copyToClipboard(trip.shareLink, 'share')
-                })()
-              }}
+              onClick={() => void copyToClipboard(trip.shareLink, 'share')}
+              disabled={!linkIsActive}
               className="shrink-0"
             >
               {shareCopied ? (
@@ -235,17 +260,28 @@ export default function CompartilharPage() {
             </Button>
           </div>
 
+          {!linkIsActive && (
+            <Button
+              className="mb-4 w-full bg-gradient-to-r from-[#5de0e6] to-[#004aad] text-white border-0"
+              onClick={() => void activateTripLink()}
+              disabled={isActivating}
+            >
+              <Lock size={16} className="mr-2" />
+              {isActivating ? "Ativando..." : "Ativar link (1 Link)"}
+            </Button>
+          )}
+
           {/* Share Buttons */}
           <div className="flex flex-wrap gap-2">
-            <Button variant="outline" size="sm" className="rounded-xl border-border/50" onClick={() => handleShareAction("qr")}>
+            <Button variant="outline" size="sm" className="rounded-xl border-border/50" onClick={() => handleShareAction("qr")} disabled={!linkIsActive}>
               <QrCode size={16} className="mr-2" />
               QR Code
             </Button>
-            <Button variant="outline" size="sm" className="rounded-xl border-border/50" onClick={() => handleShareAction("whatsapp")}>
+            <Button variant="outline" size="sm" className="rounded-xl border-border/50" onClick={() => handleShareAction("whatsapp")} disabled={!linkIsActive}>
               <MessageCircle size={16} className="mr-2" />
               WhatsApp
             </Button>
-            <Button variant="outline" size="sm" className="rounded-xl border-border/50" onClick={() => handleShareAction("email")}>
+            <Button variant="outline" size="sm" className="rounded-xl border-border/50" onClick={() => handleShareAction("email")} disabled={!linkIsActive}>
               <Mail size={16} className="mr-2" />
               Email
             </Button>
@@ -265,8 +301,10 @@ export default function CompartilharPage() {
                 <Users size={18} className="text-secondary" />
               </div>
               <div>
-                <h3 className="font-semibold">Link ativo</h3>
-                <p className="text-sm text-muted-foreground">Pronto para compartilhar</p>
+                <h3 className="font-semibold">{linkIsActive ? "Link ativo" : "Link ainda privado"}</h3>
+                <p className="text-sm text-muted-foreground">
+                  {linkIsActive ? "Pronto para compartilhar" : "Ative o link acima para liberar o compartilhamento"}
+                </p>
               </div>
             </div>
             <ChevronRight size={20} className="text-muted-foreground" />
