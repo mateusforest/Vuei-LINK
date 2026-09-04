@@ -3,7 +3,7 @@ import { createSupabaseAdminClient, hasSupabaseAdminEnv, isMissingSupabaseAdminE
 import { createSupabaseServerClient } from "@/lib/supabase/server"
 import { verifyStoredQuickAccessPin } from "@/lib/auth/quick-access"
 import { resolveAuthenticatedTripAccess } from "@/lib/security/trip-authenticated-access"
-import { isTripPublicLinkActive } from "@/lib/security/trip-link-lifecycle"
+import { resolveTripLinkAccess, type TripLinkAccessErrorCode } from "@/lib/security/trip-link-access"
 import type { Database } from "@/lib/supabase/types"
 import type { ProfileQuickAccessSettings } from "@/types"
 
@@ -31,11 +31,16 @@ type TripLinkSnapshot = {
   endDate: string | null
   status: TripRow["status"]
   ownerType: TripRow["owner_type"]
+  ownerUserId: string | null
+  agencyId: string | null
+  clientId: string | null
   visibility: TripRow["visibility"]
   linkActivatedAt: string | null
   linkAccessUntil: string | null
   travelersCount: number
   coverImage: string | null
+  adminLink: string | null
+  publicLink: string | null
 }
 
 function getMissingAdminConfigResponse() {
@@ -73,91 +78,17 @@ function mapTripSnapshot(trip: TripRow): TripLinkSnapshot {
     endDate: trip.end_date,
     status: trip.status,
     ownerType: trip.owner_type,
+    ownerUserId: trip.owner_user_id,
+    agencyId: trip.agency_id,
+    clientId: trip.client_id,
     visibility: trip.visibility,
     linkActivatedAt: trip.link_activated_at,
     linkAccessUntil: trip.link_access_until,
     travelersCount: trip.travelers_count,
     coverImage: trip.cover_image,
+    adminLink: trip.admin_link,
+    publicLink: trip.public_link,
   }
-}
-
-async function findTripForPin(
-  supabase: ReturnType<typeof createSupabaseAdminClient>,
-  params: {
-    tripId?: string | null
-    tripSlug?: string | null
-    adminToken?: string | null
-    publicToken?: string | null
-    accessMode: "admin" | "public"
-  },
-) {
-  let query = supabase.from("trips").select("*")
-
-  if (params.accessMode === "admin") {
-    if (!params.adminToken && !params.tripId && !params.tripSlug) {
-      return { trip: null as TripRow | null, error: "Acesso administrativo invalido para esta viagem." }
-    }
-
-    if (params.tripId) {
-      query = query.eq("id", params.tripId)
-    } else if (params.tripSlug) {
-      query = query.eq("slug", params.tripSlug)
-    } else {
-      query = query.eq("admin_token", params.adminToken)
-    }
-  } else if (params.tripId) {
-    query = query.eq("id", params.tripId)
-  } else if (params.tripSlug) {
-    query = query.eq("slug", params.tripSlug)
-  } else if (params.publicToken) {
-    query = query.eq("public_token", params.publicToken)
-  } else {
-    return { trip: null as TripRow | null, error: "Link da viagem invalido." }
-  }
-
-  const { data, error } = await query.maybeSingle()
-  if (error) {
-    return { trip: null as TripRow | null, error: error.message }
-  }
-
-  const trip = data as TripRow | null
-  if (!trip) {
-    return { trip: null as TripRow | null, error: "Viagem nao encontrada." }
-  }
-
-  if (params.tripId && trip.id !== params.tripId) {
-    return { trip: null as TripRow | null, error: "Viagem nao encontrada." }
-  }
-
-  if (params.tripSlug && trip.slug !== params.tripSlug) {
-    return { trip: null as TripRow | null, error: "Viagem nao encontrada." }
-  }
-
-  if (params.accessMode === "admin") {
-    if (params.adminToken && trip.admin_token !== params.adminToken) {
-      return { trip: null as TripRow | null, error: "Acesso administrativo invalido para esta viagem." }
-    }
-
-    return { trip, error: null as string | null }
-  }
-
-  const tokenMatches = Boolean(params.publicToken && trip.public_token === params.publicToken)
-  const slugMatches = Boolean(params.tripSlug && trip.slug === params.tripSlug && trip.visibility === "public")
-
-  if (!isTripPublicLinkActive({
-    ownerType: trip.owner_type,
-    visibility: trip.visibility,
-    linkActivatedAt: trip.link_activated_at,
-    linkAccessUntil: trip.link_access_until,
-  })) {
-    return { trip: null as TripRow | null, error: "Esta viagem nao esta disponivel publicamente." }
-  }
-
-  if (!tokenMatches && !slugMatches) {
-    return { trip: null as TripRow | null, error: "Acesso publico invalido para esta viagem." }
-  }
-
-  return { trip, error: null as string | null }
 }
 
 async function resolveTripFromRequest(request: NextRequest, payload?: Record<string, unknown> | null) {
@@ -175,9 +106,13 @@ async function resolveTripFromRequest(request: NextRequest, payload?: Record<str
       ? "admin"
       : "public"
 
-  let accessResult: { trip: TripRow | null; error: string | null }
+  let accessResult: {
+    trip: TripRow | null
+    error: string | null
+    code: TripLinkAccessErrorCode | null
+  }
 
-  if (accessMode === "admin" && !adminToken && !tripId && !tripSlug) {
+  if (accessMode === "admin" && !adminToken && Boolean(tripId || tripSlug)) {
     const serverClient = await createSupabaseServerClient()
     const authResult = serverClient ? await serverClient.auth.getUser() : null
     const sessionUser = authResult?.data.user ?? null
@@ -186,6 +121,7 @@ async function resolveTripFromRequest(request: NextRequest, payload?: Record<str
       accessResult = {
         trip: null,
         error: "Acesso administrativo invalido para esta viagem.",
+        code: "trip_link_access_invalid",
       }
     } else {
       const authenticatedAccessResult = await resolveAuthenticatedTripAccess(serverClient, sessionUser.id, {
@@ -197,22 +133,25 @@ async function resolveTripFromRequest(request: NextRequest, payload?: Record<str
       accessResult = {
         trip: authenticatedAccessResult.trip,
         error: authenticatedAccessResult.error,
+        code: authenticatedAccessResult.trip ? null : "trip_link_access_invalid",
       }
     }
   } else {
-    accessResult = await findTripForPin(supabase, {
+    const linkAccessResult = await resolveTripLinkAccess(supabase, {
       tripId,
       tripSlug,
       adminToken,
       publicToken,
       accessMode,
     })
+    accessResult = linkAccessResult
   }
 
   return {
     supabase,
     trip: accessResult.trip,
     error: accessResult.error,
+    code: accessResult.code,
   }
 }
 
@@ -261,9 +200,9 @@ export async function GET(request: NextRequest) {
       return getMissingAdminConfigResponse()
     }
 
-    const { supabase, trip, error } = await resolveTripFromRequest(request)
+    const { supabase, trip, error, code } = await resolveTripFromRequest(request)
     if (error || !trip) {
-      return NextResponse.json({ error: error ?? "Acesso ao PIN da viagem invalido." }, { status: 403 })
+      return NextResponse.json({ error: error ?? "Acesso ao PIN da viagem invalido.", code }, { status: 403 })
     }
 
     const pinResolution = await resolveTripPinSettings(supabase, trip)
@@ -297,9 +236,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Informe um PIN de 4 digitos." }, { status: 400 })
     }
 
-    const { supabase, trip, error } = await resolveTripFromRequest(request, body)
+    const { supabase, trip, error, code } = await resolveTripFromRequest(request, body)
     if (error || !trip) {
-      return NextResponse.json({ error: error ?? "Acesso ao PIN da viagem invalido." }, { status: 403 })
+      return NextResponse.json({ error: error ?? "Acesso ao PIN da viagem invalido.", code }, { status: 403 })
     }
 
     const pinResolution = await resolveTripPinSettings(supabase, trip)

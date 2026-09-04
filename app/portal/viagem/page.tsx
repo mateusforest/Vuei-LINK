@@ -18,13 +18,19 @@ import {
   Shield,
   Link2,
   Check,
-  Plane
+  Plane,
+  Clock
 } from "lucide-react"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { useTrips } from "@/contexts/trips-context"
+import { useTrips, type Trip } from "@/contexts/trips-context"
 import { activateTravelerTrip } from "@/lib/repositories/trips-repository"
+import {
+  getTripLinkAccessDaysRemaining,
+  resolveTripLinkLifecycle,
+  type TripLinkLifecycleStatus,
+} from "@/lib/security/trip-link-lifecycle"
 import { resolveTripHeroImage } from "@/lib/trip-destination"
 import { ImageWithFallback } from "@/components/system/image-with-fallback"
 import { CreateTripButton } from "@/components/portal/create-trip-button"
@@ -143,8 +149,51 @@ export default function ViagemListPage() {
     }
   }
 
-  const isTripLinkActive = (trip: { visibility: "private" | "public"; linkActivatedAt: string | null }) => {
-    return trip.visibility === "public" && Boolean(trip.linkActivatedAt)
+  const getTripLinkLifecycle = (trip: Trip) => {
+    return resolveTripLinkLifecycle({
+      ownerType: "traveler",
+      visibility: trip.visibility,
+      status: trip.status,
+      endDate: trip.endDate,
+      linkActivatedAt: trip.linkActivatedAt,
+      linkAccessUntil: trip.linkAccessUntil,
+    })
+  }
+
+  const isTripLinkActive = (trip: Trip) => {
+    const lifecycle = getTripLinkLifecycle(trip)
+    return trip.visibility === "public" && (lifecycle === "active" || lifecycle === "post_trip")
+  }
+
+  const getLifecycleLabel = (lifecycle: TripLinkLifecycleStatus) => {
+    switch (lifecycle) {
+      case "active": return "Ativa"
+      case "post_trip": return "Pós-viagem"
+      case "ended": return "Encerrada"
+      default: return "Rascunho"
+    }
+  }
+
+  const getLifecycleColor = (lifecycle: TripLinkLifecycleStatus) => {
+    switch (lifecycle) {
+      case "active": return "bg-emerald-500/20 text-emerald-400"
+      case "post_trip": return "bg-sky-500/20 text-sky-400"
+      case "ended": return "bg-slate-500/20 text-slate-400"
+      default: return "bg-amber-500/20 text-amber-500"
+    }
+  }
+
+  const getLifecycleDetail = (trip: Trip) => {
+    const lifecycle = getTripLinkLifecycle(trip)
+    if (lifecycle === "active" && trip.linkAccessUntil) {
+      return `Ativa até ${new Date(trip.linkAccessUntil).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", timeZone: "America/Sao_Paulo" })}`
+    }
+    if (lifecycle === "post_trip") {
+      const days = getTripLinkAccessDaysRemaining(trip.linkAccessUntil)
+      return days <= 1 ? "Acesso encerra hoje" : `Acesso encerra em ${days} dias`
+    }
+    if (lifecycle === "ended") return "Acesso público encerrado"
+    return "Ative para publicar"
   }
 
   const openShareLink = (link: string) => {
@@ -190,16 +239,6 @@ export default function ViagemListPage() {
     }
   }
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "draft": return "bg-amber-500/20 text-amber-500"
-      case "upcoming": return "bg-primary/20 text-primary"
-      case "ongoing": return "bg-emerald-500/20 text-emerald-400"
-      case "completed": return "bg-white/10 text-white/60"
-      default: return "bg-white/10 text-white/60"
-    }
-  }
-
   return (
     <motion.div
       initial="initial"
@@ -241,7 +280,11 @@ export default function ViagemListPage() {
 
       {filteredTrips.length > 0 ? (
         <motion.div variants={fadeInUp} className="space-y-4">
-          {filteredTrips.map((trip) => (
+          {filteredTrips.map((trip) => {
+            const lifecycle = getTripLinkLifecycle(trip)
+            const linkActive = isTripLinkActive(trip)
+            const canRequestActivation = lifecycle !== "ended" && !linkActive
+            return (
             <Card 
               key={trip.id}
               className="overflow-hidden bg-card/50 border-border/50 hover:border-primary/30 transition-all"
@@ -260,8 +303,8 @@ export default function ViagemListPage() {
                     className="object-cover"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent md:bg-gradient-to-r" />
-                  <Badge className={`absolute top-3 left-3 ${isTripLinkActive(trip) ? "bg-emerald-500/20 text-emerald-400" : getStatusColor(trip.status)} border-0`}>
-                    {isTripLinkActive(trip) ? "Link ativo" : getStatusLabel(trip.status)}
+                  <Badge className={`absolute top-3 left-3 ${getLifecycleColor(lifecycle)} border-0`}>
+                    {getLifecycleLabel(lifecycle)}
                   </Badge>
                 </div>
 
@@ -290,6 +333,10 @@ export default function ViagemListPage() {
                     <span className="flex items-center gap-1">
                       <Users size={14} />
                       {trip.passengersCount} {trip.passengersCount === 1 ? "pessoa" : "pessoas"}
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <Clock size={14} />
+                      {getLifecycleDetail(trip)}
                     </span>
                   </div>
 
@@ -320,7 +367,7 @@ export default function ViagemListPage() {
                           size="icon"
                           className="h-6 w-6"
                           onClick={() => void copyLink(trip.shareLink, `share-${trip.id}`)}
-                          disabled={!isTripLinkActive(trip)}
+                          disabled={!linkActive}
                         >
                           {copiedLink === `share-${trip.id}` ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
                         </Button>
@@ -332,27 +379,33 @@ export default function ViagemListPage() {
                     <Button 
                       className="flex-1 bg-gradient-to-r from-[#5de0e6] to-[#004aad] text-white border-0"
                       onClick={() => {
-                        if (isTripLinkActive(trip)) {
+                        if (linkActive) {
                           openShareLink(trip.shareLink)
                           return
                         }
 
-                        void activateForPublicAccess(trip.id)
+                        if (canRequestActivation) {
+                          void activateForPublicAccess(trip.id)
+                        }
                       }}
-                      disabled={!isTripLinkActive(trip) && activatingTripId !== null}
+                      disabled={!linkActive && (!canRequestActivation || activatingTripId !== null)}
                     >
-                      {isTripLinkActive(trip) ? <ExternalLink size={16} className="mr-2" /> : <Link2 size={16} className="mr-2" />}
-                      {isTripLinkActive(trip)
+                      {linkActive ? <ExternalLink size={16} className="mr-2" /> : <Link2 size={16} className="mr-2" />}
+                      {linkActive
                         ? "Abrir link"
+                        : lifecycle === "ended"
+                          ? "Viagem encerrada"
                         : activatingTripId === trip.id
                           ? "Ativando..."
-                          : "Ativar link (1 Link)"}
+                          : trip.linkActivatedAt
+                            ? "Reabrir link"
+                            : "Ativar link (1 Link)"}
                     </Button>
                     <Button 
                       variant="outline" 
                       className="border-border/50"
                       onClick={() => void copyLink(trip.shareLink, `share-${trip.id}`)}
-                      disabled={!isTripLinkActive(trip)}
+                      disabled={!linkActive}
                     >
                       <Copy size={16} className="mr-2" />
                       Copiar link
@@ -370,7 +423,7 @@ export default function ViagemListPage() {
                         </DropdownMenuItem>
                         <DropdownMenuItem
                           onClick={() => shareTripLink(trip.shareLink, trip.name, `share-${trip.id}`)}
-                          disabled={!isTripLinkActive(trip)}
+                          disabled={!linkActive}
                           className="cursor-pointer"
                         >
                           <Share2 size={14} className="mr-2" />
@@ -387,7 +440,8 @@ export default function ViagemListPage() {
                 </div>
               </div>
             </Card>
-          ))}
+            )
+          })}
         </motion.div>
       ) : (
         <motion.div variants={fadeInUp}>

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createSupabaseAdminClient, hasSupabaseAdminEnv, isMissingSupabaseAdminEnvError } from "@/lib/supabase/admin"
 import { resolveTripLinkAccess as resolveTripLinkRequest } from "@/lib/security/trip-link-access"
+import { resolveAuthenticatedTripAccess } from "@/lib/security/trip-authenticated-access"
+import { createSupabaseServerClient } from "@/lib/supabase/server"
 import { resolveAgencyBrandLogo } from "@/lib/trip-destination"
 import type { Database } from "@/lib/supabase/types"
 
@@ -20,18 +22,21 @@ async function resolveTripByLinkAccess(params: {
   const supabase = createSupabaseAdminClient()
 
   if (params.accessMode === "admin" && !params.adminToken && (params.tripId || params.tripSlug)) {
-    let query = supabase.from("trips").select("*")
-
-    if (params.tripId) {
-      query = query.eq("id", params.tripId)
-    } else if (params.tripSlug) {
-      query = query.eq("slug", params.tripSlug)
+    const serverClient = await createSupabaseServerClient()
+    const authResult = serverClient ? await serverClient.auth.getUser() : null
+    const user = authResult?.data.user ?? null
+    if (!serverClient || !user) {
+      return { trip: null as TripRow | null, error: "Acesso administrativo inválido." }
     }
 
-    const { data, error } = await query.maybeSingle()
+    const authenticatedAccess = await resolveAuthenticatedTripAccess(serverClient, user.id, {
+      tripId: params.tripId,
+      tripSlug: params.tripSlug,
+      requireMutationRole: true,
+    })
     return {
-      trip: (data as TripRow | null) ?? null,
-      error: error?.message ?? null,
+      trip: authenticatedAccess.trip,
+      error: authenticatedAccess.error,
     }
   }
 

@@ -47,7 +47,7 @@ export interface Trip extends Pick<CanonicalTrip, "id" | "slug" | "destination" 
   style: string
   companions: string
   passengersCount: number
-  status: Extract<TripStatus, "draft" | "upcoming" | "ongoing" | "completed">
+  status: TripStatus
   coverImage: string
   adminLink: string
   shareLink: string
@@ -215,7 +215,13 @@ function mapCanonicalTripToLegacyTrip(trip: CanonicalTrip, companions = "sozinho
     style: trip.style || "",
     companions,
     passengersCount: trip.travelersCount,
-    status: trip.status === "draft" || trip.status === "ongoing" || trip.status === "completed" ? trip.status : "upcoming",
+    status:
+      trip.status === "draft"
+      || trip.status === "ongoing"
+      || trip.status === "completed"
+      || trip.status === "cancelled"
+        ? trip.status
+        : "upcoming",
     coverImage: resolveTripHeroImage({
       coverImage: trip.coverImage,
       destination: trip.destination,

@@ -79,6 +79,22 @@ function resolveActivationError(error: unknown): ActivationErrorDefinition {
     }
   }
 
+  if (message.includes("trip_activation_end_date_required")) {
+    return {
+      status: 409,
+      code: "trip_activation_end_date_required",
+      error: "Informe a data final da viagem antes de ativar o link.",
+    }
+  }
+
+  if (message.includes("trip_activation_period_ended")) {
+    return {
+      status: 409,
+      code: "trip_activation_period_ended",
+      error: "O período de acesso desta viagem já terminou e ela não pode ser ativada.",
+    }
+  }
+
   if (message.includes("trip_activation_idempotency_conflict")) {
     return {
       status: 409,

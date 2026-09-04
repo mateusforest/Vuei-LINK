@@ -27,7 +27,7 @@ import { getOfflineDocumentBlob, getOfflineImageBlob, loadTripOfflinePackage } f
 import { isOfflineModeActive } from "@/lib/offline/offline-mode"
 import { useAuth } from "@/contexts/auth-context"
 import { buildAdminTripUrl, buildPublicTripUrl, isAdminLinkMode } from "@/lib/security/link-tokens"
-import { isTripPublicLinkActive } from "@/lib/security/trip-link-lifecycle"
+import { resolveTripLinkLifecycle } from "@/lib/security/trip-link-lifecycle"
 import { resolveTravelerPlan, resolveTravelerPlanFromBillingStatus } from "@/lib/billing/traveler-plans"
 import {
   clearPendingTripClaimSession,
@@ -97,6 +97,7 @@ type PersistedTravelerPayload = {
 type TripPinApiAccessMode = "admin" | "public"
 
 type TripPinStatusPayload = {
+  code?: string | null
   pinConfigured: boolean
   pinScope: "traveler_portal" | "agency_trip" | null
   ownerType: "traveler" | "agency" | null
@@ -8498,6 +8499,7 @@ export default function TripPage() {
   const [canWrite, setCanWrite] = useState(false)
   const [isLoadingTrip, setIsLoadingTrip] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
+  const [loadErrorCode, setLoadErrorCode] = useState<string | null>(null)
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "info" } | null>(null)
   const [shareOpen, setShareOpen] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
@@ -8755,6 +8757,7 @@ export default function TripPage() {
         setIsLoadingTrip(true)
       }
       setLoadError(null)
+      setLoadErrorCode(null)
       devLog("trip.loading", routeSlug)
 
       const useSupabase = shouldUseSupabase()
@@ -8961,6 +8964,11 @@ export default function TripPage() {
               adminToken,
               publicToken,
             })
+          } else if (pinStatusResult.data?.code === "trip_link_ended") {
+            setLoadErrorCode("trip_link_ended")
+            setLoadError("Esta viagem foi encerrada")
+            setIsLoadingTrip(false)
+            return
           }
         }
 
@@ -9033,16 +9041,29 @@ export default function TripPage() {
             authenticatedAdminAccess,
           })
 
-          if (isPublicLinkRequest && !hasVerifiedPendingDraftAccess && !isTripPublicLinkActive({
-            ownerType: resolvedTrip.ownerType,
-            visibility: resolvedTrip.visibility,
-            linkActivatedAt: resolvedTrip.linkActivatedAt,
-            linkAccessUntil: resolvedTrip.linkAccessUntil,
-          })) {
-            console.error("[TRIP] erro ao carregar link", "Esta viagem não está publicada para acesso público.")
-            setLoadError("Esta viagem não está disponível publicamente.")
-            setIsLoadingTrip(false)
-            return
+          if (isPublicLinkRequest && !hasVerifiedPendingDraftAccess) {
+            const publicLifecycle = resolveTripLinkLifecycle({
+              ownerType: resolvedTrip.ownerType,
+              visibility: resolvedTrip.visibility,
+              status: resolvedTrip.status,
+              endDate: resolvedTrip.endDate,
+              linkActivatedAt: resolvedTrip.linkActivatedAt,
+              linkAccessUntil: resolvedTrip.linkAccessUntil,
+            })
+
+            if (publicLifecycle === "ended") {
+              setLoadErrorCode("trip_link_ended")
+              setLoadError("Esta viagem foi encerrada")
+              setIsLoadingTrip(false)
+              return
+            }
+
+            if (resolvedTrip.visibility !== "public" || (publicLifecycle !== "active" && publicLifecycle !== "post_trip")) {
+              console.error("[TRIP] erro ao carregar link", "Esta viagem não está publicada para acesso público.")
+              setLoadError("Esta viagem não está disponível publicamente.")
+              setIsLoadingTrip(false)
+              return
+            }
           }
 
           setAdminLinkMutationMode(Boolean(isAdminRoute && adminPinGranted && (resolvedTrip.adminToken ?? adminToken ?? null)))
@@ -10586,6 +10607,56 @@ export default function TripPage() {
   }
 
   if (loadError) {
+    if (loadErrorCode === "trip_link_ended") {
+      const isDarkTheme = tripLinkTheme === "dark"
+      return (
+        <main
+          className={cn(
+            "trip-link-page relative flex min-h-screen items-center justify-center overflow-hidden px-5 py-12 transition-colors duration-300",
+            isDarkTheme
+              ? "bg-[#080b10] text-white"
+              : "bg-[radial-gradient(circle_at_top,#ffffff_0%,#f7f3ec_52%,#eee8df_100%)] text-[#10213b]",
+          )}
+          data-theme={tripLinkTheme}
+        >
+          <TripLinkThemeStyles />
+          <div
+            aria-hidden="true"
+            className={cn(
+              "pointer-events-none absolute inset-x-[12%] top-[-15%] h-[52vh] rounded-full blur-3xl",
+              isDarkTheme ? "bg-[#d8a75d]/[0.07]" : "bg-white/80",
+            )}
+          />
+          <section
+            className={cn(
+              "relative w-full max-w-lg rounded-[36px] border px-7 py-10 text-center backdrop-blur-xl sm:px-11 sm:py-12",
+              isDarkTheme
+                ? "border-white/[0.12] bg-white/[0.055] shadow-[0_32px_90px_rgba(0,0,0,0.42)]"
+                : "border-white/90 bg-white/65 shadow-[0_30px_80px_rgba(89,75,55,0.14)]",
+            )}
+          >
+            <div
+              className={cn(
+                "mx-auto mb-7 flex h-16 w-16 items-center justify-center rounded-[22px] border",
+                isDarkTheme
+                  ? "border-[#e7bd7a]/35 bg-[#e7bd7a]/10 text-[#edc987]"
+                  : "border-[#1f67d7]/15 bg-white/75 text-[#1f67d7] shadow-[0_12px_35px_rgba(31,103,215,0.12)]",
+              )}
+            >
+              <Clock className="h-7 w-7" strokeWidth={1.7} />
+            </div>
+            <p className={cn("text-xs font-semibold uppercase tracking-[0.24em]", isDarkTheme ? "text-[#dcb66f]" : "text-[#1f67d7]")}>Link encerrado</p>
+            <h1 className="mt-4 font-serif text-3xl font-medium tracking-[-0.02em] sm:text-4xl">
+              Esta viagem foi encerrada
+            </h1>
+            <p className={cn("mx-auto mt-4 max-w-sm text-sm leading-7 sm:text-base", isDarkTheme ? "text-white/58" : "text-slate-600")}>
+              A viagem já terminou e o período de acesso ao link expirou.
+            </p>
+          </section>
+        </main>
+      )
+    }
+
     return (
       <main className={cn("min-h-screen flex items-center justify-center px-4", isTripLinkRoute ? "bg-[#f4f1ea] text-slate-900" : "bg-black text-white")}>
         <div className={cn("max-w-md rounded-3xl p-8 text-center", isTripLinkRoute ? "border border-slate-200 bg-white/92 shadow-[0_24px_60px_rgba(148,163,184,0.16)]" : "border border-white/[0.06] bg-white/[0.02]")}>

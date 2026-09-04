@@ -118,6 +118,8 @@ export type WalletActivateTravelerTripErrorCode =
   | "trip_activation_forbidden"
   | "trip_owner_type_invalid"
   | "trip_activation_status_invalid"
+  | "trip_activation_end_date_required"
+  | "trip_activation_period_ended"
   | "trip_activation_idempotency_conflict"
   | "trip_activation_transaction_invalid"
   | "wallet_inactive"

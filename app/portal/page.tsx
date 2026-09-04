@@ -24,6 +24,10 @@ import { ImageWithFallback } from "@/components/system/image-with-fallback"
 import { useAuth } from "@/contexts/auth-context"
 import { activateTravelerTrip } from "@/lib/repositories/trips-repository"
 import { CreateTripButton } from "@/components/portal/create-trip-button"
+import {
+  getTripLinkAccessDaysRemaining,
+  resolveTripLinkLifecycle,
+} from "@/lib/security/trip-link-lifecycle"
 
 const fadeInUp = {
   initial: { opacity: 0, y: 20 },
@@ -104,7 +108,40 @@ export default function PortalHomePage() {
   const [activatingTripId, setActivatingTripId] = useState<string | null>(null)
   const firstName = profile?.name?.trim().split(" ")[0]
 
-  const isLinkActive = (trip: Trip) => Boolean(trip.linkActivatedAt && trip.visibility === "public")
+  const getLinkLifecycle = (trip: Trip) => resolveTripLinkLifecycle({
+    ownerType: "traveler",
+    visibility: trip.visibility,
+    status: trip.status,
+    endDate: trip.endDate,
+    linkActivatedAt: trip.linkActivatedAt,
+    linkAccessUntil: trip.linkAccessUntil,
+  })
+
+  const isLinkActive = (trip: Trip) => {
+    const lifecycle = getLinkLifecycle(trip)
+    return trip.visibility === "public" && (lifecycle === "active" || lifecycle === "post_trip")
+  }
+
+  const getLinkLifecycleLabel = (trip: Trip) => {
+    const lifecycle = getLinkLifecycle(trip)
+    if (lifecycle === "active") return "Ativa"
+    if (lifecycle === "post_trip") return "Pós-viagem"
+    if (lifecycle === "ended") return "Encerrada"
+    return "Rascunho"
+  }
+
+  const getLinkAccessLabel = (trip: Trip) => {
+    const lifecycle = getLinkLifecycle(trip)
+    if (lifecycle === "active" && trip.linkAccessUntil) {
+      return `Ativa até ${new Date(trip.linkAccessUntil).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", timeZone: "America/Sao_Paulo" })}`
+    }
+    if (lifecycle === "post_trip") {
+      const days = getTripLinkAccessDaysRemaining(trip.linkAccessUntil)
+      return days <= 1 ? "Acesso encerra hoje" : `Acesso encerra em ${days} dias`
+    }
+    if (lifecycle === "ended") return "Acesso público encerrado"
+    return "Privada até a ativação"
+  }
 
   const copyLink = async (link: string, type: string) => {
     try {
@@ -149,6 +186,12 @@ export default function PortalHomePage() {
   const handlePrimaryTripAction = (trip: Trip) => {
     if (isLinkActive(trip)) {
       router.push(trip.shareLink.replace(/^https?:\/\/[^/]+/, ""))
+      return
+    }
+
+    if (getLinkLifecycle(trip) === "ended") {
+      setFeedback({ message: "O acesso público desta viagem já foi encerrado.", tone: "error" })
+      window.setTimeout(() => setFeedback(null), 3500)
       return
     }
 
@@ -217,7 +260,7 @@ export default function PortalHomePage() {
               <div className="mb-4 flex items-start justify-between gap-4">
                 <div>
                   <Badge variant="secondary" className="mb-2 border-0 bg-primary/20 text-primary">
-                    {isLinkActive(activeTrip) ? "Link ativo" : activeTrip.status === "draft" ? "Rascunho" : activeTrip.status === "upcoming" ? "Próxima viagem" : activeTrip.status === "ongoing" ? "Em andamento" : "Concluída"}
+                    {getLinkLifecycleLabel(activeTrip)}
                   </Badge>
                   <h2 className="text-xl font-bold">{activeTrip.name}</h2>
                   <p className="mt-1 flex items-center gap-1 text-muted-foreground">
@@ -249,7 +292,7 @@ export default function PortalHomePage() {
                       {activeTrip.linkActivatedAt ? "Link da Viagem" : "Rascunho privado"}
                     </p>
                   </div>
-                  <p className="truncate text-xs text-muted-foreground">{activeTrip.shareLink}</p>
+                  <p className="truncate text-xs text-muted-foreground">{getLinkAccessLabel(activeTrip)}</p>
                 </div>
               </div>
 
@@ -257,10 +300,10 @@ export default function PortalHomePage() {
                 <Button
                   className="border-0 bg-gradient-to-r from-[#5de0e6] to-[#004aad] text-white"
                   onClick={() => handlePrimaryTripAction(activeTrip)}
-                  disabled={activatingTripId === activeTrip.id}
+                  disabled={activatingTripId === activeTrip.id || getLinkLifecycle(activeTrip) === "ended"}
                 >
                   <ExternalLink size={16} className="mr-2" />
-                  {activatingTripId === activeTrip.id ? "Ativando..." : isLinkActive(activeTrip) ? "Abrir link" : "Ativar link (1 Link)"}
+                  {activatingTripId === activeTrip.id ? "Ativando..." : isLinkActive(activeTrip) ? "Abrir link" : getLinkLifecycle(activeTrip) === "ended" ? "Viagem encerrada" : activeTrip.linkActivatedAt ? "Reabrir link" : "Ativar link (1 Link)"}
                 </Button>
                 <Button
                   variant="outline"
@@ -333,15 +376,18 @@ export default function PortalHomePage() {
                     />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <h3 className="font-medium">{trip.name}</h3>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h3 className="font-medium">{trip.name}</h3>
+                      <Badge variant="secondary" className="border-0 text-[11px]">{getLinkLifecycleLabel(trip)}</Badge>
+                    </div>
                     <p className="mt-1 text-sm text-muted-foreground">{trip.destination}</p>
                     <p className="mt-1 text-xs text-muted-foreground">
-                      {formatDate(trip.startDate)} - {formatDate(trip.endDate)}
+                      {formatDate(trip.startDate)} - {formatDate(trip.endDate)} · {getLinkAccessLabel(trip)}
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    <Button variant="outline" className="border-border/50" onClick={() => handlePrimaryTripAction(trip)} disabled={activatingTripId === trip.id}>
-                      {activatingTripId === trip.id ? "Ativando..." : isLinkActive(trip) ? "Abrir link" : "Ativar link (1 Link)"}
+                    <Button variant="outline" className="border-border/50" onClick={() => handlePrimaryTripAction(trip)} disabled={activatingTripId === trip.id || getLinkLifecycle(trip) === "ended"}>
+                      {activatingTripId === trip.id ? "Ativando..." : isLinkActive(trip) ? "Abrir link" : getLinkLifecycle(trip) === "ended" ? "Encerrada" : trip.linkActivatedAt ? "Reabrir link" : "Ativar link (1 Link)"}
                     </Button>
                     <Button variant="outline" className="border-border/50" onClick={() => void copyLink(trip.shareLink, "admin")} disabled={!isLinkActive(trip)}>
                       Copiar link

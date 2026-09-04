@@ -27,6 +27,7 @@ import { Switch } from "@/components/ui/switch"
 import { useTrips } from "@/contexts/trips-context"
 import { activateTravelerTrip } from "@/lib/repositories/trips-repository"
 import { CreateTripButton } from "@/components/portal/create-trip-button"
+import { getTripLinkAccessDaysRemaining, resolveTripLinkLifecycle } from "@/lib/security/trip-link-lifecycle"
 
 const fadeInUp = {
   initial: { opacity: 0, y: 20 },
@@ -151,7 +152,32 @@ export default function CompartilharPage() {
 
   const trip = activeTrip || trips[0]
   const shareUrl = trip.shareLink
-  const linkIsActive = trip.visibility === "public" && Boolean(trip.linkActivatedAt)
+  const linkLifecycle = resolveTripLinkLifecycle({
+    ownerType: "traveler",
+    visibility: trip.visibility,
+    status: trip.status,
+    endDate: trip.endDate,
+    linkActivatedAt: trip.linkActivatedAt,
+    linkAccessUntil: trip.linkAccessUntil,
+  })
+  const linkIsActive = trip.visibility === "public" && (linkLifecycle === "active" || linkLifecycle === "post_trip")
+  const lifecycleLabel = linkLifecycle === "active"
+    ? "Ativa"
+    : linkLifecycle === "post_trip"
+      ? "Pós-viagem"
+      : linkLifecycle === "ended"
+        ? "Encerrada"
+        : "Rascunho"
+  const lifecycleDescription = linkLifecycle === "active" && trip.linkAccessUntil
+    ? `Ativa até ${new Date(trip.linkAccessUntil).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", timeZone: "America/Sao_Paulo" })}`
+    : linkLifecycle === "post_trip"
+      ? (() => {
+          const days = getTripLinkAccessDaysRemaining(trip.linkAccessUntil)
+          return days <= 1 ? "O acesso encerra hoje." : `O acesso encerra em ${days} dias.`
+        })()
+      : linkLifecycle === "ended"
+        ? "O período de acesso público terminou."
+        : "Ative o link para liberar o compartilhamento."
 
   const handleShareAction = (channel: "qr" | "whatsapp" | "email") => {
     if (!linkIsActive) return
@@ -238,12 +264,12 @@ export default function CompartilharPage() {
             <div className="flex-1">
               <div className="flex items-center gap-2 mb-1">
                 <h3 className="font-semibold">Link da Viagem</h3>
-                <Badge className={linkIsActive ? "bg-emerald-500/20 text-emerald-500 border-0 text-xs" : "bg-amber-500/20 text-amber-500 border-0 text-xs"}>
-                  {linkIsActive ? "Ativo" : "Rascunho"}
+                <Badge className={linkIsActive ? "bg-emerald-500/20 text-emerald-500 border-0 text-xs" : linkLifecycle === "ended" ? "bg-slate-500/20 text-slate-500 border-0 text-xs" : "bg-amber-500/20 text-amber-500 border-0 text-xs"}>
+                  {lifecycleLabel}
                 </Badge>
               </div>
               <p className="text-sm text-muted-foreground">
-                Compartilhe este único link para que outros acompanhem sua viagem.
+                {lifecycleDescription}
               </p>
             </div>
           </div>
@@ -266,14 +292,14 @@ export default function CompartilharPage() {
             </Button>
           </div>
 
-          {!linkIsActive && (
+          {!linkIsActive && linkLifecycle !== "ended" && (
             <Button
               className="mb-4 w-full bg-gradient-to-r from-[#5de0e6] to-[#004aad] text-white border-0"
               onClick={() => void activateTripLink()}
               disabled={isActivating}
             >
               <Lock size={16} className="mr-2" />
-              {isActivating ? "Ativando..." : "Ativar link (1 Link)"}
+              {isActivating ? "Ativando..." : trip.linkActivatedAt ? "Reabrir link" : "Ativar link (1 Link)"}
             </Button>
           )}
 
@@ -307,9 +333,9 @@ export default function CompartilharPage() {
                 <Users size={18} className="text-secondary" />
               </div>
               <div>
-                <h3 className="font-semibold">{linkIsActive ? "Link ativo" : "Link ainda privado"}</h3>
+                <h3 className="font-semibold">{linkIsActive ? "Link ativo" : linkLifecycle === "ended" ? "Viagem encerrada" : "Link ainda privado"}</h3>
                 <p className="text-sm text-muted-foreground">
-                  {linkIsActive ? "Pronto para compartilhar" : "Ative o link acima para liberar o compartilhamento"}
+                  {linkIsActive ? lifecycleDescription : linkLifecycle === "ended" ? "O link público não está mais disponível" : "Ative o link acima para liberar o compartilhamento"}
                 </p>
               </div>
             </div>
