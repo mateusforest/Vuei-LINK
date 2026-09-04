@@ -23,6 +23,42 @@ const PENDING_REQUEST_TOKEN_PATTERN = /^[a-f0-9]{64}$/
 
 type TripRow = Database["public"]["Tables"]["trips"]["Row"]
 
+function serializePendingTripError(error: unknown) {
+  const record = error && typeof error === "object"
+    ? error as Record<string, unknown>
+    : null
+
+  return {
+    name: error instanceof Error ? error.name : null,
+    message: typeof record?.message === "string"
+      ? record.message
+      : error instanceof Error
+        ? error.message
+        : typeof error === "string"
+          ? error
+          : "Unknown server error",
+    code: typeof record?.code === "string" ? record.code : null,
+    details: typeof record?.details === "string" ? record.details : null,
+    hint: typeof record?.hint === "string" ? record.hint : null,
+    status: typeof record?.status === "number" ? record.status : null,
+    stack: error instanceof Error ? error.stack ?? null : null,
+  }
+}
+
+function logPendingTripError(
+  operation: string,
+  error: unknown,
+  context: Record<string, unknown> = {},
+) {
+  const logPayload = JSON.stringify({
+    operation,
+    ...context,
+    error: serializePendingTripError(error),
+    callSite: new Error(`pending_trip_${operation}`).stack ?? null,
+  })
+  console.error(`[TRIP] pending operation failed ${logPayload}`)
+}
+
 function badRequest(error: string) {
   return NextResponse.json({ error }, { status: 400 })
 }
@@ -116,7 +152,7 @@ export async function POST(request: Request) {
         .maybeSingle()
 
       if (existingTripError) {
-        console.error("[TRIP] pending idempotency lookup error", existingTripError)
+        logPendingTripError("idempotency_lookup", existingTripError)
         return NextResponse.json({ error: CREATE_TRIP_ERROR_MESSAGE }, { status: 500 })
       }
 
@@ -209,14 +245,16 @@ export async function POST(request: Request) {
         })
 
         if (travelersResult.error) {
-          console.error("[TRIP] pending travelers placeholder error", travelersResult.error)
+          logPendingTripError("travelers_placeholder", travelersResult.error, {
+            tripId: insertedTrip.id,
+          })
         }
 
         return pendingTripResponse(insertedTrip, claimToken)
       }
 
       if (requestToken) {
-        const { data: retryTrip } = await supabase
+        const { data: retryTrip, error: retryTripError } = await supabase
           .from("trips")
           .select("*")
           .eq("claim_token_hash", claimTokenHash)
@@ -224,6 +262,12 @@ export async function POST(request: Request) {
           .is("owner_user_id", null)
           .is("claim_token_claimed_at", null)
           .maybeSingle()
+
+        if (retryTripError) {
+          logPendingTripError("idempotency_retry_lookup", retryTripError, {
+            attempt: attempt + 1,
+          })
+        }
 
         const retryTripRow = retryTrip as TripRow | null
         if (retryTripRow && !isPendingTripClaimExpired(retryTripRow.claim_token_expires_at)) {
@@ -238,7 +282,11 @@ export async function POST(request: Request) {
         continue
       }
 
-      console.error("[TRIP] pending insert error", error)
+      logPendingTripError("trip_insert", error, {
+        attempt: attempt + 1,
+        maxAttempts: MAX_TRIP_SLUG_ATTEMPTS,
+        idempotentRetry: Boolean(requestToken),
+      })
       return NextResponse.json({ error: CREATE_TRIP_ERROR_MESSAGE }, { status: 500 })
     }
 
@@ -248,8 +296,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Supabase admin indisponivel para criar a viagem." }, { status: 503 })
     }
 
-    const message = error instanceof Error ? error.message : CREATE_TRIP_ERROR_MESSAGE
-    console.error("[TRIP] pending route error", message)
+    logPendingTripError("route", error)
     return NextResponse.json({ error: CREATE_TRIP_ERROR_MESSAGE }, { status: 500 })
   }
 }
