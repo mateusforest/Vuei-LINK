@@ -15,6 +15,7 @@ import {
   CREATE_TRIP_ERROR_MESSAGE,
 } from "@/lib/trips/trip-policies"
 import { isTripSlugConflict, listExistingTripSlugs } from "@/lib/trips/trip-slug"
+import { TRAVELER_TRIP_LINK_BALANCE_CHANGED_EVENT } from "@/lib/repositories/traveler-trip-link-repository"
 
 export interface ListTripsParams {
   ownerType?: TripOwnerType
@@ -803,6 +804,10 @@ export async function activateTravelerTrip(id: string) {
         error: ACTIVATE_TRIP_ERROR_MESSAGE,
         code: "invalid_activation_response",
       }
+    }
+
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new Event(TRAVELER_TRIP_LINK_BALANCE_CHANGED_EVENT))
     }
 
     return {

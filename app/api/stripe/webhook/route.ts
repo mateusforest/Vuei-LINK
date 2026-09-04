@@ -22,6 +22,13 @@ import {
   updateAgencyStripeCustomerId,
   updateAgencySubscriptionFromStripe,
 } from "@/lib/billing/agency-billing"
+import {
+  TRAVELER_TRIP_LINK_BILLING_SCOPE,
+  TRAVELER_TRIP_LINK_CHECKOUT_TYPE,
+  resolveTravelerTripLinkFulfillment,
+} from "@/lib/billing/traveler-trip-link-catalog"
+import { getTravelerTripLinkPriceMap } from "@/lib/billing/traveler-trip-link-products"
+import { createWalletService } from "@/lib/wallet"
 
 export const runtime = "nodejs"
 
@@ -72,6 +79,11 @@ function resolveAgencyPlanFromPriceId(priceId: string | null | undefined) {
 function getMetadataValue(metadata: Record<string, string> | null | undefined, key: string) {
   const value = metadata?.[key]
   return typeof value === "string" && value.length > 0 ? value : null
+}
+
+function getStripeExpandableId(value: string | { id: string } | null | undefined) {
+  if (typeof value === "string") return value
+  return value && typeof value.id === "string" ? value.id : null
 }
 
 function getStripeSubscriptionPeriod(subscription: Stripe.Subscription) {
@@ -271,6 +283,82 @@ async function handleTravelerCreditPackageCheckoutCompleted(session: Stripe.Chec
   } as any)
 
   return insertResult.error?.message ?? null
+}
+
+async function handleTravelerTripLinkCheckoutPaid(session: Stripe.Checkout.Session) {
+  const metadataUserId = getMetadataValue(session.metadata, "user_id")
+  const userId = session.client_reference_id
+  const metadataProductCode = getMetadataValue(session.metadata, "product_code")
+  const customerId = getStripeExpandableId(session.customer)
+
+  if (!userId || !metadataUserId || userId !== metadataUserId || !customerId) {
+    return "Identidade incompleta ou divergente na compra de viagens traveler."
+  }
+
+  const stripe = getStripeClient()
+  const lineItems = await stripe.checkout.sessions.listLineItems(session.id, { limit: 2 })
+  const lineItem = lineItems.data[0]
+  const priceId = lineItem?.price?.id ?? null
+  const fulfillment = resolveTravelerTripLinkFulfillment({
+    paymentStatus: session.payment_status,
+    lineItemCount: lineItems.data.length,
+    lineItemQuantity: lineItem?.quantity,
+    priceId,
+    metadataProductCode,
+  }, getTravelerTripLinkPriceMap())
+
+  if (fulfillment.status === "not_paid") return null
+  if (fulfillment.status === "invalid") {
+    logUnknownStripePriceId({
+      eventType: "checkout.session.trip_link",
+      billingScope: "traveler",
+      priceId,
+      customerId,
+    })
+    return fulfillment.reason
+  }
+  const { product } = fulfillment
+
+  const adminClient = createSupabaseAdminClient()
+  const customerOwner = await findTravelerSubscriptionByCustomerId(adminClient, customerId)
+  if (customerOwner.error) return customerOwner.error
+  if (!customerOwner.data || customerOwner.data.user_id !== userId) {
+    return "O Customer Stripe nao pertence ao traveler informado na compra de viagens."
+  }
+
+  const walletService = createWalletService(adminClient)
+  const walletProduct = await walletService.getProductByCode(product.code)
+  if (
+    !walletProduct?.active ||
+    walletProduct.assetType !== "trip_link" ||
+    walletProduct.quantity !== product.quantity
+  ) {
+    return "Produto de viagens ausente ou divergente na wallet."
+  }
+
+  const wallet = await walletService.getOrCreateWallet({ ownerType: "traveler", ownerUserId: userId })
+  await walletService.grantPurchase({
+    walletId: wallet.id,
+    assetType: "trip_link",
+    quantity: product.quantity,
+    walletProductId: walletProduct.id,
+    stripeCheckoutSessionId: session.id,
+    stripePaymentIntentId: getStripeExpandableId(session.payment_intent),
+    createdBy: userId,
+    reason: `Compra do pacote ${product.name}`,
+    source: "stripe_checkout",
+    idempotencyKey: `traveler-trip-link-purchase:${session.id}`,
+    metadata: {
+      billing_scope: TRAVELER_TRIP_LINK_BILLING_SCOPE,
+      checkout_type: TRAVELER_TRIP_LINK_CHECKOUT_TYPE,
+      product_code: product.code,
+      quantity: product.quantity,
+      stripe_price_id: priceId,
+      non_expiring: true,
+    },
+  })
+
+  return null
 }
 
 async function handleAgencyCreditPackageCheckoutCompleted(session: Stripe.Checkout.Session) {
@@ -519,7 +607,12 @@ export async function POST(request: Request) {
           const checkoutType = getMetadataValue(session.metadata, "checkout_type")
           const billingScope = getMetadataValue(session.metadata, "billing_scope")
 
-          if (checkoutType === "credit_package" && billingScope === "agency") {
+          if (
+            checkoutType === TRAVELER_TRIP_LINK_CHECKOUT_TYPE &&
+            billingScope === TRAVELER_TRIP_LINK_BILLING_SCOPE
+          ) {
+            processingError = await handleTravelerTripLinkCheckoutPaid(session)
+          } else if (checkoutType === "credit_package" && billingScope === "agency") {
             processingError = await handleAgencyCreditPackageCheckoutCompleted(session)
           } else if (checkoutType === "credit_package") {
             processingError = await handleTravelerCreditPackageCheckoutCompleted(session)
@@ -529,6 +622,24 @@ export async function POST(request: Request) {
             processingError = await handleSubscriptionCheckoutCompleted(session, "traveler")
           }
         }
+        break
+
+      case "checkout.session.async_payment_succeeded":
+        {
+          const session = event.data.object as Stripe.Checkout.Session
+          const checkoutType = getMetadataValue(session.metadata, "checkout_type")
+          const billingScope = getMetadataValue(session.metadata, "billing_scope")
+
+          if (
+            checkoutType === TRAVELER_TRIP_LINK_CHECKOUT_TYPE &&
+            billingScope === TRAVELER_TRIP_LINK_BILLING_SCOPE
+          ) {
+            processingError = await handleTravelerTripLinkCheckoutPaid(session)
+          }
+        }
+        break
+
+      case "checkout.session.async_payment_failed":
         break
 
       case "customer.subscription.created":

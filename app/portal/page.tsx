@@ -123,6 +123,11 @@ export default function PortalHomePage() {
     setActivatingTripId(trip.id)
     const result = await activateTravelerTrip(trip.id)
     if (!result.data) {
+      if (result.code === "wallet_insufficient_balance") {
+        router.push(`/portal/viagens/comprar?reason=insufficient_balance&trip_id=${encodeURIComponent(trip.id)}`)
+        setActivatingTripId(null)
+        return
+      }
       console.error("[TRIP] activation before public access error", result.error)
       setFeedback({ message: result.error || "Nao foi possivel ativar o link da viagem.", tone: "error" })
       window.setTimeout(() => setFeedback(null), 3500)

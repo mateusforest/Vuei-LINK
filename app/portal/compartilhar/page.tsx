@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { motion } from "framer-motion"
 import { 
   Share2, 
@@ -42,6 +43,7 @@ const staggerContainer = {
 }
 
 export default function CompartilharPage() {
+  const router = useRouter()
   const { activeTrip, trips, updateTrip } = useTrips()
   const [adminCopied, setAdminCopied] = useState(false)
   const [shareCopied, setShareCopied] = useState(false)
@@ -88,6 +90,10 @@ export default function CompartilharPage() {
     try {
       const result = await activateTravelerTrip(trip.id)
       if (!result.data) {
+        if (result.code === "wallet_insufficient_balance") {
+          router.push(`/portal/viagens/comprar?reason=insufficient_balance&trip_id=${encodeURIComponent(trip.id)}`)
+          return
+        }
         console.error("[TRIP] explicit link activation error", result.error)
         setShareFeedback(result.error || "Não foi possível ativar o link para compartilhamento.")
         return

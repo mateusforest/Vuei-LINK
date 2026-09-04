@@ -19,6 +19,7 @@ import {
   ChevronRight,
   User,
   LogOut,
+  Luggage,
 } from "lucide-react"
 import { useIsMobile } from "@/components/ui/use-mobile"
 import { cn } from "@/lib/utils"
@@ -35,6 +36,10 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { QuickGuideModal } from "@/components/onboarding/quick-guide-modal"
+import {
+  getTravelerTripLinkStoreSummary,
+  TRAVELER_TRIP_LINK_BALANCE_CHANGED_EVENT,
+} from "@/lib/repositories/traveler-trip-link-repository"
 
 const TRAVELER_QUICK_GUIDE_STORAGE_KEY = "vuei_traveler_quick_guide_seen_v1"
 
@@ -65,6 +70,7 @@ function PortalLayoutInner({ children }: { children: React.ReactNode }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [mobileHeaderOffset, setMobileHeaderOffset] = useState(132)
   const [quickGuideOpen, setQuickGuideOpen] = useState(false)
+  const [tripLinkBalance, setTripLinkBalance] = useState<number | null>(null)
   const mobileHeaderRef = useRef<HTMLElement | null>(null)
   const { credits, subscription, trips, loadingTrips } = useTrips()
   const { profile, signOut } = useAuth()
@@ -80,6 +86,7 @@ function PortalLayoutInner({ children }: { children: React.ReactNode }) {
 
   const accountMenuItems = [
     { label: "Minha conta", href: "/portal/configuracoes", icon: User },
+    { label: "Comprar viagens", href: "/portal/viagens/comprar", icon: Luggage },
     { label: "Créditos", href: "/portal/creditos", icon: Coins },
     { label: "Configurações", href: "/portal/configuracoes", icon: Settings },
     { label: "Offline", href: "/portal/offline", icon: WifiOff },
@@ -132,6 +139,22 @@ function PortalLayoutInner({ children }: { children: React.ReactNode }) {
     window.localStorage.setItem(TRAVELER_QUICK_GUIDE_STORAGE_KEY, "1")
     setQuickGuideOpen(true)
   }, [loadingTrips, trips.length])
+
+  useEffect(() => {
+    let mounted = true
+
+    const loadTripLinkBalance = async () => {
+      const result = await getTravelerTripLinkStoreSummary()
+      if (mounted && result.data) setTripLinkBalance(result.data.balance)
+    }
+
+    void loadTripLinkBalance()
+    window.addEventListener(TRAVELER_TRIP_LINK_BALANCE_CHANGED_EVENT, loadTripLinkBalance)
+    return () => {
+      mounted = false
+      window.removeEventListener(TRAVELER_TRIP_LINK_BALANCE_CHANGED_EVENT, loadTripLinkBalance)
+    }
+  }, [])
 
   return (
     <div className="portal-shell min-h-screen bg-background text-foreground">
@@ -207,7 +230,7 @@ function PortalLayoutInner({ children }: { children: React.ReactNode }) {
               </div>
             </nav>
 
-            <div className="px-4 pb-4">
+            <div className="space-y-3 px-4 pb-4">
               <div className={cn("rounded-2xl border border-border/60 bg-white/90 p-4 shadow-sm", sidebarCollapsed && "px-2 py-3")}>
                 <div className={cn("flex items-start gap-3", sidebarCollapsed && "flex-col items-center gap-2 text-center")}>
                   <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-[#37beff]/18 to-[#0b56d8]/14 text-[#0b56d8]">
@@ -245,6 +268,29 @@ function PortalLayoutInner({ children }: { children: React.ReactNode }) {
                   aria-label={travelerCreditsActionLabel}
                 >
                   {sidebarCollapsed ? <ChevronRight size={16} /> : travelerCreditsActionLabel}
+                </Link>
+              </div>
+              <div className={cn("rounded-2xl border border-[#0b56d8]/12 bg-white/90 p-4 shadow-sm", sidebarCollapsed && "px-2 py-3")}>
+                <div className={cn("flex items-center gap-3", sidebarCollapsed && "justify-center")}>
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-[#37beff]/18 to-[#0b56d8]/14 text-[#0b56d8]">
+                    <Luggage size={18} />
+                  </div>
+                  {!sidebarCollapsed ? (
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">Viagens disponíveis</p>
+                      <p className="mt-1 text-2xl font-semibold leading-none text-foreground">{tripLinkBalance ?? "—"}</p>
+                    </div>
+                  ) : null}
+                </div>
+                <Link
+                  href="/portal/viagens/comprar"
+                  className={cn(
+                    "mt-4 flex w-full items-center justify-center rounded-xl border border-[#0b56d8]/15 bg-[#0b56d8]/5 px-3 py-2 text-sm font-medium text-[#0b56d8] transition-colors hover:bg-[#0b56d8]/10",
+                    sidebarCollapsed && "px-2",
+                  )}
+                  aria-label="Comprar viagens"
+                >
+                  {sidebarCollapsed ? <ChevronRight size={16} /> : "Comprar viagens"}
                 </Link>
               </div>
             </div>
@@ -351,10 +397,19 @@ function PortalLayoutInner({ children }: { children: React.ReactNode }) {
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
-            <div className="mt-3 flex items-center gap-2">
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <Link
+                href="/portal/viagens/comprar"
+                className="flex min-w-0 items-center gap-2 rounded-full border border-border/60 bg-white/85 px-3 py-2 text-slate-900 transition-colors hover:bg-white"
+              >
+                <Luggage size={14} className="shrink-0 text-primary" />
+                <span className="truncate text-xs font-medium">
+                  {tripLinkBalance ?? "—"} {tripLinkBalance === 1 ? "viagem" : "viagens"}
+                </span>
+              </Link>
               <Link
                 href="/portal/creditos"
-                className="flex min-w-0 flex-1 items-center gap-2 rounded-full border border-border/60 bg-white/85 px-3 py-2 text-slate-900 transition-colors hover:bg-white"
+                className="flex min-w-0 items-center gap-2 rounded-full border border-border/60 bg-white/85 px-3 py-2 text-slate-900 transition-colors hover:bg-white"
               >
                 <Coins size={14} className="text-primary" />
                 <span className="truncate text-xs font-medium">{credits.balance} créditos</span>

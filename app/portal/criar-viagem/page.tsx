@@ -293,6 +293,11 @@ export default function CriarViagemPage() {
 
     const result = await activateTravelerTrip(createdTrip.id)
     if (!result.data) {
+      if (result.code === "wallet_insufficient_balance") {
+        router.push(`/portal/viagens/comprar?reason=insufficient_balance&trip_id=${encodeURIComponent(createdTrip.id)}`)
+        setIsActivating(false)
+        return
+      }
       setActivationError(result.error || "Nao foi possivel ativar o Link da Viagem.")
       setIsActivating(false)
       return
