@@ -5,7 +5,7 @@ import { createSupabaseAdminClient, hasSupabaseAdminEnv } from "@/lib/supabase/a
 import { buildAbsoluteAppUrl } from "@/lib/app-url"
 import { getStripeClient, getStripePriceIdForTravelerVueiPlus } from "@/lib/billing/stripe"
 import { getTravelerMembershipStatus } from "@/lib/billing/traveler-billing"
-import { TRAVELER_VUEI_PLUS_BILLING_SCOPE } from "@/lib/billing/traveler-membership"
+import { TRAVELER_VUEI_PLUS_BILLING_SCOPE, TRAVELER_VUEI_PLUS_OFFER } from "@/lib/billing/traveler-membership"
 import { ensureTravelerStripeCustomer } from "@/lib/billing/traveler-stripe"
 import { ensureProfile } from "@/lib/auth/ensure-profile"
 
@@ -56,11 +56,24 @@ export async function POST() {
     }
 
     const stripe = getStripeClient()
+    const priceId = getStripePriceIdForTravelerVueiPlus()
+    const price = await stripe.prices.retrieve(priceId)
+    if (
+      !price.active ||
+      price.type !== "recurring" ||
+      price.recurring?.interval !== "month" ||
+      price.recurring.interval_count !== 1 ||
+      price.unit_amount !== TRAVELER_VUEI_PLUS_OFFER.unitAmount ||
+      price.currency.toLowerCase() !== TRAVELER_VUEI_PLUS_OFFER.currency
+    ) {
+      return NextResponse.json({ error: "O preco do Vuei+ nao corresponde a oferta atual." }, { status: 503 })
+    }
+
     const session = await stripe.checkout.sessions.create({
       mode: "subscription",
       customer: customerResult.customerId,
       client_reference_id: user.id,
-      line_items: [{ price: getStripePriceIdForTravelerVueiPlus(), quantity: 1 }],
+      line_items: [{ price: priceId, quantity: 1 }],
       success_url: buildAbsoluteAppUrl("/portal/planos?checkout=vuei-plus-success"),
       cancel_url: buildAbsoluteAppUrl("/portal/planos?checkout=vuei-plus-canceled"),
       metadata: {

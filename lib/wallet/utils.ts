@@ -18,6 +18,7 @@ export const SUPPORTED_WALLET_TRANSACTION_TYPES: WalletTransactionType[] = [
   "refund",
   "adjustment",
   "migration_grant",
+  "expiration",
 ]
 
 export function isWalletAssetType(value: string | null | undefined): value is WalletAssetType {

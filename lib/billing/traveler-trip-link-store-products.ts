@@ -6,23 +6,40 @@ import {
   getTravelerTripLinkProduct,
 } from "@/lib/billing/traveler-trip-link-catalog"
 import {
-  formatStripePrice,
   getTravelerTripLinkPriceMap,
 } from "@/lib/billing/traveler-trip-link-products"
 import { createSupabaseAdminClient } from "@/lib/supabase/admin"
 import { createWalletService } from "@/lib/wallet"
 import type { TravelerTripLinkStoreProduct } from "@/types"
 
-export function getTravelerTripLinkProductPlaceholders(): TravelerTripLinkStoreProduct[] {
-  return TRAVELER_TRIP_LINK_PRODUCTS.map((definition) => ({
+function formatCatalogPrice(unitAmount: number, currency: string) {
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: currency.toUpperCase(),
+  }).format(unitAmount / 100)
+}
+
+function buildStoreProduct(
+  definition: (typeof TRAVELER_TRIP_LINK_PRODUCTS)[number],
+  configured: boolean,
+): TravelerTripLinkStoreProduct {
+  return {
     code: definition.code,
     name: definition.name,
     quantity: definition.quantity,
-    configured: false,
-    priceLabel: null,
-    unitAmount: null,
-    currency: null,
-  }))
+    configured,
+    priceLabel: formatCatalogPrice(definition.unitAmount, definition.currency),
+    unitAmount: definition.unitAmount,
+    currency: definition.currency,
+    validityLabel: definition.validityLabel,
+    validityShortLabel: definition.validityShortLabel,
+    description: definition.description,
+    featured: definition.featured,
+  }
+}
+
+export function getTravelerTripLinkProductPlaceholders(): TravelerTripLinkStoreProduct[] {
+  return TRAVELER_TRIP_LINK_PRODUCTS.map((definition) => buildStoreProduct(definition, false))
 }
 
 export async function listTravelerTripLinkStoreProducts(): Promise<TravelerTripLinkStoreProduct[]> {
@@ -53,39 +70,18 @@ export async function listTravelerTripLinkStoreProducts(): Promise<TravelerTripL
     )
 
     if (!priceId || !isDatabaseProductValid || !stripe) {
-      return {
-        code: definition.code,
-        name: definition.name,
-        quantity: definition.quantity,
-        configured: false,
-        priceLabel: null,
-        unitAmount: null,
-        currency: null,
-      }
+      return buildStoreProduct(definition, false)
     }
 
     try {
       const price = await stripe.prices.retrieve(priceId)
-      const priceLabel = price.active && price.type === "one_time" ? formatStripePrice(price) : null
-      return {
-        code: definition.code,
-        name: definition.name,
-        quantity: definition.quantity,
-        configured: Boolean(priceLabel),
-        priceLabel,
-        unitAmount: priceLabel ? price.unit_amount : null,
-        currency: priceLabel ? price.currency : null,
-      }
+      const matchesOffer = price.active &&
+        price.type === "one_time" &&
+        price.unit_amount === definition.unitAmount &&
+        price.currency.toLowerCase() === definition.currency
+      return matchesOffer ? buildStoreProduct(definition, true) : buildStoreProduct(definition, false)
     } catch {
-      return {
-        code: definition.code,
-        name: definition.name,
-        quantity: definition.quantity,
-        configured: false,
-        priceLabel: null,
-        unitAmount: null,
-        currency: null,
-      }
+      return buildStoreProduct(definition, false)
     }
   }))
 }

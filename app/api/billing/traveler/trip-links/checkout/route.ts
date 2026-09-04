@@ -77,7 +77,12 @@ export async function POST(request: Request) {
     const priceId = getTravelerTripLinkPriceId(definition.code as TravelerTripLinkProductCode)
     const stripe = getStripeClient()
     const price = await stripe.prices.retrieve(priceId)
-    if (!price.active || price.type !== "one_time" || typeof price.unit_amount !== "number") {
+    if (
+      !price.active ||
+      price.type !== "one_time" ||
+      price.unit_amount !== definition.unitAmount ||
+      price.currency.toLowerCase() !== definition.currency
+    ) {
       return NextResponse.json({ error: "O preco deste pacote nao esta ativo no Stripe." }, { status: 503 })
     }
 

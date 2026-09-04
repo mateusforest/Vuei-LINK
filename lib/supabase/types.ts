@@ -545,7 +545,7 @@ export interface Database {
           id: string
           wallet_id: string
           asset_type: "trip_link"
-          transaction_type: "starter_grant" | "purchase" | "consume" | "refund" | "adjustment" | "migration_grant"
+          transaction_type: "starter_grant" | "purchase" | "consume" | "refund" | "adjustment" | "migration_grant" | "expiration"
           amount: number
           balance_after: number
           reason: string
@@ -563,7 +563,7 @@ export interface Database {
           id?: string
           wallet_id: string
           asset_type: "trip_link"
-          transaction_type: "starter_grant" | "purchase" | "consume" | "refund" | "adjustment" | "migration_grant"
+          transaction_type: "starter_grant" | "purchase" | "consume" | "refund" | "adjustment" | "migration_grant" | "expiration"
           amount: number
           balance_after: number
           reason: string
@@ -580,7 +580,7 @@ export interface Database {
         Update: {
           wallet_id?: string
           asset_type?: "trip_link"
-          transaction_type?: "starter_grant" | "purchase" | "consume" | "refund" | "adjustment" | "migration_grant"
+          transaction_type?: "starter_grant" | "purchase" | "consume" | "refund" | "adjustment" | "migration_grant" | "expiration"
           amount?: number
           balance_after?: number
           reason?: string
@@ -592,6 +592,69 @@ export interface Database {
           idempotency_key?: string | null
           metadata?: Json
           created_by?: string | null
+        }
+      }
+      wallet_credit_lots: {
+        Row: {
+          id: string
+          wallet_id: string
+          asset_type: "trip_link"
+          source_transaction_id: string | null
+          wallet_product_id: string | null
+          original_amount: number
+          remaining_amount: number
+          expires_at: string | null
+          expired_at: string | null
+          metadata: Json
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          wallet_id: string
+          asset_type: "trip_link"
+          source_transaction_id?: string | null
+          wallet_product_id?: string | null
+          original_amount: number
+          remaining_amount: number
+          expires_at?: string | null
+          expired_at?: string | null
+          metadata?: Json
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          wallet_id?: string
+          asset_type?: "trip_link"
+          source_transaction_id?: string | null
+          wallet_product_id?: string | null
+          original_amount?: number
+          remaining_amount?: number
+          expires_at?: string | null
+          expired_at?: string | null
+          metadata?: Json
+          updated_at?: string
+        }
+      }
+      wallet_credit_lot_allocations: {
+        Row: {
+          id: string
+          lot_id: string
+          transaction_id: string
+          amount: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          lot_id: string
+          transaction_id: string
+          amount: number
+          created_at?: string
+        }
+        Update: {
+          lot_id?: string
+          transaction_id?: string
+          amount?: number
         }
       }
       trip_itineraries: {

@@ -34,6 +34,16 @@ function formatHistoryDate(value: string) {
   })
 }
 
+function formatPerTripPrice(unitAmount: number | null, currency: string | null, quantity: number) {
+  if (unitAmount === null || !currency || quantity < 1) return null
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: currency.toUpperCase(),
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(unitAmount / quantity / 100)
+}
+
 export default function ComprarViagensPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -142,7 +152,7 @@ export default function ComprarViagensPage() {
           </div>
         </div>
         <Badge variant="outline" className="rounded-full border-primary/20 bg-primary/5 px-4 py-2 text-primary">
-          Créditos de viagem sem expiração
+          A validade começa após a compra
         </Badge>
       </div>
 
@@ -182,7 +192,7 @@ export default function ComprarViagensPage() {
             </div>
           </div>
           <p className="max-w-sm text-sm leading-6 text-muted-foreground">
-            Criar rascunhos é grátis. Um crédito é consumido somente quando você ativa o link de uma viagem.
+            Criar rascunhos é grátis. O saldo considera apenas créditos válidos e cada ativação consome exatamente uma viagem.
           </p>
         </div>
       </Card>
@@ -197,28 +207,40 @@ export default function ComprarViagensPage() {
           <h2 className="font-semibold">Escolha um pacote</h2>
         </div>
         <div className="grid gap-4 md:grid-cols-3">
-          {(summary?.products ?? []).map((product) => (
-            <Card key={product.code} className="flex flex-col border-border/60 bg-card/80 p-5 shadow-sm">
-              <div className="flex flex-1 flex-col">
-                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-                  <PlaneTakeoff size={21} />
+          {(summary?.products ?? []).map((product) => {
+            const perTripPrice = formatPerTripPrice(product.unitAmount, product.currency, product.quantity)
+            return (
+              <Card key={product.code} className={`relative flex flex-col overflow-hidden bg-card/80 p-5 shadow-sm ${product.featured ? "border-primary/35 ring-1 ring-primary/10" : "border-border/60"}`}>
+                {product.featured ? (
+                  <Badge className="absolute right-4 top-4 border-0 bg-primary text-primary-foreground">Mais escolhido</Badge>
+                ) : null}
+                <div className="flex flex-1 flex-col">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                    <PlaneTakeoff size={21} />
+                  </div>
+                  <h3 className="mt-5 text-xl font-semibold">{product.name}</h3>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    +{product.quantity} {product.quantity === 1 ? "crédito de viagem" : "créditos de viagem"}
+                  </p>
+                  <p className="mt-3 text-sm leading-6 text-muted-foreground">{product.description}</p>
+                  <p className="mt-5 text-3xl font-bold">{product.priceLabel ?? "Indisponível"}</p>
+                  {perTripPrice ? <p className="mt-1 text-sm text-muted-foreground">{perTripPrice}/viagem</p> : null}
+                  <div className="mt-5 rounded-xl border border-primary/10 bg-primary/[0.04] px-3 py-2.5">
+                    <p className="text-sm font-medium text-foreground">{product.validityLabel}</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">Prazo para ativar uma viagem</p>
+                  </div>
                 </div>
-                <h3 className="mt-5 text-xl font-semibold">{product.name}</h3>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  +{product.quantity} {product.quantity === 1 ? "crédito de viagem" : "créditos de viagem"}
-                </p>
-                <p className="mt-5 text-3xl font-bold">{product.priceLabel ?? "Indisponível"}</p>
-              </div>
-              <Button
-                className="mt-6 w-full rounded-xl"
-                disabled={!product.configured || packageLoading !== null}
-                onClick={() => void startCheckout(product.code)}
-              >
-                {packageLoading === product.code ? <Loader2 className="mr-2 animate-spin" size={16} /> : null}
-                Comprar
-              </Button>
-            </Card>
-          ))}
+                <Button
+                  className="mt-6 w-full rounded-xl"
+                  disabled={!product.configured || packageLoading !== null}
+                  onClick={() => void startCheckout(product.code)}
+                >
+                  {packageLoading === product.code ? <Loader2 className="mr-2 animate-spin" size={16} /> : null}
+                  Comprar
+                </Button>
+              </Card>
+            )
+          })}
         </div>
         {!loading && summary?.products.length === 0 ? (
           <Card className="p-5 text-sm text-muted-foreground">Os pacotes serão exibidos após a configuração dos produtos.</Card>
@@ -253,8 +275,8 @@ export default function ComprarViagensPage() {
           ) : (
             summary?.transactions.map((transaction) => (
               <div key={transaction.id} className="flex items-center gap-4 p-4">
-                <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${transaction.amount > 0 ? "bg-emerald-500/10 text-emerald-600" : "bg-primary/10 text-primary"}`}>
-                  {transaction.amount > 0 ? <ShoppingBag size={18} /> : <PlaneTakeoff size={18} />}
+                <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${transaction.amount > 0 ? "bg-emerald-500/10 text-emerald-600" : transaction.transactionType === "expiration" ? "bg-amber-500/10 text-amber-600" : "bg-primary/10 text-primary"}`}>
+                  {transaction.amount > 0 ? <ShoppingBag size={18} /> : transaction.transactionType === "expiration" ? <Clock3 size={18} /> : <PlaneTakeoff size={18} />}
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium">{transaction.reason}</p>

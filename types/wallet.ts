@@ -9,6 +9,7 @@ export type WalletTransactionType =
   | "refund"
   | "adjustment"
   | "migration_grant"
+  | "expiration"
 
 export type WalletStatus = "active" | "archived"
 

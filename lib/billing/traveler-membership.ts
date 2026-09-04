@@ -8,6 +8,11 @@ import type {
 } from "@/types"
 
 export const TRAVELER_VUEI_PLUS_BILLING_SCOPE = "traveler_vuei_plus"
+export const TRAVELER_VUEI_PLUS_OFFER = {
+  unitAmount: 1490,
+  currency: "brl",
+  priceLabel: "R$ 14,90/mês",
+} as const
 
 export interface TravelerMembershipSnapshot {
   planCode: TravelerPlanCode

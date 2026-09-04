@@ -38,8 +38,8 @@ export async function GET() {
     const adminClient = createSupabaseAdminClient()
     const walletService = createWalletService(adminClient)
     const wallet = await walletService.getOrCreateWallet({ ownerType: "traveler", ownerUserId: user.id })
-    const [balance, transactions, products] = await Promise.all([
-      walletService.getBalance({ ownerType: "traveler", ownerUserId: user.id, assetType: "trip_link" }),
+    const balance = await walletService.getBalance({ ownerType: "traveler", ownerUserId: user.id, assetType: "trip_link" })
+    const [transactions, products] = await Promise.all([
       walletService.listTransactions({ walletId: wallet.id, assetType: "trip_link", limit: 30 }),
       listTravelerTripLinkStoreProducts(),
     ])

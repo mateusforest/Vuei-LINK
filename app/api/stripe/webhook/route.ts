@@ -368,6 +368,8 @@ async function handleTravelerTripLinkCheckoutPaid(session: Stripe.Checkout.Sessi
     lineItemQuantity: lineItem?.quantity,
     priceId,
     metadataProductCode,
+    unitAmount: lineItem?.price?.unit_amount,
+    currency: lineItem?.price?.currency,
   }, getTravelerTripLinkPriceMap())
 
   if (fulfillment.status === "not_paid") return null
@@ -417,7 +419,8 @@ async function handleTravelerTripLinkCheckoutPaid(session: Stripe.Checkout.Sessi
       product_code: product.code,
       quantity: product.quantity,
       stripe_price_id: priceId,
-      non_expiring: true,
+      activation_validity: product.validityLabel,
+      non_expiring: false,
     },
   })
 

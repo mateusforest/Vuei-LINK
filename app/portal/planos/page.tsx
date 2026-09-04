@@ -11,6 +11,8 @@ import { Button } from "@/components/ui/button"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import { useTrips } from "@/contexts/trips-context"
 import { TRAVELER_CREDIT_PACKAGES, TRAVELER_PLAN_DEFINITIONS } from "@/lib/billing/traveler-plans"
+import { TRAVELER_TRIP_LINK_PRODUCTS } from "@/lib/billing/traveler-trip-link-catalog"
+import { TRAVELER_VUEI_PLUS_OFFER } from "@/lib/billing/traveler-membership"
 import {
   createTravelerCreditsCheckout,
   createTravelerCustomerPortal,
@@ -23,6 +25,13 @@ const fadeInUp = {
   initial: { opacity: 0, y: 20 },
   animate: { opacity: 1, y: 0 },
   transition: { duration: 0.45 },
+}
+
+function formatOfferPrice(unitAmount: number, currency: string) {
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: currency.toUpperCase(),
+  }).format(unitAmount / 100)
 }
 
 export default function PortalPlanosPage() {
@@ -160,10 +169,22 @@ export default function PortalPlanosPage() {
           </div>
 
           <div className="mt-6 min-h-[11rem] space-y-3">
+            <div className="grid gap-2 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
+              {TRAVELER_TRIP_LINK_PRODUCTS.map((product) => (
+                <div key={product.code} className={`rounded-xl border px-3 py-2.5 ${product.featured ? "border-primary/25 bg-primary/[0.06]" : "border-border/50 bg-background/35"}`}>
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-sm font-semibold">{product.name}</p>
+                    {product.featured ? <span className="text-[0.62rem] font-semibold uppercase tracking-wide text-primary">Mais escolhido</span> : null}
+                  </div>
+                  <p className="mt-1 text-sm font-medium">{formatOfferPrice(product.unitAmount, product.currency)}</p>
+                  <p className="mt-0.5 text-[0.7rem] text-muted-foreground">{product.validityLabel} para ativar</p>
+                </div>
+              ))}
+            </div>
             {[
               "Crie rascunhos sem consumir uma viagem",
               "1 crédito de viagem ativa 1 viagem",
-              "Compre pacotes de 1, 5 ou 10 viagens",
+              "Créditos com validade por lote e consumo dos que vencem primeiro",
               "O link permanece público até o fim da viagem + 7 dias",
               "Seus dados não são apagados ao encerrar",
             ].map((feature) => (
@@ -183,7 +204,8 @@ export default function PortalPlanosPage() {
             <div>
               <p className="text-sm text-muted-foreground">Assinatura opcional</p>
               <h2 className="mt-2 text-[2rem] font-bold leading-none">Vuei+</h2>
-              <p className="mt-2 text-sm text-muted-foreground">Valor e periodicidade exibidos no checkout seguro.</p>
+              <p className="mt-2 text-xl font-semibold text-foreground">{TRAVELER_VUEI_PLUS_OFFER.priceLabel}</p>
+              <p className="mt-1 text-sm text-muted-foreground">Sua viagem termina. Seu histórico não precisa.</p>
             </div>
             <Badge className="bg-amber-500 text-black">
               {membership?.hasVueiPlus ? "Ativo" : "Arquivo Vuei+"}

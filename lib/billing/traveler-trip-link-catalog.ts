@@ -7,18 +7,36 @@ export const TRAVELER_TRIP_LINK_PRODUCTS = [
     name: "1 viagem",
     quantity: 1,
     priceEnv: "STRIPE_PRICE_TRAVELER_TRIP_LINK_1",
+    unitAmount: 2490,
+    currency: "brl",
+    validityLabel: "Use em até 90 dias",
+    validityShortLabel: "Válida por 90 dias",
+    description: "Ideal para sua próxima viagem.",
+    featured: false,
+  },
+  {
+    code: "trip_link_3",
+    name: "3 viagens",
+    quantity: 3,
+    priceEnv: "STRIPE_PRICE_TRAVELER_TRIP_LINK_3",
+    unitAmount: 5990,
+    currency: "brl",
+    validityLabel: "Use em até 6 meses",
+    validityShortLabel: "Válidas por 6 meses",
+    description: "Para quem já tem mais viagens nos planos.",
+    featured: true,
   },
   {
     code: "trip_link_5",
     name: "5 viagens",
     quantity: 5,
     priceEnv: "STRIPE_PRICE_TRAVELER_TRIP_LINK_5",
-  },
-  {
-    code: "trip_link_10",
-    name: "10 viagens",
-    quantity: 10,
-    priceEnv: "STRIPE_PRICE_TRAVELER_TRIP_LINK_10",
+    unitAmount: 8990,
+    currency: "brl",
+    validityLabel: "Use em até 12 meses",
+    validityShortLabel: "Válidas por 12 meses",
+    description: "Melhor custo para quem viaja mais.",
+    featured: false,
   },
 ] as const
 
@@ -56,6 +74,8 @@ export function resolveTravelerTripLinkFulfillment(
     lineItemQuantity: number | null | undefined
     priceId: string | null | undefined
     metadataProductCode: string | null | undefined
+    unitAmount: number | null | undefined
+    currency: string | null | undefined
   },
   prices: TravelerTripLinkPriceMap,
 ): TravelerTripLinkFulfillmentResolution {
@@ -70,6 +90,9 @@ export function resolveTravelerTripLinkFulfillment(
   const product = resolveTravelerTripLinkProductByPriceId(input.priceId, prices)
   if (!product || input.metadataProductCode !== product.code) {
     return { status: "invalid", reason: "Price ou pacote nao reconhecido." }
+  }
+  if (input.unitAmount !== product.unitAmount || input.currency?.toLowerCase() !== product.currency) {
+    return { status: "invalid", reason: "Valor ou moeda do pacote nao reconhecido." }
   }
 
   return { status: "grant", product }

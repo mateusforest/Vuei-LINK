@@ -9,6 +9,10 @@ export interface TravelerTripLinkStoreProduct {
   priceLabel: string | null
   unitAmount: number | null
   currency: string | null
+  validityLabel: string
+  validityShortLabel: string
+  description: string
+  featured: boolean
 }
 
 export interface TravelerTripLinkProductsSummary {

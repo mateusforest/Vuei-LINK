@@ -16,6 +16,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { useAuth } from "@/contexts/auth-context"
 import { getPublicTravelerTripLinkProducts } from "@/lib/repositories/traveler-trip-link-repository"
+import { TRAVELER_VUEI_PLUS_OFFER } from "@/lib/billing/traveler-membership"
 import type { TravelerTripLinkStoreProduct } from "@/types"
 
 const journeySteps = [
@@ -48,7 +49,11 @@ const faqItems = [
   },
   {
     question: "Os créditos de viagem expiram?",
-    answer: "Não. Neste momento, as viagens compradas ficam disponíveis na sua conta até você decidir usá-las.",
+    answer: "Sim. O prazo para ativar é de 90 dias no pacote de 1 viagem, 6 meses no de 3 e 12 meses no de 5. O sistema usa primeiro os créditos que vencem antes.",
+  },
+  {
+    question: "O que acontece depois que ativo uma viagem?",
+    answer: "A validade do crédito termina no momento da ativação. A partir daí, o link segue normalmente durante a viagem e por mais 7 dias depois da data final.",
   },
   {
     question: "Quanto tempo o link fica ativo?",
@@ -69,7 +74,7 @@ const faqItems = [
 ]
 
 function formatPerTripPrice(product: TravelerTripLinkStoreProduct) {
-  if (product.unitAmount === null || !product.currency || product.quantity < 2) return null
+  if (product.unitAmount === null || !product.currency || product.quantity < 1) return null
 
   return new Intl.NumberFormat("pt-BR", {
     style: "currency",
@@ -172,7 +177,7 @@ export function IndividualCommercialSections() {
             </h2>
           </div>
           <p className="max-w-sm text-sm leading-6 text-slate-600">
-            Cada crédito de viagem ativa uma viagem. Seu saldo acumula e não expira.
+            Cada crédito ativa uma viagem. A validade indicada é o prazo para ativar; depois, vale o lifecycle normal do link.
           </p>
         </div>
 
@@ -196,28 +201,34 @@ export function IndividualCommercialSections() {
                       <span className="grid size-12 place-items-center rounded-2xl bg-[#0b56d8]/[0.07] text-[#0b56d8] ring-1 ring-[#0b56d8]/10">
                         <PlaneTakeoff className="size-5" />
                       </span>
-                      {savings ? (
-                        <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-600/10">
-                          Economize {savings}%
-                        </span>
-                      ) : null}
+                      <div className="flex flex-col items-end gap-2">
+                        {product.featured ? (
+                          <span className="rounded-full bg-[#0b56d8] px-3 py-1 text-xs font-semibold text-white shadow-sm">
+                            Mais escolhido
+                          </span>
+                        ) : null}
+                        {savings ? (
+                          <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-600/10">
+                            Economize {savings}%
+                          </span>
+                        ) : null}
+                      </div>
                     </div>
 
                     <div className="mt-8">
                       <h3 className="text-2xl font-semibold tracking-tight">{packageTitle}</h3>
-                      <p className="mt-2 text-sm text-slate-500">
-                        {product.quantity === 1 ? "Para sua próxima viagem" : `${product.quantity} ativações para usar quando quiser`}
-                      </p>
+                      <p className="mt-2 text-sm text-slate-500">{product.description}</p>
                     </div>
 
                     <div className="mt-9">
                       <p className="text-4xl font-semibold tracking-[-0.04em]">{product.priceLabel ?? "Preço indisponível"}</p>
-                      {perTripPrice ? <p className="mt-2 text-sm text-slate-500">Equivale a {perTripPrice} por viagem</p> : null}
+                      {perTripPrice ? <p className="mt-2 text-sm text-slate-500">{perTripPrice}/viagem</p> : null}
                     </div>
 
                     <div className="mt-7 space-y-3 text-sm text-slate-600">
                       <p className="flex items-center gap-2"><Check className="size-4 text-emerald-600" /> Compra única</p>
-                      <p className="flex items-center gap-2"><Check className="size-4 text-emerald-600" /> Sem prazo para usar</p>
+                      <p className="flex items-center gap-2"><Check className="size-4 text-emerald-600" /> {product.validityShortLabel}</p>
+                      <p className="pl-6 text-xs text-slate-500">Prazo para ativar a viagem</p>
                     </div>
 
                     <Button
@@ -247,11 +258,12 @@ export function IndividualCommercialSections() {
                 Assinatura opcional
               </div>
               <h2 id="vuei-plus-title" className="mt-7 max-w-2xl text-balance text-4xl font-semibold leading-[1.02] tracking-[-0.04em] md:text-6xl">
-                Suas viagens não precisam acabar quando você volta para casa.
+                Sua viagem termina. Seu histórico não precisa.
               </h2>
               <p className="mt-6 max-w-xl text-pretty text-base leading-7 text-white/60 md:text-lg">
                 Vuei+ mantém seu arquivo pessoal vivo, privado e pronto para ser revisitado.
               </p>
+              <p className="mt-5 text-2xl font-semibold tracking-tight text-white">{TRAVELER_VUEI_PLUS_OFFER.priceLabel}</p>
 
               <Button
                 size="lg"
@@ -270,7 +282,7 @@ export function IndividualCommercialSections() {
                   { icon: FileClock, text: "Documentos preservados" },
                   { icon: ShieldCheck, text: "Histórico pessoal e privado" },
                   { icon: LockKeyhole, text: "Acesso às viagens encerradas" },
-                  { icon: Sparkles, text: "Benefícios futuros" },
+                  { icon: Sparkles, text: "Benefícios recorrentes e novidades futuras" },
                 ].map(({ icon: Icon, text }) => (
                   <div key={text} className="flex items-center gap-4 border-b border-white/[0.07] pb-5 last:border-b-0 last:pb-0">
                     <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-white/[0.07] text-amber-200">

@@ -90,7 +90,11 @@ function mapActivateTravelerTripPayload(payload: unknown): WalletActivateTravele
   }
 }
 
-function mapRpcBalancePayload(payload: WalletRpcStatusPayload): WalletBalance {
+function mapRpcBalancePayload(rawPayload: WalletRpcStatusPayload | WalletRpcStatusPayload[]): WalletBalance {
+  const payload = Array.isArray(rawPayload) ? rawPayload[0] : rawPayload
+  if (!payload) {
+    throw new Error("Resposta vazia ao calcular o saldo da wallet.")
+  }
   const nowIso = new Date().toISOString()
   return {
     id: payload.balance_id,
@@ -128,16 +132,19 @@ export class WalletService {
   async getBalance(input: WalletBalanceLookup): Promise<WalletBalance> {
     const db = this.client as UntypedSupabaseClient
     const wallet = await this.getOrCreateWallet(input)
-    const ensured = await db.rpc("ensure_wallet_balance", {
+    const balanceRpc = input.assetType === "trip_link"
+      ? "get_wallet_available_balance"
+      : "ensure_wallet_balance"
+    const ensured = await db.rpc(balanceRpc, {
       p_wallet_id: wallet.id,
       p_asset_type: input.assetType,
     })
 
     if (ensured.error || !ensured.data) {
-      throw new Error(ensured.error?.message ?? "Nao foi possivel garantir o saldo da wallet.")
+      throw new Error(ensured.error?.message ?? "Nao foi possivel calcular o saldo da wallet.")
     }
 
-    return mapRpcBalancePayload(ensured.data as WalletRpcStatusPayload)
+    return mapRpcBalancePayload(ensured.data as WalletRpcStatusPayload | WalletRpcStatusPayload[])
   }
 
   async getWalletSummary(owner: WalletOwnerReference): Promise<WalletSummary> {
@@ -174,7 +181,7 @@ export class WalletService {
       throw new Error(result.error?.message ?? "Nao foi possivel aplicar o starter grant.")
     }
 
-    const payload = result.data as WalletRpcStatusPayload
+    const payload = (Array.isArray(result.data) ? result.data[0] : result.data) as WalletRpcStatusPayload
     return {
       applied: payload.applied === true,
       balance: mapRpcBalancePayload(payload),

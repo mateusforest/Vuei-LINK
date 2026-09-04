@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 // @ts-expect-error Node's native TypeScript runner requires the explicit extension.
-import { resolveTravelerMembership } from "./traveler-membership.ts"
+import { TRAVELER_VUEI_PLUS_OFFER, resolveTravelerMembership } from "./traveler-membership.ts"
 
 const base = {
   planCode: "free" as const,
@@ -13,6 +13,14 @@ const base = {
   vueiPlusStripeSubscriptionId: null,
   stripeCustomerId: null,
 }
+
+test("fixes the Vuei+ commercial offer at R$ 14,90 monthly", () => {
+  assert.deepEqual(TRAVELER_VUEI_PLUS_OFFER, {
+    unitAmount: 1490,
+    currency: "brl",
+    priceLabel: "R$ 14,90/mês",
+  })
+})
 
 test("keeps travel and AI balances outside membership capabilities", () => {
   const result = resolveTravelerMembership(base, new Date("2026-09-04T12:00:00Z"))
