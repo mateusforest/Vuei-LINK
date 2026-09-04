@@ -22,6 +22,7 @@ import { ImageWithFallback } from "@/components/system/image-with-fallback"
 import { useAuth } from "@/contexts/auth-context"
 import { activateTravelerTrip } from "@/lib/repositories/trips-repository"
 import { CreateTripButton } from "@/components/portal/create-trip-button"
+import { formatTripLinkPreview, getTripPublicLinkCopyHint } from "@/lib/trips/trip-link-display"
 import {
   getTripLinkAccessDaysRemaining,
   resolveTripLinkLifecycle,
@@ -141,6 +142,20 @@ export default function PortalHomePage() {
     return "Privada até a ativação"
   }
 
+  const getLinkPreview = (trip: Trip) => formatTripLinkPreview(trip.shareLink, { maxSlugLength: 20 })
+
+  const getShareHint = (trip: Trip) => {
+    return getTripPublicLinkCopyHint(getLinkLifecycle(trip))
+  }
+
+  const openPublicLink = (trip: Trip) => {
+    if (!isLinkActive(trip)) return
+    const path = trip.shareLink?.replace(/^https?:\/\/[^/]+/, "") ?? ""
+    if (path) {
+      router.push(path)
+    }
+  }
+
   const copyLink = async (link: string, type: string) => {
     try {
       await navigator.clipboard.writeText(link)
@@ -183,13 +198,12 @@ export default function PortalHomePage() {
 
   const handlePrimaryTripAction = (trip: Trip) => {
     if (isLinkActive(trip)) {
-      router.push(trip.shareLink.replace(/^https?:\/\/[^/]+/, ""))
+      openPublicLink(trip)
       return
     }
 
     if (getLinkLifecycle(trip) === "ended") {
-      setFeedback({ message: "O acesso público desta viagem já foi encerrado.", tone: "error" })
-      window.setTimeout(() => setFeedback(null), 3500)
+      router.push(`/portal/viagem/arquivo/${trip.id}`)
       return
     }
 
@@ -197,6 +211,8 @@ export default function PortalHomePage() {
   }
 
   const shareTrip = async (link: string) => {
+    if (!link) return
+
     if (navigator.share) {
       try {
         await navigator.share({
@@ -221,7 +237,7 @@ export default function PortalHomePage() {
       initial="initial"
       animate="animate"
       variants={staggerContainer}
-      className="mx-auto max-w-6xl space-y-8"
+      className="mx-auto max-w-6xl space-y-5"
     >
       <motion.div variants={fadeInUp} className="space-y-2">
         <h1 className="text-2xl font-bold md:text-3xl">
@@ -238,7 +254,7 @@ export default function PortalHomePage() {
             <p className="text-sm text-muted-foreground">Carregando viagens...</p>
           </Card>
         ) : activeTrip ? (
-          <Card className="relative min-h-[238px] overflow-hidden border-border/60 bg-card shadow-[0_18px_48px_-34px_rgba(15,23,42,0.28)]">
+          <Card className="relative min-h-[214px] overflow-hidden rounded-[1.6rem] border-border/55 bg-card shadow-[0_18px_52px_-38px_rgba(15,23,42,0.42)]">
             <div className="absolute inset-0">
               <ImageWithFallback
                 src={activeTrip.coverImage}
@@ -272,9 +288,9 @@ export default function PortalHomePage() {
                     <Calendar size={15} className="text-primary" />
                     {formatDate(activeTrip.startDate)} – {formatDate(activeTrip.endDate)}
                   </span>
-                  <span className="flex items-center gap-1.5">
-                    <Link2 size={15} className="text-primary" />
-                    {activeTrip.linkActivatedAt ? "Link da viagem" : "Rascunho privado"}
+                  <span className="flex min-w-0 items-center gap-1.5">
+                    <Link2 size={15} className="shrink-0 text-primary" />
+                    <span className="truncate">{isLinkActive(activeTrip) ? getLinkPreview(activeTrip) : getShareHint(activeTrip)}</span>
                   </span>
                 </div>
               </div>
@@ -284,16 +300,19 @@ export default function PortalHomePage() {
                   size="sm"
                   className="h-9 rounded-xl border-0 bg-gradient-to-r from-[#37beff] to-[#0b56d8] px-4 text-white shadow-[0_12px_26px_-14px_rgba(11,86,216,0.7)]"
                   onClick={() => handlePrimaryTripAction(activeTrip)}
-                  disabled={activatingTripId === activeTrip.id || getLinkLifecycle(activeTrip) === "ended"}
+                  disabled={activatingTripId === activeTrip.id}
                 >
                   <ExternalLink size={16} className="mr-2" />
-                  {activatingTripId === activeTrip.id ? "Ativando..." : isLinkActive(activeTrip) ? "Abrir link" : getLinkLifecycle(activeTrip) === "ended" ? "Viagem encerrada" : activeTrip.linkActivatedAt ? "Reabrir link" : "Ativar viagem (1 crédito)"}
+                  {activatingTripId === activeTrip.id ? "Ativando..." : isLinkActive(activeTrip) ? "Abrir link" : getLinkLifecycle(activeTrip) === "ended" ? "Abrir arquivo" : activeTrip.linkActivatedAt ? "Reabrir link" : "Ativar viagem (1 crédito)"}
                 </Button>
                 <Button
                   size="sm"
                   variant="outline"
                   className="h-9 rounded-xl border-border/60 bg-background/70 px-3 backdrop-blur-md"
-                  onClick={() => void copyLink(activeTrip.shareLink, "admin")}
+                  onClick={() => {
+                    if (!isLinkActive(activeTrip)) return
+                    void copyLink(activeTrip.shareLink, "admin")
+                  }}
                   disabled={!isLinkActive(activeTrip)}
                 >
                   <Copy size={16} className="mr-2" />
@@ -303,7 +322,10 @@ export default function PortalHomePage() {
                   size="sm"
                   variant="outline"
                   className="h-9 rounded-xl border-border/60 bg-background/70 px-3 backdrop-blur-md"
-                  onClick={() => void shareTrip(activeTrip.shareLink)}
+                  onClick={() => {
+                    if (!isLinkActive(activeTrip)) return
+                    void shareTrip(activeTrip.shareLink)
+                  }}
                   disabled={!isLinkActive(activeTrip)}
                 >
                   <Share2 size={16} className="mr-2" />
@@ -321,7 +343,7 @@ export default function PortalHomePage() {
             <p className="mb-6 text-sm text-muted-foreground">
               Organize tudo em um único link: roteiro, documentos, passagens e mais.
             </p>
-            <CreateTripButton className="border-0 bg-gradient-to-r from-[#5de0e6] to-[#004aad] text-white">
+            <CreateTripButton className="rounded-xl border-0 bg-gradient-to-r from-[#37beff] to-[#0b56d8] text-white shadow-[0_12px_28px_-17px_rgba(11,86,216,0.65)]">
               <Plus size={18} className="mr-2" />
               Nova Viagem
             </CreateTripButton>
@@ -337,7 +359,7 @@ export default function PortalHomePage() {
 
           <div className="space-y-3">
             {trips.map((trip) => (
-              <Card key={trip.id} className="border-border/50 bg-card/50 p-4">
+              <Card key={trip.id} className="rounded-[1.3rem] border-border/55 bg-card/70 p-3.5 shadow-[0_12px_38px_-32px_rgba(15,23,42,0.44)]">
                 <div className="flex flex-col gap-4 md:flex-row md:items-center">
                   <div
                     className={`relative h-20 w-full overflow-hidden rounded-xl md:h-16 md:w-24 md:shrink-0 ${isLinkActive(trip) ? "cursor-pointer" : ""}`}
@@ -366,15 +388,34 @@ export default function PortalHomePage() {
                     <p className="mt-1 text-xs text-muted-foreground">
                       {formatDate(trip.startDate)} - {formatDate(trip.endDate)} · {getLinkAccessLabel(trip)}
                     </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {isLinkActive(trip) ? getLinkPreview(trip) : getShareHint(trip)}
+                    </p>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    <Button variant="outline" className="border-border/50" onClick={() => handlePrimaryTripAction(trip)} disabled={activatingTripId === trip.id || getLinkLifecycle(trip) === "ended"}>
-                      {activatingTripId === trip.id ? "Ativando..." : isLinkActive(trip) ? "Abrir link" : getLinkLifecycle(trip) === "ended" ? "Encerrada" : trip.linkActivatedAt ? "Reabrir link" : "Ativar viagem (1 crédito)"}
+                    <Button variant="outline" className="border-border/50" onClick={() => handlePrimaryTripAction(trip)} disabled={activatingTripId === trip.id}>
+                      {activatingTripId === trip.id ? "Ativando..." : isLinkActive(trip) ? "Abrir link" : getLinkLifecycle(trip) === "ended" ? "Abrir arquivo" : trip.linkActivatedAt ? "Reabrir link" : "Ativar viagem (1 crédito)"}
                     </Button>
-                    <Button variant="outline" className="border-border/50" onClick={() => void copyLink(trip.shareLink, "admin")} disabled={!isLinkActive(trip)}>
+                    <Button
+                      variant="outline"
+                      className="border-border/50"
+                      onClick={() => {
+                        if (!isLinkActive(trip)) return
+                        void copyLink(trip.shareLink, "admin")
+                      }}
+                      disabled={!isLinkActive(trip)}
+                    >
                       Copiar link
                     </Button>
-                    <Button variant="outline" className="border-border/50" onClick={() => void shareTrip(trip.shareLink)} disabled={!isLinkActive(trip)}>
+                    <Button
+                      variant="outline"
+                      className="border-border/50"
+                      onClick={() => {
+                        if (!isLinkActive(trip)) return
+                        void shareTrip(trip.shareLink)
+                      }}
+                      disabled={!isLinkActive(trip)}
+                    >
                       Compartilhar
                     </Button>
                   </div>

@@ -28,6 +28,7 @@ import { useTrips } from "@/contexts/trips-context"
 import { activateTravelerTrip } from "@/lib/repositories/trips-repository"
 import { CreateTripButton } from "@/components/portal/create-trip-button"
 import { getTripLinkAccessDaysRemaining, resolveTripLinkLifecycle } from "@/lib/security/trip-link-lifecycle"
+import { formatTripLinkPreview, getTripPublicLinkCopyHint } from "@/lib/trips/trip-link-display"
 
 const fadeInUp = {
   initial: { opacity: 0, y: 20 },
@@ -161,6 +162,9 @@ export default function CompartilharPage() {
     linkAccessUntil: trip.linkAccessUntil,
   })
   const linkIsActive = trip.visibility === "public" && (linkLifecycle === "active" || linkLifecycle === "post_trip")
+  const linkPreview = linkIsActive
+    ? formatTripLinkPreview(trip.shareLink, { maxSlugLength: 22 })
+    : getTripPublicLinkCopyHint(linkLifecycle)
   const lifecycleLabel = linkLifecycle === "active"
     ? "Ativa"
     : linkLifecycle === "post_trip"
@@ -207,7 +211,7 @@ export default function CompartilharPage() {
       initial="initial"
       animate="animate"
       variants={staggerContainer}
-      className="space-y-6 max-w-4xl mx-auto"
+      className="mx-auto max-w-4xl space-y-5"
     >
       {/* Header */}
       <motion.div variants={fadeInUp}>
@@ -256,10 +260,10 @@ export default function CompartilharPage() {
       )}
 
       <motion.div variants={fadeInUp}>
-        <Card className="p-5 bg-gradient-to-br from-primary/5 to-secondary/5 border-primary/20 vuei-glass">
-          <div className="flex items-start gap-4 mb-4">
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center shrink-0">
-              <Share2 size={24} className="text-primary-foreground" />
+        <Card className="rounded-[1.5rem] border-primary/15 bg-gradient-to-br from-primary/[0.055] via-card/85 to-secondary/[0.055] p-5 shadow-[0_18px_48px_-36px_rgba(15,23,42,0.48)]">
+          <div className="mb-4 flex items-start gap-3.5">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-secondary shadow-[0_10px_24px_-14px_rgba(11,86,216,0.8)]">
+              <Share2 size={19} className="text-primary-foreground" />
             </div>
             <div className="flex-1">
               <div className="flex items-center gap-2 mb-1">
@@ -274,13 +278,16 @@ export default function CompartilharPage() {
             </div>
           </div>
           
-          <div className="flex items-center gap-2 p-3 rounded-xl bg-background/50 border border-primary/20 mb-4">
+          <div className="mb-4 flex items-center gap-2 rounded-xl border border-primary/15 bg-background/65 px-3 py-2.5">
             <Globe size={16} className="text-primary shrink-0" />
-            <code className="flex-1 text-sm truncate">{trip.shareLink}</code>
+            <code className="min-w-0 flex-1 truncate text-sm text-foreground/75">{linkPreview}</code>
             <Button 
               variant="ghost" 
               size="sm"
-              onClick={() => void copyToClipboard(trip.shareLink, 'share')}
+              onClick={() => {
+                if (!linkIsActive) return
+                void copyToClipboard(trip.shareLink, 'share')
+              }}
               disabled={!linkIsActive}
               className="shrink-0"
             >
@@ -294,7 +301,7 @@ export default function CompartilharPage() {
 
           {!linkIsActive && linkLifecycle !== "ended" && (
             <Button
-              className="mb-4 w-full bg-gradient-to-r from-[#5de0e6] to-[#004aad] text-white border-0"
+              className="mb-4 w-full rounded-xl border-0 bg-gradient-to-r from-[#37beff] to-[#0b56d8] text-white shadow-[0_12px_28px_-18px_rgba(11,86,216,0.8)]"
               onClick={() => void activateTripLink()}
               disabled={isActivating}
             >
@@ -326,7 +333,7 @@ export default function CompartilharPage() {
 
       {/* Viewers */}
       <motion.div variants={fadeInUp}>
-        <Card className="p-5 bg-card/50 border-border/50 vuei-glass">
+        <Card className="rounded-[1.35rem] border-border/55 bg-card/70 p-4 shadow-[0_12px_36px_-30px_rgba(15,23,42,0.42)]">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-secondary/20 flex items-center justify-center">

@@ -34,6 +34,7 @@ import {
   resolveTripLinkLifecycle,
   type TripLinkLifecycleStatus,
 } from "@/lib/security/trip-link-lifecycle"
+import { formatTripLinkPreview, getTripPublicLinkCopyHint } from "@/lib/trips/trip-link-display"
 import { resolveTripHeroImage } from "@/lib/trip-destination"
 import { ImageWithFallback } from "@/components/system/image-with-fallback"
 import { CreateTripButton } from "@/components/portal/create-trip-button"
@@ -183,6 +184,13 @@ export default function ViagemListPage() {
     return trip.visibility === "public" && (lifecycle === "active" || lifecycle === "post_trip")
   }
 
+  const getLinkPreview = (trip: Trip) => formatTripLinkPreview(trip.shareLink, { maxSlugLength: 22 })
+
+  const getShareHint = (trip: Trip) => {
+    const lifecycle = getTripLinkLifecycle(trip)
+    return getTripPublicLinkCopyHint(lifecycle)
+  }
+
   const getLifecycleLabel = (lifecycle: TripLinkLifecycleStatus) => {
     switch (lifecycle) {
       case "active": return "Ativa"
@@ -214,13 +222,16 @@ export default function ViagemListPage() {
     return "Ative para publicar"
   }
 
-  const openShareLink = (link: string) => {
-    router.push(link.replace(/^https?:\/\/[^/]+/, ""))
+  const openShareLink = (trip: Trip) => {
+    if (!isTripLinkActive(trip)) return
+    router.push(trip.shareLink.replace(/^https?:\/\/[^/]+/, ""))
   }
 
-  const shareTripLink = (link: string, tripName: string, copyType: string) => {
+  const shareTripLink = (trip: Trip, copyType: string) => {
+    if (!isTripLinkActive(trip)) return
+
     if (typeof navigator.share === "function") {
-      void navigator.share({ title: tripName, url: link }).catch((error: unknown) => {
+      void navigator.share({ title: trip.name, url: trip.shareLink }).catch((error: unknown) => {
         if (error instanceof DOMException && error.name === "AbortError") return
         console.error("[TRIP] share link error", error)
         setFeedback({ message: "Não foi possível compartilhar o link.", tone: "error" })
@@ -229,7 +240,7 @@ export default function ViagemListPage() {
       return
     }
 
-    void copyLink(link, copyType)
+    void copyLink(trip.shareLink, copyType)
   }
 
   const formatDate = (dateStr: string) => {
@@ -264,15 +275,15 @@ export default function ViagemListPage() {
       initial="initial"
       animate="animate"
       variants={staggerContainer}
-      className="space-y-6 max-w-4xl mx-auto"
+      className="mx-auto max-w-5xl space-y-5"
     >
-      <motion.div variants={fadeInUp} className="flex items-center justify-between">
+      <motion.div variants={fadeInUp} className="flex items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold">Minhas Viagens</h1>
           <p className="text-muted-foreground text-sm">{trips.length} {trips.length === 1 ? "viagem" : "viagens"} criadas</p>
         </div>
         <CreateTripButton 
-          className="bg-gradient-to-r from-[#5de0e6] to-[#004aad] text-white border-0"
+          className="h-10 rounded-xl border-0 bg-gradient-to-r from-[#37beff] to-[#0b56d8] px-4 text-white shadow-[0_12px_28px_-16px_rgba(11,86,216,0.65)]"
         >
           <Plus size={18} className="mr-2" />
           Nova Viagem
@@ -300,7 +311,7 @@ export default function ViagemListPage() {
       </motion.div>
 
       {filteredTrips.length > 0 ? (
-        <motion.div variants={fadeInUp} className="space-y-4">
+        <motion.div variants={fadeInUp} className="space-y-3">
           {filteredTrips.map((trip) => {
             const lifecycle = getTripLinkLifecycle(trip)
             const linkActive = isTripLinkActive(trip)
@@ -308,10 +319,10 @@ export default function ViagemListPage() {
             return (
             <Card 
               key={trip.id}
-              className="overflow-hidden bg-card/50 border-border/50 hover:border-primary/30 transition-all"
+              className="overflow-hidden rounded-[1.4rem] border-border/55 bg-card/70 shadow-[0_14px_42px_-32px_rgba(15,23,42,0.45)] transition-all hover:border-primary/25 hover:shadow-[0_18px_46px_-30px_rgba(15,23,42,0.5)]"
             >
               <div className="flex flex-col md:flex-row">
-                <div className="relative w-full md:w-48 h-40 md:h-auto shrink-0">
+                <div className="relative h-36 w-full shrink-0 md:h-auto md:w-44">
                   <ImageWithFallback
                     src={trip.coverImage}
                     fallbackSrc={resolveTripHeroImage({
@@ -329,8 +340,8 @@ export default function ViagemListPage() {
                   </Badge>
                 </div>
 
-                <div className="flex-1 p-5">
-                  <div className="flex items-start justify-between mb-3">
+                <div className="min-w-0 flex-1 p-4 sm:p-5">
+                  <div className="mb-2.5 flex items-start justify-between gap-4">
                     <div>
                       <h3 className="text-lg font-semibold">{trip.name}</h3>
                       <p className="text-sm text-muted-foreground flex items-center gap-1">
@@ -346,7 +357,7 @@ export default function ViagemListPage() {
                     )}
                   </div>
 
-                  <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground mb-4">
+                  <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-muted-foreground">
                     <span className="flex items-center gap-1">
                       <Calendar size={14} />
                       {formatDate(trip.startDate)} - {formatDate(trip.endDate)}
@@ -361,7 +372,7 @@ export default function ViagemListPage() {
                     </span>
                   </div>
 
-                  <div className="grid grid-cols-1 gap-3 mb-4">
+                  <div className="mb-3 grid grid-cols-1 gap-2">
                     {false && (
                     <div className="p-3 rounded-xl bg-muted/30 border border-border/50">
                       <div className="flex items-center gap-2 mb-1">
@@ -376,18 +387,23 @@ export default function ViagemListPage() {
                       </div>
                     </div>
                     )}
-                    <div className="p-3 rounded-xl bg-primary/5 border border-primary/20">
-                      <div className="flex items-center gap-2 mb-1">
+                    <div className="rounded-xl border border-primary/15 bg-primary/[0.035] px-3 py-2.5">
+                      <div className="mb-1 flex items-center gap-2">
                         <Link2 size={14} className="text-primary" />
                         <span className="text-xs text-muted-foreground">Link da Viagem</span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <code className="text-xs truncate flex-1">{trip.shareLink}</code>
+                        <code className="min-w-0 flex-1 truncate text-xs text-foreground/75">
+                          {linkActive ? getLinkPreview(trip) : getShareHint(trip)}
+                        </code>
                         <Button
                           variant="ghost"
                           size="icon"
                           className="h-6 w-6"
-                          onClick={() => void copyLink(trip.shareLink, `share-${trip.id}`)}
+                          onClick={() => {
+                            if (!linkActive) return
+                            void copyLink(trip.shareLink, `share-${trip.id}`)
+                          }}
                           disabled={!linkActive}
                         >
                           {copiedLink === `share-${trip.id}` ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
@@ -396,12 +412,12 @@ export default function ViagemListPage() {
                     </div>
                   </div>
 
-                  <div className="flex gap-3">
+                  <div className="flex flex-wrap gap-2">
                     <Button 
-                      className="flex-1 bg-gradient-to-r from-[#5de0e6] to-[#004aad] text-white border-0"
+                      className="min-w-[12rem] flex-1 rounded-xl border-0 bg-gradient-to-r from-[#37beff] to-[#0b56d8] text-white shadow-[0_12px_26px_-17px_rgba(11,86,216,0.8)]"
                       onClick={() => {
                         if (linkActive) {
-                          openShareLink(trip.shareLink)
+                          openShareLink(trip)
                           return
                         }
 
@@ -425,7 +441,10 @@ export default function ViagemListPage() {
                     <Button 
                       variant="outline" 
                       className="border-border/50"
-                      onClick={() => void copyLink(trip.shareLink, `share-${trip.id}`)}
+                      onClick={() => {
+                        if (!linkActive) return
+                        void copyLink(trip.shareLink, `share-${trip.id}`)
+                      }}
                       disabled={!linkActive}
                     >
                       <Copy size={16} className="mr-2" />
@@ -443,7 +462,7 @@ export default function ViagemListPage() {
                           Definir como ativa
                         </DropdownMenuItem>
                         <DropdownMenuItem
-                          onClick={() => shareTripLink(trip.shareLink, trip.name, `share-${trip.id}`)}
+                          onClick={() => shareTripLink(trip, `share-${trip.id}`)}
                           disabled={!linkActive}
                           className="cursor-pointer"
                         >
@@ -466,9 +485,9 @@ export default function ViagemListPage() {
         </motion.div>
       ) : filter === "ended" && archivedTrips.length > 0 ? null : (
         <motion.div variants={fadeInUp}>
-          <Card className="p-12 bg-card/50 border-border/50 text-center">
-            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center mx-auto mb-4">
-              <Plane size={28} className="text-primary" />
+          <Card className="rounded-[1.5rem] border-border/55 bg-card/70 p-8 text-center shadow-[0_16px_44px_-36px_rgba(15,23,42,0.45)]">
+            <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-primary/20 to-secondary/20">
+              <Plane size={22} className="text-primary" />
             </div>
             <h3 className="text-lg font-semibold mb-2">
               {filter === "all"
@@ -513,7 +532,7 @@ export default function ViagemListPage() {
 
           <div className="grid gap-3 sm:grid-cols-2">
             {archivedTrips.map((trip) => (
-              <Card key={trip.id} className="border-border/50 bg-card/50 p-4 vuei-glass">
+              <Card key={trip.id} className="rounded-[1.25rem] border-border/55 bg-card/70 p-3.5 shadow-[0_12px_36px_-30px_rgba(15,23,42,0.42)]">
                 <div className="flex items-start gap-3">
                   <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-xl">
                     <ImageWithFallback

@@ -61,6 +61,12 @@ function buildSameOriginPath(url: string) {
   }
 }
 
+function buildPendingDraftPath(url: string) {
+  const path = buildSameOriginPath(url)
+  const separator = path.includes("?") ? "&" : "?"
+  return `${path}${separator}draft=1`
+}
+
 function toPendingBagItem(session: PendingTripClaimSession): PublicBagTripItem {
   return {
     id: session.tripId,
@@ -399,7 +405,7 @@ export function TripLanding() {
       }
 
       setPendingSession(session)
-      handleOpenTrip(session.shareLink)
+      window.location.assign(buildPendingDraftPath(session.shareLink))
       return
     }
 

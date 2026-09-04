@@ -137,7 +137,7 @@ export default function ComprarViagensPage() {
     <motion.div
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
-      className="mx-auto max-w-5xl space-y-6"
+      className="mx-auto max-w-5xl space-y-5"
     >
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-3">
@@ -177,21 +177,21 @@ export default function ComprarViagensPage() {
         </Card>
       ) : null}
 
-      <Card className="relative overflow-hidden border-primary/15 bg-gradient-to-br from-primary/10 via-card to-secondary/10 p-6 md:p-8">
-        <div className="relative flex flex-col justify-between gap-6 sm:flex-row sm:items-end">
+      <Card className="relative overflow-hidden rounded-[1.5rem] border-primary/15 bg-gradient-to-br from-primary/[0.08] via-card/90 to-secondary/[0.07] p-5 shadow-[0_18px_52px_-38px_rgba(15,23,42,0.42)] md:p-6">
+        <div className="relative flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
           <div>
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Luggage size={17} className="text-primary" />
               Saldo de viagens
             </div>
-            <div className="mt-3 flex items-end gap-3">
+            <div className="mt-2 flex items-end gap-2.5">
               <span className="text-5xl font-bold text-primary md:text-6xl">{loading ? "—" : summary?.balance ?? 0}</span>
-              <span className="pb-2 text-muted-foreground">
+              <span className="pb-1 text-sm text-muted-foreground">
                 {(summary?.balance ?? 0) === 1 ? "viagem disponível" : "viagens disponíveis"}
               </span>
             </div>
           </div>
-          <p className="max-w-sm text-sm leading-6 text-muted-foreground">
+          <p className="max-w-sm text-sm leading-5 text-muted-foreground">
             Criar rascunhos é grátis. O saldo considera apenas créditos válidos e cada ativação consome exatamente uma viagem.
           </p>
         </div>
@@ -206,32 +206,32 @@ export default function ComprarViagensPage() {
           <ShoppingBag size={19} className="text-primary" />
           <h2 className="font-semibold">Escolha um pacote</h2>
         </div>
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-3 md:grid-cols-3">
           {(summary?.products ?? []).map((product) => {
             const perTripPrice = formatPerTripPrice(product.unitAmount, product.currency, product.quantity)
             return (
-              <Card key={product.code} className={`relative flex flex-col overflow-hidden bg-card/80 p-5 shadow-sm ${product.featured ? "border-primary/35 ring-1 ring-primary/10" : "border-border/60"}`}>
+              <Card key={product.code} className={`relative flex flex-col overflow-hidden rounded-[1.35rem] bg-card/80 p-4 shadow-[0_14px_40px_-34px_rgba(15,23,42,0.5)] ${product.featured ? "border-primary/35 ring-1 ring-primary/10" : "border-border/60"}`}>
                 {product.featured ? (
                   <Badge className="absolute right-4 top-4 border-0 bg-primary text-primary-foreground">Mais escolhido</Badge>
                 ) : null}
                 <div className="flex flex-1 flex-col">
-                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-                    <PlaneTakeoff size={21} />
+                  <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                    <PlaneTakeoff size={18} />
                   </div>
-                  <h3 className="mt-5 text-xl font-semibold">{product.name}</h3>
+                  <h3 className="mt-4 text-lg font-semibold">{product.name}</h3>
                   <p className="mt-1 text-sm text-muted-foreground">
                     +{product.quantity} {product.quantity === 1 ? "crédito de viagem" : "créditos de viagem"}
                   </p>
                   <p className="mt-3 text-sm leading-6 text-muted-foreground">{product.description}</p>
                   <p className="mt-5 text-3xl font-bold">{product.priceLabel ?? "Indisponível"}</p>
                   {perTripPrice ? <p className="mt-1 text-sm text-muted-foreground">{perTripPrice}/viagem</p> : null}
-                  <div className="mt-5 rounded-xl border border-primary/10 bg-primary/[0.04] px-3 py-2.5">
+                  <div className="mt-4 rounded-xl border border-primary/10 bg-primary/[0.04] px-3 py-2.5">
                     <p className="text-sm font-medium text-foreground">{product.validityLabel}</p>
                     <p className="mt-0.5 text-xs text-muted-foreground">Prazo para ativar uma viagem</p>
                   </div>
                 </div>
                 <Button
-                  className="mt-6 w-full rounded-xl"
+                  className="mt-4 w-full rounded-xl"
                   disabled={!product.configured || packageLoading !== null}
                   onClick={() => void startCheckout(product.code)}
                 >

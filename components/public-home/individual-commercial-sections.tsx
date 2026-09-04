@@ -41,35 +41,75 @@ const journeySteps = [
 const faqItems = [
   {
     question: "Preciso assinar para usar o Vuei?",
-    answer: "Não. Você pode começar e montar sua viagem gratuitamente. A assinatura Vuei+ é opcional e voltada ao arquivo pessoal.",
+    answer: "Não. Você pode começar e montar sua viagem gratuitamente. A assinatura Vuei+ é opcional e serve para manter seu arquivo e histórico acessíveis.",
   },
   {
-    question: "Quando uma viagem é descontada?",
-    answer: "Somente quando você decide ativar a viagem para publicar e compartilhar o link. Criar e completar a viagem não consome saldo.",
+    question: "O que acontece quando crio uma viagem?",
+    answer: "Ela nasce como um rascunho privado. Você pode preencher e revisar tudo antes de ativar, sem publicar um link e sem consumir uma viagem disponível.",
   },
   {
-    question: "Os créditos de viagem expiram?",
-    answer: "Sim. O prazo para ativar é de 90 dias no pacote de 1 viagem, 6 meses no de 3 e 12 meses no de 5. O sistema usa primeiro os créditos que vencem antes.",
+    question: "Quando uma viagem é consumida?",
+    answer: "Somente quando você toca em Ativar viagem para publicar e compartilhar o link. Criar, completar ou vincular o rascunho à sua conta não consome saldo.",
   },
   {
-    question: "O que acontece depois que ativo uma viagem?",
-    answer: "A validade do crédito termina no momento da ativação. A partir daí, o link segue normalmente durante a viagem e por mais 7 dias depois da data final.",
+    question: "Posso criar rascunhos sem gastar viagem?",
+    answer: "Sim. Seus rascunhos permanecem privados e não reduzem o saldo até que você escolha ativar um deles.",
   },
   {
-    question: "Quanto tempo o link fica ativo?",
-    answer: "O link permanece ativo durante a viagem e por mais 7 dias depois da data final.",
+    question: "Qual a diferença entre rascunho e viagem ativa?",
+    answer: "O rascunho é privado e não pode ser compartilhado. A viagem ativa consumiu 1 crédito de viagem e possui um link público disponível durante o período da viagem.",
   },
   {
-    question: "O que acontece depois da viagem?",
-    answer: "O link público é encerrado, mas os dados não são apagados. Com Vuei+, você continua acessando tudo pelo arquivo autenticado.",
+    question: "Quanto tempo tenho para usar cada pacote?",
+    answer: "Você tem 90 dias para ativar a viagem avulsa, 6 meses no pacote de 3 e 12 meses no pacote de 5. O prazo começa após a confirmação da compra.",
   },
   {
-    question: "Para que serve o Vuei+?",
-    answer: "Para manter seu arquivo de viagens, documentos e histórico pessoal acessível, além de preparar benefícios futuros.",
+    question: "O que acontece depois que a viagem termina?",
+    answer: "O link continua disponível por 7 dias e depois é encerrado. Seus dados não são apagados; o Vuei+ mantém o acesso autenticado ao arquivo.",
+  },
+  {
+    question: "Por quanto tempo o link fica disponível?",
+    answer: "Depois da ativação, ele permanece público durante a viagem e por mais 7 dias após a data final cadastrada.",
+  },
+  {
+    question: "O que acontece se eu não ativar dentro da validade?",
+    answer: "O crédito vencido deixa de ficar disponível para ativação. O rascunho continua salvo e poderá ser ativado depois com uma nova viagem válida.",
+  },
+  {
+    question: "O que é o Vuei+?",
+    answer: "É a assinatura opcional para manter seu arquivo de viagens, documentos e histórico pessoal acessível depois que o link público encerra.",
+  },
+  {
+    question: "O Vuei+ substitui a compra de viagens?",
+    answer: "Não. O Vuei+ não concede viagens e não substitui os pacotes. Cada link novo ainda usa 1 crédito de viagem na ativação.",
+  },
+  {
+    question: "O que fica salvo no arquivo Vuei+?",
+    answer: "Roteiro, documentos, passagens, hospedagens e demais informações preservadas da viagem ficam disponíveis ao proprietário autenticado.",
+  },
+  {
+    question: "Créditos de IA são a mesma coisa que viagens?",
+    answer: "Não. Viagens ativam links públicos; créditos de IA são usados em recursos inteligentes. Os dois saldos são totalmente separados.",
+  },
+  {
+    question: "Para que servem os créditos de IA?",
+    answer: "Eles abastecem recursos inteligentes disponíveis na conta, como Concierge IA, roteiros e extrações automatizadas, conforme a regra de cada recurso.",
   },
   {
     question: "Posso comprar mais viagens depois?",
-    answer: "Sim. Você pode comprar novos pacotes quando quiser, e as viagens disponíveis são acumuladas.",
+    answer: "Sim. Você pode comprar novos pacotes quando quiser. Os créditos válidos são somados e o sistema usa primeiro os que vencem antes.",
+  },
+  {
+    question: "Como funciona a ativação de uma viagem?",
+    answer: "Ao tocar em Ativar viagem, o sistema confirma seu saldo, consome exatamente 1 crédito e libera o link. Repetir a ação não cobra duas vezes a mesma viagem.",
+  },
+  {
+    question: "Posso compartilhar uma viagem antes de ativar?",
+    answer: "Não. Enquanto for rascunho, a URL pública não funciona e as ações de abrir, copiar e compartilhar permanecem bloqueadas.",
+  },
+  {
+    question: "Como funciona a validade dos pacotes de 1, 3 e 5 viagens?",
+    answer: "Cada compra gera créditos válidos por 90 dias, 6 meses ou 12 meses. Após a ativação, a validade do pacote dá lugar ao período normal do link: viagem + 7 dias.",
   },
 ]
 

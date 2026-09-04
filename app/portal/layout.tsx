@@ -159,29 +159,29 @@ function PortalLayoutInner({ children }: { children: React.ReactNode }) {
       {!isMobile && (
         <motion.aside
           initial={false}
-          animate={{ width: sidebarCollapsed ? 80 : 240 }}
-          className="fixed left-0 top-0 z-40 h-full border-r border-border/60 vuei-glass"
+          animate={{ width: sidebarCollapsed ? 72 : 216 }}
+          className="fixed left-0 top-0 z-40 h-full border-r border-border/55 bg-background/88 shadow-[10px_0_40px_-34px_rgba(15,23,42,0.45)] backdrop-blur-xl"
         >
           <div className="flex h-full flex-col">
-            <div className="flex items-center justify-between p-6">
+            <div className="flex items-center justify-between px-4 pb-3 pt-5">
               <Link href="/portal" className="flex items-center gap-3">
                 <Image
                   src="/vuei-logo.png"
                   alt="Vuei"
-                  width={sidebarCollapsed ? 32 : 100}
+                  width={sidebarCollapsed ? 30 : 88}
                   height={32}
                   className="object-contain"
                 />
               </Link>
               <button
                 onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-                className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
+                className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
               >
                 {sidebarCollapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
               </button>
             </div>
 
-            <nav className="flex-1 px-3 py-4">
+            <nav className="flex-1 px-2.5 py-2">
               <div className="space-y-1">
                 {navItems.map((item) => {
                   const isActive = pathname === item.href || (item.href !== "/portal" && pathname.startsWith(item.href))
@@ -190,7 +190,7 @@ function PortalLayoutInner({ children }: { children: React.ReactNode }) {
                       key={item.href}
                       href={item.href}
                       className={cn(
-                        "flex items-center gap-3 rounded-xl px-3 py-3 transition-all duration-300",
+                        "flex items-center gap-3 rounded-xl px-3 py-2.5 transition-all duration-300",
                         isActive
                           ? "bg-gradient-to-r from-[#37beff]/14 to-[#0b56d8]/12 text-[#0b56d8] shadow-[inset_0_0_0_1px_rgba(11,86,216,0.08)]"
                           : "text-muted-foreground hover:bg-[#f8fafc] hover:text-foreground",
@@ -214,10 +214,10 @@ function PortalLayoutInner({ children }: { children: React.ReactNode }) {
                 })}
               </div>
 
-              <div className="my-6 px-1">
+              <div className="my-4 px-1">
                 <CreateTripButton
                   className={cn(
-                    "flex w-full items-center justify-center gap-2 rounded-xl py-3 font-semibold transition-all duration-300",
+                    "flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold transition-all duration-300",
                     "bg-gradient-to-r from-[#37beff] to-[#0b56d8] text-white shadow-[0_18px_36px_rgba(11,86,216,0.18)] hover:opacity-95",
                     sidebarCollapsed ? "px-3" : "px-4",
                   )}
@@ -228,16 +228,16 @@ function PortalLayoutInner({ children }: { children: React.ReactNode }) {
               </div>
             </nav>
 
-            <div className="space-y-2.5 px-4 pb-4">
-              <div className={cn("rounded-2xl border border-border/55 bg-white/78 p-3 shadow-[0_10px_28px_-24px_rgba(15,23,42,0.34)]", sidebarCollapsed && "px-2 py-2.5")}>
+            <div className="space-y-2 px-3 pb-3">
+              <div className={cn("rounded-[1.15rem] border border-border/55 bg-white/70 p-2.5 shadow-[0_10px_28px_-25px_rgba(15,23,42,0.38)]", sidebarCollapsed && "px-2 py-2")}>
                 <div className={cn("flex items-center gap-2.5", sidebarCollapsed && "flex-col justify-center gap-1.5 text-center")}>
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#37beff]/14 to-[#0b56d8]/10 text-[#0b56d8]">
+                  <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-[0.65rem] bg-gradient-to-br from-[#37beff]/14 to-[#0b56d8]/10 text-[#0b56d8]">
                     <Coins size={15} />
                   </div>
                   <div className="min-w-0 flex-1">
                     {!sidebarCollapsed && <p className="text-[0.68rem] font-medium uppercase tracking-[0.13em] text-muted-foreground">Créditos de IA</p>}
                     <div className={cn("mt-0.5 flex items-baseline gap-2", sidebarCollapsed && "mt-0 flex-col items-center gap-0.5")}>
-                      <span className="text-xl font-semibold leading-none text-foreground">{credits.balance}</span>
+                      <span className="text-lg font-semibold leading-none text-foreground">{credits.balance}</span>
                       {!sidebarCollapsed && (
                         <span className="text-[0.68rem] text-muted-foreground">
                           {subscription.isPremium ? "Premium legado" : "Saldo disponível"}
@@ -249,7 +249,7 @@ function PortalLayoutInner({ children }: { children: React.ReactNode }) {
                 <Link
                   href={travelerCreditsActionHref}
                   className={cn(
-                    "mt-2.5 flex w-full items-center justify-center rounded-lg border border-[#0b56d8]/12 bg-[#0b56d8]/[0.035] px-3 py-1.5 text-xs font-medium text-[#0b56d8] transition-colors hover:bg-[#0b56d8]/[0.08]",
+                    "mt-2 flex w-full items-center justify-center rounded-lg border border-[#0b56d8]/12 bg-[#0b56d8]/[0.035] px-2.5 py-1.5 text-[0.7rem] font-medium text-[#0b56d8] transition-colors hover:bg-[#0b56d8]/[0.08]",
                     sidebarCollapsed && "px-2 text-xs"
                   )}
                   aria-label={travelerCreditsActionLabel}
@@ -257,9 +257,9 @@ function PortalLayoutInner({ children }: { children: React.ReactNode }) {
                   {sidebarCollapsed ? <ChevronRight size={16} /> : travelerCreditsActionLabel}
                 </Link>
               </div>
-              <div className={cn("rounded-2xl border border-[#0b56d8]/10 bg-white/78 p-3 shadow-[0_10px_28px_-24px_rgba(15,23,42,0.34)]", sidebarCollapsed && "px-2 py-2.5")}>
+              <div className={cn("rounded-[1.15rem] border border-[#0b56d8]/10 bg-white/70 p-2.5 shadow-[0_10px_28px_-25px_rgba(15,23,42,0.38)]", sidebarCollapsed && "px-2 py-2")}>
                 <div className={cn("flex items-center gap-2.5", sidebarCollapsed && "justify-center")}>
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#37beff]/14 to-[#0b56d8]/10 text-[#0b56d8]">
+                  <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-[0.65rem] bg-gradient-to-br from-[#37beff]/14 to-[#0b56d8]/10 text-[#0b56d8]">
                     <Luggage size={15} />
                   </div>
                   {!sidebarCollapsed ? (
@@ -272,7 +272,7 @@ function PortalLayoutInner({ children }: { children: React.ReactNode }) {
                 <Link
                   href="/portal/viagens/comprar"
                   className={cn(
-                    "mt-2.5 flex w-full items-center justify-center rounded-lg border border-[#0b56d8]/12 bg-[#0b56d8]/[0.035] px-3 py-1.5 text-xs font-medium text-[#0b56d8] transition-colors hover:bg-[#0b56d8]/[0.08]",
+                    "mt-2 flex w-full items-center justify-center rounded-lg border border-[#0b56d8]/12 bg-[#0b56d8]/[0.035] px-2.5 py-1.5 text-[0.7rem] font-medium text-[#0b56d8] transition-colors hover:bg-[#0b56d8]/[0.08]",
                     sidebarCollapsed && "px-2",
                   )}
                   aria-label="Comprar viagens"
@@ -282,7 +282,7 @@ function PortalLayoutInner({ children }: { children: React.ReactNode }) {
               </div>
             </div>
 
-            <div className="border-t border-border/50 p-4">
+            <div className="border-t border-border/50 p-3">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button
@@ -291,7 +291,7 @@ function PortalLayoutInner({ children }: { children: React.ReactNode }) {
                       sidebarCollapsed && "justify-center",
                     )}
                   >
-                    <div className="relative flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-primary to-secondary">
+                    <div className="relative flex h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-primary to-secondary">
                       {profile?.avatarUrl ? (
                         <Image src={profile.avatarUrl} alt={profile.name} fill className="rounded-full object-cover" />
                       ) : (
@@ -423,7 +423,7 @@ function PortalLayoutInner({ children }: { children: React.ReactNode }) {
       <main
         className={cn(
           "min-h-screen transition-all duration-300",
-          isMobile ? "px-4 pb-[calc(env(safe-area-inset-bottom)+104px)]" : sidebarCollapsed ? "ml-20 p-8" : "ml-60 p-8",
+          isMobile ? "px-4 pb-[calc(env(safe-area-inset-bottom)+104px)]" : sidebarCollapsed ? "ml-[4.5rem] p-7" : "ml-[13.5rem] p-7",
         )}
         style={isMobile ? { paddingTop: `calc(${mobileHeaderOffset}px + 16px)` } : undefined}
       >

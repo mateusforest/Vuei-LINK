@@ -774,7 +774,7 @@ export default function ConfiguracoesPage() {
       initial="initial"
       animate="animate"
       variants={staggerContainer}
-      className="mx-auto max-w-4xl space-y-6"
+      className="mx-auto max-w-5xl space-y-5"
     >
       <motion.div variants={fadeInUp}>
         <h1 className="text-2xl font-bold">Configurações</h1>
@@ -782,7 +782,7 @@ export default function ConfiguracoesPage() {
       </motion.div>
 
       <motion.div variants={fadeInUp}>
-        <Card className="vuei-glass border-border/50 bg-card/50 p-5">
+        <Card className="rounded-[1.35rem] border-border/55 bg-card/70 p-4 shadow-[0_14px_42px_-34px_rgba(15,23,42,0.45)]">
           <div className="flex items-center gap-4">
             <div className="relative">
               <div className="relative flex h-16 w-16 items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-primary to-secondary">
@@ -814,9 +814,9 @@ export default function ConfiguracoesPage() {
 
       <motion.div variants={fadeInUp}>
         <h2 className="mb-3 px-1 text-sm font-medium text-muted-foreground">Produtos da conta</h2>
-        <Card className="vuei-glass border-border/50 bg-card/50 p-5">
+        <Card className="rounded-[1.35rem] border-border/55 bg-card/70 p-4 shadow-[0_14px_42px_-34px_rgba(15,23,42,0.45)]">
           <div className="grid gap-4 sm:grid-cols-2">
-            <div className="rounded-2xl border border-border/50 bg-background/40 p-4">
+            <div className="rounded-[1.15rem] border border-border/50 bg-background/55 p-3.5">
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <p className="text-xs uppercase tracking-wide text-muted-foreground">Vuei+</p>
@@ -847,7 +847,7 @@ export default function ConfiguracoesPage() {
               </div>
             </div>
 
-            <div className="rounded-2xl border border-border/50 bg-background/40 p-4">
+            <div className="rounded-[1.15rem] border border-border/50 bg-background/55 p-3.5">
               <p className="text-xs uppercase tracking-wide text-muted-foreground">Saldos independentes</p>
               <div className="mt-3 grid grid-cols-2 gap-3">
                 <div>
@@ -928,11 +928,11 @@ export default function ConfiguracoesPage() {
       {sections.map((section) => (
         <motion.div key={section.title} variants={fadeInUp}>
           <h2 className="mb-3 px-1 text-sm font-medium text-muted-foreground">{section.title}</h2>
-          <Card className="vuei-glass divide-y divide-border/50 border-border/50 bg-card/50">
+          <Card className="divide-y divide-border/50 rounded-[1.3rem] border-border/55 bg-card/70 shadow-[0_12px_38px_-32px_rgba(15,23,42,0.42)]">
             {section.items.map((item) => (
               <div
                 key={item.label}
-                className={`flex items-center justify-between p-4 ${item.action ? "cursor-pointer transition-colors hover:bg-muted/20" : ""}`}
+                className={`flex items-center justify-between px-4 py-3.5 ${item.action ? "cursor-pointer transition-colors hover:bg-muted/20" : ""}`}
                 onClick={item.action}
               >
                 <div className="flex items-center gap-3">

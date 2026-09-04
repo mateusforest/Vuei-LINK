@@ -148,7 +148,7 @@ export default function CreditosPage() {
       initial="initial"
       animate="animate"
       variants={staggerContainer}
-      className="space-y-6 max-w-4xl mx-auto"
+      className="mx-auto max-w-5xl space-y-5"
     >
       <motion.div variants={fadeInUp} className="flex items-center justify-between gap-4">
         <div>
@@ -180,18 +180,18 @@ export default function CreditosPage() {
       ) : null}
 
       <motion.div variants={fadeInUp}>
-        <Card className="p-6 md:p-8 bg-gradient-to-br from-primary/10 via-card/50 to-secondary/10 border-primary/20 vuei-glass relative overflow-hidden">
+        <Card className="relative overflow-hidden rounded-[1.5rem] border-primary/15 bg-gradient-to-br from-primary/[0.08] via-card/80 to-secondary/[0.07] p-5 shadow-[0_18px_52px_-38px_rgba(15,23,42,0.45)] md:p-6">
           <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-primary/10 to-secondary/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none" />
 
           <div className="relative">
-            <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+            <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
               <div className="space-y-2">
                 <div className="flex items-center gap-2 text-muted-foreground">
                   <Coins size={16} className="text-primary" />
                   <span className="text-sm">Saldo de IA</span>
                 </div>
                 <div className="flex items-baseline gap-3">
-                  <span className="text-5xl md:text-6xl font-bold vuei-gradient-text">{effectiveBalance}</span>
+                  <span className="text-4xl font-bold vuei-gradient-text md:text-5xl">{effectiveBalance}</span>
                   <span className="text-muted-foreground">créditos IA</span>
                 </div>
                 <div className="space-y-1 text-sm">
@@ -233,11 +233,11 @@ export default function CreditosPage() {
             { label: "Documentos", value: documentsUsage.toString(), icon: FileText, desc: "transações" },
             { label: "Offline", value: offlineUsage.toString(), icon: WifiOff, desc: "transações" },
           ].map((stat) => (
-            <Card key={stat.label} className="p-4 bg-card/50 border-border/50 vuei-glass text-center">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary/10 to-secondary/10 flex items-center justify-center mx-auto mb-2">
+            <Card key={stat.label} className="rounded-[1.2rem] border-border/55 bg-card/70 p-3 text-center shadow-[0_10px_32px_-28px_rgba(15,23,42,0.45)]">
+              <div className="mx-auto mb-1.5 flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-primary/10 to-secondary/10">
                 <stat.icon size={18} className="text-primary" />
               </div>
-              <p className="text-2xl font-bold">{stat.value}</p>
+              <p className="text-xl font-bold">{stat.value}</p>
               <p className="text-xs text-muted-foreground">{stat.desc}</p>
             </Card>
           ))}
@@ -256,11 +256,11 @@ export default function CreditosPage() {
         <div className="flex items-center justify-between mb-4">
           <h2 className="font-semibold">Comprar créditos de IA</h2>
         </div>
-        <div className="grid md:grid-cols-3 gap-4">
+        <div className="grid gap-3 md:grid-cols-3">
           {TRAVELER_CREDIT_PACKAGES.map((pkg) => (
             <Card
               key={pkg.code}
-              className={`p-5 bg-card/50 border-border/50 vuei-glass relative overflow-hidden transition-all duration-300 hover:border-primary/30 ${
+              className={`relative overflow-hidden rounded-[1.3rem] border-border/55 bg-card/70 p-4 shadow-[0_12px_38px_-32px_rgba(15,23,42,0.45)] transition-all duration-300 hover:border-primary/30 ${
                 pkg.code === "popular" ? "ring-2 ring-primary/50" : ""
               }`}
             >

@@ -41,6 +41,7 @@ import {
   type DestinationOption,
 } from "@/lib/destinations/catalog"
 import { TripDatePickerField } from "@/components/trip/trip-date-picker-field"
+import { formatTripLinkPreview } from "@/lib/trips/trip-link-display"
 
 const fadeInUp = {
   initial: { opacity: 0, y: 20 },
@@ -634,7 +635,7 @@ export default function CriarViagemPage() {
                   </div>
                   <div className="flex items-center gap-2 p-3 rounded-xl bg-background/50 border border-primary/20">
                     <Link2 size={16} className="text-primary shrink-0" />
-                    <code className="flex-1 text-sm truncate">{createdTrip.shareLink}</code>
+                    <code className="flex-1 truncate text-sm">{formatTripLinkPreview(createdTrip.shareLink, { maxSlugLength: 22 })}</code>
                     <Button
                       variant="ghost"
                       size="sm"

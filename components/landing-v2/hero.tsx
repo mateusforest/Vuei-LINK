@@ -139,12 +139,8 @@ export function Hero({
 
   function handleOpenTrip() {
     if (!createdTripUrl) return
-    window.location.assign(buildSameOriginTripPath(createdTripUrl))
-  }
-
-  async function handleCopyLink() {
-    if (!createdTripUrl || typeof navigator === "undefined" || !navigator.clipboard) return
-    await navigator.clipboard.writeText(createdTripUrl)
+    const path = buildSameOriginTripPath(createdTripUrl)
+    window.location.assign(`${path}${path.includes("?") ? "&" : "?"}draft=1`)
   }
 
   function handleProtectTrip() {
@@ -153,7 +149,7 @@ export function Hero({
 
   function handleContinueWithoutAccount() {
     if (!createdTripUrl) return
-    window.location.assign(buildSameOriginTripPath(createdTripUrl))
+    handleOpenTrip()
   }
 
   return (
@@ -280,7 +276,6 @@ export function Hero({
         needsClaim={!user}
         onClose={() => onCeremonyChange(false)}
         onOpenTrip={handleOpenTrip}
-        onCopyLink={handleCopyLink}
         onProtectTrip={handleProtectTrip}
         onContinueWithoutAccount={handleContinueWithoutAccount}
       />

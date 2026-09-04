@@ -265,7 +265,7 @@ function TripCard({
   return (
     <div
       className={cn(
-        "group rounded-[1.25rem] border border-border/55 bg-background/58 p-4 shadow-[0_8px_28px_-24px_rgba(20,60,120,0.34)] transition-[border-color,box-shadow] duration-300 [transition-timing-function:var(--ease-out-soft)] hover:border-border hover:shadow-[0_14px_38px_-24px_rgba(20,60,120,0.42)]",
+        "group rounded-[1.25rem] border border-border/55 bg-background/64 p-3.5 shadow-[0_8px_28px_-24px_rgba(20,60,120,0.34)] transition-[border-color,box-shadow] duration-300 [transition-timing-function:var(--ease-out-soft)] hover:border-border hover:shadow-[0_14px_38px_-24px_rgba(20,60,120,0.42)]",
         highlighted && "border-brand/40 shadow-[0_18px_44px_-20px_rgba(20,60,120,0.42)]",
       )}
     >

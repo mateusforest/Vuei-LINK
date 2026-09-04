@@ -2,7 +2,7 @@
 
 import Image from "next/image"
 import { useEffect, useState } from "react"
-import { ArrowRight, Check, Copy, ExternalLink } from "lucide-react"
+import { ArrowRight, Check, ExternalLink, LockKeyhole } from "lucide-react"
 
 const phrases = ["Preparando sua viagem...", "Criando seu link...", "Tudo pronto."]
 
@@ -14,7 +14,6 @@ type LinkCeremonyProps = {
   needsClaim: boolean
   onClose: () => void
   onOpenTrip: () => void
-  onCopyLink: () => void | Promise<void>
   onProtectTrip: () => void
   onContinueWithoutAccount: () => void
 }
@@ -27,7 +26,6 @@ export function LinkCeremony({
   needsClaim,
   onClose,
   onOpenTrip,
-  onCopyLink,
   onProtectTrip,
   onContinueWithoutAccount,
 }: LinkCeremonyProps) {
@@ -98,12 +96,17 @@ export function LinkCeremony({
                 : "Continue pela sua Bolsa para revisar e ativar a viagem."}
             </p>
 
-            <div className="mt-8 rounded-[28px] border border-border/60 bg-card/90 p-5 text-left shadow-[0_18px_50px_-28px_rgba(16,26,44,0.32)]">
-              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground">Link da viagem</p>
-              <p className="mt-3 break-all text-sm font-medium text-foreground">{tripUrl}</p>
+            <div className="mt-8 flex items-center gap-3 rounded-[28px] border border-amber-500/20 bg-amber-500/[0.06] p-5 text-left shadow-[0_18px_50px_-28px_rgba(16,26,44,0.24)]">
+              <span className="grid size-10 shrink-0 place-items-center rounded-2xl bg-amber-500/10 text-amber-700">
+                <LockKeyhole className="size-4.5" aria-hidden="true" />
+              </span>
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-amber-700">Rascunho privado</p>
+                <p className="mt-1 text-sm text-muted-foreground">O link público será liberado somente após a ativação.</p>
+              </div>
             </div>
 
-            <div className="mt-6 grid gap-3 sm:grid-cols-2">
+            <div className="mt-6 grid gap-3">
               <button
                 type="button"
                 onClick={onOpenTrip}
@@ -112,16 +115,6 @@ export function LinkCeremony({
                 {needsClaim ? "Continuar rascunho" : "Abrir viagem"}
                 <ExternalLink className="size-5" aria-hidden="true" />
               </button>
-              {!needsClaim ? (
-                <button
-                  type="button"
-                  onClick={() => void onCopyLink()}
-                  className="flex w-full items-center justify-center gap-2 rounded-full border border-border/70 bg-white px-6 py-4 text-base font-semibold text-foreground transition-colors hover:bg-muted/40"
-                >
-                  Copiar link
-                  <Copy className="size-5" aria-hidden="true" />
-                </button>
-              ) : null}
             </div>
 
             {needsClaim ? (

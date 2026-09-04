@@ -34,6 +34,99 @@ function formatOfferPrice(unitAmount: number, currency: string) {
   }).format(unitAmount / 100)
 }
 
+const INDIVIDUAL_FAQ = [
+  {
+    id: "subscription",
+    question: "Preciso assinar para usar o Vuei?",
+    answer: "Não. Você pode criar sua viagem gratuitamente e comprar viagens avulsas quando quiser ativar um link. O Vuei+ é uma assinatura opcional para acessar o arquivo e o histórico depois que a viagem termina.",
+  },
+  {
+    id: "create",
+    question: "O que acontece quando crio uma viagem?",
+    answer: "A viagem nasce como um rascunho privado. Você pode completar destino, datas, participantes e documentos sem publicar o link e sem consumir uma viagem disponível.",
+  },
+  {
+    id: "consume",
+    question: "Quando uma viagem é consumida?",
+    answer: "Somente quando você escolhe Ativar viagem. Nesse momento, 1 crédito de viagem é consumido e o link público é liberado para compartilhamento.",
+  },
+  {
+    id: "drafts",
+    question: "Posso criar rascunhos sem gastar viagem?",
+    answer: "Sim. Você pode montar quantos rascunhos precisar. Criar, editar ou vincular um rascunho à sua conta não reduz o saldo de viagens.",
+  },
+  {
+    id: "draft-active",
+    question: "Qual a diferença entre rascunho e viagem ativa?",
+    answer: "O rascunho é privado e não pode ser aberto, copiado ou compartilhado como link público. A viagem ativa já consumiu 1 crédito de viagem e pode ser acessada pelo link durante o período previsto.",
+  },
+  {
+    id: "package-validity",
+    question: "Quanto tempo tenho para usar cada pacote?",
+    answer: "A viagem avulsa pode ser ativada em até 90 dias; o pacote de 3, em até 6 meses; e o pacote de 5, em até 12 meses. A validade começa após a confirmação da compra.",
+  },
+  {
+    id: "after-trip",
+    question: "O que acontece depois que a viagem termina?",
+    answer: "O link continua disponível por mais 7 dias e depois é encerrado. Os dados não são apagados; com Vuei+, você continua acessando a viagem no arquivo privado autenticado.",
+  },
+  {
+    id: "public-window",
+    question: "Por quanto tempo o link fica disponível?",
+    answer: "Depois da ativação, o link permanece público durante a viagem e por 7 dias após a data final. Esse prazo do link é independente da validade usada para ativar o crédito comprado.",
+  },
+  {
+    id: "expired-credit",
+    question: "O que acontece se eu não ativar dentro da validade?",
+    answer: "O crédito vencido deixa de compor o saldo disponível para novas ativações. Seus rascunhos continuam salvos e podem ser ativados depois com uma nova viagem válida.",
+  },
+  {
+    id: "vuei-plus",
+    question: "O que é o Vuei+?",
+    answer: "É a assinatura opcional do Vuei para manter seu arquivo pessoal acessível, preservar a consulta às viagens encerradas e reunir seu histórico e documentos dentro da conta.",
+  },
+  {
+    id: "vuei-plus-trips",
+    question: "O Vuei+ substitui a compra de viagens?",
+    answer: "Não. Vuei+ e viagens são produtos independentes. A assinatura não concede créditos de viagem e cada novo link ainda precisa de 1 viagem disponível para ser ativado.",
+  },
+  {
+    id: "archive",
+    question: "O que fica salvo no arquivo Vuei+?",
+    answer: "As informações preservadas da viagem, como roteiro, documentos, passagens e hospedagens, permanecem acessíveis ao proprietário autenticado. O link público encerrado não é reaberto.",
+  },
+  {
+    id: "ai-vs-trips",
+    question: "Créditos de IA são a mesma coisa que viagens?",
+    answer: "Não. Créditos de viagem ativam links; créditos de IA são usados nos recursos inteligentes. Os saldos, compras e regras são separados.",
+  },
+  {
+    id: "ai-use",
+    question: "Para que servem os créditos de IA?",
+    answer: "Eles são consumidos por recursos inteligentes disponíveis na sua conta, como Concierge IA, geração de roteiros e extrações automatizadas, conforme a regra de cada recurso.",
+  },
+  {
+    id: "buy-more",
+    question: "Posso comprar mais viagens depois?",
+    answer: "Sim. Você pode comprar novos pacotes a qualquer momento. As viagens válidas são somadas ao saldo e o sistema usa primeiro os créditos que vencem antes.",
+  },
+  {
+    id: "activation",
+    question: "Como funciona a ativação de uma viagem?",
+    answer: "Revise o rascunho e toque em Ativar viagem. O sistema valida seu saldo, consome exatamente 1 crédito e libera o link. Repetir o clique ou atualizar a página não consome novamente a mesma viagem.",
+  },
+  {
+    id: "share-draft",
+    question: "Posso compartilhar uma viagem antes de ativar?",
+    answer: "Não. Antes da ativação, o rascunho é privado: a URL pública não funciona e as ações de copiar, abrir e compartilhar ficam indisponíveis.",
+  },
+  {
+    id: "packages",
+    question: "Como funciona a validade dos pacotes de 1, 3 e 5 viagens?",
+    answer: "Cada compra cria créditos com a validade do pacote: 90 dias, 6 meses ou 12 meses. Ao ativar, o sistema consome um crédito válido do lote que vence primeiro; depois disso, o link segue o lifecycle normal da viagem.",
+  },
+] as const
+
 export default function PortalPlanosPage() {
   const { subscription } = useTrips()
   const searchParams = useSearchParams()
@@ -104,7 +197,7 @@ export default function PortalPlanosPage() {
   }
 
   return (
-    <div className="mx-auto max-w-5xl space-y-8">
+    <div className="mx-auto max-w-5xl space-y-6">
       <motion.div {...fadeInUp} className="space-y-3">
         <Button asChild variant="ghost" className="w-fit rounded-xl px-0 text-muted-foreground hover:text-foreground">
           <Link href="/portal/viagem">
@@ -159,7 +252,7 @@ export default function PortalPlanosPage() {
       </motion.div>
 
       <motion.div {...fadeInUp} className="grid gap-5 lg:grid-cols-2">
-        <Card className="flex min-h-[31rem] flex-col border-border/50 bg-card/50 p-6 vuei-glass">
+        <Card className="flex min-h-[27rem] flex-col rounded-[1.5rem] border-border/55 bg-card/70 p-5 shadow-[0_16px_48px_-38px_rgba(15,23,42,0.45)]">
           <div className="flex min-h-[5rem] items-start justify-between gap-4">
             <div>
               <p className="text-sm text-muted-foreground">Uso sem assinatura</p>
@@ -198,7 +291,7 @@ export default function PortalPlanosPage() {
           <Button asChild className="mt-auto w-full rounded-xl"><Link href="/portal/viagens/comprar">Comprar viagens</Link></Button>
         </Card>
 
-        <Card className="relative flex min-h-[31rem] flex-col overflow-hidden border-amber-500/30 bg-gradient-to-br from-amber-500/10 via-card/70 to-secondary/10 p-6 vuei-glass">
+        <Card className="relative flex min-h-[27rem] flex-col overflow-hidden rounded-[1.5rem] border-amber-500/25 bg-gradient-to-br from-amber-500/[0.08] via-card/80 to-secondary/[0.07] p-5 shadow-[0_16px_48px_-38px_rgba(15,23,42,0.45)]">
           <div className="absolute right-0 top-0 h-32 w-32 rounded-full bg-amber-500/15 blur-3xl" />
           <div className="relative flex min-h-[5rem] items-start justify-between gap-4">
             <div>
@@ -264,7 +357,7 @@ export default function PortalPlanosPage() {
       ) : null}
 
       <motion.div {...fadeInUp}>
-        <Card className="border-border/50 bg-card/50 p-6 vuei-glass">
+        <Card className="rounded-[1.5rem] border-border/55 bg-card/70 p-5 shadow-[0_16px_48px_-38px_rgba(15,23,42,0.45)]">
           <div className="mb-5 flex items-start gap-3">
             <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/10">
               <Coins size={20} className="text-primary" />
@@ -279,7 +372,7 @@ export default function PortalPlanosPage() {
 
           <div className="grid gap-4 md:grid-cols-3">
             {TRAVELER_CREDIT_PACKAGES.map((pkg) => (
-              <Card key={pkg.code} className="flex min-h-[15.5rem] flex-col border-border/50 bg-background/60 p-5">
+              <Card key={pkg.code} className="flex min-h-[13.5rem] flex-col rounded-[1.2rem] border-border/50 bg-background/65 p-4 shadow-[0_12px_34px_-30px_rgba(15,23,42,0.42)]">
                 <div className="mb-4 flex items-center justify-between">
                   <p className="font-semibold">{pkg.name}</p>
                   {pkg.code === "popular" ? <Badge className="bg-primary text-primary-foreground">Popular</Badge> : null}
@@ -303,27 +396,16 @@ export default function PortalPlanosPage() {
       </motion.div>
 
       <motion.div {...fadeInUp}>
-        <Card className="border-border/50 bg-card/50 p-6 vuei-glass">
-          <h2 className="text-xl font-semibold">FAQ</h2>
+        <Card className="rounded-[1.5rem] border-border/55 bg-card/70 p-5 shadow-[0_16px_48px_-38px_rgba(15,23,42,0.45)] sm:p-6">
+          <h2 className="text-xl font-semibold">Perguntas frequentes</h2>
+          <p className="mt-1 text-sm text-muted-foreground">Tudo o que você precisa saber sobre rascunhos, viagens, créditos de IA e Vuei+.</p>
           <Accordion type="single" collapsible className="mt-4">
-            <AccordionItem value="credits">
-              <AccordionTrigger>O que são créditos de IA?</AccordionTrigger>
-              <AccordionContent>
-                Créditos de IA são usados em recursos inteligentes e nunca ativam um link de viagem.
-              </AccordionContent>
-            </AccordionItem>
-            <AccordionItem value="consumption">
-              <AccordionTrigger>Quando os créditos de IA são consumidos?</AccordionTrigger>
-              <AccordionContent>
-                Atualmente, os créditos de IA são consumidos em perguntas ao Concierge IA, geração de roteiros e extração inteligente de passagens.
-              </AccordionContent>
-            </AccordionItem>
-            <AccordionItem value="rollover">
-              <AccordionTrigger>Os créditos de IA acumulam?</AccordionTrigger>
-              <AccordionContent>
-                Créditos de IA comprados acumulam e não expiram. Os créditos de IA incluídos são renovados a cada ciclo.
-              </AccordionContent>
-            </AccordionItem>
+            {INDIVIDUAL_FAQ.map((item) => (
+              <AccordionItem key={item.id} value={item.id} className="border-border/55">
+                <AccordionTrigger className="text-left text-[0.95rem] font-medium hover:no-underline">{item.question}</AccordionTrigger>
+                <AccordionContent className="max-w-3xl text-sm leading-6 text-muted-foreground">{item.answer}</AccordionContent>
+              </AccordionItem>
+            ))}
           </Accordion>
         </Card>
       </motion.div>

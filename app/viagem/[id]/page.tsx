@@ -28,6 +28,7 @@ import { isOfflineModeActive } from "@/lib/offline/offline-mode"
 import { useAuth } from "@/contexts/auth-context"
 import { buildAdminTripUrl, buildPublicTripUrl, isAdminLinkMode } from "@/lib/security/link-tokens"
 import { resolveTripLinkLifecycle } from "@/lib/security/trip-link-lifecycle"
+import { formatTripLinkPreview } from "@/lib/trips/trip-link-display"
 import { resolveTravelerPlan, resolveTravelerPlanFromBillingStatus } from "@/lib/billing/traveler-plans"
 import {
   clearPendingTripClaimSession,
@@ -7102,12 +7103,13 @@ function ConciergeSection({
 }
 
 // Sharing Modal
-function ShareModal({ open, onClose, tripData }: { open: boolean; onClose: () => void; tripData: any }) {
+function ShareModal({ open, onClose, tripData, canShare = true }: { open: boolean; onClose: () => void; tripData: any; canShare?: boolean }) {
   const [copied, setCopied] = useState<string | null>(null)
   const { showToast } = useToast()
   const { isAdmin } = useContext(PermissionContext)
 
   const handleCopy = (type: string, link: string) => {
+    if (!canShare) return
     navigator.clipboard.writeText(link)
     setCopied(type)
     showToast("Link copiado!", "success")
@@ -7140,8 +7142,10 @@ function ShareModal({ open, onClose, tripData }: { open: boolean; onClose: () =>
           </div>
           <p className="text-xs text-white/40 mb-3">Um único link para acompanhar a viagem com segurança.</p>
           <div className="flex items-center gap-2 p-3 rounded-xl bg-white/[0.03]">
-            <code className="flex-1 text-xs text-white/60 truncate">{tripData.shareLink}</code>
-            <Button size="sm" variant="ghost" onClick={() => handleCopy("public", tripData.shareLink)} className="text-white/60">
+            <code className="flex-1 text-xs text-white/60 truncate">
+              {canShare ? formatTripLinkPreview(tripData.shareLink, { maxSlugLength: 20 }) : "Rascunho privado"}
+            </code>
+            <Button size="sm" variant="ghost" onClick={() => handleCopy("public", tripData.shareLink)} disabled={!canShare} className="text-white/60">
               {copied === "public" ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
             </Button>
           </div>
@@ -7151,21 +7155,25 @@ function ShareModal({ open, onClose, tripData }: { open: boolean; onClose: () =>
           <p className="text-sm text-white font-medium mb-2">Compartilhar via</p>
           <div className="flex gap-3">
             <button
+              disabled={!canShare}
               onClick={() => {
+                if (!canShare) return
                 const shareText = encodeURIComponent(`Acompanhe a viagem: ${tripData.shareLink}`)
                 window.open(`https://wa.me/?text=${shareText}`, "_blank", "noopener,noreferrer")
               }}
-              className="flex-1 p-3 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 text-sm font-medium transition-colors"
+              className="flex-1 p-3 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40"
             >
               WhatsApp
             </button>
             <button
+              disabled={!canShare}
               onClick={() => {
+                if (!canShare) return
                 const subject = encodeURIComponent(`Viagem ${tripData.destination}`)
                 const body = encodeURIComponent(`Acompanhe a viagem por aqui: ${tripData.shareLink}`)
                 window.location.href = `mailto:?subject=${subject}&body=${body}`
               }}
-              className="flex-1 p-3 rounded-xl bg-white/[0.05] hover:bg-white/10 border border-white/10 text-white/60 text-sm font-medium transition-colors"
+              className="flex-1 p-3 rounded-xl bg-white/[0.05] hover:bg-white/10 border border-white/10 text-white/60 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40"
             >
               Email
             </button>
@@ -8539,6 +8547,18 @@ export default function TripPage() {
   const offlineImageUrlsRef = useRef<string[]>([])
   const flightPollingTimersRef = useRef<Map<string, ReturnType<typeof window.setTimeout>>>(new Map())
   const isAgencyTrip = Boolean(tripData?.agencyId || tripData?.agency_id || agencyBranding?.isAgency)
+  const currentPublicLifecycle = resolveTripLinkLifecycle({
+    ownerType: isAgencyTrip ? "agency" : "traveler",
+    visibility: tripData?.visibility,
+    status: tripData?.status,
+    endDate: tripData?.endDate,
+    linkActivatedAt: tripData?.linkActivatedAt,
+    linkAccessUntil: tripData?.linkAccessUntil,
+  })
+  const canSharePublicTrip = isAgencyTrip || (
+    tripData?.visibility === "public" &&
+    (currentPublicLifecycle === "active" || currentPublicLifecycle === "post_trip")
+  )
 
   const logOfflineLookupDev = (stage: string, payload: Record<string, unknown>) => {
     if (process.env.NODE_ENV !== "development") return
@@ -8724,6 +8744,7 @@ export default function TripPage() {
     const routeSearchParams = new URLSearchParams(searchParamsKey)
     const adminToken = routeSearchParams.get("adminToken") ?? tripAdminToken
     const publicToken = routeSearchParams.get("token") || routeSearchParams.get("publicToken")
+    const pendingDraftMode = routeSearchParams.get("draft") === "1"
     const isPublicRoute = pathname?.startsWith("/v/") ?? false
     const isAdminRoute = adminRouteActive || isAdminLinkMode(routeSearchParams, pathname)
 
@@ -8886,7 +8907,7 @@ export default function TripPage() {
       }
 
       try {
-        const matchingPendingClaim = !isAdminRoute
+        const matchingPendingClaim = !isAdminRoute && pendingDraftMode
           ? findPendingTripClaimSession({ tripSlug: routeSlug })
           : null
         const pendingDraftResult = matchingPendingClaim
@@ -9021,7 +9042,7 @@ export default function TripPage() {
             ownerUserId: resolvedTrip.ownerUserId ?? null,
             tripAgencyId: resolvedAgencyId,
           })
-          const isPublicLinkRequest = isPublicRoute || (!isAdminRoute && !authenticatedAdminAccess && !publicToken)
+          const isPublicLinkRequest = isTripLinkRoute && !isAdminRoute
           const adminLinkAccessMode = isAdminRoute && !isOwner
           const adminAccessAllowed = isAdminRoute || authenticatedAdminAccess
           const adminPinGranted = !adminAccessAllowed || sensitiveAccessGranted
@@ -9320,10 +9341,31 @@ export default function TripPage() {
       try {
         const portalTrips = extractTripsStoragePayload(window.localStorage.getItem(TRIPS_STORAGE_KEY)).trips
         const agencyTrips = extractAgencyStorageState(window.localStorage.getItem(AGENCY_STORAGE_KEY)).trips
-        const allTrips = [...portalTrips, ...agencyTrips]
+        const allTrips: any[] = [...(portalTrips as any[]), ...(agencyTrips as any[])]
         const matchedTrip = allTrips.find((trip) => trip.slug === routeSlug || trip.id === routeSlug)
 
         if (matchedTrip) {
+          const cachedOwnerType = matchedTrip.ownerType ?? (matchedTrip.agencyId ? "agency" : "traveler")
+          const cachedLifecycle = resolveTripLinkLifecycle({
+            ownerType: cachedOwnerType,
+            visibility: matchedTrip.visibility,
+            status: matchedTrip.status,
+            endDate: matchedTrip.endDate,
+            linkActivatedAt: matchedTrip.linkActivatedAt,
+            linkAccessUntil: matchedTrip.linkAccessUntil,
+          })
+          const cachedPublicAccessAllowed = cachedOwnerType === "agency" || (
+            matchedTrip.visibility === "public" &&
+            (cachedLifecycle === "active" || cachedLifecycle === "post_trip")
+          )
+
+          if (isTripLinkRoute && !cachedPublicAccessAllowed) {
+            setLoadError(cachedLifecycle === "ended" ? "Esta viagem foi encerrada" : "Esta viagem não está disponível publicamente.")
+            setLoadErrorCode(cachedLifecycle === "ended" ? "trip_link_ended" : "trip_link_not_public")
+            setIsLoadingTrip(false)
+            return
+          }
+
           setAgencyBranding({ name: null, logoUrl: null, isAgency: false })
           setTripData(buildTripDataFromStoredTrip(matchedTrip))
           setSectionsLoading({
@@ -10863,7 +10905,7 @@ export default function TripPage() {
               ) : null}
             </BottomSheet>
 
-            <ShareModal open={shareOpen} onClose={() => setShareOpen(false)} tripData={tripData} />
+            <ShareModal open={shareOpen} onClose={() => setShareOpen(false)} tripData={tripData} canShare={canSharePublicTrip} />
             <PortalPinUnlockModal
               open={securityModalOpen}
               onClose={handleCloseSensitiveAccessModal}
@@ -11076,7 +11118,7 @@ export default function TripPage() {
               ) : null}
             </BottomSheet>
 
-            <ShareModal open={shareOpen} onClose={() => setShareOpen(false)} tripData={tripData} />
+            <ShareModal open={shareOpen} onClose={() => setShareOpen(false)} tripData={tripData} canShare={canSharePublicTrip} />
             <PortalPinUnlockModal
               open={securityModalOpen}
               onClose={handleCloseSensitiveAccessModal}
@@ -11227,7 +11269,7 @@ export default function TripPage() {
           <QuickInfoSection tripData={tripData} />
           <TripFooter agencyBranding={agencyBranding} />
 
-          <ShareModal open={shareOpen} onClose={() => setShareOpen(false)} tripData={tripData} />
+          <ShareModal open={shareOpen} onClose={() => setShareOpen(false)} tripData={tripData} canShare={canSharePublicTrip} />
           <PortalPinUnlockModal
             open={securityModalOpen}
             onClose={handleCloseSensitiveAccessModal}
