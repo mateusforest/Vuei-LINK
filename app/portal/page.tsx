@@ -303,7 +303,7 @@ export default function PortalHomePage() {
                   disabled={activatingTripId === activeTrip.id || getLinkLifecycle(activeTrip) === "ended"}
                 >
                   <ExternalLink size={16} className="mr-2" />
-                  {activatingTripId === activeTrip.id ? "Ativando..." : isLinkActive(activeTrip) ? "Abrir link" : getLinkLifecycle(activeTrip) === "ended" ? "Viagem encerrada" : activeTrip.linkActivatedAt ? "Reabrir link" : "Ativar link (1 Link)"}
+                  {activatingTripId === activeTrip.id ? "Ativando..." : isLinkActive(activeTrip) ? "Abrir link" : getLinkLifecycle(activeTrip) === "ended" ? "Viagem encerrada" : activeTrip.linkActivatedAt ? "Reabrir link" : "Ativar viagem (1 crédito)"}
                 </Button>
                 <Button
                   variant="outline"
@@ -387,7 +387,7 @@ export default function PortalHomePage() {
                   </div>
                   <div className="flex flex-wrap gap-2">
                     <Button variant="outline" className="border-border/50" onClick={() => handlePrimaryTripAction(trip)} disabled={activatingTripId === trip.id || getLinkLifecycle(trip) === "ended"}>
-                      {activatingTripId === trip.id ? "Ativando..." : isLinkActive(trip) ? "Abrir link" : getLinkLifecycle(trip) === "ended" ? "Encerrada" : trip.linkActivatedAt ? "Reabrir link" : "Ativar link (1 Link)"}
+                      {activatingTripId === trip.id ? "Ativando..." : isLinkActive(trip) ? "Abrir link" : getLinkLifecycle(trip) === "ended" ? "Encerrada" : trip.linkActivatedAt ? "Reabrir link" : "Ativar viagem (1 crédito)"}
                     </Button>
                     <Button variant="outline" className="border-border/50" onClick={() => void copyLink(trip.shareLink, "admin")} disabled={!isLinkActive(trip)}>
                       Copiar link

@@ -1239,8 +1239,8 @@ function getFlightStatusCopy(flight: any) {
 
   if (flight.extractionStatus === "failed" && hasInsufficientCreditsError) {
     return {
-      eyebrow: "Créditos insuficientes",
-      detail: "Você não possui créditos suficientes para extrair automaticamente os dados desta passagem. Adicione créditos ou altere seu plano para continuar utilizando a Extração IA.",
+      eyebrow: "Créditos de IA insuficientes",
+      detail: "Você não possui créditos de IA suficientes para extrair automaticamente os dados desta passagem. Compre créditos de IA para continuar utilizando a Extração IA.",
       tone: "error" as const,
     }
   }
@@ -5101,7 +5101,7 @@ function UploadExistingItineraryModal({
             <>
               <Upload className="w-8 h-8 mx-auto text-white/40 mb-3" />
               <p className="text-sm text-white/60">Clique para selecionar PDF, imagem ou documento</p>
-              <p className="text-xs text-white/30 mt-1">Sem leitura de IA e sem consumo de créditos</p>
+              <p className="text-xs text-white/30 mt-1">Sem leitura de IA e sem consumo de créditos de IA</p>
             </>
           )}
           <input type="file" accept=".pdf,.png,.jpg,.jpeg,.heic,.heif,image/heic,image/heif" className="hidden" disabled={uploading} onChange={(event) => void handleUpload(event.target.files?.[0])} />
@@ -7087,7 +7087,7 @@ function ConciergeSection({
               <div className="flex items-center gap-2">
                 <CreditCard className="w-4 h-4 text-[#5de0e6]" />
                 <span className="text-xs text-white/40">
-                  {typeof creditsBalance === "number" ? `${creditsBalance} créditos restantes` : "Sincronizando saldo real"}
+                  {typeof creditsBalance === "number" ? `${creditsBalance} créditos IA restantes` : "Sincronizando saldo real"}
                 </span>
               </div>
               <Button size="sm" variant="ghost" onClick={onOpenCredits} className="text-[#5de0e6] text-xs">
@@ -7218,13 +7218,13 @@ function MenuModal({
     ...(isAdmin ? [
       ...(onOpenEditTrip ? [{ icon: Edit3, label: "Editar viagem", action: onOpenEditTrip }] : []),
       ...(onOpenShare ? [{ icon: Share2, label: "Compartilhar link", action: onOpenShare }] : []),
-      ...(showCredits ? [{ icon: CreditCard, label: "Créditos", action: onOpenCredits }] : []),
+      ...(showCredits ? [{ icon: CreditCard, label: "Créditos de IA", action: onOpenCredits }] : []),
       { icon: Shield, label: "Segurança", action: onOpenSecurity },
       ...(onOpenOffline ? [{ icon: WifiOff, label: "Offline", action: onOpenOffline }] : []),
       { icon: Settings, label: "Configurações", action: onOpenSettings },
       { icon: User, label: "Viajantes", action: onOpenTravelers },
     ] : []),
-    { icon: CreditCard, label: "Créditos", action: onOpenCredits },
+    { icon: CreditCard, label: "Créditos de IA", action: onOpenCredits },
   ]
 
   return (
@@ -7972,7 +7972,7 @@ function TravelerPublicCreditsModal({
   const usagePercentage = monthlyCredits > 0 ? Math.min((planCreditsUsed / monthlyCredits) * 100, 100) : 0
 
   return (
-    <Modal tone={tone} open={open} onClose={onClose} title="Créditos">
+    <Modal tone={tone} open={open} onClose={onClose} title="Créditos de IA">
       <div className="space-y-5">
         {!credits ? (
           <div className="rounded-2xl border border-slate-200 bg-white/92 p-4 text-sm text-slate-600">
@@ -7982,33 +7982,33 @@ function TravelerPublicCreditsModal({
         <div className="rounded-[26px] border border-[#dbe5f4] bg-[linear-gradient(180deg,#ffffff_0%,#eef5ff_100%)] p-5">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <p className="text-sm text-slate-500">Créditos disponíveis</p>
+              <p className="text-sm text-slate-500">Saldo de IA</p>
               <p className="mt-1 text-4xl font-semibold tracking-[-0.04em] text-slate-950">{balance}</p>
             </div>
             <div className="rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-600 ring-1 ring-slate-200">
-              Plano {credits?.currentPlan === "premium" ? "Premium" : "Free"}
+              {credits?.currentPlan === "premium" ? "Premium legado" : "Créditos de IA"}
             </div>
           </div>
           <div className="mt-4 h-2 rounded-full bg-slate-200">
             <div className="h-full rounded-full bg-gradient-to-r from-[#5de0e6] to-[#004aad]" style={{ width: `${usagePercentage}%` }} />
           </div>
           <p className="mt-3 text-xs text-slate-500">
-            {planCreditsUsed} de {monthlyCredits} créditos mensais utilizados neste ciclo
+            Uso dos créditos incluídos: {planCreditsUsed} de {monthlyCredits}
           </p>
         </div>
 
         <div className="grid grid-cols-2 gap-3">
           <div className="rounded-2xl border border-slate-200 bg-white/92 p-4">
-            <p className="text-xs text-slate-500">Créditos do plano</p>
+            <p className="text-xs text-slate-500">Incluídos neste ciclo</p>
             <p className="mt-2 text-2xl font-semibold text-slate-950">{planCredits}</p>
             <p className="mt-1 text-xs text-slate-500">Disponiveis neste ciclo</p>
           </div>
           <div className="rounded-2xl border border-slate-200 bg-white/92 p-4">
-            <p className="text-xs text-slate-500">Saldo atual</p>
+            <p className="text-xs text-slate-500">Saldo de IA</p>
             <p className="mt-2 text-2xl font-semibold text-slate-950">{balance}</p>
           </div>
           <div className="rounded-2xl border border-slate-200 bg-white/92 p-4">
-            <p className="text-xs text-slate-500">Créditos comprados</p>
+            <p className="text-xs text-slate-500">Comprados</p>
             <p className="mt-2 text-2xl font-semibold text-slate-950">{purchasedCredits}</p>
             <p className="mt-1 text-xs text-slate-500">Acumulados fora do ciclo mensal</p>
           </div>
@@ -8019,7 +8019,7 @@ function TravelerPublicCreditsModal({
         </div>
 
         <div className="rounded-2xl border border-slate-200 bg-white/92 p-4 text-sm text-slate-600">
-          Recargas e compras sao feitas pelo portal.
+          A compra de créditos de IA é feita pelo portal.
         </div>
       </div>
     </Modal>
@@ -8045,7 +8045,7 @@ function LinkCreditsSummaryModal({
   const usagePercentage = monthlyCredits > 0 ? Math.min((planCreditsUsed / monthlyCredits) * 100, 100) : 0
 
   return (
-    <Modal tone={tone} open={open} onClose={onClose} title="Créditos">
+    <Modal tone={tone} open={open} onClose={onClose} title="Créditos de IA">
       <div className="space-y-5">
         {!credits ? (
           <div className="rounded-2xl border border-slate-200 bg-white/92 p-4 text-sm text-slate-600">
@@ -8055,33 +8055,33 @@ function LinkCreditsSummaryModal({
         <div className="rounded-[26px] border border-[#dbe5f4] bg-[linear-gradient(180deg,#ffffff_0%,#eef5ff_100%)] p-5">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <p className="text-sm text-slate-500">Créditos disponíveis</p>
+              <p className="text-sm text-slate-500">Saldo de IA</p>
               <p className="mt-1 text-4xl font-semibold tracking-[-0.04em] text-slate-950">{balance}</p>
             </div>
             <div className="rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-600 ring-1 ring-slate-200">
-              Plano {credits?.currentPlan === "premium" ? "Premium" : "Free"}
+              {credits?.currentPlan === "premium" ? "Premium legado" : "Créditos de IA"}
             </div>
           </div>
           <div className="mt-4 h-2 rounded-full bg-slate-200">
             <div className="h-full rounded-full bg-gradient-to-r from-[#5de0e6] to-[#004aad]" style={{ width: `${usagePercentage}%` }} />
           </div>
           <p className="mt-3 text-xs text-slate-500">
-            {planCreditsUsed} de {monthlyCredits} créditos mensais utilizados neste ciclo
+            Uso dos créditos incluídos: {planCreditsUsed} de {monthlyCredits}
           </p>
         </div>
 
         <div className="grid grid-cols-2 gap-3">
           <div className="rounded-2xl border border-slate-200 bg-white/92 p-4">
-            <p className="text-xs text-slate-500">Créditos do plano</p>
+            <p className="text-xs text-slate-500">Incluídos neste ciclo</p>
             <p className="mt-2 text-2xl font-semibold text-slate-950">{planCredits}</p>
             <p className="mt-1 text-xs text-slate-500">Disponiveis neste ciclo</p>
           </div>
           <div className="rounded-2xl border border-slate-200 bg-white/92 p-4">
-            <p className="text-xs text-slate-500">Saldo atual</p>
+            <p className="text-xs text-slate-500">Saldo de IA</p>
             <p className="mt-2 text-2xl font-semibold text-slate-950">{balance}</p>
           </div>
           <div className="rounded-2xl border border-slate-200 bg-white/92 p-4">
-            <p className="text-xs text-slate-500">Créditos comprados</p>
+            <p className="text-xs text-slate-500">Comprados</p>
             <p className="mt-2 text-2xl font-semibold text-slate-950">{purchasedCredits}</p>
             <p className="mt-1 text-xs text-slate-500">Acumulados fora do ciclo mensal</p>
           </div>
@@ -8092,7 +8092,7 @@ function LinkCreditsSummaryModal({
         </div>
 
         <div className="rounded-2xl border border-slate-200 bg-white/92 p-4 text-sm text-slate-600">
-          Recargas e compras sao feitas pelo portal.
+          A compra de créditos de IA é feita pelo portal.
         </div>
       </div>
     </Modal>
@@ -10931,19 +10931,16 @@ export default function TripPage() {
             <TripSettingsModal open={tripSettingsOpen} onClose={() => setTripSettingsOpen(false)} tripData={tripData} onSave={handleSaveTripSettings} />
             <LinkSecurityInfoModal open={securitySettingsOpen} onClose={() => setSecuritySettingsOpen(false)} tripId={tripData.id} tripSlug={routeSlug} adminToken={tripAdminToken} publicToken={tripPublicToken} accessMode={authenticatedAdminEligible ? "admin" : "public"} />
             {!isAgencyTrip ? <TravelerPublicCreditsModal open={creditsOpen} onClose={() => setCreditsOpen(false)} credits={travelerCredits} tone={tripLinkTheme} /> : null}
-            <Modal open={premiumGateModalOpen} onClose={() => setPremiumGateModalOpen(false)} title="Disponível no Premium">
+            <Modal open={premiumGateModalOpen} onClose={() => setPremiumGateModalOpen(false)} title="Roteiro IA">
               <div className="space-y-5">
                 <p className="text-sm text-white/60">
-                  Assine o Premium para gerar roteiros inteligentes, criar viagens ilimitadas e receber créditos mensais inclusos.
+                  Roteiro IA não está disponível na sua conta atualmente.
                 </p>
                 <Button
                   className="w-full rounded-2xl border-0 bg-gradient-to-r from-[#5de0e6] to-[#004aad] text-white"
-                  onClick={() => {
-                    setPremiumGateModalOpen(false)
-                    router.push("/portal/planos")
-                  }}
+                  onClick={() => setPremiumGateModalOpen(false)}
                 >
-                  Conhecer Premium
+                  Entendi
                 </Button>
               </div>
             </Modal>
@@ -11154,19 +11151,16 @@ export default function TripPage() {
             <TripSettingsModal open={tripSettingsOpen} onClose={() => setTripSettingsOpen(false)} tripData={tripData} onSave={handleSaveTripSettings} />
             <LinkSecurityInfoModal open={securitySettingsOpen} onClose={() => setSecuritySettingsOpen(false)} tripId={tripData.id} tripSlug={routeSlug} adminToken={tripAdminToken} publicToken={tripPublicToken} accessMode="admin" />
             {!isAgencyTrip ? <LinkCreditsSummaryModal open={creditsOpen} onClose={() => setCreditsOpen(false)} credits={travelerCredits} tone={tripLinkTheme} /> : null}
-            <Modal open={premiumGateModalOpen} onClose={() => setPremiumGateModalOpen(false)} title="Disponível no Premium">
+            <Modal open={premiumGateModalOpen} onClose={() => setPremiumGateModalOpen(false)} title="Roteiro IA">
               <div className="space-y-5">
                 <p className="text-sm text-slate-600">
-                  Assine o Premium para gerar roteiros inteligentes, criar viagens ilimitadas e receber créditos mensais inclusos.
+                  Roteiro IA não está disponível na sua conta atualmente.
                 </p>
                 <Button
                   className="w-full rounded-2xl border-0 bg-gradient-to-r from-[#5de0e6] to-[#004aad] text-white"
-                  onClick={() => {
-                    setPremiumGateModalOpen(false)
-                    router.push("/portal/planos")
-                  }}
+                  onClick={() => setPremiumGateModalOpen(false)}
                 >
-                  Conhecer Premium
+                  Entendi
                 </Button>
               </div>
             </Modal>
@@ -11290,19 +11284,16 @@ export default function TripPage() {
           <TripSettingsModal open={tripSettingsOpen} onClose={() => setTripSettingsOpen(false)} tripData={tripData} onSave={handleSaveTripSettings} />
           <LinkSecurityInfoModal open={securitySettingsOpen} onClose={() => setSecuritySettingsOpen(false)} tripId={tripData.id} tripSlug={routeSlug} adminToken={tripAdminToken} publicToken={tripPublicToken} accessMode={canWrite || adminRouteActive || authenticatedAdminEligible ? "admin" : "public"} />
           {!isAgencyTrip ? <LinkCreditsSummaryModal open={creditsOpen} onClose={() => setCreditsOpen(false)} credits={travelerCredits} /> : null}
-          <Modal open={premiumGateModalOpen} onClose={() => setPremiumGateModalOpen(false)} title="Disponível no Premium">
+          <Modal open={premiumGateModalOpen} onClose={() => setPremiumGateModalOpen(false)} title="Roteiro IA">
             <div className="space-y-5">
               <p className="text-sm text-white/60">
-                Assine o Premium para gerar roteiros inteligentes, criar viagens ilimitadas e receber créditos mensais inclusos.
+                Roteiro IA não está disponível na sua conta atualmente.
               </p>
               <Button
                 className="w-full rounded-2xl border-0 bg-gradient-to-r from-[#5de0e6] to-[#004aad] text-white"
-                onClick={() => {
-                  setPremiumGateModalOpen(false)
-                  router.push("/portal/planos")
-                }}
+                onClick={() => setPremiumGateModalOpen(false)}
               >
-                Conhecer Premium
+                Entendi
               </Button>
             </div>
           </Modal>

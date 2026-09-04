@@ -138,11 +138,11 @@ export default function ComprarViagensPage() {
           </Button>
           <div>
             <h1 className="text-2xl font-bold">Comprar viagens</h1>
-            <p className="text-sm text-muted-foreground">Créditos para ativar links de viagem quando você quiser.</p>
+            <p className="text-sm text-muted-foreground">Viagens disponíveis para ativar seus links quando você quiser.</p>
           </div>
         </div>
         <Badge variant="outline" className="rounded-full border-primary/20 bg-primary/5 px-4 py-2 text-primary">
-          Créditos sem expiração
+          Créditos de viagem sem expiração
         </Badge>
       </div>
 

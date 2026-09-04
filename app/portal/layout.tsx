@@ -87,15 +87,13 @@ function PortalLayoutInner({ children }: { children: React.ReactNode }) {
   const accountMenuItems = [
     { label: "Minha conta", href: "/portal/configuracoes", icon: User },
     { label: "Comprar viagens", href: "/portal/viagens/comprar", icon: Luggage },
-    { label: "Créditos", href: "/portal/creditos", icon: Coins },
+    { label: "Créditos de IA", href: "/portal/creditos", icon: Coins },
     { label: "Configurações", href: "/portal/configuracoes", icon: Settings },
     { label: "Offline", href: "/portal/offline", icon: WifiOff },
     { label: "Compartilhar", href: "/portal/compartilhar", icon: Share2 },
   ]
-  const travelerPlanCredits = Math.max(subscription.definition.monthlyCredits, 1)
-  const travelerCreditsProgress = Math.min((credits.balance / travelerPlanCredits) * 100, 100)
-  const travelerCreditsActionHref = subscription.code === "free" ? "/portal/planos" : "/portal/creditos"
-  const travelerCreditsActionLabel = subscription.code === "free" ? "Fazer upgrade" : "Comprar créditos"
+  const travelerCreditsActionHref = "/portal/creditos"
+  const travelerCreditsActionLabel = "Comprar créditos de IA"
 
   const handleSignOut = async () => {
     void signOut()
@@ -237,28 +235,20 @@ function PortalLayoutInner({ children }: { children: React.ReactNode }) {
                     <Coins size={18} />
                   </div>
                   <div className="min-w-0 flex-1">
-                    {!sidebarCollapsed && <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">Créditos IA</p>}
+                    {!sidebarCollapsed && <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">Créditos de IA</p>}
                     <div className={cn("mt-1 flex items-end gap-2", sidebarCollapsed && "mt-0 flex-col items-center gap-1")}>
                       <span className="text-2xl font-semibold leading-none text-foreground">{credits.balance}</span>
-                      {!sidebarCollapsed && <span className="text-xs text-muted-foreground">Plano {subscription.definition.name}</span>}
+                      {!sidebarCollapsed && (
+                        <span className="text-xs text-muted-foreground">
+                          {subscription.isPremium ? "Premium legado" : "Saldo disponível"}
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>
-                <div className="mt-4">
-                  <div className="h-2 overflow-hidden rounded-full bg-slate-200/80">
-                    <motion.div
-                      className="h-full rounded-full bg-gradient-to-r from-[#37beff] to-[#0b56d8]"
-                      initial={false}
-                      animate={{ width: `${travelerCreditsProgress}%` }}
-                      transition={{ duration: 0.4, ease: "easeOut" }}
-                    />
-                  </div>
-                  {!sidebarCollapsed && (
-                    <p className="mt-2 text-xs text-muted-foreground">
-                      {credits.balance} de {travelerPlanCredits} créditos considerados no saldo atual
-                    </p>
-                  )}
-                </div>
+                {!sidebarCollapsed ? (
+                  <p className="mt-3 text-xs text-muted-foreground">Saldo de IA: {credits.balance} créditos</p>
+                ) : null}
                 <Link
                   href={travelerCreditsActionHref}
                   className={cn(
@@ -412,7 +402,7 @@ function PortalLayoutInner({ children }: { children: React.ReactNode }) {
                 className="flex min-w-0 items-center gap-2 rounded-full border border-border/60 bg-white/85 px-3 py-2 text-slate-900 transition-colors hover:bg-white"
               >
                 <Coins size={14} className="text-primary" />
-                <span className="truncate text-xs font-medium">{credits.balance} créditos</span>
+                <span className="truncate text-xs font-medium">{credits.balance} créditos IA</span>
               </Link>
               <Link
                 href="/portal/offline"

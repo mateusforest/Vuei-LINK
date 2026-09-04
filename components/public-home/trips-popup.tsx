@@ -7,6 +7,10 @@ import type { Trip as LegacyTrip } from "@/contexts/trips-context"
 import { VueiSymbol } from "@/components/public-home/vuei-mark"
 import { formatRange } from "@/components/public-home/date-range-picker"
 import { cn } from "@/lib/utils"
+import {
+  resolveTripLinkLifecycle,
+  type TripLinkLifecycleStatus,
+} from "@/lib/security/trip-link-lifecycle"
 
 export interface PublicBagTripItem {
   id: string
@@ -17,12 +21,28 @@ export interface PublicBagTripItem {
   travelersCount: number | null
   url: string
   statusLabel: string
+  lifecycle: TripLinkLifecycleStatus
   isActivated: boolean
   isPending?: boolean
 }
 
 export function mapLegacyTripToBagItem(trip: LegacyTrip): PublicBagTripItem {
-  const isActivated = Boolean(trip.linkActivatedAt && trip.visibility === "public")
+  const lifecycle = resolveTripLinkLifecycle({
+    ownerType: "traveler",
+    visibility: trip.visibility,
+    status: trip.status,
+    endDate: trip.endDate,
+    linkActivatedAt: trip.linkActivatedAt,
+    linkAccessUntil: trip.linkAccessUntil,
+  })
+  const isActivated = trip.visibility === "public" && (lifecycle === "active" || lifecycle === "post_trip")
+  const statusLabel = lifecycle === "active"
+    ? "Ativa"
+    : lifecycle === "post_trip"
+      ? "Pós-viagem"
+      : lifecycle === "ended"
+        ? "Encerrada"
+        : "Rascunho"
 
   return {
     id: trip.id,
@@ -32,7 +52,8 @@ export function mapLegacyTripToBagItem(trip: LegacyTrip): PublicBagTripItem {
     endDate: trip.endDate || null,
     travelersCount: trip.passengersCount,
     url: trip.shareLink,
-    statusLabel: isActivated ? "Ativa" : "Rascunho",
+    statusLabel,
+    lifecycle,
     isActivated,
     isPending: false,
   }
@@ -44,6 +65,7 @@ export function TripsPopup({
   trips,
   highlightTripId,
   walletBalanceLabel,
+  canAccessArchive = false,
   emptyStateMode = "default",
   onClose,
   onNewTrip,
@@ -57,6 +79,7 @@ export function TripsPopup({
   trips: PublicBagTripItem[]
   highlightTripId?: string | null
   walletBalanceLabel?: string | null
+  canAccessArchive?: boolean
   emptyStateMode?: "default" | "guest-bag"
   onClose: () => void
   onNewTrip: () => void
@@ -120,7 +143,7 @@ export function TripsPopup({
             <div className="rounded-2xl border border-border/60 bg-background/60 p-3.5 shadow-[0_2px_10px_-6px_rgba(20,60,120,0.15)]">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">Links disponíveis</p>
+                  <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">Viagens disponíveis</p>
                   <p className="mt-1 text-xl font-semibold text-foreground">
                     {walletBalanceLabel ?? "0"}
                   </p>
@@ -131,7 +154,7 @@ export function TripsPopup({
                   onClick={onOpenWalletAction}
                   className="h-9 rounded-xl border-border/60 bg-background/70 px-3 text-[0.82rem] text-foreground"
                 >
-                  Comprar Links
+                  Comprar viagens
                 </Button>
               </div>
             </div>
@@ -172,6 +195,7 @@ export function TripsPopup({
                     trip={trip}
                     highlighted={highlightTripId === trip.id}
                     onOpen={onOpenTrip}
+                    canAccessArchive={canAccessArchive}
                   />
                 </li>
               ))}
@@ -218,10 +242,12 @@ function TripCard({
   trip,
   highlighted,
   onOpen,
+  canAccessArchive,
 }: {
   trip: PublicBagTripItem
   highlighted?: boolean
   onOpen: (trip: PublicBagTripItem) => void
+  canAccessArchive: boolean
 }) {
   const [copied, setCopied] = useState(false)
   const range = formatRange(trip.startDate, trip.endDate)
@@ -250,10 +276,25 @@ function TripCard({
             <span
               className={cn(
                 "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[0.68rem] font-medium",
-                trip.isActivated ? "bg-emerald-500/12 text-emerald-700" : "bg-amber-500/12 text-amber-700",
+                trip.lifecycle === "active"
+                  ? "bg-emerald-500/12 text-emerald-700"
+                  : trip.lifecycle === "post_trip"
+                    ? "bg-sky-500/12 text-sky-700"
+                    : trip.lifecycle === "ended"
+                      ? "bg-slate-500/12 text-slate-600"
+                      : "bg-amber-500/12 text-amber-700",
               )}
             >
-              <span className={cn("size-1.5 rounded-full", trip.isActivated ? "bg-emerald-500" : "bg-amber-500")} />
+              <span className={cn(
+                "size-1.5 rounded-full",
+                trip.lifecycle === "active"
+                  ? "bg-emerald-500"
+                  : trip.lifecycle === "post_trip"
+                    ? "bg-sky-500"
+                    : trip.lifecycle === "ended"
+                      ? "bg-slate-500"
+                      : "bg-amber-500",
+              )} />
               {trip.statusLabel}
             </span>
           </div>
@@ -263,6 +304,8 @@ function TripCard({
           <p className="mt-1.5 truncate text-[0.75rem] text-muted-foreground">
             {trip.isActivated
               ? trip.url
+              : trip.lifecycle === "ended"
+                ? "Link público encerrado"
               : trip.isPending
                 ? "Rascunho privado neste navegador"
                 : "Rascunho privado na sua Bolsa"}
@@ -276,7 +319,13 @@ function TripCard({
             className="h-8 rounded-xl px-2.5 text-[0.78rem] text-muted-foreground transition-colors hover:bg-foreground/5 hover:text-foreground"
           >
             <ExternalLink className="size-3.5" />
-            {trip.isActivated ? "Abrir" : trip.isPending ? "Continuar" : "Ativar viagem"}
+            {trip.isActivated
+              ? "Abrir"
+              : trip.lifecycle === "ended"
+                ? canAccessArchive ? "Abrir arquivo" : "Conhecer Vuei+"
+                : trip.isPending
+                  ? "Continuar"
+                  : "Ativar viagem"}
           </Button>
           {trip.isActivated ? (
             <Button

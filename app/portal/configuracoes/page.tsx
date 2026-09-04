@@ -38,7 +38,12 @@ import { useTrips } from "@/contexts/trips-context"
 import { shouldUseSupabase } from "@/lib/data-source"
 import { updateProfile as updateProfileRepository } from "@/lib/repositories/profiles-repository"
 import { createSupabaseBrowserClient } from "@/lib/supabase/client"
-import { createTravelerCustomerPortal, getTravelerBillingStatus } from "@/lib/repositories/traveler-billing-repository"
+import {
+  createTravelerCustomerPortal,
+  getTravelerBillingStatus,
+  getTravelerVueiPlusStatus,
+} from "@/lib/repositories/traveler-billing-repository"
+import { getTravelerTripLinkStoreSummary } from "@/lib/repositories/traveler-trip-link-repository"
 import { createSupportTicket } from "@/lib/repositories/support-repository"
 import {
   disableQuickAccessBiometric,
@@ -49,7 +54,7 @@ import {
   registerQuickAccessBiometric,
   saveQuickAccessPin,
 } from "@/lib/auth/quick-access"
-import type { TravelerBillingStatusSummary } from "@/types"
+import type { TravelerBillingStatusSummary, TravelerMembershipStatusSummary } from "@/types"
 
 const fadeInUp = {
   initial: { opacity: 0, y: 20 },
@@ -71,7 +76,7 @@ const defaultProfile = {
   name: "Conta",
   email: "",
   phone: "",
-  plan: "Free",
+  plan: "Viajante",
   avatar: "",
   createdAt: "Não informado",
 }
@@ -82,12 +87,6 @@ const defaultSettings = {
   notifications: true,
   darkMode: true,
   language: "pt-BR",
-}
-
-function isTravelerPaidSubscriptionActive(status: TravelerBillingStatusSummary | null) {
-  if (!status) return false
-  if (status.currentPlan === "free") return false
-  return status.subscriptionStatus === "active" || status.subscriptionStatus === "trialing" || status.subscriptionStatus === "past_due"
 }
 
 function SettingsToast({ message }: { message: string }) {
@@ -108,7 +107,7 @@ export default function ConfiguracoesPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { signOut, user, profile: authProfile, refreshProfile } = useAuth()
-  const { subscription } = useTrips()
+  const { credits, subscription } = useTrips()
   const [profile, setProfile] = useState(defaultProfile)
   const [settings, setSettings] = useState(defaultSettings)
   const [toastMessage, setToastMessage] = useState("")
@@ -124,6 +123,8 @@ export default function ConfiguracoesPage() {
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [infoModal, setInfoModal] = useState<{ title: string; description: string } | null>(null)
   const [billingStatus, setBillingStatus] = useState<TravelerBillingStatusSummary | null>(null)
+  const [membershipStatus, setMembershipStatus] = useState<TravelerMembershipStatusSummary | null>(null)
+  const [tripLinkBalance, setTripLinkBalance] = useState<number | null>(null)
   const [billingLoading, setBillingLoading] = useState(false)
   const [billingActionLoading, setBillingActionLoading] = useState(false)
   const [deleteRequestSubmitting, setDeleteRequestSubmitting] = useState(false)
@@ -142,7 +143,14 @@ export default function ConfiguracoesPage() {
   const [deviceQuickAccess, setDeviceQuickAccess] = useState({ configured: false, pinEnabled: false, biometricEnabled: false })
   const setupQuickAccess = searchParams.get("quickAccess") === "1"
   const returnTo = searchParams.get("returnTo")
-  const hasActivePaidSubscription = isTravelerPaidSubscriptionActive(billingStatus)
+  const hasActivePaidSubscription = Boolean(membershipStatus?.hasVueiPlus || membershipStatus?.isPremiumLegacy)
+  const canManageVueiPlus = Boolean(
+    membershipStatus?.hasVueiPlus && membershipStatus.vueiPlusStripeSubscriptionId,
+  )
+  const canManagePremiumLegacy = Boolean(
+    membershipStatus?.isPremiumLegacy && billingStatus?.stripeSubscriptionId,
+  )
+  const canManageAnySubscription = canManageVueiPlus || canManagePremiumLegacy
 
   useEffect(() => {
     if (typeof window === "undefined") return
@@ -159,7 +167,7 @@ export default function ConfiguracoesPage() {
         name: authProfile.name || defaultProfile.name,
         email: authProfile.email || defaultProfile.email,
         phone: authProfile.phone || defaultProfile.phone,
-        plan: authProfile.role === "agency_owner" || authProfile.role === "agency_member" ? "Agency" : subscription.definition.name,
+        plan: authProfile.role === "agency_owner" || authProfile.role === "agency_member" ? "Agency" : "Viajante",
         avatar: authProfile.avatarUrl || "",
         createdAt: authProfile.createdAt
           ? new Date(authProfile.createdAt).toLocaleDateString("pt-BR", { month: "long", year: "numeric" })
@@ -192,8 +200,8 @@ export default function ConfiguracoesPage() {
     try {
       const parsed = JSON.parse(saved)
       if (parsed.profile) {
-        setProfile({ ...defaultProfile, ...parsed.profile })
-        setProfileForm({ ...defaultProfile, ...parsed.profile })
+        setProfile({ ...defaultProfile, ...parsed.profile, plan: "Viajante" })
+        setProfileForm({ ...defaultProfile, ...parsed.profile, plan: "Viajante" })
         setPhotoPreview(parsed.profile.avatar ?? "")
       }
       if (parsed.settings) {
@@ -202,11 +210,13 @@ export default function ConfiguracoesPage() {
     } catch {
       // fallback silencioso
     }
-  }, [authProfile, subscription.definition.name])
+  }, [authProfile])
 
   useEffect(() => {
     if (!shouldUseSupabase() || !authProfile?.id) {
       setBillingStatus(null)
+      setMembershipStatus(null)
+      setTripLinkBalance(null)
       return
     }
 
@@ -214,11 +224,18 @@ export default function ConfiguracoesPage() {
     setBillingLoading(true)
 
     const loadBilling = async () => {
-      const result = await getTravelerBillingStatus()
+      const [billingResult, membershipResult, tripLinkResult] = await Promise.all([
+        getTravelerBillingStatus(),
+        getTravelerVueiPlusStatus(),
+        getTravelerTripLinkStoreSummary(),
+      ])
       if (!active) return
-      setBillingStatus(result.data ?? null)
-      if (result.error) {
-        setActionError(result.error)
+      setBillingStatus(billingResult.data ?? null)
+      setMembershipStatus(membershipResult.data ?? null)
+      setTripLinkBalance(tripLinkResult.data?.balance ?? null)
+      const loadError = billingResult.error ?? membershipResult.error ?? tripLinkResult.error
+      if (loadError) {
+        setActionError(loadError)
       }
       setBillingLoading(false)
     }
@@ -672,11 +689,11 @@ export default function ConfiguracoesPage() {
           action: () => setShowPasswordModal(true),
         },
         {
-          icon: Crown,
-          label: "Plano atual",
-          description: profile.plan,
-          badgeText: profile.plan,
-          badgeClass: "bg-amber-500/20 text-amber-400",
+          icon: User,
+          label: "Tipo de conta",
+          description: "Viajante",
+          badgeText: "Viajante",
+          badgeClass: "bg-primary/10 text-primary",
         },
       ],
     },
@@ -787,58 +804,89 @@ export default function ConfiguracoesPage() {
               <p className="text-sm text-muted-foreground">{profile.email}</p>
               <p className="mt-1 text-xs text-muted-foreground">Membro desde {profile.createdAt}</p>
             </div>
-            <Badge className="border-amber-500/30 bg-gradient-to-r from-amber-500/20 to-amber-600/20 text-amber-400">
-              <Crown size={12} className="mr-1" />
-              {profile.plan}
+            <Badge className="border-primary/20 bg-primary/10 text-primary">
+              <User size={12} className="mr-1" />
+              Viajante
             </Badge>
           </div>
         </Card>
       </motion.div>
 
       <motion.div variants={fadeInUp}>
-        <h2 className="mb-3 px-1 text-sm font-medium text-muted-foreground">Assinatura</h2>
+        <h2 className="mb-3 px-1 text-sm font-medium text-muted-foreground">Produtos da conta</h2>
         <Card className="vuei-glass border-border/50 bg-card/50 p-5">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-            <div className="space-y-3">
-              <div>
-                <p className="text-sm text-muted-foreground">Plano atual</p>
-                <p className="text-lg font-semibold">{billingStatus?.currentPlan === "premium" ? "Premium" : "Free"}</p>
-              </div>
-              <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="rounded-2xl border border-border/50 bg-background/40 p-4">
+              <div className="flex items-center justify-between gap-3">
                 <div>
-                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Status</p>
-                  <p className="mt-1 text-sm font-medium">
-                    {billingLoading ? "Carregando..." : billingStatus?.currentPlan === "free" ? "Você está utilizando o plano Free." : billingStatus?.subscriptionStatus ?? "Não informado"}
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Vuei+</p>
+                  <p className="mt-1 text-lg font-semibold">
+                    {billingLoading ? "Carregando..." : membershipStatus?.hasVueiPlus ? "Ativo" : "Inativo"}
                   </p>
                 </div>
-                <div>
-                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Próxima renovação</p>
-                  <p className="mt-1 text-sm font-medium">
-                    {billingStatus?.currentPeriodEnd ? new Date(billingStatus.currentPeriodEnd).toLocaleDateString("pt-BR") : "Não se aplica"}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Créditos mensais</p>
-                  <p className="mt-1 text-sm font-medium">{subscription.definition.monthlyCredits}</p>
-                </div>
+                <Badge variant="secondary" className={membershipStatus?.hasVueiPlus ? "text-emerald-500" : "text-muted-foreground"}>
+                  {membershipStatus?.hasVueiPlus ? "Assinatura ativa" : "Opcional"}
+                </Badge>
               </div>
-              {billingStatus?.currentPlan === "free" || !billingStatus ? (
-                <p className="text-sm text-muted-foreground">Você está utilizando o plano Free.</p>
-              ) : billingStatus.cancelAtPeriodEnd ? (
-                <p className="text-sm text-amber-400">Sua assinatura está programada para cancelamento ao final do ciclo atual.</p>
-              ) : null}
+              {membershipStatus?.hasVueiPlus && membershipStatus.vueiPlusCurrentPeriodEnd ? (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  {membershipStatus.vueiPlusCancelAtPeriodEnd ? "Acesso até" : "Próxima renovação"}: {new Date(membershipStatus.vueiPlusCurrentPeriodEnd).toLocaleDateString("pt-BR")}
+                </p>
+              ) : (
+                <p className="mt-2 text-xs text-muted-foreground">Arquivo de viagens encerradas e benefícios recorrentes.</p>
+              )}
+              <div className="mt-4 flex flex-wrap gap-2">
+                {canManageVueiPlus ? (
+                  <Button size="sm" variant="outline" onClick={() => void handleOpenTravelerCustomerPortal()} disabled={billingActionLoading}>
+                    {billingActionLoading ? "Abrindo..." : "Gerenciar Vuei+"}
+                  </Button>
+                ) : null}
+                {!membershipStatus?.hasVueiPlus ? (
+                  <Button size="sm" variant="outline" onClick={() => router.push("/portal/planos")}>Conhecer Vuei+</Button>
+                ) : null}
+              </div>
             </div>
 
-            <div className="flex flex-col gap-3 sm:flex-row lg:flex-col">
-              {billingStatus?.currentPlan !== "free" ? (
-                <Button className="bg-gradient-to-r from-primary to-secondary text-primary-foreground" onClick={() => void handleOpenTravelerCustomerPortal()} disabled={billingActionLoading}>
-                  {billingActionLoading ? "Abrindo..." : "Gerenciar assinatura"}
+            <div className="rounded-2xl border border-border/50 bg-background/40 p-4">
+              <p className="text-xs uppercase tracking-wide text-muted-foreground">Saldos independentes</p>
+              <div className="mt-3 grid grid-cols-2 gap-3">
+                <div>
+                  <p className="text-2xl font-semibold">{tripLinkBalance ?? "—"}</p>
+                  <p className="text-xs text-muted-foreground">Viagens disponíveis</p>
+                </div>
+                <div>
+                  <p className="text-2xl font-semibold">{billingStatus?.totalAvailable ?? credits.balance}</p>
+                  <p className="text-xs text-muted-foreground">Créditos de IA</p>
+                </div>
+              </div>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <Button size="sm" variant="outline" onClick={() => router.push("/portal/viagens/comprar")}>Comprar viagens</Button>
+                <Button size="sm" variant="outline" onClick={() => router.push("/portal/creditos")}>Comprar créditos de IA</Button>
+              </div>
+            </div>
+          </div>
+
+          {membershipStatus?.isPremiumLegacy ? (
+            <div className="mt-4 flex flex-col gap-3 rounded-2xl border border-amber-500/20 bg-amber-500/10 p-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <div className="flex items-center gap-2">
+                  <Crown size={16} className="text-amber-400" />
+                  <p className="font-medium">Premium legado</p>
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">Sua assinatura e os benefícios contratados continuam preservados.</p>
+              </div>
+              {canManagePremiumLegacy ? (
+                <Button size="sm" variant="outline" onClick={() => void handleOpenTravelerCustomerPortal()} disabled={billingActionLoading}>
+                  {billingActionLoading ? "Abrindo..." : "Gerenciar Premium legado"}
                 </Button>
               ) : null}
-              <Button variant="outline" onClick={() => router.push("/portal/planos")}>
-                Ver planos
-              </Button>
             </div>
+          ) : null}
+
+          <div className="mt-4 grid gap-2 border-t border-border/50 pt-4 text-sm sm:grid-cols-3">
+            <p><span className="text-muted-foreground">Saldo de IA:</span> {billingStatus?.totalAvailable ?? credits.balance} créditos</p>
+            <p><span className="text-muted-foreground">Incluídos neste ciclo:</span> {billingStatus?.planCreditsAvailable ?? subscription.definition.monthlyCredits}</p>
+            <p><span className="text-muted-foreground">Comprados:</span> {billingStatus?.purchasedCreditsAvailable ?? 0}</p>
           </div>
         </Card>
       </motion.div>
@@ -1173,22 +1221,30 @@ export default function ConfiguracoesPage() {
           <DialogHeader>
             <DialogTitle className="text-destructive">Excluir conta</DialogTitle>
             <DialogDescription>
-              Se você possui uma assinatura ativa, cancele-a antes de excluir sua conta.
+              Vuei+ ativo ou Premium legado dentro do período pago precisam ser gerenciados antes da exclusão.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
             {hasActivePaidSubscription ? (
               <>
                 <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 p-4 text-sm text-amber-300">
-                  Sua assinatura ainda está ativa. Cancele ou gerencie a assinatura antes de solicitar a exclusão da conta.
+                  Há uma assinatura com acesso vigente nesta conta. Cancele ou gerencie o período pago antes de solicitar a exclusão.
                 </div>
                 <div className="flex gap-3">
                   <Button variant="outline" className="flex-1" onClick={() => setShowDeleteModal(false)}>
                     Fechar
                   </Button>
-                  <Button className="flex-1 bg-gradient-to-r from-primary to-secondary text-primary-foreground" onClick={() => void handleOpenTravelerCustomerPortal()} disabled={billingActionLoading}>
-                    {billingActionLoading ? "Abrindo..." : "Gerenciar assinatura"}
-                  </Button>
+                  {canManageAnySubscription ? (
+                    <Button className="flex-1 bg-gradient-to-r from-primary to-secondary text-primary-foreground" onClick={() => void handleOpenTravelerCustomerPortal()} disabled={billingActionLoading}>
+                      {billingActionLoading
+                        ? "Abrindo..."
+                        : membershipStatus?.hasVueiPlus
+                          ? "Gerenciar Vuei+"
+                          : "Gerenciar Premium legado"}
+                    </Button>
+                  ) : (
+                    <Button className="flex-1" onClick={() => router.push("/portal/suporte")}>Falar com suporte</Button>
+                  )}
                 </div>
               </>
             ) : (

@@ -91,7 +91,11 @@ export default function CreditosPage() {
     () =>
       isRealMode
         ? realHistory.map((transaction) => ({
-            action: transaction.reason || transaction.type,
+            action: transaction.source === "plan_cycle"
+              ? transaction.metadata?.plan_code === "premium"
+                ? "Créditos de IA — Premium legado"
+                : "Créditos de IA incluídos neste ciclo"
+              : transaction.reason || transaction.type,
             amount: transaction.amount,
             date: transaction.createdAt,
             source: transaction.source || "Supabase",
@@ -131,7 +135,7 @@ export default function CreditosPage() {
 
     const result = await createTravelerCreditsCheckout(packageCode)
     if (result.error || !result.data?.url) {
-        setLoadError(result.error ?? "Não foi possível iniciar o checkout de créditos.")
+        setLoadError(result.error ?? "Não foi possível iniciar o checkout de créditos de IA.")
       setPackageLoading(null)
       return
     }
@@ -148,19 +152,21 @@ export default function CreditosPage() {
     >
       <motion.div variants={fadeInUp} className="flex items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold">Créditos</h1>
-          <p className="text-sm text-muted-foreground">Gerencie seus créditos Vuei</p>
+          <h1 className="text-2xl font-bold">Créditos de IA</h1>
+          <p className="text-sm text-muted-foreground">Gerencie seu saldo para recursos de inteligência artificial.</p>
         </div>
-        <Badge className="bg-gradient-to-r from-amber-500/20 to-amber-600/20 text-amber-400 border-amber-500/30">
-          <Crown size={14} className="mr-1" />
-          {subscription.definition.name}
-        </Badge>
+        {subscription.isPremium ? (
+          <Badge className="bg-gradient-to-r from-amber-500/20 to-amber-600/20 text-amber-400 border-amber-500/30">
+            <Crown size={14} className="mr-1" />
+            Premium legado
+          </Badge>
+        ) : null}
       </motion.div>
 
       {checkoutStatus === "success" ? (
         <motion.div variants={fadeInUp}>
           <Card className="border-emerald-500/20 bg-emerald-500/10 p-4 text-sm text-emerald-300">
-            Checkout concluído. Os créditos só aparecem no saldo após o webhook real do Stripe.
+            Checkout concluído. Os créditos de IA aparecem no saldo após a confirmação do Stripe.
           </Card>
         </motion.div>
       ) : null}
@@ -182,21 +188,19 @@ export default function CreditosPage() {
               <div className="space-y-2">
                 <div className="flex items-center gap-2 text-muted-foreground">
                   <Coins size={16} className="text-primary" />
-                  <span className="text-sm">Saldo disponível</span>
+                  <span className="text-sm">Saldo de IA</span>
                 </div>
                 <div className="flex items-baseline gap-3">
                   <span className="text-5xl md:text-6xl font-bold vuei-gradient-text">{effectiveBalance}</span>
-                  <span className="text-muted-foreground">créditos</span>
+                  <span className="text-muted-foreground">créditos IA</span>
                 </div>
                 <div className="space-y-1 text-sm">
                   <div className="flex items-center gap-2 text-green-400">
                     <Gift size={14} />
-                    <span>
-                      {planCreditsAvailable} de {monthlyPlanCredits} créditos do plano disponíveis neste ciclo
-                    </span>
+                    <span>Incluídos neste ciclo: {planCreditsAvailable}</span>
                   </div>
                   <div className="text-muted-foreground">
-                    {purchasedCreditsAvailable} créditos comprados acumulados
+                    Comprados: {purchasedCreditsAvailable}
                   </div>
                 </div>
               </div>
@@ -205,7 +209,7 @@ export default function CreditosPage() {
                 <div className="flex items-center gap-2 md:justify-end">
                   <TrendingUp size={14} className="text-muted-foreground" />
                   <span className="text-sm text-muted-foreground">
-                    {planCreditsUsed} de {monthlyPlanCredits} créditos mensais utilizados
+                    Uso dos créditos incluídos: {planCreditsUsed} de {monthlyPlanCredits}
                   </span>
                 </div>
                 <Progress value={usagePercentage} className="h-2 w-full md:w-48" />
@@ -213,8 +217,8 @@ export default function CreditosPage() {
                   {billingStatus?.currentPeriodEnd
                     ? `Ciclo atual até ${new Date(billingStatus.currentPeriodEnd).toLocaleDateString("pt-BR")}`
                     : isRealMode
-                      ? "Saldo sincronizado com o Supabase"
-                      : "Ciclo do plano ainda sem renovação automática nesta fase."}
+                      ? "Renovação do saldo incluído ainda não disponível."
+                      : "Saldo local de demonstração."}
                 </p>
               </div>
             </div>
@@ -248,9 +252,9 @@ export default function CreditosPage() {
         </motion.div>
       ) : null}
 
-      <motion.div variants={fadeInUp}>
+      <motion.div variants={fadeInUp} id="comprar-creditos-ia">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="font-semibold">Comprar créditos</h2>
+          <h2 className="font-semibold">Comprar créditos de IA</h2>
         </div>
         <div className="grid md:grid-cols-3 gap-4">
           {TRAVELER_CREDIT_PACKAGES.map((pkg) => (
@@ -268,7 +272,7 @@ export default function CreditosPage() {
                 <div className="flex items-center gap-2">
                   <Coins size={20} className="text-primary" />
                   <span className="text-2xl font-bold">{pkg.credits}</span>
-                  <span className="text-muted-foreground">créditos</span>
+                  <span className="text-muted-foreground">créditos de IA</span>
                 </div>
 
                 <div>
@@ -286,7 +290,7 @@ export default function CreditosPage() {
                   disabled={packageLoading !== null}
                 >
                   {packageLoading === pkg.code ? <Loader2 size={16} className="mr-2 animate-spin" /> : null}
-                  Comprar
+                  Comprar créditos de IA
                 </Button>
               </div>
             </Card>
@@ -295,7 +299,7 @@ export default function CreditosPage() {
       </motion.div>
 
       <motion.div variants={fadeInUp}>
-        <Card className="p-6 bg-gradient-to-r from-amber-500/10 to-amber-600/10 border-amber-500/20 relative overflow-hidden">
+        <Card className="p-6 bg-gradient-to-r from-primary/10 to-secondary/10 border-primary/20 relative overflow-hidden">
           <div className="absolute inset-0 vuei-grid opacity-20 pointer-events-none" />
           <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div className="flex items-start gap-4">
@@ -303,18 +307,26 @@ export default function CreditosPage() {
                 <Crown size={24} className="text-primary-foreground" />
               </div>
               <div>
-                <h3 className="font-semibold mb-1">Planos e benefícios</h3>
+                <h3 className="font-semibold mb-1">Produtos independentes</h3>
                 <p className="text-sm text-muted-foreground">
-                  Compare Free e Premium, veja os créditos inclusos e gerencie sua assinatura do viajante.
+                  Viagens, créditos de IA e Vuei+ são produtos independentes.
                 </p>
               </div>
             </div>
-            <Button asChild className="bg-gradient-to-r from-amber-500 to-amber-600 text-primary-foreground font-semibold rounded-xl whitespace-nowrap">
-              <Link href="/portal/planos">
-                Ver Planos
-                <ChevronRight size={16} className="ml-1" />
-              </Link>
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button asChild variant="outline" className="rounded-xl whitespace-nowrap">
+                <Link href="#comprar-creditos-ia">Comprar créditos de IA</Link>
+              </Button>
+              <Button asChild variant="outline" className="rounded-xl whitespace-nowrap">
+                <Link href="/portal/viagens/comprar">Comprar viagens</Link>
+              </Button>
+              <Button asChild className="bg-gradient-to-r from-amber-500 to-amber-600 text-primary-foreground font-semibold rounded-xl whitespace-nowrap">
+                <Link href="/portal/planos">
+                  Conhecer Vuei+
+                  <ChevronRight size={16} className="ml-1" />
+                </Link>
+              </Button>
+            </div>
           </div>
         </Card>
       </motion.div>
@@ -325,7 +337,7 @@ export default function CreditosPage() {
         </div>
         <Card className="bg-card/50 border-border/50 vuei-glass divide-y divide-border/50">
           {effectiveHistory.length === 0 ? (
-            <div className="p-4 text-sm text-muted-foreground">Nenhum consumo de créditos registrado ainda.</div>
+            <div className="p-4 text-sm text-muted-foreground">Nenhum consumo de créditos de IA registrado ainda.</div>
           ) : (
             effectiveHistory.slice(0, 5).map((item, index) => {
               const Icon = iconMap[item.source] || Gift

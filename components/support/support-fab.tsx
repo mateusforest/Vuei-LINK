@@ -150,7 +150,7 @@ export function SupportFab({
                 >
                   {categories.map((category) => (
                     <option key={category.value} value={category.value}>
-                      {category.label}
+                      {portalType === "traveler" && category.value === "credits" ? "Créditos de IA" : category.label}
                     </option>
                   ))}
                 </select>

@@ -35,7 +35,7 @@ function resolveActivationError(error: unknown): ActivationErrorDefinition {
     return {
       status: 409,
       code: "wallet_insufficient_balance",
-      error: "Voce nao tem Links disponiveis para ativar esta viagem.",
+      error: "Você não possui viagens disponíveis para ativar esta viagem.",
     }
   }
 

@@ -35,10 +35,11 @@ export default function PortalPlanosPage() {
   const [membership, setMembership] = useState<TravelerMembershipStatusSummary | null>(null)
   const premiumPlan = TRAVELER_PLAN_DEFINITIONS.premium
   const checkoutStatus = searchParams.get("checkout")
-  const canManageSubscription = Boolean(membership?.stripeCustomerId || subscription.stripeCustomerId || subscription.isPremium)
   const hasManageableVueiPlus = Boolean(
-    membership?.vueiPlusStripeSubscriptionId &&
-    !["none", "canceled"].includes(membership.vueiPlusStatus),
+    membership?.hasVueiPlus && membership.vueiPlusStripeSubscriptionId,
+  )
+  const hasManageableLegacyPremium = Boolean(
+    membership?.isPremiumLegacy && subscription.stripeSubscriptionId,
   )
 
   useEffect(() => {
@@ -71,7 +72,7 @@ export default function PortalPlanosPage() {
 
     const result = await createTravelerCreditsCheckout(packageCode)
     if (result.error || !result.data?.url) {
-      setActionError(result.error ?? "Não foi possível iniciar o checkout de créditos.")
+      setActionError(result.error ?? "Não foi possível iniciar o checkout de créditos de IA.")
       setPackageLoading(null)
       return
     }
@@ -97,26 +98,32 @@ export default function PortalPlanosPage() {
     <div className="mx-auto max-w-5xl space-y-8">
       <motion.div {...fadeInUp} className="space-y-3">
         <Button asChild variant="ghost" className="w-fit rounded-xl px-0 text-muted-foreground hover:text-foreground">
-          <Link href="/portal/creditos">
+          <Link href="/portal/viagem">
             <ChevronLeft size={16} className="mr-2" />
             Voltar
           </Link>
         </Button>
 
         <div>
-          <h1 className="text-3xl font-bold">Planos e créditos</h1>
+          <h1 className="text-3xl font-bold">Viagens e Vuei+</h1>
           <p className="text-sm text-muted-foreground">Viagens compradas e Vuei+ são independentes. Assine apenas se quiser manter seu arquivo histórico acessível.</p>
         </div>
 
         <div className="flex flex-wrap gap-3">
-          {canManageSubscription ? (
+          {hasManageableVueiPlus ? (
             <Button variant="outline" className="rounded-xl" onClick={handleOpenPortal} disabled={portalLoading}>
               {portalLoading ? <Loader2 size={16} className="mr-2 animate-spin" /> : <Crown size={16} className="mr-2" />}
-              Gerenciar assinatura
+              Gerenciar Vuei+
+            </Button>
+          ) : null}
+          {hasManageableLegacyPremium ? (
+            <Button variant="outline" className="rounded-xl" onClick={handleOpenPortal} disabled={portalLoading}>
+              {portalLoading ? <Loader2 size={16} className="mr-2 animate-spin" /> : <ShieldCheck size={16} className="mr-2" />}
+              Gerenciar Premium legado
             </Button>
           ) : null}
 
-          {membership?.vueiPlusCurrentPeriodEnd ? (
+          {membership?.hasVueiPlus && membership.vueiPlusCurrentPeriodEnd ? (
             <Badge variant="secondary" className="border-border/50 bg-card/60 text-muted-foreground">
               Vuei+ até {new Date(membership.vueiPlusCurrentPeriodEnd).toLocaleDateString("pt-BR")}
             </Badge>
@@ -154,8 +161,8 @@ export default function PortalPlanosPage() {
 
           <div className="mt-6 min-h-[11rem] space-y-3">
             {[
-              "Crie rascunhos sem consumir Link",
-              "Ative uma viagem com 1 crédito trip_link",
+              "Crie rascunhos sem consumir uma viagem",
+              "1 crédito de viagem ativa 1 viagem",
               "Compre pacotes de 1, 5 ou 10 viagens",
               "O link permanece público até o fim da viagem + 7 dias",
               "Seus dados não são apagados ao encerrar",
@@ -179,7 +186,7 @@ export default function PortalPlanosPage() {
               <p className="mt-2 text-sm text-muted-foreground">Valor e periodicidade exibidos no checkout seguro.</p>
             </div>
             <Badge className="bg-amber-500 text-black">
-              {membership?.state === "VUEI_PLUS_ACTIVE" ? "Ativo" : "Arquivo premium"}
+              {membership?.hasVueiPlus ? "Ativo" : "Arquivo Vuei+"}
             </Badge>
           </div>
 
@@ -199,20 +206,16 @@ export default function PortalPlanosPage() {
 
           <Button
             className="mt-auto w-full rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 text-black font-semibold"
-            onClick={membership?.canAccessArchivedTrips || hasManageableVueiPlus ? handleOpenPortal : handleVueiPlusCheckout}
+            onClick={membership?.hasVueiPlus ? handleOpenPortal : handleVueiPlusCheckout}
             disabled={vueiPlusLoading || portalLoading || membership === null}
           >
             {vueiPlusLoading || portalLoading ? <Loader2 size={16} className="mr-2 animate-spin" /> : null}
-            {membership?.state === "PREMIUM_LEGACY"
-              ? "Gerenciar Premium legado"
-              : membership?.canAccessArchivedTrips || hasManageableVueiPlus
-                ? "Gerenciar Vuei+"
-                : "Assinar Vuei+"}
+            {membership?.hasVueiPlus ? "Gerenciar Vuei+" : "Assinar Vuei+"}
           </Button>
         </Card>
       </motion.div>
 
-      {subscription.isPremium ? (
+      {membership?.isPremiumLegacy ? (
         <motion.div {...fadeInUp}>
           <Card className="border-primary/20 bg-primary/5 p-6 vuei-glass">
             <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
@@ -225,7 +228,14 @@ export default function PortalPlanosPage() {
                   Seus créditos de IA, roteiros e demais benefícios atuais continuam no plano {premiumPlan.name}. O acesso ao arquivo também permanece liberado.
                 </p>
               </div>
-              <Badge variant="secondary" className="w-fit">{premiumPlan.priceLabel}</Badge>
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge variant="secondary" className="w-fit">{premiumPlan.priceLabel}</Badge>
+                {hasManageableLegacyPremium ? (
+                  <Button size="sm" variant="outline" onClick={handleOpenPortal} disabled={portalLoading}>
+                    Gerenciar Premium legado
+                  </Button>
+                ) : null}
+              </div>
             </div>
           </Card>
         </motion.div>
@@ -253,7 +263,7 @@ export default function PortalPlanosPage() {
                   {pkg.code === "popular" ? <Badge className="bg-primary text-primary-foreground">Popular</Badge> : null}
                 </div>
                 <p className="text-[2rem] font-bold leading-none">{pkg.credits}</p>
-                <p className="text-sm text-muted-foreground">créditos</p>
+                <p className="text-sm text-muted-foreground">créditos de IA</p>
                 <p className="mt-3 text-lg font-semibold">{pkg.priceLabel}</p>
                 <Button
                   className="mt-auto w-full rounded-xl"
@@ -262,7 +272,7 @@ export default function PortalPlanosPage() {
                   disabled={packageLoading !== null}
                 >
                   {packageLoading === pkg.code ? <Loader2 size={16} className="mr-2 animate-spin" /> : null}
-                  Comprar
+                  Comprar créditos de IA
                 </Button>
               </Card>
             ))}
@@ -281,15 +291,15 @@ export default function PortalPlanosPage() {
               </AccordionContent>
             </AccordionItem>
             <AccordionItem value="consumption">
-              <AccordionTrigger>Quando os créditos são consumidos?</AccordionTrigger>
+              <AccordionTrigger>Quando os créditos de IA são consumidos?</AccordionTrigger>
               <AccordionContent>
-                Atualmente, os créditos são consumidos em perguntas ao Concierge IA, geração de roteiros e extração inteligente de passagens.
+                Atualmente, os créditos de IA são consumidos em perguntas ao Concierge IA, geração de roteiros e extração inteligente de passagens.
               </AccordionContent>
             </AccordionItem>
             <AccordionItem value="rollover">
-              <AccordionTrigger>Os créditos acumulam?</AccordionTrigger>
+              <AccordionTrigger>Os créditos de IA acumulam?</AccordionTrigger>
               <AccordionContent>
-                Créditos comprados acumulam e não expiram. Os créditos do plano são renovados a cada ciclo.
+                Créditos de IA comprados acumulam e não expiram. Os créditos de IA incluídos são renovados a cada ciclo.
               </AccordionContent>
             </AccordionItem>
           </Accordion>

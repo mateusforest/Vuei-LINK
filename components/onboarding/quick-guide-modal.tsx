@@ -62,20 +62,16 @@ export function QuickGuideModal({ open, onOpenChange, variant, onCreateTrip }: Q
           ) : (
             <>
               <GuideStep icon={Plane} index={1} title="Crie sua viagem.">
-                Informe destino, datas e informações básicas.
+                Informe destino, datas e informações básicas. Sua viagem começa como um rascunho privado.
               </GuideStep>
-              <GuideStep icon={Settings} index={2} title="Defina seu PIN.">
-                <p>Abra Configurações e configure um PIN de 4 dígitos.</p>
-                <p className="mt-2">Esse PIN protege todos os documentos e informações da sua viagem.</p>
+              <GuideStep icon={FileText} index={2} title="Complete seu rascunho.">
+                Adicione passagens, hospedagens, documentos e os demais detalhes antes de compartilhar.
               </GuideStep>
-              <GuideStep icon={Link2} index={3} title="Abra o Link da Viagem.">
-                É nele que toda a organização acontece.
+              <GuideStep icon={Settings} index={3} title="Ative usando 1 viagem.">
+                A ativação usa 1 crédito de viagem e libera o link público. Criar e editar o rascunho não consome saldo.
               </GuideStep>
-              <GuideStep icon={FileText} index={4} title="Adicione passagens, hospedagens, documentos e roteiros.">
-                Todas as ações da viagem são feitas diretamente pelo Link da Viagem.
-              </GuideStep>
-              <GuideStep icon={Users} index={5} title="Compartilhe quando desejar.">
-                Pronto. Sua viagem estará organizada em um único lugar.
+              <GuideStep icon={Link2} index={4} title="Compartilhe seu link.">
+                Com a viagem ativa, envie o link para quem vai acompanhar a viagem.
               </GuideStep>
             </>
           )}

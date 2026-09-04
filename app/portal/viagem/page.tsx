@@ -84,7 +84,7 @@ export default function ViagemListPage() {
   const { trips, deleteTrip, setActiveTrip, updateTrip } = useTrips()
   const [copiedLink, setCopiedLink] = useState<string | null>(null)
   const [feedback, setFeedback] = useState<{ message: string; tone: "success" | "error" } | null>(null)
-  const [filter, setFilter] = useState<"all" | "upcoming" | "ongoing" | "completed">("all")
+  const [filter, setFilter] = useState<"all" | TripLinkLifecycleStatus>("all")
   const [activatingTripId, setActivatingTripId] = useState<string | null>(null)
   const [canAccessArchive, setCanAccessArchive] = useState(false)
   const [archiveAccessLoaded, setArchiveAccessLoaded] = useState(false)
@@ -246,16 +246,16 @@ export default function ViagemListPage() {
   const filteredTrips = trips.filter(trip => {
     if (getTripLinkLifecycle(trip) === "ended") return false
     if (filter === "all") return true
-    return trip.status === filter
+    return getTripLinkLifecycle(trip) === filter
   })
 
-  const getStatusLabel = (status: string) => {
-    switch (status) {
+  const getFilterLabel = (value: typeof filter) => {
+    switch (value) {
       case "draft": return "Rascunho"
-      case "upcoming": return "Próxima"
-      case "ongoing": return "Em andamento"
-      case "completed": return "Concluída"
-      default: return status
+      case "active": return "Ativa"
+      case "post_trip": return "Pós-viagem"
+      case "ended": return "Encerrada"
+      default: return "Todas"
     }
   }
 
@@ -282,9 +282,10 @@ export default function ViagemListPage() {
       <motion.div variants={fadeInUp} className="flex gap-2 overflow-x-auto pb-2">
         {[
           { value: "all", label: "Todas" },
-          { value: "upcoming", label: "Próximas" },
-          { value: "ongoing", label: "Em andamento" },
-          { value: "completed", label: "Concluídas" },
+          { value: "draft", label: "Rascunho" },
+          { value: "active", label: "Ativa" },
+          { value: "post_trip", label: "Pós-viagem" },
+          { value: "ended", label: "Encerrada" },
         ].map((f) => (
           <Button
             key={f.value}
@@ -419,7 +420,7 @@ export default function ViagemListPage() {
                           ? "Ativando..."
                           : trip.linkActivatedAt
                             ? "Reabrir link"
-                            : "Ativar link (1 Link)"}
+                            : "Ativar viagem (1 crédito)"}
                     </Button>
                     <Button 
                       variant="outline" 
@@ -463,7 +464,7 @@ export default function ViagemListPage() {
             )
           })}
         </motion.div>
-      ) : (
+      ) : filter === "ended" && archivedTrips.length > 0 ? null : (
         <motion.div variants={fadeInUp}>
           <Card className="p-12 bg-card/50 border-border/50 text-center">
             <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center mx-auto mb-4">
@@ -472,7 +473,7 @@ export default function ViagemListPage() {
             <h3 className="text-lg font-semibold mb-2">
               {filter === "all"
                 ? archivedTrips.length > 0 ? "Nenhuma viagem em andamento" : "Nenhuma viagem ainda"
-                : `Nenhuma viagem ${getStatusLabel(filter).toLowerCase()}`}
+                : `Nenhuma viagem no estado ${getFilterLabel(filter).toLowerCase()}`}
             </h3>
             <p className="text-muted-foreground text-sm mb-6">
               {filter === "all"
@@ -491,7 +492,7 @@ export default function ViagemListPage() {
         </motion.div>
       )}
 
-      {archivedTrips.length > 0 ? (
+      {archivedTrips.length > 0 && (filter === "all" || filter === "ended") ? (
         <motion.section variants={fadeInUp} className="space-y-3">
           <div className="flex items-end justify-between gap-4">
             <div>

@@ -656,7 +656,7 @@ export default function CriarViagemPage() {
                         </Badge>
                       </div>
                       <p className="mt-1 text-xs text-muted-foreground">
-                        Você pode editar esta viagem sem consumir saldo. Ativar o link usa 1 Link da Viagem.
+                        Você pode editar esta viagem sem consumir saldo. Ativar a viagem usa 1 crédito de viagem.
                       </p>
                     </div>
                   </div>
@@ -690,7 +690,7 @@ export default function CriarViagemPage() {
                     disabled={isActivating}
                   >
                     <Link2 size={16} className="mr-2" />
-                    {isActivating ? "Ativando..." : "Ativar link (1 Link)"}
+                    {isActivating ? "Ativando..." : "Ativar viagem (1 crédito)"}
                   </Button>
                 )}
               </div>

@@ -27,6 +27,7 @@ import {
   type PendingTripClaimSession,
 } from "@/lib/pending-trip-claim"
 import { claimPendingTrip, createPendingTripClaim } from "@/lib/repositories/pending-trip-claim-repository"
+import { getTravelerVueiPlusStatus } from "@/lib/repositories/traveler-billing-repository"
 import { resolveDestinationInput, type DestinationOption } from "@/lib/destinations/catalog"
 import { cn } from "@/lib/utils"
 
@@ -69,6 +70,7 @@ function toPendingBagItem(session: PendingTripClaimSession): PublicBagTripItem {
     travelersCount: session.travelersCount ?? null,
     url: session.shareLink,
     statusLabel: "Rascunho",
+    lifecycle: "draft",
     isActivated: false,
     isPending: true,
   }
@@ -105,6 +107,22 @@ export function TripLanding() {
   const [bagPulseToken, setBagPulseToken] = useState(0)
   const [pendingNoticeDismissed, setPendingNoticeDismissed] = useState(false)
   const [loginChoiceOpen, setLoginChoiceOpen] = useState(false)
+  const [canAccessArchive, setCanAccessArchive] = useState(false)
+
+  useEffect(() => {
+    if (!user) {
+      setCanAccessArchive(false)
+      return
+    }
+
+    let active = true
+    const loadMembership = async () => {
+      const result = await getTravelerVueiPlusStatus()
+      if (active) setCanAccessArchive(Boolean(result.data?.canAccessArchivedTrips))
+    }
+    void loadMembership()
+    return () => { active = false }
+  }, [user])
 
   useEffect(() => {
     const syncPendingBag = () => {
@@ -356,6 +374,16 @@ export function TripLanding() {
 
   function handleBagTripOpen(trip: PublicBagTripItem) {
     setPopupOpen(false)
+    if (trip.lifecycle === "ended") {
+      if (!user) {
+        openTravelerLogin()
+        return
+      }
+
+      router.push(canAccessArchive ? `/portal/viagem/arquivo/${trip.id}` : "/portal/planos")
+      return
+    }
+
     if (trip.isActivated) {
       handleOpenTrip(trip.url)
       return
@@ -759,6 +787,7 @@ export function TripLanding() {
         loading={Boolean(user) && loadingTrips}
         trips={bagTrips}
         highlightTripId={highlightTripId}
+        canAccessArchive={canAccessArchive}
         emptyStateMode={!user && bagTrips.length === 0 ? "guest-bag" : "default"}
         onClose={() => setPopupOpen(false)}
         onNewTrip={() => {

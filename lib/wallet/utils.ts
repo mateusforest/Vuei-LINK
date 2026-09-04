@@ -60,7 +60,7 @@ export function buildWalletBalanceLookup(reference: WalletOwnerReference, assetT
 }
 
 export function getWalletDisplayAssetName(assetType: WalletAssetType) {
-  if (assetType === "trip_link") return "Links disponiveis"
+  if (assetType === "trip_link") return "Viagens disponíveis"
   return assetType
 }
 

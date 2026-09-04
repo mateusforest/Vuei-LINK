@@ -299,7 +299,7 @@ export default function CompartilharPage() {
               disabled={isActivating}
             >
               <Lock size={16} className="mr-2" />
-              {isActivating ? "Ativando..." : trip.linkActivatedAt ? "Reabrir link" : "Ativar link (1 Link)"}
+              {isActivating ? "Ativando..." : trip.linkActivatedAt ? "Reabrir link" : "Ativar viagem (1 crédito)"}
             </Button>
           )}
 

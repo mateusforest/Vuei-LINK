@@ -325,7 +325,7 @@ export async function ensureTravelerFreePlanCycle(client: SupabaseDbClient, user
       owner_user_id: userId,
       type: "grant",
       amount: grantedCredits,
-      reason: "Créditos mensais do plano Free",
+      reason: "Créditos de IA incluídos neste ciclo",
       source: "plan_cycle",
       metadata: {
         kind: "plan_cycle_grant",
@@ -405,7 +405,9 @@ export async function grantTravelerPlanCycleFromInvoice(
       owner_user_id: params.userId,
       type: "grant",
       amount: grantedCredits,
-      reason: `Créditos do plano ${params.planCode === "premium" ? "Premium" : "Free"}`,
+      reason: params.planCode === "premium"
+        ? "Créditos de IA incluídos — Premium legado"
+        : "Créditos de IA incluídos neste ciclo",
       source: "plan_cycle",
       metadata: {
         kind: "plan_cycle_grant",

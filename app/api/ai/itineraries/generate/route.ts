@@ -101,7 +101,7 @@ interface GenerateItineraryRequestBody {
   adminToken?: string
 }
 
-const PREMIUM_REQUIRED_ERROR = "Assine o Premium para gerar roteiros inteligentes, criar viagens ilimitadas e receber créditos mensais inclusos."
+const PREMIUM_REQUIRED_ERROR = "Roteiro IA não está disponível na sua conta atualmente."
 
 async function getTripByAdminAccess(
   client: ReturnType<typeof createSupabaseAdminClient>,
