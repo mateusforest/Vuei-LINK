@@ -10,6 +10,7 @@ import type { Trip as CanonicalTrip } from "@/types"
 import { DateRangePicker, formatRange } from "@/components/public-home/date-range-picker"
 import { DestinationCombobox } from "@/components/public-home/destination-combobox"
 import { TripBag } from "@/components/public-home/trip-bag"
+import { IndividualCommercialSections } from "@/components/public-home/individual-commercial-sections"
 import { TripsPopup, mapLegacyTripToBagItem, type PublicBagTripItem } from "@/components/public-home/trips-popup"
 import { VueiWordmark } from "@/components/public-home/vuei-mark"
 import {
@@ -474,40 +475,42 @@ export function TripLanding() {
   const bagInteractionBlocked = popupOpen
 
   return (
-    <main className="landing-shell relative flex h-[100dvh] w-full flex-col overflow-hidden overscroll-none text-foreground">
-      <img
-        src="/beach-landing/beach-scene.png"
-        alt="Praia ao entardecer com uma cadeira e uma bolsa de viagem Vuei"
-        className="absolute inset-0 z-0 h-full w-full object-cover object-[68%_center] md:object-[58%_center] lg:object-[center_90%]"
-      />
-      <div
-        className="absolute inset-0 z-0"
-        style={{
-          background:
-            "linear-gradient(90deg, color-mix(in oklch, var(--background) 90%, transparent) 0%, color-mix(in oklch, var(--background) 74%, transparent) 32%, color-mix(in oklch, var(--background) 18%, transparent) 58%, transparent 76%)",
-        }}
-      />
+    <main className="landing-shell min-h-screen w-full overflow-x-hidden text-foreground">
+      <section id="criar-viagem" className="relative flex h-[100dvh] w-full flex-col overflow-hidden overscroll-none">
+        <img
+          src="/beach-landing/beach-scene.png"
+          alt="Praia ao entardecer com uma cadeira e uma bolsa de viagem Vuei"
+          className="absolute inset-0 z-0 h-full w-full object-cover object-[68%_center] md:object-[58%_center] lg:object-[center_90%]"
+        />
+        <div
+          className="absolute inset-0 z-0"
+          style={{
+            background:
+              "linear-gradient(90deg, color-mix(in oklch, var(--background) 90%, transparent) 0%, color-mix(in oklch, var(--background) 74%, transparent) 32%, color-mix(in oklch, var(--background) 18%, transparent) 58%, transparent 76%)",
+          }}
+        />
 
-      <header className="relative z-10 flex items-center justify-between px-6 py-5 md:px-10 md:py-7">
-        <VueiWordmark />
-        <nav className="flex items-center gap-2 md:gap-3">
-          <Button
-            variant="secondary"
-            size="lg"
-            onClick={() => setLoginChoiceOpen(true)}
-            className="vuei-glass h-10 rounded-full border border-border/60 px-5 text-[0.9rem] text-foreground shadow-sm"
-          >
-            Entrar
-          </Button>
-          <Button
-            size="lg"
-            onClick={openStart}
-            className="h-10 rounded-full bg-foreground px-5 text-[0.9rem] text-background shadow-[0_8px_30px_-8px_var(--brand)] ring-1 ring-inset ring-white/10 hover:bg-foreground/90"
-          >
-            Começar agora
-          </Button>
-        </nav>
-      </header>
+        <header className="relative z-10 flex items-center justify-between px-6 py-5 md:px-10 md:py-7">
+          <VueiWordmark />
+          <nav className="flex items-center gap-2 md:gap-3">
+            <Button
+              variant="secondary"
+              size="lg"
+              onClick={() => setLoginChoiceOpen(true)}
+              className="vuei-glass h-10 rounded-full border border-border/60 px-5 text-[0.9rem] text-foreground shadow-sm"
+            >
+              Entrar
+            </Button>
+            <Button
+              size="lg"
+              onClick={openStart}
+              className="h-10 rounded-full bg-foreground px-5 text-[0.9rem] text-background shadow-[0_8px_30px_-8px_var(--brand)] ring-1 ring-inset ring-white/10 hover:bg-foreground/90"
+            >
+              <span className="hidden sm:inline">Começar minha viagem</span>
+              <span className="sm:hidden">Começar</span>
+            </Button>
+          </nav>
+        </header>
 
       <div
         className={cn(
@@ -520,6 +523,9 @@ export function TripLanding() {
             Sua viagem começa <span className="text-brand-gradient">aqui.</span>
           </h1>
           <p className="mt-3 text-pretty text-lg text-muted-foreground">Um único link para organizar tudo.</p>
+          <p className="mt-2 text-pretty text-sm font-medium text-foreground/72 sm:text-base">
+            Comece grátis. Ative sua viagem quando estiver pronta.
+          </p>
 
           <div
             className={cn(
@@ -653,7 +659,7 @@ export function TripLanding() {
                   </span>
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <p className="text-lg font-semibold leading-tight text-foreground sm:text-[1.15rem]">Seu rascunho está pronto.</p>
+                      <p className="text-lg font-semibold leading-tight text-foreground sm:text-[1.15rem]">Sua viagem está pronta para continuar.</p>
                       <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/12 px-2.5 py-1 text-[0.72rem] font-medium text-amber-700">
                         <Check className="size-3.5" />
                         Privado
@@ -686,7 +692,7 @@ export function TripLanding() {
                           className="h-11 rounded-2xl bg-foreground px-5 text-[0.9rem] text-background"
                         >
                           <ExternalLink className="size-4" />
-                          Continuar rascunho
+                          Continuar minha viagem
                         </Button>
                         <Button
                           size="lg"
@@ -759,7 +765,7 @@ export function TripLanding() {
                   </>
                 ) : (
                   <>
-                    Criar meu link
+                    Criar minha viagem
                     <ArrowRight className="size-4" />
                   </>
                 )}
@@ -772,15 +778,18 @@ export function TripLanding() {
         </div>
       </div>
 
-      <TripBag
-        count={bagTrips.length}
-        disabled={bagInteractionBlocked}
-        glow={glow}
-        pulseToken={bagPulseToken}
-        showBalloon={showBalloon}
-        onDismissBalloon={() => setShowBalloon(false)}
-        onOpen={() => setPopupOpen(true)}
-      />
+        <TripBag
+          count={bagTrips.length}
+          disabled={bagInteractionBlocked}
+          glow={glow}
+          pulseToken={bagPulseToken}
+          showBalloon={showBalloon}
+          onDismissBalloon={() => setShowBalloon(false)}
+          onOpen={() => setPopupOpen(true)}
+        />
+      </section>
+
+      <IndividualCommercialSections />
 
       <TripsPopup
         open={popupOpen}

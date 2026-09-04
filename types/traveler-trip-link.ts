@@ -7,6 +7,12 @@ export interface TravelerTripLinkStoreProduct {
   quantity: number
   configured: boolean
   priceLabel: string | null
+  unitAmount: number | null
+  currency: string | null
+}
+
+export interface TravelerTripLinkProductsSummary {
+  products: TravelerTripLinkStoreProduct[]
 }
 
 export interface TravelerTripLinkHistoryItem {

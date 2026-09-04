@@ -1,5 +1,5 @@
 import type { TravelerTripLinkProductCode } from "@/lib/billing/traveler-trip-link-catalog"
-import type { TravelerTripLinkStoreSummary } from "@/types"
+import type { TravelerTripLinkProductsSummary, TravelerTripLinkStoreSummary } from "@/types"
 
 export const TRAVELER_TRIP_LINK_BALANCE_CHANGED_EVENT = "vuei:traveler-trip-link-balance-changed"
 
@@ -34,6 +34,35 @@ export async function getTravelerTripLinkStoreSummary() {
     return {
       data: null as TravelerTripLinkStoreSummary | null,
       error: error instanceof Error ? error.message : "Nao foi possivel consultar as viagens disponiveis.",
+    }
+  }
+}
+
+export async function getPublicTravelerTripLinkProducts() {
+  try {
+    const response = await fetch("/api/billing/traveler/trip-links/products", {
+      method: "GET",
+      cache: "no-store",
+    })
+    const body = await response.json().catch(() => null) as TravelerTripLinkProductsSummary | { error?: string } | null
+
+    if (!response.ok || !body || !("products" in body)) {
+      return {
+        data: null as TravelerTripLinkProductsSummary | null,
+        error: body && "error" in body && typeof body.error === "string"
+          ? body.error
+          : "Não foi possível carregar as opções de viagem.",
+      }
+    }
+
+    return {
+      data: body as TravelerTripLinkProductsSummary,
+      error: null as string | null,
+    }
+  } catch (error) {
+    return {
+      data: null as TravelerTripLinkProductsSummary | null,
+      error: error instanceof Error ? error.message : "Não foi possível carregar as opções de viagem.",
     }
   }
 }
